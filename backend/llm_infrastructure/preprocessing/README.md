@@ -655,7 +655,6 @@ preprocessing/
 
 - [프로젝트 README](../../../README.md): 전체 아키텍처
 - [실험 가이드](../../../experiments/README.md): 실험 실행 방법
-- [마이그레이션 가이드](../../../docs/MIGRATION_GUIDE.md): v1→v2 이동
 
 ## 📞 문의
 

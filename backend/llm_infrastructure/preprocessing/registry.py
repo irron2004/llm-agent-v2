@@ -1,4 +1,4 @@
-"""Registry for preprocessing methods."""
+"""전처리(preprocessing) 메서드 레지스트리 모듈."""
 
 from typing import Any, Type
 
@@ -6,19 +6,16 @@ from .base import BasePreprocessor
 
 
 class PreprocessorRegistry:
-    """Global registry for preprocessing methods.
+    """전처리 클래스를 이름/버전으로 등록·조회하는 전역 레지스트리.
 
-    This allows dynamic selection of preprocessing methods at runtime
-    based on configuration (e.g., from .env or preset files).
+    설정(.env, 프리셋 등)에 따라 런타임에 전처리 구현을 교체할 수 있게 해준다.
 
-    Example:
+    예시:
         ```python
-        # Register
         @register_preprocessor("method_a", version="v1")
         class PreprocessorA(BasePreprocessor):
             ...
 
-        # Use
         preprocessor = get_preprocessor("method_a", version="v1")
         results = preprocessor.preprocess(docs)
         ```
@@ -33,13 +30,7 @@ class PreprocessorRegistry:
         preprocessor_cls: Type[BasePreprocessor],
         version: str = "v1",
     ) -> None:
-        """Register a preprocessor class.
-
-        Args:
-            name: Method name (e.g., "standard", "domain_specific")
-            preprocessor_cls: Preprocessor class to register
-            version: Version string (default: "v1")
-        """
+        """전처리 클래스를 레지스트리에 등록한다."""
         if name not in cls._registry:
             cls._registry[name] = {}
 
@@ -57,19 +48,7 @@ class PreprocessorRegistry:
         version: str = "v1",
         **kwargs: Any,
     ) -> BasePreprocessor:
-        """Get a preprocessor instance.
-
-        Args:
-            name: Method name
-            version: Version string (default: "v1")
-            **kwargs: Additional config passed to preprocessor __init__
-
-        Returns:
-            Preprocessor instance
-
-        Raises:
-            ValueError: If method not found
-        """
+        """이름/버전으로 전처리 인스턴스를 생성해 반환한다."""
         if name not in cls._registry:
             available = ", ".join(cls._registry.keys())
             raise ValueError(
@@ -89,11 +68,7 @@ class PreprocessorRegistry:
 
     @classmethod
     def list_methods(cls) -> dict[str, list[str]]:
-        """List all registered methods and their versions.
-
-        Returns:
-            Dict mapping method names to list of versions
-        """
+        """등록된 전처리 이름과 버전 목록을 반환한다."""
         return {
             name: list(versions.keys())
             for name, versions in cls._registry.items()
@@ -101,20 +76,7 @@ class PreprocessorRegistry:
 
 
 def register_preprocessor(name: str, version: str = "v1"):
-    """Decorator to register a preprocessor class.
-
-    Args:
-        name: Method name
-        version: Version string (default: "v1")
-
-    Example:
-        ```python
-        @register_preprocessor("my_method", version="v1")
-        class MyPreprocessor(BasePreprocessor):
-            def preprocess(self, docs):
-                ...
-        ```
-    """
+    """전처리 클래스를 데코레이터로 등록하기 위한 헬퍼."""
     def decorator(cls: Type[BasePreprocessor]) -> Type[BasePreprocessor]:
         PreprocessorRegistry.register(name, cls, version=version)
         return cls
@@ -122,14 +84,5 @@ def register_preprocessor(name: str, version: str = "v1"):
 
 
 def get_preprocessor(name: str, version: str = "v1", **kwargs: Any) -> BasePreprocessor:
-    """Get a preprocessor instance (convenience function).
-
-    Args:
-        name: Method name
-        version: Version string
-        **kwargs: Config passed to preprocessor
-
-    Returns:
-        Preprocessor instance
-    """
+    """전처리 인스턴스를 조회하는 편의 함수."""
     return PreprocessorRegistry.get(name, version=version, **kwargs)

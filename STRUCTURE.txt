@@ -92,8 +92,7 @@
 │   └── runs/                                   ✅ Results directory
 │
 ├── data/                                        ✅ Data volumes
-├── docs/                                        ✅ Documentation
-│   └── MIGRATION_GUIDE.md                      ✅ Migration instructions
+├── docs/                                        ✅ Documentation (optional)
 │
 └── [Status Summary]
     ✅ COMPLETED: Core structure, Registry patterns, Config system, Experiment framework
