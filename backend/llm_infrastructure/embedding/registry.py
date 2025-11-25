@@ -82,8 +82,8 @@ class EmbedderRegistry:
             )
 
         embedder_cls = cls._registry[name][version]
-        # 호출 정보를 넘겨 어댑터가 기본 모델 등을 결정할 수 있게 한다.
-        kwargs.setdefault("method_name", name)
+        # 레지스트리에서 요청한 별칭(alias)을 그대로 전달하여 기본 모델 선택 등에 활용
+        kwargs.setdefault("alias", name)
         return embedder_cls(**kwargs)
 
     @classmethod

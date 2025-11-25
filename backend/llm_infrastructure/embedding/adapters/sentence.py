@@ -32,13 +32,13 @@ class SentenceEmbedderAdapter(BaseEmbedder):
         use_cache: bool = False,
         cache_dir: str = ".cache/embeddings",
         show_progress_bar: bool = False,
-        method_name: str | None = None,
+        alias: str | None = None,
         **kwargs: Any,
     ) -> None:
-        # method_name은 레지스트리에서 전달됨 (koe5, bge_base 등)
-        method = method_name or "sentence"
-        # method_name 기준으로 기본 모델 결정
-        resolved_model = model_name or DEFAULT_MODELS.get(method, "nlpai-lab/KoE5")
+        # alias는 레지스트리에서 전달되는 이름(koe5, bge_base 등)
+        requested = alias or "sentence"
+        # alias 기준으로 기본 모델 결정
+        resolved_model = model_name or DEFAULT_MODELS.get(requested, "nlpai-lab/KoE5")
 
         super().__init__(
             model_name=resolved_model,
@@ -47,7 +47,7 @@ class SentenceEmbedderAdapter(BaseEmbedder):
             use_cache=use_cache,
             cache_dir=cache_dir,
             show_progress_bar=show_progress_bar,
-            method_name=method,
+            alias=requested,
             **kwargs,
         )
         self.engine = create_embedder(
