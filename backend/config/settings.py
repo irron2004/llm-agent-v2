@@ -43,6 +43,18 @@ class RAGSettings(BaseSettings):
         default="v1",
         description="Embedding method version"
     )
+    embedding_device: str = Field(
+        default="cpu",
+        description="Embedding device (cpu/auto/cuda:N)"
+    )
+    embedding_use_cache: bool = Field(
+        default=False,
+        description="Use disk cache for embeddings"
+    )
+    embedding_cache_dir: str = Field(
+        default=".cache/embeddings",
+        description="Directory for embedding cache"
+    )
 
     # Retrieval
     retrieval_preset: str = Field(

@@ -1,7 +1,7 @@
 """Base classes for embedding."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Union
+from typing import Any, Iterable
 import numpy as np
 import numpy.typing as npt
 
@@ -61,6 +61,10 @@ class BaseEmbedder(ABC):
             Embedding matrix (2D numpy array: [n_texts, dimension])
         """
         raise NotImplementedError
+
+    def encode(self, texts: Iterable[str]) -> npt.NDArray[np.float32]:
+        """레지스트리 레벨에서의 배치 임베딩 편의 함수."""
+        return self.embed_batch(list(texts))
 
     def get_dimension(self) -> int:
         """Get embedding dimension.

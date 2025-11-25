@@ -1,6 +1,9 @@
-"""Text Embeddings Inference (TEI) client embedder."""
+"""Text Embeddings Inference (TEI) client embedder (adapter)."""
 
-from typing import Any
+from __future__ import annotations
+
+from typing import Any, List
+
 import numpy as np
 import numpy.typing as npt
 
@@ -10,23 +13,17 @@ from ..registry import register_embedder
 
 @register_embedder("tei", version="v1")
 class TEIEmbedder(BaseEmbedder):
-    """TEI (Text Embeddings Inference) server client.
-
-    Config options:
-        endpoint_url: str - TEI server URL (e.g., "http://tei:80")
-        timeout: int = 30 - Request timeout in seconds
-        normalize: bool = True - L2 normalize embeddings
-    """
+    """TEI (Text Embeddings Inference) 서버 클라이언트."""
 
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(**kwargs)
 
         try:
-            import httpx
-        except ImportError:
+            import httpx  # type: ignore
+        except ImportError as exc:
             raise ImportError(
-                "httpx not installed. Install with: pip install httpx"
-            )
+                "httpx가 필요합니다. `pip install httpx` 로 설치하세요."
+            ) from exc
 
         self.endpoint_url = self.config.get("endpoint_url")
         if not self.endpoint_url:
@@ -36,48 +33,55 @@ class TEIEmbedder(BaseEmbedder):
         self.normalize = self.config.get("normalize", True)
         self.client = httpx.Client(timeout=self.timeout)
 
-        # Infer dimension from server
-        self.dimension = self._get_dimension_from_server()
+        # Dimension은 지연 초기화
+        self._dimension: int | None = None
 
-    def _get_dimension_from_server(self) -> int:
-        """Get embedding dimension from TEI server."""
-        # Embed a short test string to get dimension
+    def _infer_dimension(self) -> int:
         test_embedding = self.embed("test")
-        return len(test_embedding)
+        return int(test_embedding.shape[-1])
 
     def embed(self, text: str) -> npt.NDArray[np.float32]:
-        """Embed a single text."""
         response = self.client.post(
             f"{self.endpoint_url}/embed",
             json={"inputs": text, "normalize": self.normalize},
         )
         response.raise_for_status()
         embedding = np.array(response.json(), dtype=np.float32)
+        if self._dimension is None:
+            self._dimension = embedding.shape[-1]
         return embedding
 
     def embed_batch(
         self,
-        texts: list[str],
+        texts: List[str],
         batch_size: int = 32,
     ) -> npt.NDArray[np.float32]:
-        """Embed multiple texts in batches."""
         all_embeddings = []
-
         for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
-
+            batch = texts[i : i + batch_size]
             response = self.client.post(
                 f"{self.endpoint_url}/embed",
                 json={"inputs": batch, "normalize": self.normalize},
             )
             response.raise_for_status()
-
             batch_embeddings = np.array(response.json(), dtype=np.float32)
             all_embeddings.append(batch_embeddings)
+        stacked = np.vstack(all_embeddings) if all_embeddings else np.zeros((0, 0), dtype=np.float32)
+        if self._dimension is None and stacked.size > 0:
+            self._dimension = stacked.shape[-1]
+        return stacked
 
-        return np.vstack(all_embeddings)
+    def get_dimension(self) -> int:
+        if self._dimension is None:
+            self._dimension = self._infer_dimension()
+        return self._dimension
 
     def __del__(self):
-        """Clean up HTTP client."""
         if hasattr(self, "client"):
-            self.client.close()
+            try:
+                self.client.close()
+            except Exception:
+                pass
+
+
+__all__ = ["TEIEmbedder"]
