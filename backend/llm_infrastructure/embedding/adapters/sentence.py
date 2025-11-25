@@ -10,7 +10,7 @@ from ..base import BaseEmbedder
 from ..registry import register_embedder
 from ..engines.sentence import create_embedder
 
-
+# 모델 추가할 때 여기서 추가.
 DEFAULT_MODELS = {
     # alias : hf_name
     "koe5": "nlpai-lab/KoE5",
