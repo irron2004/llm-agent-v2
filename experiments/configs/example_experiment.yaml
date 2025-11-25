@@ -1,0 +1,55 @@
+# Example Experiment Configuration
+#
+# This file defines the configuration for a RAG pipeline evaluation experiment.
+# Copy and modify this template for your own experiments.
+
+# Experiment metadata
+name: example_hybrid_rrf_experiment
+description: |
+  Baseline experiment using hybrid retrieval with RRF fusion.
+  Testing on PE Agent troubleshooting dataset.
+
+# Preprocessing configuration
+preprocess_method: standard
+preprocess_version: v1
+
+# Embedding configuration
+embedding_method: bge_base
+embedding_version: v1
+
+# Retrieval configuration
+retrieval:
+  method: hybrid
+  version: v1
+  top_k: 50
+  dense_weight: 0.7
+  sparse_weight: 0.3
+  rrf:
+    enabled: true
+    k: 60
+  similarity_threshold: 0.0
+
+# Multi-query expansion
+multi_query:
+  enabled: false
+  n: 4
+  include_original: true
+
+# Reranking
+reranker:
+  enabled: false
+  model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  top_k: 10
+
+# Final results
+final_top_k: 10
+
+# Evaluation settings
+evaluation:
+  metrics:
+    - hit@1
+    - hit@3
+    - hit@5
+    - hit@10
+    - mrr
+    - avg_latency_ms

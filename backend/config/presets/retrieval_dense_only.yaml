@@ -1,0 +1,46 @@
+# Dense-only Retrieval (Semantic Search Baseline)
+#
+# This preset uses only dense (vector/semantic) retrieval
+# without any sparse, multi-query, or reranking components.
+#
+# Best for: Baseline experiments, low-latency requirements
+
+name: dense_only
+description: "Dense retrieval only - simple and fast baseline"
+
+# Preprocessing
+preprocess_method: standard
+preprocess_version: v1
+
+# Embedding
+embedding_method: bge_base
+embedding_version: v1
+
+# Retrieval method
+retrieval:
+  method: dense
+  version: v1
+
+  top_k: 10
+
+  # Only dense search, no sparse component
+  dense_weight: 1.0
+  sparse_weight: 0.0
+
+  # No RRF needed for single method
+  rrf:
+    enabled: false
+
+  # Minimum cosine similarity
+  similarity_threshold: 0.7
+
+# Multi-query: disabled
+multi_query:
+  enabled: false
+
+# Reranking: disabled
+reranker:
+  enabled: false
+
+# Final results
+final_top_k: 10

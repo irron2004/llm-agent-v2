@@ -1,0 +1,55 @@
+# Full RAG Pipeline - All Features Enabled
+#
+# This preset uses:
+# - Domain-specific preprocessing (PE Agent)
+# - Hybrid retrieval (dense + sparse)
+# - Multi-query expansion
+# - Reranking with cross-encoder
+#
+# Best for: Maximum recall and precision, when latency is acceptable
+
+name: full_pipeline
+description: "Full RAG pipeline with all enhancements"
+
+# Preprocessing
+preprocess_method: pe_domain
+preprocess_version: v2  # Use enhanced version
+
+# Embedding
+embedding_method: bge_large  # Use larger model
+embedding_version: v1
+
+# Retrieval method
+retrieval:
+  method: hybrid
+  version: v1
+
+  # Fetch more candidates for reranking
+  top_k: 100
+
+  dense_weight: 0.7
+  sparse_weight: 0.3
+
+  rrf:
+    enabled: true
+    k: 60
+
+  similarity_threshold: 0.0
+
+# Multi-query expansion - ENABLED
+multi_query:
+  enabled: true
+  n: 4
+  include_original: true
+  # This generates 4 query variants + original = 5 queries total
+  # Each query retrieves top_k results
+  # Then fusion combines all results
+
+# Reranking - ENABLED
+reranker:
+  enabled: true
+  model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  top_k: 20  # Rerank top 20 from fusion
+
+# Final results
+final_top_k: 10

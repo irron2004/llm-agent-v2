@@ -1,0 +1,100 @@
+/home/hskim/work/llm-agent-refactor/
+├── README.md                                    ✅ Main documentation
+├── .gitignore                                   ✅ Git ignore rules
+│
+├── backend/                                     ✅ Backend application
+│   ├── __init__.py
+│   ├── pyproject.toml                          ✅ Python dependencies
+│   │
+│   ├── api/                                     ✅ API Layer (FastAPI)
+│   │   ├── __init__.py
+│   │   ├── main.py                             TODO: Migrate from services/pe_agent/api/app/main.py
+│   │   ├── routers/                            ✅ HTTP endpoints
+│   │   │   └── __init__.py
+│   │   └── middleware/                         ✅ Auth, logging, etc.
+│   │
+│   ├── services/                                ✅ Service Layer (NEW)
+│   │   ├── __init__.py
+│   │   ├── chat_service.py                     TODO: Create orchestration logic
+│   │   ├── search_service.py                   TODO: Create orchestration logic
+│   │   └── document_service.py                 TODO: Create orchestration logic
+│   │
+│   ├── domain/                                  ✅ Domain Layer (PE specific)
+│   │   ├── __init__.py
+│   │   └── pe_core/                            ✅ PE domain logic
+│   │       ├── __init__.py
+│   │       └── parsers/                        TODO: Migrate from services/pe_agent/pe_core/
+│   │
+│   ├── llm_infrastructure/                      ✅ Infrastructure Layer
+│   │   ├── __init__.py
+│   │   │
+│   │   ├── preprocessing/                       ✅ Preprocessing (Registry pattern)
+│   │   │   ├── __init__.py
+│   │   │   ├── base.py                         ✅ Base class
+│   │   │   ├── registry.py                     ✅ Registry implementation
+│   │   │   └── methods/                        ✅ Implementations
+│   │   │       ├── __init__.py
+│   │   │       ├── standard.py                 ✅ Standard preprocessing
+│   │   │       └── domain_specific.py          ✅ PE domain preprocessing
+│   │   │
+│   │   ├── embedding/                           ✅ Embedding (Registry pattern)
+│   │   │   ├── __init__.py
+│   │   │   ├── base.py                         ✅ Base embedder
+│   │   │   ├── registry.py                     ✅ Registry implementation
+│   │   │   └── embedders/                      ✅ Implementations
+│   │   │       ├── __init__.py
+│   │   │       ├── sentence_transformer.py     ✅ BGE embedders
+│   │   │       └── tei_client.py               ✅ TEI client
+│   │   │
+│   │   ├── retrieval/                           ✅ Retrieval (Registry pattern)
+│   │   │   ├── __init__.py
+│   │   │   ├── base.py                         ✅ Base retriever
+│   │   │   ├── registry.py                     ✅ Registry implementation
+│   │   │   ├── presets.py                      ✅ Preset definitions
+│   │   │   └── methods/                        ✅ Implementations
+│   │   │       └── __init__.py
+│   │   │
+│   │   └── llm/                                 ✅ LLM engines
+│   │       ├── __init__.py
+│   │       ├── engines/                        TODO: Migrate from core/llm/engines/
+│   │       └── prompts/                        TODO: Migrate from core/llm/prompts/
+│   │
+│   └── config/                                  ✅ Configuration
+│       ├── __init__.py
+│       ├── settings.py                         ✅ Pydantic Settings
+│       └── presets/                            ✅ YAML presets
+│           ├── retrieval_dense_only.yaml       ✅ Dense baseline
+│           ├── retrieval_hybrid_rrf_v1.yaml    ✅ Hybrid RRF
+│           └── retrieval_full_pipeline.yaml    ✅ Full pipeline
+│
+├── frontend/                                    ✅ Frontend application
+│   ├── package.json                            ✅ Frontend config
+│   ├── src/                                    TODO: Migrate from docker/ragflow-stack/web/src/
+│   │   ├── components/
+│   │   └── services/
+│   └── dist/                                   ✅ Build output
+│
+├── docker/                                      ✅ Docker stack
+│   ├── .env.example                            ✅ Environment template
+│   ├── docker-compose.yaml                     TODO: Migrate from docker/ragflow-stack/
+│   ├── docker-compose.with-ragflow.yml         TODO: Migrate
+│   ├── Dockerfile.backend                      TODO: Create
+│   ├── Dockerfile.frontend                     TODO: Create
+│   ├── Dockerfile.vllm                         TODO: Migrate
+│   └── Makefile                                TODO: Migrate
+│
+├── experiments/                                 ✅ Experiment framework
+│   ├── __init__.py
+│   ├── run.py                                  ✅ Experiment runner
+│   ├── README.md                               ✅ Experiment guide
+│   ├── configs/                                ✅ Experiment configs
+│   │   └── example_experiment.yaml             ✅ Example config
+│   └── runs/                                   ✅ Results directory
+│
+├── data/                                        ✅ Data volumes
+├── docs/                                        ✅ Documentation
+│   └── MIGRATION_GUIDE.md                      ✅ Migration instructions
+│
+└── [Status Summary]
+    ✅ COMPLETED: Core structure, Registry patterns, Config system, Experiment framework
+    TODO: Migrate existing code from llm-agent/ to refactor/

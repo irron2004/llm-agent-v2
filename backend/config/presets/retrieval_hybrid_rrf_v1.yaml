@@ -1,0 +1,54 @@
+# Hybrid Retrieval with RRF (Reciprocal Rank Fusion) - Version 1
+#
+# This preset combines dense (semantic) and sparse (keyword) retrieval
+# using Reciprocal Rank Fusion for score combination.
+#
+# Best for: Balanced precision and recall across diverse queries
+
+name: hybrid_rrf_v1
+description: "Hybrid retrieval with RRF fusion - balanced approach"
+
+# Preprocessing
+preprocess_method: standard
+preprocess_version: v1
+
+# Embedding
+embedding_method: bge_base
+embedding_version: v1
+
+# Retrieval method
+retrieval:
+  method: hybrid
+  version: v1
+
+  # How many results to fetch initially
+  top_k: 50
+
+  # Dense (vector) search weight
+  dense_weight: 0.7
+
+  # Sparse (BM25) search weight
+  sparse_weight: 0.3
+
+  # RRF parameter (higher = more conservative fusion)
+  rrf:
+    enabled: true
+    k: 60
+
+  # Similarity threshold (0.0 = no filtering)
+  similarity_threshold: 0.0
+
+# Multi-query expansion
+multi_query:
+  enabled: false
+  n: 4  # Generate 4 query variants
+  include_original: true
+
+# Reranking
+reranker:
+  enabled: false
+  model: cross-encoder/ms-marco-MiniLM-L-6-v2
+  top_k: 10
+
+# Final number of results to return
+final_top_k: 10
