@@ -17,7 +17,7 @@ _gpu_rr = 0
 
 
 def pick_device(strategy: str | None = None) -> str:
-    """GPU 자동 선택 전략 (컨테이너 안전)."""
+    """GPU 자동 선택 전략."""
     if strategy is None or strategy == "auto":
         if torch is not None and torch.cuda.is_available():
             try:

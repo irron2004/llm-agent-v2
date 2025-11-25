@@ -136,9 +136,9 @@ engines/
 @register_embedder("multilingual_e5", version="v1")
 @register_embedder("bge_base", version="v1")
 class SentenceEmbedderAdapter(BaseEmbedder):
-    def __init__(self, model_name=None, device=None, method_name=None, ...):
-        # method_name으로 기본 모델 결정
-        resolved_model = model_name or DEFAULT_MODELS.get(method_name)
+    def __init__(self, model_name=None, device=None, alias=None, ...):
+        # alias(레지스트리 키, 예: bge_base)로 기본 모델 결정
+        resolved_model = model_name or DEFAULT_MODELS.get(alias)
         self.engine = create_embedder("sentence", model_name=resolved_model, ...)
 ```
 

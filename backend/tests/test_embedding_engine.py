@@ -121,6 +121,35 @@ def test_pick_device_cpu_when_no_cuda():
     assert device == "cpu"
 
 
+def test_pick_device_round_robin(monkeypatch):
+    # fake torch with 2 cuda devices
+    class _Cuda:
+        @staticmethod
+        def is_available():
+            return True
+
+        @staticmethod
+        def device_count():
+            return 2
+
+        @staticmethod
+        def mem_get_info(idx):
+            return (1024, 0)
+
+    fake_torch = type(sys)("torch")
+    fake_torch.cuda = _Cuda()
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    # reload pick_device with fake torch
+    from importlib import reload
+    from backend.llm_infrastructure.embedding.engines import sentence
+    reload(sentence.utils)
+    from backend.llm_infrastructure.embedding.engines.sentence.utils import pick_device as pick_device_rr
+
+    d1 = pick_device_rr("round-robin")
+    d2 = pick_device_rr("round-robin")
+    assert {d1, d2} == {"cuda:0", "cuda:1"}
+
+
 def test_sentence_engine_encode_and_cache(tmp_path):
     cache_dir = tmp_path / "emb_cache"
     embedder = create_embedder(
@@ -158,3 +187,54 @@ def test_tei_adapter_mocked():
     assert vec.shape == (2,)
     vecs = emb.embed_batch(["x", "y"])
     assert vecs.shape == (2, 2)
+
+
+def test_alias_mapping_and_override():
+    # default alias → default model
+    emb_default = get_embedder("koe5", version="v1", device="cpu")
+    assert emb_default.config["model_name"] == "nlpai-lab/KoE5"
+
+    # override model_name
+    emb_custom = get_embedder(
+        "bge_base",
+        version="v1",
+        device="cpu",
+        model_name="custom/model",
+    )
+    assert emb_custom.config["model_name"] == "custom/model"
+
+    # unknown alias → ValueError (설정 오류 조기 발견)
+    with pytest.raises(ValueError, match="Unknown embedding method"):
+        get_embedder("unknown_alias", version="v1", device="cpu")
+
+
+def test_encode_convenience():
+    emb = get_embedder("bge_base", version="v1", device="cpu")
+    vecs = emb.encode(["a", "b"])
+    assert vecs.shape == (2, 2)
+
+
+def test_tei_errors(monkeypatch):
+    # missing endpoint_url
+    with pytest.raises(ValueError):
+        get_embedder("tei", version="v1")
+
+    # simulate HTTP error
+    class _ErrResponse:
+        def raise_for_status(self):
+            raise RuntimeError("http error")
+
+        def json(self):
+            return []
+
+    class _ErrClient(_FakeHTTPXClient):
+        def post(self, *_args, **_kwargs):
+            return _ErrResponse()
+
+    fake_httpx = type(sys)("httpx")
+    fake_httpx.Client = _ErrClient
+    monkeypatch.setitem(sys.modules, "httpx", fake_httpx)
+
+    emb = get_embedder("tei", version="v1", endpoint_url="http://fake")
+    with pytest.raises(RuntimeError):
+        emb.embed("x")

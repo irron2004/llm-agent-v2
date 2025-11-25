@@ -12,6 +12,7 @@ from ..engines.sentence import create_embedder
 
 
 DEFAULT_MODELS = {
+    # alias : hf_name
     "koe5": "nlpai-lab/KoE5",
     "multilingual_e5": "intfloat/multilingual-e5-large",
     "bge_base": "BAAI/bge-base-en-v1.5",
@@ -36,9 +37,11 @@ class SentenceEmbedderAdapter(BaseEmbedder):
         **kwargs: Any,
     ) -> None:
         # alias는 레지스트리에서 전달되는 이름(koe5, bge_base 등)
-        requested = alias or "sentence"
-        # alias 기준으로 기본 모델 결정
-        resolved_model = model_name or DEFAULT_MODELS.get(requested, "nlpai-lab/KoE5")
+        requested = alias
+        # alias가 없으면 기본값(koe5)로 사용, model_name이 우선
+        resolved_model = model_name or DEFAULT_MODELS.get(
+            requested, DEFAULT_MODELS["koe5"]
+        )
 
         super().__init__(
             model_name=resolved_model,

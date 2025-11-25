@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import numpy as np
+
 from backend.llm_infrastructure.preprocessing.normalize_engine import (
     build_normalizer,
     sanitize_variant_map,
 )
+from backend.llm_infrastructure.embedding.registry import get_embedder
+from backend.config.settings import rag_settings
 
 
 def main() -> None:
@@ -27,6 +31,24 @@ def main() -> None:
         print(f"\n[Original] {text}")
         for lvl in levels:
             print(f"  [{lvl}] {normalizers[lvl](text)}")
+
+    # --- Embedding demo (registry + alias 기반) ---
+    print("\n=== Embedding Demo ===")
+    # 레지스트리 alias: bge_base/multilingual_e5/koe5
+    embedder = get_embedder(
+        rag_settings.embedding_method,
+        version=rag_settings.embedding_version,
+        device=rag_settings.embedding_device,
+        use_cache=rag_settings.embedding_use_cache,
+        cache_dir=rag_settings.embedding_cache_dir,
+    )
+
+    text = "pm 2-1 helium leak"
+    vec = embedder.embed(text)
+    vecs = embedder.embed_batch(["hello world", "embedding test"])
+
+    print(f"Embedding (single) shape: {vec.shape}, norm={float(np.linalg.norm(vec)):.4f}")
+    print(f"Embedding (batch) shape: {vecs.shape}")
 
 
 if __name__ == "__main__":
