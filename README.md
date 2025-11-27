@@ -109,6 +109,7 @@ class MyPreprocessor(BasePreprocessor):
 ## 문서
 - 전처리 가이드: `backend/llm_infrastructure/preprocessing/README.md`
 - 실험 가이드: `experiments/README.md`
+- 리팩토링 배경/의미: `docs/REFACTORING_RATIONALE.md`
 
 ## 기여/문의
 - 레지스트리에 새 컴포넌트를 추가하고 예시 설정을 함께 제공해주세요.

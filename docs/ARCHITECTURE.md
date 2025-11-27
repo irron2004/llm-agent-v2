@@ -3,6 +3,8 @@
 이 문서는 `llm-agent-v2` 프로젝트의 핵심 아키텍처 패턴을 설명합니다.
 preprocessing, embedding, retrieval 모두 동일한 **엔진-어댑터-레지스트리** 패턴을 사용합니다.
 
+> 리팩토링 배경/의미는 `docs/REFACTORING_RATIONALE.md`를 참고하세요.
+
 ---
 
 ## 0. 용어 정리

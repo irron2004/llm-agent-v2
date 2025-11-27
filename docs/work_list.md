@@ -6,3 +6,4 @@
 | ---------- | ---- | ---------------------------------------- | ------ | ---- | ---- |
 | 2025-11-25 | BE   | EmbeddingService lazy init 문서화        | hskim  | done | [상세](work_list/2025-11-25_embedding_service_lazy_init.md) |
 | 2025-11-25 | BE   | Embedding 구조/테스트 정리 (TEI/OpenAI 추후) | hskim  | done | [상세](work_list/2025-11-25_embedding_progress.md) |
+| 2025-11-25 | Plan | 다음 작업: DB 저장·LLM 응답·FE 화면 구현 준비 | hskim  | todo | [상세](work_list/2025-11-25_next_steps_db_llm_fe.md) |
