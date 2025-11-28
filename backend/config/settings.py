@@ -61,6 +61,42 @@ class RAGSettings(BaseSettings):
         default="hybrid_rrf_v1",
         description="Retrieval preset name"
     )
+    retrieval_method: str = Field(
+        default="hybrid",
+        description="Retrieval method (dense/bm25/hybrid)"
+    )
+    retrieval_version: str = Field(
+        default="v1",
+        description="Retrieval method version"
+    )
+    retrieval_top_k: int = Field(
+        default=10,
+        description="Number of documents to retrieve"
+    )
+
+    # Hybrid retrieval
+    hybrid_dense_weight: float = Field(
+        default=0.7,
+        description="Dense retrieval weight for hybrid"
+    )
+    hybrid_sparse_weight: float = Field(
+        default=0.3,
+        description="Sparse retrieval weight for hybrid"
+    )
+    hybrid_rrf_k: int = Field(
+        default=60,
+        description="RRF k parameter"
+    )
+
+    # Vector store
+    vector_store_dir: str = Field(
+        default="data/vector_stores",
+        description="Directory for persisted vector stores"
+    )
+    vector_normalize: bool = Field(
+        default=True,
+        description="L2 normalize vectors for cosine similarity"
+    )
 
     # RAGFlow integration
     ragflow_enabled: bool = Field(

@@ -55,5 +55,9 @@ class EmbeddingService:
         """임베딩 차원."""
         return self._get_embedder().get_dimension()
 
+    def get_raw_embedder(self):
+        """레지스트리에서 생성된 실제 임베더 인스턴스를 반환한다."""
+        return self._get_embedder()
+
 
 __all__ = ["EmbeddingService"]

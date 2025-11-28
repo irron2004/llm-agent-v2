@@ -1,0 +1,19 @@
+# Simple hybrid retrieval preset (weights + RRF)
+name: hybrid_rrf_simple
+description: "Hybrid retrieval (dense + BM25) with RRF fusion"
+
+retrieval:
+  method: hybrid
+  version: v1
+  top_k: 10
+
+dense:
+  similarity_threshold: 0.0
+
+sparse:
+  top_k: 10
+
+hybrid:
+  dense_weight: 0.7
+  sparse_weight: 0.3
+  rrf_k: 60
