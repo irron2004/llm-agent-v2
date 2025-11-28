@@ -55,14 +55,18 @@ class RAGService:
         self.corpus = corpus
         self.retrieval_top_k = retrieval_top_k or rag_settings.retrieval_top_k
 
-        # Preprocessor
-        if preprocessor is None:
+        # Preprocessor: prioritize corpus preprocessor, then explicit param, then settings
+        if preprocessor is not None:
+            self.preprocessor = preprocessor
+        elif corpus.preprocessor is not None:
+            # Use corpus preprocessor for consistency
+            self.preprocessor = corpus.preprocessor
+        else:
+            # Fallback to settings
             self.preprocessor = get_preprocessor(
                 rag_settings.preprocess_method,
                 version=rag_settings.preprocess_version,
             )
-        else:
-            self.preprocessor = preprocessor
 
         # Search service
         if search_service is None:

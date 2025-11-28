@@ -33,6 +33,7 @@ class IndexedCorpus:
     bm25_index: BM25Index | None
     documents: list[StoredDocument]
     embedder: Any | None = None  # Embedder used for indexing (for search consistency)
+    preprocessor: BasePreprocessor | None = None  # Preprocessor used for indexing
 
 
 class DocumentIndexService:
@@ -61,6 +62,47 @@ class DocumentIndexService:
         if hasattr(self.embedder, "embed_texts"):
             return self.embedder.embed_texts(list(texts))
         raise TypeError("embedder must implement embed_batch() or embed_texts()")
+
+    @staticmethod
+    def _save_index_metadata(
+        persist_dir: Path,
+        embedder: Any,
+        preprocessor: Optional[BasePreprocessor],
+    ) -> None:
+        """Save indexing metadata for reload consistency."""
+        import json
+
+        metadata = {
+            "embedder": {
+                "type": type(embedder).__name__,
+                "module": type(embedder).__module__,
+            },
+            "preprocessor": None,
+        }
+
+        # Try to extract preprocessor info
+        if preprocessor is not None:
+            metadata["preprocessor"] = {
+                "type": type(preprocessor).__name__,
+                "module": type(preprocessor).__module__,
+            }
+
+        metadata_path = persist_dir / "index_metadata.json"
+        metadata_path.write_text(
+            json.dumps(metadata, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+    @staticmethod
+    def _load_index_metadata(persist_dir: Path) -> dict | None:
+        """Load indexing metadata if exists."""
+        import json
+
+        metadata_path = persist_dir / "index_metadata.json"
+        if not metadata_path.exists():
+            return None
+
+        return json.loads(metadata_path.read_text(encoding="utf-8"))
 
     def index(
         self,
@@ -97,13 +139,22 @@ class DocumentIndexService:
         bm25_index = BM25Index(stored_docs, tokenizer=self.bm25_tokenizer) if build_sparse else None
 
         if persist_dir:
-            vector_store.save(persist_dir)
+            persist_path = Path(persist_dir)
+            vector_store.save(persist_path)
+
+            # Save index metadata for reload consistency
+            self._save_index_metadata(
+                persist_path,
+                embedder=self.embedder,
+                preprocessor=self.preprocessor,
+            )
 
         return IndexedCorpus(
             vector_store=vector_store,
             bm25_index=bm25_index,
             documents=stored_docs,
             embedder=self.embedder,  # Store embedder for search consistency
+            preprocessor=self.preprocessor,  # Store preprocessor for query consistency
         )
 
     @staticmethod
@@ -112,15 +163,68 @@ class DocumentIndexService:
         *,
         build_sparse: bool = True,
         bm25_tokenizer=None,
+        embedder: Any | None = None,
+        preprocessor: BasePreprocessor | None = None,
+        validate_metadata: bool = True,
     ) -> IndexedCorpus:
-        """Reload persisted vector store and rebuild sparse index if needed."""
-        vector_store = VectorStore.load(path)
+        """Reload persisted vector store and rebuild sparse index if needed.
+
+        Args:
+            path: Path to persisted index
+            build_sparse: Whether to rebuild BM25 index
+            bm25_tokenizer: Tokenizer for BM25
+            embedder: Embedder to use (CRITICAL: must match indexing embedder)
+            validate_metadata: Whether to validate against saved metadata
+
+        Returns:
+            IndexedCorpus with loaded data
+
+        Raises:
+            ValueError: If metadata validation fails and embedder not provided
+
+        Warning:
+            If embedder is not provided or doesn't match saved metadata,
+            search results will be incorrect due to dimension/model mismatch.
+        """
+        import warnings
+
+        persist_path = Path(path)
+        vector_store = VectorStore.load(persist_path)
         docs = list(vector_store.iter_documents())
+
+        # Load and validate metadata
+        metadata = DocumentIndexService._load_index_metadata(persist_path)
+        if validate_metadata and metadata:
+            embedder_info = metadata.get("embedder", {})
+            if embedder is None:
+                warnings.warn(
+                    f"No embedder provided for reloaded index. "
+                    f"Original index used: {embedder_info.get('type', 'unknown')}. "
+                    f"You MUST provide the same embedder to SearchService/RAGService "
+                    f"or search results will be incorrect.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            elif embedder_info:
+                # Basic type check
+                provided_type = type(embedder).__name__
+                expected_type = embedder_info.get("type")
+                if provided_type != expected_type:
+                    warnings.warn(
+                        f"Embedder type mismatch: provided '{provided_type}' "
+                        f"but index was created with '{expected_type}'. "
+                        f"This may cause dimension mismatch or incorrect search.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+
         bm25_index = BM25Index(docs, tokenizer=bm25_tokenizer) if build_sparse else None
         return IndexedCorpus(
             vector_store=vector_store,
             bm25_index=bm25_index,
             documents=docs,
+            embedder=embedder,  # Pass through for consistency
+            preprocessor=preprocessor,  # Pass through for query preprocessing
         )
 
     @classmethod
