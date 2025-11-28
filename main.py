@@ -10,6 +10,8 @@ from backend.llm_infrastructure.preprocessing.normalize_engine import (
 )
 from backend.config.settings import rag_settings
 from backend.services.embedding_service import EmbeddingService
+from backend.services.document_service import DocumentIndexService, SourceDocument
+from backend.services.search_service import SearchService
 
 
 def main() -> None:
@@ -49,6 +51,27 @@ def main() -> None:
 
     print(f"Embedding (single) shape: {vec.shape}, norm={float(np.linalg.norm(vec)):.4f}")
     print(f"Embedding (batch) shape: {vecs.shape}")
+
+    # --- Indexing + Hybrid Search demo (code-only, no API) ---
+    print("\n=== Index + Search Demo ===")
+    corpus_docs = [
+        SourceDocument(doc_id="d1", text="apple wafer contamination alarm"),
+        SourceDocument(doc_id="d2", text="banana vacuum leak in pm chamber"),
+        SourceDocument(doc_id="d3", text="apple sensor drift warning"),
+    ]
+
+    # 설정 기반 전처리/임베더로 인덱스 생성
+    indexer = DocumentIndexService.from_settings()
+    corpus = indexer.index(
+        corpus_docs,
+        preprocess=True,
+        persist_dir="data/vector_stores/demo",
+    )
+
+    search = SearchService(corpus)
+    results = search.search("apple alarm issue", top_k=3)
+    for r in results:
+        print(f"[{r.score:.3f}] {r.doc_id}: {r.content}")
 
 
 if __name__ == "__main__":
