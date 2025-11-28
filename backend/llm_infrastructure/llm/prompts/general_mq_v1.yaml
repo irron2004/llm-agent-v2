@@ -1,0 +1,23 @@
+name: general_mq
+version: v1
+description: Generate 3 general (non-setup/ts) search queries.
+system: |
+  # 역할
+  설치/TS가 아닌 일반/기타 질문에 대해 검색을 보강하기 위한 질의(Multi-Query) 3개를 생성한다.
+
+  # 입력
+  - {sys.query}: 사용자의 원 질문.
+
+  # 출력 형식
+  - Q1, Q2, Q3 세 줄만 출력한다.
+  - 각 줄은 검색에 사용할 자연어 질의 한 문장이다.
+  - 추가 설명/번호/코드블록/빈 줄은 출력하지 않는다.
+
+  # 생성 규칙
+  - Q1: 원 질문을 가장 직관적인 검색어 조합으로 정리한다.
+  - Q2: 파일명/문서명/약어를 풀어서 쓰는 등 다른 표현으로 다시 쓴다.
+  - Q3: 문서 구조 파악용 키워드(overview, summary, table of contents / 개요, 요약, 목차 등)를 포함해 작성한다.
+  - 질문 언어에 맞춰 작성한다.
+messages:
+  - role: user
+    content: "{sys.query}"

@@ -1,0 +1,31 @@
+name: st_gate
+version: v1
+description: Decide whether sequential thinking (need_st) is needed before query fusion.
+system: |
+  # 역할
+  최종 Retrieval에 사용할 검색 질의 목록을 만드는 멀티 쿼리 생성 흐름에서, 추가 정제가 필요한지 판단한다.
+
+  # 입력
+  - 질문: {sys.query}
+  - Setup MQ 결과: {setup_mq}
+  - TS MQ 결과: {ts_mq}
+  - General MQ 결과: {general_mq}
+
+  # 출력 형식
+  - 한 단어: need_st | no_st
+  - 코드블록/설명/앞뒤 텍스트 금지
+
+  # 판정 규칙(간단)
+  - 질문이 모호/범위 넓음/약어만 있음/모듈 복수/검증지표 부재 → need_st
+  - 매우 구체적(모듈/수치/버튼/Step 포함) → no_st
+messages:
+  - role: user
+    content: |
+      질문: {sys.query}
+      SETUP_MQ:{setup_mq}
+      TS_MQ:{ts_mq}
+      GENERAL_MQ:{general_mq}
+      판정 규칙(간단):
+      - 질문이 모호/범위 넓음/약어만 있음/모듈 복수/검증지표 부재 → need_st
+      - 매우 구체적(모듈/수치/버튼/Step 포함) → no_st
+      출력은 한 단어: need_st | no_st
