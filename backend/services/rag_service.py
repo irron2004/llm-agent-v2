@@ -104,10 +104,13 @@ class RAGService:
         return processed[0] if processed else query
 
     def _build_context(self, results: list[RetrievalResult]) -> str:
-        """Build context string from retrieval results."""
+        """Build context string from retrieval results with doc_id and raw text."""
         context_parts = []
         for i, result in enumerate(results, 1):
-            context_parts.append(f"[{i}] {result.content}")
+            # Use raw_text if available (original), otherwise fallback to content (preprocessed)
+            text = result.raw_text if hasattr(result, 'raw_text') and result.raw_text else result.content
+            # Include doc_id for citation/reference
+            context_parts.append(f"[{i}] (doc_id: {result.doc_id}) {text}")
         return "\n\n".join(context_parts)
 
     def _build_system_prompt(self, context: str, question: str) -> str:

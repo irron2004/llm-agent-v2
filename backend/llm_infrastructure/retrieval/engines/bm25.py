@@ -54,6 +54,7 @@ class BM25Index:
                     content=doc.content,
                     score=float(score),
                     metadata=doc.metadata,
+                    raw_text=doc.raw_text,
                 )
             )
         return results

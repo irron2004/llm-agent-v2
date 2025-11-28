@@ -23,8 +23,9 @@ class StoredDocument:
     """Document payload saved alongside embeddings."""
 
     doc_id: str
-    content: str
+    content: str  # Preprocessed text for embedding/search
     metadata: dict[str, Any] | None = None
+    raw_text: str | None = None  # Original text for display/LLM context
 
 
 class VectorStore:
@@ -91,6 +92,7 @@ class VectorStore:
                     content=doc.content,
                     score=float(scores[idx]),
                     metadata=doc.metadata,
+                    raw_text=doc.raw_text,
                 )
             )
         return results

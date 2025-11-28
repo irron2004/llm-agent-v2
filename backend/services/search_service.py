@@ -32,13 +32,19 @@ class SearchService:
         self.sparse_weight = sparse_weight if sparse_weight is not None else rag_settings.hybrid_sparse_weight
         self.rrf_k = rrf_k if rrf_k is not None else rag_settings.hybrid_rrf_k
 
-        self._embedding_service = EmbeddingService(
-            method=rag_settings.embedding_method,
-            version=rag_settings.embedding_version,
-            device=rag_settings.embedding_device,
-            use_cache=rag_settings.embedding_use_cache,
-            cache_dir=rag_settings.embedding_cache_dir,
-        )
+        # Use corpus embedder if available (ensures consistency), otherwise create from settings
+        if corpus.embedder is not None:
+            self._embedder = corpus.embedder
+        else:
+            self._embedding_service = EmbeddingService(
+                method=rag_settings.embedding_method,
+                version=rag_settings.embedding_version,
+                device=rag_settings.embedding_device,
+                use_cache=rag_settings.embedding_use_cache,
+                cache_dir=rag_settings.embedding_cache_dir,
+            )
+            self._embedder = self._embedding_service.get_raw_embedder()
+
         self.retriever = self._build_retriever()
 
     def _build_dense(self, **kwargs: Any):
@@ -48,7 +54,7 @@ class SearchService:
             "dense",
             version=self.version,
             vector_store=self.corpus.vector_store,
-            embedder=self._embedding_service.get_raw_embedder(),
+            embedder=self._embedder,
             top_k=kwargs.get("top_k", self.top_k),
             similarity_threshold=kwargs.get("similarity_threshold", 0.0),
         )

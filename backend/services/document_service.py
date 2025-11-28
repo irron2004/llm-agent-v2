@@ -32,6 +32,7 @@ class IndexedCorpus:
     vector_store: VectorStore
     bm25_index: BM25Index | None
     documents: list[StoredDocument]
+    embedder: Any | None = None  # Embedder used for indexing (for search consistency)
 
 
 class DocumentIndexService:
@@ -86,8 +87,9 @@ class DocumentIndexService:
         for doc, text, emb in zip(documents, processed_texts, embeddings):
             stored = StoredDocument(
                 doc_id=doc.doc_id,
-                content=text,
+                content=text,  # Preprocessed text for search
                 metadata=doc.metadata,
+                raw_text=doc.text,  # Original text for display/LLM
             )
             vector_store.add(stored, emb)
             stored_docs.append(stored)
@@ -101,6 +103,7 @@ class DocumentIndexService:
             vector_store=vector_store,
             bm25_index=bm25_index,
             documents=stored_docs,
+            embedder=self.embedder,  # Store embedder for search consistency
         )
 
     @staticmethod

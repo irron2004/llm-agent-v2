@@ -9,9 +9,10 @@ from typing import Any
 class RetrievalResult:
     """Single retrieval result."""
     doc_id: str
-    content: str
+    content: str  # Preprocessed text (for matching)
     score: float
     metadata: dict[str, Any] | None = None
+    raw_text: str | None = None  # Original text (for display/LLM context)
 
     def __repr__(self) -> str:
         return f"RetrievalResult(doc_id={self.doc_id}, score={self.score:.4f})"
