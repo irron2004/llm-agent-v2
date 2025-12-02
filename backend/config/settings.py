@@ -117,6 +117,94 @@ class RAGSettings(BaseSettings):
     )
 
 
+class DeepDocSettings(BaseSettings):
+    """DeepDoc vision/OCR/TSR settings."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="DEEPDOC_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+    )
+
+    preferred_backend: str = Field(
+        default="RAGFlowPdfParser",
+        description="DeepDoc backend: RAGFlowPdfParser, PdfParser, PlainParser",
+    )
+    model_root: str = Field(
+        default="data/deepdoc_models",
+        description="Local cache directory for DeepDoc vision models",
+    )
+    hf_endpoint: str = Field(
+        default="",
+        description="Custom HuggingFace endpoint (e.g., mirror) for model downloads",
+    )
+    ocr_model: str = Field(
+        default="infiniflow/deepdoc-ocr",
+        description="OCR model repo id on HuggingFace",
+    )
+    layout_model: str = Field(
+        default="infiniflow/deepdoc-layout",
+        description="Layout recognition model repo id on HuggingFace",
+    )
+    tsr_model: str = Field(
+        default="infiniflow/deepdoc-tsr",
+        description="Table structure recognition model repo id on HuggingFace",
+    )
+    allow_download: bool = Field(
+        default=True,
+        description="Permit auto-download of models when missing",
+    )
+    device: str = Field(
+        default="cpu",
+        description="Preferred device for DeepDoc (cpu/cuda)",
+    )
+
+
+class DeepSeekSettings(BaseSettings):
+    """DeepSeek VLM parsing settings."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="DEEPSEEK_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+    )
+
+    model_root: str = Field(
+        default="data/deepseek_models",
+        description="Local cache directory for DeepSeek models (optional)",
+    )
+    model_id: str = Field(
+        default="deepseek-ai/deepseek-vl2",
+        description="HuggingFace repo id for the DeepSeek VLM",
+    )
+    prompt: str = Field(
+        default="Extract all text on this page as Markdown. Preserve tables and formulas. Do not summarize.",
+        description="Default prompt for VLM parsing",
+    )
+    max_new_tokens: int = Field(
+        default=2048,
+        description="Max new tokens when calling the VLM",
+    )
+    temperature: float = Field(
+        default=0.0,
+        description="Temperature for VLM generation",
+    )
+    hf_endpoint: str = Field(
+        default="",
+        description="Custom HuggingFace endpoint for model downloads",
+    )
+    allow_download: bool = Field(
+        default=True,
+        description="Permit auto-download of models when missing",
+    )
+    device: str = Field(
+        default="cpu",
+        description="Preferred device for DeepSeek VLM (cpu/cuda)",
+    )
+
+
 class VLLMSettings(BaseSettings):
     """vLLM inference settings."""
 
@@ -214,6 +302,8 @@ rag_settings = RAGSettings()
 vllm_settings = VLLMSettings()
 tei_settings = TEISettings()
 api_settings = APISettings()
+deepdoc_settings = DeepDocSettings()
+deepseek_settings = DeepSeekSettings()
 
 
 __all__ = [
@@ -225,4 +315,8 @@ __all__ = [
     "vllm_settings",
     "tei_settings",
     "api_settings",
+    "DeepDocSettings",
+    "deepdoc_settings",
+    "DeepSeekSettings",
+    "deepseek_settings",
 ]
