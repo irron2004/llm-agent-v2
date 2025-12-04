@@ -10,10 +10,13 @@ from typing import Any, BinaryIO, Dict, List, Optional, Sequence
 
 
 class DeepDocBackend(str, Enum):
-    """Available DeepDoc PDF parser backends."""
+    """Available DeepDoc PDF parser backends.
+
+    RAGFLOW: 전체 기능 (OCR, 레이아웃 분석, 테이블 인식)
+    PLAIN: 텍스트 추출만 (빠름, 모델 불필요)
+    """
 
     RAGFLOW = "RAGFlowPdfParser"
-    PDF = "PdfParser"
     PLAIN = "PlainParser"
 
     @classmethod

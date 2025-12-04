@@ -1,9 +1,11 @@
-"""Engine that wraps DeepDoc/RAGFlow PDF parsing with graceful fallbacks."""
+"""DeepDoc PDF 파싱 엔진.
+
+프로젝트 내 deepdoc 패키지의 PDF 파서를 사용하여 통일된 인터페이스를 제공합니다.
+OCR, 레이아웃 분석, 테이블 구조 인식 등의 기능을 지원합니다.
+"""
 
 from __future__ import annotations
 
-import importlib
-import io
 import logging
 import os
 import tempfile
@@ -20,33 +22,48 @@ from ..base import (
     ParsedTable,
     PdfParseOptions,
 )
-from .pdf_plain_engine import PlainPdfEngine
 
 logger = logging.getLogger(__name__)
 
 
+def _get_backend_classes() -> dict[DeepDocBackend, type]:
+    """백엔드 클래스 매핑을 반환합니다 (lazy import).
+
+    Returns:
+        DeepDocBackend enum을 클래스로 매핑하는 dict
+    """
+    from ...deepdoc.parser.pdf_parser import RAGFlowPdfParser, PlainParser
+
+    return {
+        DeepDocBackend.RAGFLOW: RAGFlowPdfParser,
+        DeepDocBackend.PLAIN: PlainParser,
+    }
+
+
 class DeepDocPdfEngine:
+    """DeepDoc 기반 PDF 파싱 엔진.
+
+    프로젝트 내 deepdoc 패키지를 사용하여 PDF 문서를 파싱합니다.
+    OCR, 레이아웃 분석, 테이블/이미지 추출 기능을 제공합니다.
+
+    Attributes:
+        content_type: 처리 가능한 MIME 타입
+    """
+
     content_type: str = "application/pdf"
 
-    # 설치 방식에 따라 다를 수 있는 모듈 경로
-    MODULE_CANDIDATES = [
-        "deepdoc.parser.pdf_parser",
-        "ragflow.deepdoc.parser.pdf_parser",
-    ]
+    def __init__(self) -> None:
+        """엔진 인스턴스를 초기화합니다."""
+        pass
 
-    def __init__(self, plain_engine: Optional[PlainPdfEngine] = None) -> None:
-        self.plain_engine = plain_engine or PlainPdfEngine()
-
-    def _load_backend_class(
-        self, preferred: Optional[DeepDocBackend] = None
-    ) -> Optional[type]:
-        """Attempt to locate a DeepDoc-compatible parser class.
+    def _get_backend_class(self, preferred: Optional[DeepDocBackend] = None) -> Optional[type]:
+        """지정된 DeepDoc 백엔드 클래스를 반환합니다.
 
         Args:
-            preferred: Explicitly requested backend. Must be specified.
+            preferred: 사용할 백엔드 (DeepDocBackend enum). 필수 지정.
 
         Returns:
-            The backend class if found, None otherwise.
+            백엔드 클래스. 찾지 못하면 None.
         """
         if not preferred:
             logger.error(
@@ -55,25 +72,26 @@ class DeepDocPdfEngine:
             )
             return None
 
-        target_class = preferred.value
-        for module_name in self.MODULE_CANDIDATES:
-            try:
-                module = importlib.import_module(module_name)
-            except Exception:
-                continue
-            backend_cls = getattr(module, target_class, None)
-            if backend_cls:
-                logger.info(f"Using DeepDoc backend: {target_class}")
-                return backend_cls
+        backend_cls = _get_backend_classes().get(preferred)
+        if backend_cls:
+            logger.info(f"Using DeepDoc backend: {preferred.value}")
+            return backend_cls
 
-        # 원하는 백엔드를 찾지 못함
         logger.warning(
-            f"Backend '{target_class}' not found. "
+            f"Backend '{preferred.value}' not found. "
             f"Available options: {DeepDocBackend.choices()}"
         )
         return None
 
     def _configure_hf_env(self, opts: PdfParseOptions) -> None:
+        """HuggingFace 관련 환경변수를 설정합니다.
+
+        모델 다운로드 및 캐시 경로를 위한 환경변수를 구성합니다.
+        HF_ENDPOINT, HF_HOME, HUGGINGFACE_HUB_CACHE, TRANSFORMERS_CACHE를 설정합니다.
+
+        Args:
+            opts: HF 엔드포인트 및 모델 루트 경로를 포함한 파싱 옵션
+        """
         if opts.hf_endpoint:
             os.environ.setdefault("HF_ENDPOINT", opts.hf_endpoint)
         if opts.model_root:
@@ -84,13 +102,25 @@ class DeepDocPdfEngine:
             Path(root).mkdir(parents=True, exist_ok=True)
 
     def _maybe_download_models(self, opts: PdfParseOptions) -> None:
+        """필요한 모델을 HuggingFace에서 다운로드합니다.
+
+        OCR, 레이아웃, 테이블 구조 인식(TSR) 모델을 다운로드합니다.
+        이미 로컬에 존재하는 모델은 건너뜁니다.
+
+        Args:
+            opts: 모델 정보 및 다운로드 설정을 포함한 파싱 옵션
+
+        Note:
+            allow_download=False이거나 model_root가 없으면 아무 작업도 하지 않습니다.
+            다운로드 실패는 예외를 발생시키지 않고 건너뜁니다.
+        """
         if not opts.allow_download or not opts.model_root:
             return
         repos = [opts.ocr_model, opts.layout_model, opts.tsr_model]
         repos = [repo for repo in repos if repo]
         if not repos:
             return
-        try:  # pragma: no cover - optional dependency
+        try:
             from huggingface_hub import snapshot_download
         except Exception:
             return
@@ -108,10 +138,21 @@ class DeepDocPdfEngine:
                     resume_download=True,
                 )
             except Exception:
-                # Download errors are non-fatal; fallback will handle missing assets.
                 continue
 
     def _coerce_bbox(self, payload: Any) -> Optional[BoundingBox]:
+        """다양한 형식의 바운딩 박스를 BoundingBox 객체로 변환합니다.
+
+        지원하는 형식:
+        - dict: {"x0", "y0", "x1", "y1"} 또는 {"left", "top", "right", "bottom"}
+        - list/tuple: [x0, y0, x1, y1]
+
+        Args:
+            payload: 바운딩 박스 데이터 (dict, list, tuple, 또는 None)
+
+        Returns:
+            BoundingBox 객체. 변환 불가능하면 None.
+        """
         if payload is None:
             return None
         if isinstance(payload, dict):
@@ -126,10 +167,21 @@ class DeepDocPdfEngine:
         return None
 
     def _iter_block_entries(self, raw: Any) -> Iterable[dict]:
+        """백엔드 결과에서 블록 엔트리들을 추출하여 순회합니다.
+
+        DeepDoc 출력 형식의 다양한 구조를 처리합니다:
+        - dict: {"pages": [...], "blocks": [...]} 형태에서 리스트 값들을 추출
+        - list: 직접 엔트리들을 순회
+
+        Args:
+            raw: 백엔드에서 반환된 원시 데이터
+
+        Yields:
+            각 블록을 나타내는 dict 객체
+        """
         if raw is None:
             return
         if isinstance(raw, dict):
-            # Common DeepDoc output shape: {"pages": [...], "blocks": [...]}
             for value in raw.values():
                 if isinstance(value, list):
                     for entry in value:
@@ -143,6 +195,18 @@ class DeepDocPdfEngine:
         return
 
     def _coerce_document(self, backend_result: Any, opts: PdfParseOptions) -> ParsedDocument:
+        """백엔드 결과를 ParsedDocument 객체로 변환합니다.
+
+        DeepDoc 백엔드의 다양한 출력 형식을 표준 ParsedDocument 구조로 정규화합니다.
+        블록, 테이블, 이미지 정보를 추출하고 페이지별로 그룹화합니다.
+
+        Args:
+            backend_result: 백엔드 파서에서 반환된 원시 결과
+            opts: 메타데이터에 포함할 파싱 옵션
+
+        Returns:
+            정규화된 ParsedDocument 객체
+        """
         metadata: Dict[str, Any] = {"parser": "pdf_deepdoc"}
         raw_tables: List[Any] = []
         raw_figures: List[Any] = []
@@ -288,25 +352,59 @@ class DeepDocPdfEngine:
         )
 
     def _run_backend(self, backend_cls: type, pdf_path: str, opts: PdfParseOptions) -> Any:
+        """백엔드 파서를 실행합니다.
+
+        백엔드 클래스의 인스턴스를 생성하고 PDF를 파싱합니다.
+
+        Args:
+            backend_cls: DeepDoc 파서 클래스 (RAGFlowPdfParser 또는 PlainParser)
+            pdf_path: PDF 파일의 임시 경로
+            opts: max_pages 등을 포함한 파싱 옵션
+
+        Returns:
+            백엔드 파서의 원시 결과
+        """
         instance = backend_cls()
-        call_kwargs: Dict[str, Any] = {}
-        if opts.max_pages is not None:
-            call_kwargs["max_pages"] = opts.max_pages
-        if hasattr(instance, "parse"):
-            return instance.parse(pdf_path, **call_kwargs)
-        if callable(instance):
-            return instance(pdf_path, **call_kwargs)
-        raise TypeError(f"Backend parser {backend_cls} is not callable")
+        # RAGFlowPdfParser, PlainParser는 __call__ 메서드 사용
+        return instance(pdf_path)
 
     def run(self, file: BinaryIO, options: Optional[PdfParseOptions] = None) -> ParsedDocument:
+        """PDF 파일을 파싱하여 ParsedDocument를 반환합니다.
+
+        전체 파싱 파이프라인을 실행합니다:
+        1. 환경변수 설정
+        2. 필요시 모델 다운로드
+        3. 백엔드 클래스 로드
+        4. PDF를 임시 파일로 저장
+        5. 백엔드 실행 및 결과 정규화
+        6. 임시 파일 정리
+
+        Args:
+            file: PDF 파일의 바이너리 스트림
+            options: 파싱 옵션 (preferred_backend 필수 지정)
+
+        Returns:
+            파싱된 문서 정보를 담은 ParsedDocument 객체
+
+        Raises:
+            ImportError: 지정된 백엔드를 찾을 수 없는 경우
+
+        Note:
+            이 메서드는 BinaryIO를 입력으로 받습니다.
+            파일 경로가 아닌 바이트로 전달되는 경우(HTTP 업로드, S3 다운로드,
+            메모리 생성 PDF 등)를 지원하기 위함입니다.
+            DeepDoc 백엔드는 파일 경로(str)만 받을 수 있으므로, 바이트를 임시 파일로
+            저장한 뒤 경로를 전달합니다. 임시 파일은 처리 완료 후 자동 삭제됩니다.
+        """
         opts = options or PdfParseOptions()
         self._configure_hf_env(opts)
         self._maybe_download_models(opts)
-        backend_cls = self._load_backend_class(preferred=opts.preferred_backend)
+        backend_cls = self._get_backend_class(preferred=opts.preferred_backend)
         if backend_cls is None:
-            if opts.fallback_to_plain:
-                return self._fallback_to_plain(file, opts, reason="DeepDoc backend not available")
-            raise ImportError("DeepDoc backend is not available; install ragflow/deepdoc to enable it.")
+            raise ImportError(
+                f"DeepDoc backend not available. "
+                f"Specify preferred_backend from: {DeepDocBackend.choices()}"
+            )
 
         if hasattr(file, "seek"):
             try:
@@ -317,32 +415,27 @@ class DeepDocPdfEngine:
 
         temp_path = ""
         try:
-            with tempfile.NamedTemporaryFile(prefix="deepdoc_", suffix=".pdf", delete=False) as handle:
-                handle.write(pdf_bytes)
-                handle.flush()
-                temp_path = handle.name
+            # 1. 임시 파일 생성
+            with tempfile.NamedTemporaryFile(
+                prefix="deepdoc_",      # 파일명 접두사: deepdoc_xxxxx.pdf
+                suffix=".pdf",          # 확장자
+                delete=False            # with 블록 끝나도 삭제하지 않음 (수동 삭제 예정)
+            ) as handle:
+                handle.write(pdf_bytes)  # PDF 바이트 쓰기
+                handle.flush()           # 디스크에 확실히 기록
+                temp_path = handle.name  # 파일 경로 저장 (예: /tmp/deepdoc_abc123.pdf)
+
 
             backend_result = self._run_backend(backend_cls, temp_path, opts)
             parsed = self._coerce_document(backend_result, opts)
             parsed.metadata["backend"] = backend_cls.__name__
             return parsed
-        except Exception as exc:
-            if opts.fallback_to_plain:
-                return self._fallback_to_plain(io.BytesIO(pdf_bytes), opts, reason=str(exc))
-            raise
         finally:
             if temp_path and os.path.exists(temp_path):
                 try:
                     os.remove(temp_path)
                 except Exception:
                     pass
-
-    def _fallback_to_plain(self, file: BinaryIO, opts: PdfParseOptions, *, reason: str) -> ParsedDocument:
-        fallback_doc = self.plain_engine.run(file, options=opts)
-        fallback_doc.metadata.update(
-            {"parser": "pdf_deepdoc", "used_fallback": True, "fallback_reason": reason}
-        )
-        return fallback_doc
 
 
 __all__ = ["DeepDocPdfEngine"]
