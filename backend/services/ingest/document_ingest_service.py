@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, BinaryIO, Dict, List, Optional
 
-from backend.config.settings import deepdoc_settings, deepseek_settings
+from backend.config.settings import deepdoc_settings, vlm_parser_settings
 from backend.llm_infrastructure.preprocessing.parsers import ParsedDocument, PdfParseOptions
 from backend.llm_infrastructure.preprocessing.parsers.registry import get_parser
 from .normalizer import get_normalizer
@@ -149,14 +149,14 @@ class DocumentIngestService:
     def _default_options(self, parser_id: str) -> PdfParseOptions:
         if parser_id.startswith("pdf_deepseek"):
             return PdfParseOptions(
-                vlm_model=deepseek_settings.model_id,
-                vlm_prompt=deepseek_settings.prompt,
-                vlm_max_new_tokens=deepseek_settings.max_new_tokens,
-                vlm_temperature=deepseek_settings.temperature,
-                hf_endpoint=deepseek_settings.hf_endpoint or None,
-                allow_download=deepseek_settings.allow_download,
-                model_root=deepseek_settings.model_root,
-                device=deepseek_settings.device,
+                vlm_model=vlm_parser_settings.model_id,
+                vlm_prompt=vlm_parser_settings.prompt,
+                vlm_max_new_tokens=vlm_parser_settings.max_new_tokens,
+                vlm_temperature=vlm_parser_settings.temperature,
+                hf_endpoint=vlm_parser_settings.hf_endpoint or None,
+                allow_download=vlm_parser_settings.allow_download,
+                model_root=vlm_parser_settings.model_root,
+                device=vlm_parser_settings.device,
             )
         return PdfParseOptions(
             model_root=deepdoc_settings.model_root,
@@ -171,12 +171,12 @@ class DocumentIngestService:
     @staticmethod
     def _default_vlm_options() -> PdfParseOptions:
         return PdfParseOptions(
-            vlm_model=deepseek_settings.model_id,
-            vlm_prompt=deepseek_settings.prompt,
-            vlm_max_new_tokens=deepseek_settings.max_new_tokens,
-            vlm_temperature=deepseek_settings.temperature,
-            hf_endpoint=deepseek_settings.hf_endpoint or None,
-            allow_download=deepseek_settings.allow_download,
-            model_root=deepseek_settings.model_root,
-            device=deepseek_settings.device,
+            vlm_model=vlm_parser_settings.model_id,
+            vlm_prompt=vlm_parser_settings.prompt,
+            vlm_max_new_tokens=vlm_parser_settings.max_new_tokens,
+            vlm_temperature=vlm_parser_settings.temperature,
+            hf_endpoint=vlm_parser_settings.hf_endpoint or None,
+            allow_download=vlm_parser_settings.allow_download,
+            model_root=vlm_parser_settings.model_root,
+            device=vlm_parser_settings.device,
         )

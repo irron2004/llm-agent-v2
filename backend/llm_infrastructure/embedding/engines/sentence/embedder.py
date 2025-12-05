@@ -6,7 +6,7 @@ from typing import Iterable, Optional
 
 import numpy as np
 
-from .base import BaseEmbedder
+from backend.llm_infrastructure.embedding.base import BaseEmbedder
 from .cache import EmbeddingCache
 from .utils import l2_normalize, pick_device
 
@@ -39,6 +39,14 @@ class SentenceTransformerEmbedder(BaseEmbedder):
         self.cache: Optional[EmbeddingCache] = None
         if use_cache:
             self.cache = EmbeddingCache(cache_dir)
+
+    def embed(self, text: str) -> np.ndarray:
+        """Embed a single string."""
+        return self.encode([text])[0]
+
+    def embed_batch(self, texts: list[str], batch_size: int = 32) -> np.ndarray:
+        """Embed a batch of strings."""
+        return self.encode(texts)
 
     def encode(self, texts: Iterable[str]) -> np.ndarray:
         texts_list = list(texts)

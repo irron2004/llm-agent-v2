@@ -6,7 +6,7 @@ Configuration is loaded from:
 3. Default values (lowest priority)
 """
 
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,12 +16,12 @@ class RAGSettings(BaseSettings):
     All settings can be overridden via environment variables with prefix RAG_
     Example: RAG_PREPROCESS_METHOD=pe_domain
     """
-
     model_config = SettingsConfigDict(
         env_prefix="RAG_",
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # Preprocessing
@@ -125,6 +125,7 @@ class DeepDocSettings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore"
     )
 
     preferred_backend: str = Field(
@@ -161,47 +162,55 @@ class DeepDocSettings(BaseSettings):
     )
 
 
-class DeepSeekSettings(BaseSettings):
-    """DeepSeek VLM parsing settings."""
+class VlmParserSettings(BaseSettings):
+    """Vision-language PDF parser settings (VLM vendor agnostic)."""
 
     model_config = SettingsConfigDict(
-        env_prefix="DEEPSEEK_",
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     model_root: str = Field(
         default="data/deepseek_models",
-        description="Local cache directory for DeepSeek models (optional)",
+        description="Local cache directory for VLM models (optional)",
+        validation_alias=AliasChoices("VLM_PARSER_MODEL_ROOT", "DEEPSEEK_MODEL_ROOT"),
     )
     model_id: str = Field(
         default="deepseek-ai/deepseek-vl2",
-        description="HuggingFace repo id for the DeepSeek VLM",
+        description="HuggingFace repo id for the VLM",
+        validation_alias=AliasChoices("VLM_PARSER_MODEL_ID", "DEEPSEEK_MODEL_ID"),
     )
     prompt: str = Field(
         default="Extract all text on this page as Markdown. Preserve tables and formulas. Do not summarize.",
         description="Default prompt for VLM parsing",
+        validation_alias=AliasChoices("VLM_PARSER_PROMPT", "DEEPSEEK_PROMPT"),
     )
     max_new_tokens: int = Field(
         default=2048,
         description="Max new tokens when calling the VLM",
+        validation_alias=AliasChoices("VLM_PARSER_MAX_NEW_TOKENS", "DEEPSEEK_MAX_NEW_TOKENS"),
     )
     temperature: float = Field(
         default=0.0,
         description="Temperature for VLM generation",
+        validation_alias=AliasChoices("VLM_PARSER_TEMPERATURE", "DEEPSEEK_TEMPERATURE"),
     )
     hf_endpoint: str = Field(
         default="",
         description="Custom HuggingFace endpoint for model downloads",
+        validation_alias=AliasChoices("VLM_PARSER_HF_ENDPOINT", "DEEPSEEK_HF_ENDPOINT"),
     )
     allow_download: bool = Field(
         default=True,
         description="Permit auto-download of models when missing",
+        validation_alias=AliasChoices("VLM_PARSER_ALLOW_DOWNLOAD", "DEEPSEEK_ALLOW_DOWNLOAD"),
     )
     device: str = Field(
         default="cpu",
-        description="Preferred device for DeepSeek VLM (cpu/cuda)",
+        description="Preferred device for VLM parsing (cpu/cuda)",
+        validation_alias=AliasChoices("VLM_PARSER_DEVICE", "DEEPSEEK_DEVICE"),
     )
 
 
@@ -213,6 +222,7 @@ class VLLMSettings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore"
     )
 
     base_url: str = Field(
@@ -245,6 +255,7 @@ class TEISettings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore"
     )
 
     endpoint_url: str = Field(
@@ -265,6 +276,7 @@ class APISettings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore"
     )
 
     title: str = Field(
@@ -303,7 +315,7 @@ vllm_settings = VLLMSettings()
 tei_settings = TEISettings()
 api_settings = APISettings()
 deepdoc_settings = DeepDocSettings()
-deepseek_settings = DeepSeekSettings()
+vlm_parser_settings = VlmParserSettings()
 
 
 __all__ = [
@@ -317,6 +329,6 @@ __all__ = [
     "api_settings",
     "DeepDocSettings",
     "deepdoc_settings",
-    "DeepSeekSettings",
-    "deepseek_settings",
+    "VlmParserSettings",
+    "vlm_parser_settings",
 ]

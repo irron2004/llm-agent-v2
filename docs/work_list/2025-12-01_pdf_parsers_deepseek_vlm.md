@@ -18,7 +18,7 @@
 - `llm_infrastructure/preprocessing/__init__.py`
   - VLM 어댑터/alias 공개
 - `config/settings.py`
-  - `DeepSeekSettings` 추가 (모델 id, 프롬프트, HF 엔드포인트, 모델 캐시 경로, 다운로드 허용, 디바이스)
+  - `VlmParserSettings` 추가 (DeepSeek 기본값, 모델 id, 프롬프트, HF 엔드포인트, 모델 캐시 경로, 다운로드 허용, 디바이스)
   - 기존 `DeepDocSettings`와 함께 export
 - `services/ingest/document_ingest_service.py`
   - `for_deepdoc()`, `for_vlm()` 팩토리 제공

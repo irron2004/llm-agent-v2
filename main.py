@@ -10,9 +10,12 @@ from backend.llm_infrastructure.preprocessing.normalize_engine import (
 )
 from backend.config.settings import rag_settings
 from backend.services.embedding_service import EmbeddingService
+from backend.services.chat_service import ChatService
 from backend.services.document_service import DocumentIndexService, SourceDocument
 from backend.services.search_service import SearchService
+from dotenv import load_dotenv
 
+load_dotenv("/home/llm-share/.env.llm")
 
 def main() -> None:
     sample_texts = [
@@ -72,6 +75,13 @@ def main() -> None:
     results = search.search("apple alarm issue", top_k=3)
     for r in results:
         print(f"[{r.score:.3f}] {r.doc_id}: {r.content}")
+
+    # --- LLM Chat demo ---
+    print("\n=== LLM Chat Demo ===")
+    chat = ChatService()
+    prompt = "Summarize key issues in PM 2-1 helium leak alarm logs."
+    chat_response = chat.chat(prompt)
+    print(chat_response.text)
 
 
 if __name__ == "__main__":

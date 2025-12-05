@@ -81,6 +81,36 @@ python -m experiments.run \
 - TEI: `TEI_ENDPOINT_URL`, `TEI_TIMEOUT`
 - API: `API_TITLE`, `API_VERSION`, `API_DESCRIPTION`, `API_HOST`, `API_PORT`, `API_RELOAD`, `API_LOG_LEVEL`
 
+### 공용 모델 캐시(.env.llm) 활용
+여러 사용자가 공유 모델/데이터 캐시를 쓰려면 `/home/llm-share/.env.llm`를 만들어 프로젝트에서 먼저 로드합니다.
+
+```python
+from dotenv import load_dotenv
+from pathlib import Path
+import os
+
+# 1) 공용 .env 먼저 로드
+load_dotenv("/home/llm-share/.env.llm")
+
+# 2) 프로젝트 로컬 .env도 있으면 덮어쓰기(옵션)
+project_env = Path(__file__).resolve().parents[2] / ".env"
+if project_env.exists():
+    load_dotenv(project_env, override=True)
+
+LLM_SHARED_ROOT = os.getenv("LLM_SHARED_ROOT", "/home/llm-share")
+HF_HOME = os.getenv("HF_HOME", f"{LLM_SHARED_ROOT}/hf")
+```
+
+Docker/docker-compose를 사용할 때는 공용 .env + 프로젝트 .env를 같이 물려줍니다.
+
+```yaml
+services:
+  backend:
+    env_file:
+      - /home/llm-share/.env.llm  # 공용
+      - ./.env                    # 프로젝트 개별(선택)
+```
+
 ## 전처리(정규화) 개요
 - 엔진: `backend/llm_infrastructure/preprocessing/normalize_engine/`에서 L0~L5 구현.
 - 어댑터: `adapters/standard.py`, `adapters/domain_specific.py`가 레지스트리에 등록.
