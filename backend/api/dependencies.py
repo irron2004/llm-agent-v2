@@ -1,9 +1,10 @@
 """FastAPI dependency providers for heavy objects."""
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Callable
 
-from backend.config.settings import rag_settings, vllm_settings
+from backend.config.settings import api_settings, rag_settings, vllm_settings
 from backend.llm_infrastructure.embedding import get_embedder
 from backend.llm_infrastructure.embedding.base import BaseEmbedder
 from backend.llm_infrastructure.llm import get_llm
@@ -11,6 +12,9 @@ from backend.llm_infrastructure.llm.base import BaseLLM
 from backend.llm_infrastructure.preprocessing import get_preprocessor
 from backend.llm_infrastructure.preprocessing.base import BasePreprocessor
 from backend.llm_infrastructure.retrieval.base import BaseRetriever
+from backend.services.chat_service import ChatService
+from backend.services.rag_service import RAGService, RAGResponse
+from backend.services.search_service import SearchService
 
 
 @lru_cache
@@ -79,6 +83,58 @@ def get_default_retriever() -> BaseRetriever:
             raise RuntimeError(msg)
 
     return _UnconfiguredRetriever()
+
+
+class _NotConfiguredSearchService:
+    """Fallback search service that raises a helpful error."""
+
+    def search(self, *_: object, **__: object):
+        msg = (
+            "Search service is not configured. "
+            "Provide a concrete SearchService via dependency override or wire an indexed corpus."
+        )
+        raise RuntimeError(msg)
+
+
+class _NotConfiguredRAGService:
+    """Fallback RAG service that raises a helpful error."""
+
+    def query(self, *_: object, **__: object) -> RAGResponse:  # pragma: no cover - simple guard
+        msg = (
+            "RAG service is not configured. "
+            "Provide a concrete RAGService via dependency override or wire an indexed corpus."
+        )
+        raise RuntimeError(msg)
+
+
+@lru_cache
+def get_search_service() -> SearchService:
+    """Provide a search service (override in tests or when a corpus is available)."""
+    return _NotConfiguredSearchService()  # type: ignore[return-value]
+
+
+@lru_cache
+def get_rag_service() -> RAGService:
+    """Provide a RAG service (override in tests or when a corpus is available)."""
+    return _NotConfiguredRAGService()  # type: ignore[return-value]
+
+
+@lru_cache
+def get_chat_service() -> ChatService:
+    """Provide a chat service (LLM only, no retrieval)."""
+    return ChatService()
+
+
+@lru_cache
+def get_simple_chat_prompt() -> str | None:
+    """Load system prompt for simple chat from file if configured."""
+    path = api_settings.simple_chat_prompt_file
+    if not path:
+        return None
+    prompt_path = Path(path)
+    if not prompt_path.exists():
+        raise FileNotFoundError(f"Simple chat prompt file not found: {prompt_path}")
+    return prompt_path.read_text(encoding="utf-8")
 
 
 @lru_cache
