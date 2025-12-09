@@ -1,0 +1,140 @@
+# =============================================================================
+# RAG System Docker Compose
+# Local development / PoC environment
+# Services: FastAPI + Elasticsearch + vLLM + Ingestion volumes
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # FastAPI Backend API
+  # ---------------------------------------------------------------------------
+  api:
+    container_name: rag-api
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - HF_HOME=/data/hf_cache
+      - TRANSFORMERS_CACHE=/data/hf_cache
+
+    volumes:
+      # Code hot-reload (development): mount backend source into /app/backend
+      - ./backend:/app/backend
+      # Ingestion data (original pdf, pages, parsed.json)
+      - /home/llm-share/ingestions:/data/ingestions
+      # Vector store persistence (local-only; can be moved later)
+      - ./data/vector_store:/data/vector_store
+      # HuggingFace model cache (shared host cache)
+      - /home/llm-share/hf:/data/hf_cache
+    ports:
+      - "${API_PORT}:8000"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - rag_net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Elasticsearch (Vector + BM25 search)
+  # ---------------------------------------------------------------------------
+  elasticsearch:
+    container_name: rag-elasticsearch
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.0
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms2g -Xmx2g
+      - xpack.security.enabled=false
+      - xpack.security.enrollment.enabled=false
+      # For Korean analysis, consider building custom image with nori plugin
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      # ES data persistence (host path or named volume via ES_DATA_PATH env)
+      - ${ES_DATA_PATH:?ES_DATA_PATH is required}:/usr/share/elasticsearch/data
+    ports:
+      - "${ES_PORT}:9200"
+    networks:
+      - rag_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # vLLM (OpenAI compatible LLM server)
+  # ---------------------------------------------------------------------------
+  vllm:
+    container_name: rag-vllm
+    image: vllm/vllm-openai:latest
+    command: >
+      --model ${VLLM_MODEL_NAME:-gpt-oss-20b}
+      --port 8000
+      --host 0.0.0.0
+      --trust-remote-code
+    environment:
+      - HF_HOME=/data/hf_cache
+      - HUGGINGFACE_HUB_TOKEN=${HUGGINGFACE_HUB_TOKEN:-}
+      - CUDA_VISIBLE_DEVICES=${VLLM_CUDA_DEVICE:-1}
+    volumes:
+      - /home/llm-share/hf:/data/hf_cache
+      - ./data/models:/data/models
+    ports:
+      - "${VLLM_PORT}:8000"
+    networks:
+      - rag_net
+    # GPU configuration (NVIDIA GPU)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${VLLM_CUDA_DEVICE:-1}"]
+              capabilities: [gpu]
+    shm_size: ${VLLM_SHM_SIZE:-8g}
+    restart: unless-stopped
+    profiles:
+      - with-vllm  # Only start with: docker compose --profile with-vllm up
+
+  # ---------------------------------------------------------------------------
+  # TEI (Text Embeddings Inference) - Optional
+  # ---------------------------------------------------------------------------
+  tei:
+    container_name: rag-tei
+    image: ghcr.io/huggingface/text-embeddings-inference:${TEI_VERSION:-cpu-1.8}
+    command: >
+      --model-id ${TEI_MODEL_ID:-intfloat/multilingual-e5-large}
+      --port 80
+      --max-concurrent-requests ${TEI_MAX_CONCURRENT:-512}
+    environment:
+      - HF_HOME=/data/hf_cache
+      - HUGGINGFACE_HUB_TOKEN=${HUGGINGFACE_HUB_TOKEN:-}
+    volumes:
+      - /home/llm-share/hf:/data/hf_cache
+    networks:
+      - rag_net
+    restart: unless-stopped
+    profiles:
+      - with-tei  # Only start with: docker compose --profile with-tei up
+
+# =============================================================================
+# Networks & Volumes
+# =============================================================================
+
+networks:
+  rag_net:
+    driver: bridge
+
+volumes:
+  es_data:
+    driver: local
