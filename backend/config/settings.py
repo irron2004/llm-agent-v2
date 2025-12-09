@@ -407,12 +407,12 @@ class SearchSettings(BaseSettings):
         description="Path to persisted local index (DocumentIndexService.persist_dir)",
     )
     es_host: str = Field(
-        default="",
+        default="http://localhost:9200",
         description="Elasticsearch host (e.g., http://localhost:9200)",
     )
     es_index: str = Field(
         default="",
-        description="Elasticsearch index name for vector search",
+        description="Elasticsearch index name for vector search (legacy, use es_index_* for new setup)",
     )
     es_user: str = Field(
         default="",
@@ -421,6 +421,23 @@ class SearchSettings(BaseSettings):
     es_password: str = Field(
         default="",
         description="Elasticsearch password (optional)",
+    )
+    # ES Index Management Settings (SU-2509)
+    es_env: str = Field(
+        default="dev",
+        description="Environment name for index naming (dev, staging, prod)",
+    )
+    es_index_prefix: str = Field(
+        default="rag_chunks",
+        description="Index name prefix (e.g., rag_chunks -> rag_chunks_dev_v1)",
+    )
+    es_index_version: int = Field(
+        default=1,
+        description="Current index version number",
+    )
+    es_embedding_dims: int = Field(
+        default=1024,
+        description="Embedding vector dimensions (1024 for KoE5/multilingual-e5)",
     )
 
 
