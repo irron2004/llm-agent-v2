@@ -26,12 +26,16 @@ class RAGSettings(BaseSettings):
 
     # Preprocessing
     preprocess_method: str = Field(
-        default="standard",
-        description="Preprocessing method name"
+        default="normalize",
+        description="Preprocessing method name (e.g., normalize, standard, pe_domain)"
     )
     preprocess_version: str = Field(
         default="v1",
         description="Preprocessing method version"
+    )
+    preprocess_level: str = Field(
+        default="L3",
+        description="Preprocessing level (used by normalize preprocessor)"
     )
 
     # Embedding
@@ -86,6 +90,76 @@ class RAGSettings(BaseSettings):
     hybrid_rrf_k: int = Field(
         default=60,
         description="RRF k parameter"
+    )
+
+    # Chunking
+    chunking_enabled: bool = Field(
+        default=True,
+        description="Enable text chunking before embedding"
+    )
+    chunking_method: str = Field(
+        default="fixed_size",
+        description="Chunking method (fixed_size, recursive, semantic)"
+    )
+    chunking_version: str = Field(
+        default="v1",
+        description="Chunking method version"
+    )
+    chunk_size: int = Field(
+        default=512,
+        description="Maximum chunk size (characters or tokens)"
+    )
+    chunk_overlap: int = Field(
+        default=50,
+        description="Overlap between chunks"
+    )
+    chunk_split_by: str = Field(
+        default="char",
+        description="Split unit: 'char' (characters) or 'token' (tokens)"
+    )
+    chunk_min_size: int = Field(
+        default=50,
+        description="Minimum chunk size (smaller chunks are merged)"
+    )
+
+    # Multi-Query Expansion
+    multi_query_enabled: bool = Field(
+        default=False,
+        description="Enable multi-query expansion for retrieval"
+    )
+    multi_query_method: str = Field(
+        default="llm",
+        description="Multi-query expansion method"
+    )
+    multi_query_n: int = Field(
+        default=3,
+        description="Number of expanded queries to generate"
+    )
+    multi_query_include_original: bool = Field(
+        default=True,
+        description="Include original query in expanded queries"
+    )
+    multi_query_prompt: str = Field(
+        default="general_mq_v1",
+        description="Prompt template name for multi-query expansion"
+    )
+
+    # Reranking
+    rerank_enabled: bool = Field(
+        default=False,
+        description="Enable reranking of retrieval results"
+    )
+    rerank_method: str = Field(
+        default="cross_encoder",
+        description="Reranking method (cross_encoder, llm)"
+    )
+    rerank_model: str = Field(
+        default="cross-encoder/ms-marco-MiniLM-L-6-v2",
+        description="Reranking model name/path"
+    )
+    rerank_top_k: int = Field(
+        default=5,
+        description="Number of results to keep after reranking"
     )
 
     # Vector store
@@ -291,6 +365,10 @@ class APISettings(BaseSettings):
         default="PE Agent RAG API",
         description="API description"
     )
+    simple_chat_prompt_file: str | None = Field(
+        default=None,
+        description="Path to system prompt file for simple chat (LLM-only)",
+    )
     host: str = Field(
         default="0.0.0.0",
         description="Host to bind"
@@ -309,6 +387,43 @@ class APISettings(BaseSettings):
     )
 
 
+class SearchSettings(BaseSettings):
+    """Search service wiring settings."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="SEARCH_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    backend: str = Field(
+        default="local",
+        description="Search backend type: local | es",
+    )
+    local_index_path: str = Field(
+        default="",
+        description="Path to persisted local index (DocumentIndexService.persist_dir)",
+    )
+    es_host: str = Field(
+        default="",
+        description="Elasticsearch host (e.g., http://localhost:9200)",
+    )
+    es_index: str = Field(
+        default="",
+        description="Elasticsearch index name for vector search",
+    )
+    es_user: str = Field(
+        default="",
+        description="Elasticsearch user (optional)",
+    )
+    es_password: str = Field(
+        default="",
+        description="Elasticsearch password (optional)",
+    )
+
+
 # Global settings instances
 rag_settings = RAGSettings()
 vllm_settings = VLLMSettings()
@@ -316,6 +431,7 @@ tei_settings = TEISettings()
 api_settings = APISettings()
 deepdoc_settings = DeepDocSettings()
 vlm_parser_settings = VlmParserSettings()
+search_settings = SearchSettings()
 
 
 __all__ = [
@@ -331,4 +447,6 @@ __all__ = [
     "deepdoc_settings",
     "VlmParserSettings",
     "vlm_parser_settings",
+    "SearchSettings",
+    "search_settings",
 ]

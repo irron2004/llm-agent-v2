@@ -43,6 +43,7 @@ class SearchResponse(BaseModel):
     page: int
     size: int
     has_next: bool
+    multi_query_used: bool = Field(default=False, description="Whether multi-query expansion was used")
     reranked: bool = Field(default=False, description="Whether results were reranked")
 
 
@@ -51,6 +52,12 @@ async def search(
     q: str = Query(..., description="검색어", min_length=1),
     page: int = Query(default=1, ge=1, description="페이지 번호"),
     size: int = Query(default=10, ge=1, le=100, description="페이지 크기"),
+    multi_query: Optional[bool] = Query(
+        default=None, description="Enable multi-query expansion (None = use service default)"
+    ),
+    multi_query_n: Optional[int] = Query(
+        default=None, ge=1, le=10, description="Number of expanded queries"
+    ),
     rerank: Optional[bool] = Query(
         default=None, description="Enable reranking (None = use service default)"
     ),
@@ -65,6 +72,8 @@ async def search(
         q: 검색어
         page: 페이지 번호 (1부터 시작)
         size: 페이지당 결과 수
+        multi_query: 멀티쿼리 확장 활성화 여부 (None이면 서비스 기본값 사용)
+        multi_query_n: 확장 쿼리 개수
         rerank: 리랭킹 활성화 여부 (None이면 서비스 기본값 사용)
         rerank_top_k: 리랭킹 후 반환할 결과 수
     """
@@ -75,6 +84,8 @@ async def search(
         results = search_service.search(
             q,
             top_k=top_k,
+            multi_query=multi_query,
+            multi_query_n=multi_query_n,
             rerank=rerank,
             rerank_top_k=effective_rerank_top_k,
         )
@@ -86,6 +97,11 @@ async def search(
         items = _to_search_items(page_results, start_idx, q)
         total = len(results)
         has_next = end_idx < total
+
+        # Determine if multi-query was actually applied
+        was_multi_query = (
+            multi_query if multi_query is not None else search_service.multi_query_enabled
+        ) and search_service.query_expander is not None
 
         # Determine if reranking was actually applied
         was_reranked = (
@@ -100,6 +116,7 @@ async def search(
             page=page,
             size=size,
             has_next=has_next,
+            multi_query_used=was_multi_query,
             reranked=was_reranked,
         )
 

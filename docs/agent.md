@@ -72,3 +72,14 @@ Kent Beck의 **TDD**와 **Tidy First** 원칙을 따르는 시니어 엔지니�
 - 종료: 테스트/린트 통과 → 상세 일지 작성 → `docs/work_list.md`에 행 추가 → 커밋.
 
 > 모든 역할 프롬프트는 위 Work Log 규칙을 **작업 마무리 단계에서 반드시 준수**한다.
+
+## 5. 티켓/브랜치 운영 규칙 (ClickUp 우선)
+- 티켓 생성 위치: `TSI Unit(공통) > ai_temp > PSK-LLM-PHASE2` 하위 서브태스크로만 생성.
+- 기준 이슈 번호: 항상 ClickUp 티켓 ID를 사용하고 공유한다(예: `86evu0q1f`).
+- 브랜치 네이밍: ClickUp ID 기반으로 생성한다(예: `86evu0q1f/rerank-impl` 형태).
+- 기록/보고: ClickUp 티켓에 작업 기록과 링크를 남기고, Linear에는 동일 내용을 백업하되 번호는 반드시 ClickUp ID를 유지한다.
+
+## 6. SearchService 자동 설정 (API)
+- 환경변수로 백엔드 선택: `SEARCH_BACKEND=local | es` (기본: local)
+- 로컬 인덱스 로딩: `SEARCH_LOCAL_INDEX_PATH`에 `DocumentIndexService.persist_dir` 경로 지정 → 앱 startup에서 SearchService 자동 구성
+- ES 백엔드는 후속 구현 예정; 설정이 없으면 검색 서비스는 미구성 상태로 남는다.

@@ -13,6 +13,8 @@ from backend.llm_infrastructure.preprocessing import get_preprocessor
 from backend.llm_infrastructure.preprocessing.base import BasePreprocessor
 from backend.llm_infrastructure.reranking import get_reranker as _get_reranker
 from backend.llm_infrastructure.reranking.base import BaseReranker
+from backend.llm_infrastructure.query_expansion import get_query_expander as _get_query_expander
+from backend.llm_infrastructure.query_expansion.base import BaseQueryExpander
 from backend.llm_infrastructure.retrieval.base import BaseRetriever
 from backend.services.chat_service import ChatService
 from backend.services.rag_service import RAGService, RAGResponse
@@ -109,9 +111,25 @@ class _NotConfiguredRAGService:
         raise RuntimeError(msg)
 
 
+_search_service_instance: SearchService | None = None
+
+
+def set_search_service(service: SearchService) -> None:
+    """Override the default search service (e.g., at app startup)."""
+    global _search_service_instance
+    _search_service_instance = service
+    # Reset cache so future calls return the new instance
+    try:
+        get_search_service.cache_clear()  # type: ignore[attr-defined]
+    except AttributeError:
+        pass
+
+
 @lru_cache
 def get_search_service() -> SearchService:
     """Provide a search service (override in tests or when a corpus is available)."""
+    if _search_service_instance is not None:
+        return _search_service_instance
     return _NotConfiguredSearchService()  # type: ignore[return-value]
 
 
@@ -161,4 +179,14 @@ def get_reranker() -> BaseReranker:
         version="v1",
         model_name=rag_settings.rerank_model,
         device=rag_settings.embedding_device,
+    )
+
+
+@lru_cache
+def get_query_expander() -> BaseQueryExpander:
+    """Provide a query expander based on settings."""
+    return _get_query_expander(
+        rag_settings.multi_query_method,
+        version="v1",
+        prompt_template=rag_settings.multi_query_prompt,
     )
