@@ -11,6 +11,8 @@ from backend.llm_infrastructure.llm import get_llm
 from backend.llm_infrastructure.llm.base import BaseLLM
 from backend.llm_infrastructure.preprocessing import get_preprocessor
 from backend.llm_infrastructure.preprocessing.base import BasePreprocessor
+from backend.llm_infrastructure.reranking import get_reranker as _get_reranker
+from backend.llm_infrastructure.reranking.base import BaseReranker
 from backend.llm_infrastructure.retrieval.base import BaseRetriever
 from backend.services.chat_service import ChatService
 from backend.services.rag_service import RAGService, RAGResponse
@@ -148,4 +150,15 @@ def get_default_llm() -> BaseLLM:
         temperature=vllm_settings.temperature,
         max_tokens=vllm_settings.max_tokens,
         timeout=vllm_settings.timeout,
+    )
+
+
+@lru_cache
+def get_reranker() -> BaseReranker:
+    """Provide a reranker based on settings."""
+    return _get_reranker(
+        rag_settings.rerank_method,
+        version="v1",
+        model_name=rag_settings.rerank_model,
+        device=rag_settings.embedding_device,
     )

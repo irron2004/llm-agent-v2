@@ -1,6 +1,6 @@
 """Search Service API (검색 결과 + 페이지네이션)."""
 
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
@@ -43,6 +43,7 @@ class SearchResponse(BaseModel):
     page: int
     size: int
     has_next: bool
+    reranked: bool = Field(default=False, description="Whether results were reranked")
 
 
 @router.get("", response_model=SearchResponse)
@@ -50,12 +51,33 @@ async def search(
     q: str = Query(..., description="검색어", min_length=1),
     page: int = Query(default=1, ge=1, description="페이지 번호"),
     size: int = Query(default=10, ge=1, le=100, description="페이지 크기"),
+    rerank: Optional[bool] = Query(
+        default=None, description="Enable reranking (None = use service default)"
+    ),
+    rerank_top_k: Optional[int] = Query(
+        default=None, ge=1, le=100, description="Number of results after reranking"
+    ),
     search_service: SearchService = Depends(get_search_service),
 ):
-    """문서 검색 API."""
+    """문서 검색 API.
+
+    Args:
+        q: 검색어
+        page: 페이지 번호 (1부터 시작)
+        size: 페이지당 결과 수
+        rerank: 리랭킹 활성화 여부 (None이면 서비스 기본값 사용)
+        rerank_top_k: 리랭킹 후 반환할 결과 수
+    """
     try:
         top_k = page * size + size  # 여유분 포함
-        results = search_service.search(q, top_k=top_k)
+        # If rerank_top_k not specified, use top_k to avoid pagination mismatch
+        effective_rerank_top_k = rerank_top_k if rerank_top_k is not None else top_k
+        results = search_service.search(
+            q,
+            top_k=top_k,
+            rerank=rerank,
+            rerank_top_k=effective_rerank_top_k,
+        )
 
         start_idx = (page - 1) * size
         end_idx = start_idx + size
@@ -65,6 +87,11 @@ async def search(
         total = len(results)
         has_next = end_idx < total
 
+        # Determine if reranking was actually applied
+        was_reranked = (
+            rerank if rerank is not None else search_service.rerank_enabled
+        ) and search_service.reranker is not None
+
         return SearchResponse(
             query=q,
             clean_query=q,
@@ -73,6 +100,7 @@ async def search(
             page=page,
             size=size,
             has_next=has_next,
+            reranked=was_reranked,
         )
 
     except RuntimeError as exc:
