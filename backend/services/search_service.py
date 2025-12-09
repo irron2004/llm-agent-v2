@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Optional
 
 from backend.config.settings import rag_settings
 from backend.llm_infrastructure.retrieval import get_retriever
+from backend.llm_infrastructure.retrieval.base import RetrievalResult
+from backend.llm_infrastructure.reranking import get_reranker
+from backend.llm_infrastructure.reranking.base import BaseReranker
 from backend.services.embedding_service import EmbeddingService
 from backend.services.document_service import IndexedCorpus
 
+logger = logging.getLogger(__name__)
+
 
 class SearchService:
-    """Compose retrievers (dense/bm25/hybrid) over a prepared corpus."""
+    """Compose retrievers (dense/bm25/hybrid) over a prepared corpus with optional reranking."""
 
     def __init__(
         self,
@@ -23,6 +29,12 @@ class SearchService:
         dense_weight: Optional[float] = None,
         sparse_weight: Optional[float] = None,
         rrf_k: Optional[int] = None,
+        # Reranking options
+        rerank_enabled: Optional[bool] = None,
+        rerank_method: Optional[str] = None,
+        rerank_model: Optional[str] = None,
+        rerank_top_k: Optional[int] = None,
+        rerank_device: Optional[str] = None,
     ) -> None:
         self.corpus = corpus
         self.method = (method or rag_settings.retrieval_method).lower()
@@ -31,6 +43,13 @@ class SearchService:
         self.dense_weight = dense_weight if dense_weight is not None else rag_settings.hybrid_dense_weight
         self.sparse_weight = sparse_weight if sparse_weight is not None else rag_settings.hybrid_sparse_weight
         self.rrf_k = rrf_k if rrf_k is not None else rag_settings.hybrid_rrf_k
+
+        # Reranking settings
+        self.rerank_enabled = rerank_enabled if rerank_enabled is not None else rag_settings.rerank_enabled
+        self.rerank_method = rerank_method or rag_settings.rerank_method
+        self.rerank_model = rerank_model or rag_settings.rerank_model
+        self.rerank_top_k = rerank_top_k or rag_settings.rerank_top_k
+        self.rerank_device = rerank_device or rag_settings.embedding_device
 
         # Use corpus embedder if available (ensures consistency), otherwise create from settings
         if corpus.embedder is not None:
@@ -46,6 +65,7 @@ class SearchService:
             self._embedder = self._embedding_service.get_raw_embedder()
 
         self.retriever = self._build_retriever()
+        self.reranker: Optional[BaseReranker] = self._build_reranker() if self.rerank_enabled else None
 
     def _build_dense(self, **kwargs: Any):
         if self.corpus.vector_store is None:
@@ -89,8 +109,58 @@ class SearchService:
             )
         raise ValueError(f"Unknown retrieval method: {self.method}")
 
-    def search(self, query: str, top_k: Optional[int] = None):
-        return self.retriever.retrieve(query, top_k=top_k or self.top_k)
+    def _build_reranker(self) -> BaseReranker:
+        """Build reranker based on settings."""
+        logger.info(
+            f"Building reranker: method={self.rerank_method}, "
+            f"model={self.rerank_model}"
+        )
+        return get_reranker(
+            self.rerank_method,
+            version="v1",
+            model_name=self.rerank_model,
+            device=self.rerank_device,
+        )
+
+    def search(
+        self,
+        query: str,
+        top_k: Optional[int] = None,
+        rerank: Optional[bool] = None,
+        rerank_top_k: Optional[int] = None,
+    ) -> list[RetrievalResult]:
+        """Search for relevant documents with optional reranking.
+
+        Args:
+            query: Search query
+            top_k: Number of results to retrieve (before reranking)
+            rerank: Override reranking setting (None = use service setting)
+            rerank_top_k: Number of results after reranking (None = use service setting)
+
+        Returns:
+            List of retrieval results (reranked if enabled)
+        """
+        # Determine effective top_k for retrieval
+        retrieval_top_k = top_k or self.top_k
+
+        # If reranking is enabled, retrieve more candidates for better reranking
+        should_rerank = rerank if rerank is not None else self.rerank_enabled
+        if should_rerank and self.reranker is not None:
+            # Retrieve more candidates for reranking (e.g., 2x or at least 20)
+            retrieval_top_k = max(retrieval_top_k * 2, 20, retrieval_top_k)
+
+        # Retrieve documents
+        results = self.retriever.retrieve(query, top_k=retrieval_top_k)
+
+        # Apply reranking if enabled
+        if should_rerank and self.reranker is not None and results:
+            final_top_k = rerank_top_k or self.rerank_top_k or (top_k or self.top_k)
+            logger.debug(
+                f"Reranking {len(results)} results to top_k={final_top_k}"
+            )
+            results = self.reranker.rerank(query, results, top_k=final_top_k)
+
+        return results
 
 
 __all__ = ["SearchService"]
