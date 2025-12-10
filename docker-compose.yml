@@ -82,10 +82,13 @@ services:
       --port 8000
       --host 0.0.0.0
       --trust-remote-code
+      --tensor-parallel-size ${VLLM_TP_SIZE:-2}
+      --max-model-len ${VLLM_MAX_MODEL_LEN:-32768}
+      --gpu-memory-utilization ${VLLM_GPU_MEM_UTIL:-0.9}
     environment:
       - HF_HOME=/data/hf_cache
       - HUGGINGFACE_HUB_TOKEN=${HUGGINGFACE_HUB_TOKEN:-}
-      - CUDA_VISIBLE_DEVICES=${VLLM_CUDA_DEVICE:-1}
+      - CUDA_VISIBLE_DEVICES=${VLLM_CUDA_DEVICES:-0,1}
     volumes:
       - /home/llm-share/hf:/data/hf_cache
       - ./data/models:/data/models
@@ -99,7 +102,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["${VLLM_CUDA_DEVICE:-1}"]
+              device_ids: ["${VLLM_CUDA_DEVICE:-0}", "${VLLM_CUDA_DEVICE1:-1}"]
               capabilities: [gpu]
     shm_size: ${VLLM_SHM_SIZE:-8g}
     restart: unless-stopped

@@ -4,5 +4,12 @@
 from .dense import DenseRetriever
 from .bm25 import BM25Retriever
 from .hybrid import HybridRetriever
+from .es_hybrid import EsHybridRetriever, EsDenseRetriever
 
-__all__ = ["DenseRetriever", "BM25Retriever", "HybridRetriever"]
+__all__ = [
+    "DenseRetriever",
+    "BM25Retriever",
+    "HybridRetriever",
+    "EsHybridRetriever",
+    "EsDenseRetriever",
+]

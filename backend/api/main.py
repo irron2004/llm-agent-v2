@@ -11,6 +11,8 @@ from backend.llm_infrastructure.preprocessing import get_preprocessor
 from backend.services.document_service import DocumentIndexService
 from backend.services.embedding_service import EmbeddingService
 from backend.services.search_service import SearchService
+from backend.services.es_search_service import EsSearchService
+from backend.llm_infrastructure.elasticsearch.manager import EsIndexManager
 
 APP_VERSION = "0.1.0"
 logger = logging.getLogger(__name__)
@@ -111,6 +113,21 @@ def _configure_search_service() -> None:
         return
 
     if backend == "es":
-        raise NotImplementedError("Elasticsearch backend wiring is not implemented yet.")
+        # Wire Elasticsearch-backed search service
+        index_manager = EsIndexManager(
+            es_host=search_settings.es_host,
+            env=search_settings.es_env,
+            index_prefix=search_settings.es_index_prefix,
+            es_user=search_settings.es_user or None,
+            es_password=search_settings.es_password or None,
+        )
+
+        index_alias = index_manager.get_alias_name()
+        es_search = EsSearchService.from_settings(index=index_alias)
+        set_search_service(es_search)
+        logger.info(
+            "Search service configured with Elasticsearch alias: %s", index_alias
+        )
+        return
 
     logger.warning("Unknown SEARCH_BACKEND '%s'; search service not configured.", backend)

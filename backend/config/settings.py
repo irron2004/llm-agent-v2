@@ -321,6 +321,42 @@ class VLLMSettings(BaseSettings):
     )
 
 
+class VlmClientSettings(BaseSettings):
+    """VLM (Vision-Language Model) client settings for OpenAI-compatible API.
+
+    Used for connecting to vLLM-served Qwen-VL or similar vision models.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="VLM_CLIENT_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    base_url: str = Field(
+        default="http://localhost:8000/v1",
+        description="VLM server base URL (OpenAI-compatible API)",
+    )
+    model: str = Field(
+        default="Qwen/Qwen2-VL-7B-Instruct",
+        description="VLM model name/identifier",
+    )
+    timeout: int = Field(
+        default=600,
+        description="Request timeout in seconds (VLM inference can be slow)",
+    )
+    max_tokens: int = Field(
+        default=2048,
+        description="Maximum tokens to generate per page",
+    )
+    temperature: float = Field(
+        default=0.0,
+        description="Sampling temperature (0.0 for deterministic)",
+    )
+
+
 class TEISettings(BaseSettings):
     """Text Embeddings Inference settings."""
 
@@ -444,6 +480,7 @@ class SearchSettings(BaseSettings):
 # Global settings instances
 rag_settings = RAGSettings()
 vllm_settings = VLLMSettings()
+vlm_client_settings = VlmClientSettings()
 tei_settings = TEISettings()
 api_settings = APISettings()
 deepdoc_settings = DeepDocSettings()
@@ -454,10 +491,12 @@ search_settings = SearchSettings()
 __all__ = [
     "RAGSettings",
     "VLLMSettings",
+    "VlmClientSettings",
     "TEISettings",
     "APISettings",
     "rag_settings",
     "vllm_settings",
+    "vlm_client_settings",
     "tei_settings",
     "api_settings",
     "DeepDocSettings",
