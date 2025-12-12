@@ -46,14 +46,26 @@ export function useIngestionData({
       const sectionsData: Section[] = await sectionsRes.json();
       setSections(sectionsData);
 
+      const pageCountFromSections = sectionsData.reduce((max, section) => {
+        const start = typeof section.page_start === "number" ? section.page_start : 0;
+        const end = typeof section.page_end === "number" ? section.page_end : start;
+        return Math.max(max, end);
+      }, 0);
+
       const pageDataList: PageData[] = [];
-      for (let i = 1; i <= 100; i++) {
+      // If section metadata includes page ranges, trust it; otherwise probe up to 100 pages.
+      const maxPages = pageCountFromSections || 100;
+      for (let i = 1; i <= maxPages; i++) {
         const pageNum = String(i).padStart(3, "0");
         const imagePath = `${basePath}/pages/page_${pageNum}.png`;
         const vlmPath = `${basePath}/vlm/page_${pageNum}.txt`;
 
-        const imgRes = await fetch(imagePath, { method: "HEAD" });
-        if (!imgRes.ok) break;
+        if (!pageCountFromSections) {
+          const imgRes = await fetch(imagePath, { method: "HEAD" });
+          const contentType = imgRes.headers.get("content-type") || "";
+          // Vite dev server falls back to index.html with 200 when file is missing, so also check MIME.
+          if (!imgRes.ok || !contentType.startsWith("image/")) break;
+        }
 
         let vlmText = "";
         try {
@@ -79,6 +91,10 @@ export function useIngestionData({
       setIsLoading(false);
     }
   }, [basePath, runId, documentName]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [documentName]);
 
   useEffect(() => {
     if (runId && documentName) {
