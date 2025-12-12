@@ -158,6 +158,10 @@ class EsChunkDocument:
         if vlm_model:
             doc_tags.append(f"vlm:{vlm_model}")
 
+        # Extract page_image_path from section metadata if available
+        section_meta = section.metadata or {}
+        page_image_path = section_meta.get("page_image_path")
+
         return cls(
             doc_id=doc_id,
             chunk_id=chunk_id,
@@ -171,6 +175,7 @@ class EsChunkDocument:
             project_id=project_id,
             pipeline_version=pipeline_version,
             tags=doc_tags,
+            page_image_path=page_image_path,
         )
 
 

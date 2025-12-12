@@ -181,7 +181,7 @@ class EsIngestService:
         Returns:
             Embedding vectors as 2D numpy array (n_texts, embedding_dim).
         """
-        raw_embeddings = self.embedder.embed(texts)
+        raw_embeddings = self.embedder.embed_batch(list(texts))
         embeddings = np.asarray(raw_embeddings, dtype=np.float32)
 
         # Ensure 2D array
