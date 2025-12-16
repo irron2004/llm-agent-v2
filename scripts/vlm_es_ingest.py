@@ -1,8 +1,9 @@
 """Run VLM-based PDF parsing and ingest results into Elasticsearch.
 
 Usage (example):
+    # 단일 PDF 파일 처리
     python scripts/vlm_es_ingest.py \
-        --pdf "data/global sop_supra xp_all_efem_rfid assy.pdf" \
+        --input "data/global sop_supra xp_all_efem_rfid assy.pdf" \
         --doc-id global_sop_efem_rfid \
         --doc-type sop \
         --lang ko \
@@ -11,9 +12,16 @@ Usage (example):
         --tags manual equipment \
         --refresh
 
+    # 폴더 전체 처리 (하위 폴더 포함)
+    python scripts/vlm_es_ingest.py \
+        --input "data/manuals/" \
+        --doc-type sop \
+        --lang ko \
+        --tenant-id tenant1
+
     # 페이지 이미지 저장 및 ES에 경로 포함
     python scripts/vlm_es_ingest.py \
-        --pdf "data/sample.pdf" \
+        --input "data/sample.pdf" \
         --doc-id sample_001 \
         --save-images \
         --image-dir data/page_images/sample_001
@@ -28,6 +36,7 @@ Prerequisites:
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from pathlib import Path
 from typing import Iterable, List, Optional
@@ -43,10 +52,67 @@ from backend.llm_infrastructure.vlm.clients import OpenAIVisionClient
 from backend.services.es_ingest_service import EsIngestService
 
 
+def find_pdf_files(input_path: Path) -> List[Path]:
+    """입력 경로에서 PDF 파일 목록을 반환.
+
+    Args:
+        input_path: PDF 파일 또는 폴더 경로
+
+    Returns:
+        PDF 파일 경로 리스트 (정렬됨)
+    """
+    if input_path.is_file():
+        if input_path.suffix.lower() == ".pdf":
+            return [input_path]
+        raise ValueError(f"Not a PDF file: {input_path}")
+
+    if input_path.is_dir():
+        pdf_files = sorted(input_path.rglob("*.pdf"))
+        if not pdf_files:
+            raise FileNotFoundError(f"No PDF files found in: {input_path}")
+        return pdf_files
+
+    raise FileNotFoundError(f"Path not found: {input_path}")
+
+
+def generate_doc_id(pdf_path: Path, base_path: Optional[Path] = None) -> str:
+    """PDF 경로에서 doc_id 생성.
+
+    Args:
+        pdf_path: PDF 파일 경로
+        base_path: 기준 폴더 경로 (있으면 상대 경로 기반으로 생성)
+
+    Returns:
+        ES용 document id (영문/숫자/언더스코어만 포함)
+    """
+    if base_path and base_path.is_dir():
+        # 폴더 기준 상대 경로 사용 (확장자 제외)
+        rel_path = pdf_path.relative_to(base_path)
+        name = str(rel_path.with_suffix(""))
+    else:
+        # 파일명만 사용 (확장자 제외)
+        name = pdf_path.stem
+
+    # 특수문자를 언더스코어로 치환, 연속 언더스코어 정리
+    doc_id = re.sub(r"[^a-zA-Z0-9가-힣]", "_", name)
+    doc_id = re.sub(r"_+", "_", doc_id)
+    doc_id = doc_id.strip("_").lower()
+
+    return doc_id or "doc"
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="VLM PDF ingest to Elasticsearch")
-    parser.add_argument("--pdf", required=True, help="Path to PDF file")
-    parser.add_argument("--doc-id", required=True, help="Base document id for ES")
+    parser.add_argument(
+        "--input",
+        required=True,
+        help="Path to PDF file or folder (recursively processes all PDFs in folder)",
+    )
+    parser.add_argument(
+        "--doc-id",
+        default=None,
+        help="Base document id for ES (auto-generated from filename if not provided)",
+    )
     parser.add_argument("--doc-type", default="generic", help="Document type (e.g., sop, guide)")
     parser.add_argument(
         "--index",
@@ -161,22 +227,30 @@ def save_page_images(
     return page_paths
 
 
-def main() -> None:
-    args = parse_args()
+def process_single_pdf(
+    pdf_path: Path,
+    doc_id: str,
+    args: argparse.Namespace,
+    ingest_svc: DocumentIngestService,
+    es_ingest: EsIngestService,
+) -> dict:
+    """단일 PDF 파일을 처리하고 ES에 색인.
 
-    pdf_path = Path(args.pdf)
-    if not pdf_path.exists():
-        raise FileNotFoundError(f"PDF not found: {pdf_path}")
+    Args:
+        pdf_path: PDF 파일 경로
+        doc_id: ES document ID
+        args: CLI 인자
+        ingest_svc: VLM 기반 문서 파싱 서비스
+        es_ingest: ES 색인 서비스
 
-    # 1) VLM client (OpenAI-compatible vision API)
-    vlm_client = OpenAIVisionClient(
-        base_url=vlm_client_settings.base_url,
-        model=vlm_client_settings.model,
-        timeout=vlm_client_settings.timeout,
-    )
+    Returns:
+        색인 결과 딕셔너리
+    """
+    print(f"\n{'='*60}")
+    print(f"Processing: {pdf_path}")
+    print(f"  doc_id: {doc_id}")
 
-    # 2) VLM parsing
-    ingest_svc = DocumentIngestService.for_vlm(vlm_client=vlm_client)
+    # VLM parsing
     with pdf_path.open("rb") as f:
         parsed = ingest_svc.ingest_pdf(f, doc_type=args.doc_type)
 
@@ -184,10 +258,10 @@ def main() -> None:
     if args.max_sections:
         sections = sections[: args.max_sections]
 
-    # 3) 페이지 이미지 저장 (optional)
+    # 페이지 이미지 저장 (optional)
     page_image_paths: Optional[dict[int, str]] = None
     if args.save_images:
-        image_dir = args.image_dir or Path(f"data/page_images/{args.doc_id}")
+        image_dir = args.image_dir or Path(f"data/page_images/{doc_id}")
         page_image_paths = save_page_images(
             pdf_path=pdf_path,
             image_dir=image_dir,
@@ -195,17 +269,13 @@ def main() -> None:
             image_base_url=args.image_base_url,
         )
 
-    # 4) Section 객체로 변환 (이미지 경로 주입 포함)
+    # Section 객체로 변환
     section_objs = to_section_objs(sections, page_image_paths)
-    print(f"Parsed sections: {len(section_objs)}")
-    for i, sec in enumerate(section_objs[:3], 1):
-        print(f"[Section {i}] {sec.title}\n{sec.text[:200]}...\n")
+    print(f"  Parsed sections: {len(section_objs)}")
 
-    # 5) ES ingest
-    alias = args.index or f"{search_settings.es_index_prefix}_{search_settings.es_env}_current"
-    es_ingest = EsIngestService.from_settings(index=alias)
+    # ES ingest
     result = es_ingest.ingest_sections(
-        base_doc_id=args.doc_id,
+        base_doc_id=doc_id,
         sections=section_objs,
         doc_type=args.doc_type,
         lang=args.lang,
@@ -216,10 +286,77 @@ def main() -> None:
         refresh=args.refresh,
     )
 
-    print(f"Ingested {result['indexed']} chunks into {result['index']}")
-    print(f"  doc_type={args.doc_type}, lang={args.lang}, vlm_model={vlm_client_settings.model}")
+    print(f"  Ingested {result['indexed']} chunks")
     if page_image_paths:
-        print(f"  page_image_path included for {len(page_image_paths)} pages")
+        print(f"  Page images: {len(page_image_paths)}")
+
+    return result
+
+
+def main() -> None:
+    args = parse_args()
+
+    input_path = Path(args.input)
+
+    # PDF 파일 목록 찾기
+    pdf_files = find_pdf_files(input_path)
+    print(f"Found {len(pdf_files)} PDF file(s) to process")
+
+    # 기준 경로 설정 (폴더인 경우 해당 폴더, 아니면 None)
+    base_path = input_path if input_path.is_dir() else None
+
+    # VLM client 초기화 (재사용)
+    vlm_client = OpenAIVisionClient(
+        base_url=vlm_client_settings.base_url,
+        model=vlm_client_settings.model,
+        timeout=vlm_client_settings.timeout,
+    )
+    ingest_svc = DocumentIngestService.for_vlm(vlm_client=vlm_client)
+
+    # ES ingest 서비스 초기화
+    alias = args.index or f"{search_settings.es_index_prefix}_{search_settings.es_env}_current"
+    es_ingest = EsIngestService.from_settings(index=alias)
+
+    # 각 PDF 처리
+    total_indexed = 0
+    success_count = 0
+    failed_files: List[Path] = []
+
+    for pdf_path in pdf_files:
+        # doc_id 결정: CLI에서 제공된 경우 사용, 아니면 자동 생성
+        if args.doc_id and len(pdf_files) == 1:
+            doc_id = args.doc_id
+        else:
+            doc_id = generate_doc_id(pdf_path, base_path)
+
+        try:
+            result = process_single_pdf(
+                pdf_path=pdf_path,
+                doc_id=doc_id,
+                args=args,
+                ingest_svc=ingest_svc,
+                es_ingest=es_ingest,
+            )
+            total_indexed += result.get("indexed", 0)
+            success_count += 1
+        except Exception as e:
+            print(f"  ERROR: {e}")
+            failed_files.append(pdf_path)
+
+    # 최종 요약
+    print(f"\n{'='*60}")
+    print("SUMMARY")
+    print(f"  Total files: {len(pdf_files)}")
+    print(f"  Success: {success_count}")
+    print(f"  Failed: {len(failed_files)}")
+    print(f"  Total chunks indexed: {total_indexed}")
+    print(f"  Index: {alias}")
+    print(f"  doc_type={args.doc_type}, lang={args.lang}, vlm_model={vlm_client_settings.model}")
+
+    if failed_files:
+        print("\nFailed files:")
+        for f in failed_files:
+            print(f"  - {f}")
 
 
 if __name__ == "__main__":
