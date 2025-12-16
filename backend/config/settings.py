@@ -7,6 +7,7 @@ Configuration is loaded from:
 """
 
 from pydantic import AliasChoices, Field
+from .settings_vlm import vlm_settings  # noqa: F401  (optional VLM settings import)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -257,12 +258,23 @@ class VlmParserSettings(BaseSettings):
         validation_alias=AliasChoices("VLM_PARSER_MODEL_ID", "DEEPSEEK_MODEL_ID"),
     )
     prompt: str = Field(
-        default="Extract all text on this page as Markdown. Preserve tables and formulas. Do not summarize.",
+        default=(
+            "Read this page and extract all content as Markdown.\n\n"
+            "Rules:\n"
+            "- Output ONLY valid Markdown (no LaTeX, no $...$ or $$...$$)\n"
+            "- Convert mathematical formulas to plain text or Unicode symbols\n"
+            "- Preserve tables using Markdown table syntax (| column |)\n"
+            "- Keep headings with # syntax\n"
+            "- Preserve lists and bullet points\n"
+            "- Do not summarize or omit any text\n"
+            "- Do not add explanations or comments\n"
+            "- NEVER output repeated characters like ||||, &&&&, ----, ====, etc."
+        ),
         description="Default prompt for VLM parsing",
         validation_alias=AliasChoices("VLM_PARSER_PROMPT", "DEEPSEEK_PROMPT"),
     )
     max_new_tokens: int = Field(
-        default=2048,
+        default=9096,
         description="Max new tokens when calling the VLM",
         validation_alias=AliasChoices("VLM_PARSER_MAX_NEW_TOKENS", "DEEPSEEK_MAX_NEW_TOKENS"),
     )
@@ -312,7 +324,7 @@ class VLLMSettings(BaseSettings):
         description="Sampling temperature"
     )
     max_tokens: int = Field(
-        default=2048,
+        default=30000,
         description="Maximum tokens to generate"
     )
     timeout: int = Field(
@@ -354,6 +366,55 @@ class VlmClientSettings(BaseSettings):
     temperature: float = Field(
         default=0.0,
         description="Sampling temperature (0.0 for deterministic)",
+    )
+
+
+class IngestSettings(BaseSettings):
+    """Document ingestion pipeline settings.
+
+    Controls metadata extraction, chapter assignment, and summarization.
+    """
+
+    model_config = SettingsConfigDict(
+        env_prefix="INGEST_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # Metadata extraction
+    enable_doc_metadata: bool = Field(
+        default=True,
+        description="Extract device_name/doc_description from first pages",
+    )
+    enable_chapter_extraction: bool = Field(
+        default=True,
+        description="Assign chapter titles with carry-forward logic",
+    )
+    enable_summarization: bool = Field(
+        default=False,
+        description="Generate chunk-level summaries (requires text LLM)",
+    )
+    use_llm_fallback: bool = Field(
+        default=True,
+        description="Use LLM when rule-based extraction fails",
+    )
+
+    # Chunk settings
+    max_chunk_size: int = Field(
+        default=2000,
+        description="Maximum chunk size before additional splitting (chars)",
+    )
+    min_chunk_size: int = Field(
+        default=100,
+        description="Minimum chunk size for summarization",
+    )
+
+    # First pages for document metadata
+    doc_metadata_pages: int = Field(
+        default=3,
+        description="Number of first pages to analyze for doc metadata",
     )
 
 
@@ -486,6 +547,7 @@ api_settings = APISettings()
 deepdoc_settings = DeepDocSettings()
 vlm_parser_settings = VlmParserSettings()
 search_settings = SearchSettings()
+ingest_settings = IngestSettings()
 
 
 __all__ = [
@@ -494,11 +556,13 @@ __all__ = [
     "VlmClientSettings",
     "TEISettings",
     "APISettings",
+    "IngestSettings",
     "rag_settings",
     "vllm_settings",
     "vlm_client_settings",
     "tei_settings",
     "api_settings",
+    "ingest_settings",
     "DeepDocSettings",
     "deepdoc_settings",
     "VlmParserSettings",

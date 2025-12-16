@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CopyOutlined, LikeOutlined, DislikeOutlined, CheckOutlined } from "@ant-design/icons";
 import { Message } from "../types";
 import { MarkdownContent } from "./markdown-content";
+import { Collapse } from "antd";
 
 type MessageItemProps = {
   message: Message;
@@ -62,24 +63,35 @@ export function MessageItem({ message, isStreaming, onLike, onDislike }: Message
             )}
           </div>
 
-          {/* Reference section */}
-          {message.reference && message.reference.chunks.length > 0 && (
-            <div className="reference-section">
-              <div className="reference-title">
-                <span>References ({message.reference.chunks.length})</span>
-              </div>
-              <div className="reference-list">
-                {message.reference.chunks.map((chunk, idx) => (
-                  <div key={chunk.id || idx} className="reference-item">
-                    <span>{chunk.documentName || `Document ${idx + 1}`}</span>
-                    {chunk.similarity !== undefined && (
-                      <span style={{ opacity: 0.6 }}>
-                        {(chunk.similarity * 100).toFixed(0)}%
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
+          {/* Retrieved documents (collapsible) */}
+          {isAssistant && message.retrievedDocs && message.retrievedDocs.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <Collapse
+                size="small"
+                items={[
+                  {
+                    key: "retrieved",
+                    label: `검색 문서 (${message.retrievedDocs.length})`,
+                    children: (
+                      <div className="reference-list">
+                        {message.retrievedDocs.map((doc, idx) => (
+                          <div key={doc.id || idx} className="reference-item" style={{ marginBottom: 8 }}>
+                            <div style={{ fontWeight: 600 }}>{doc.title || `Document ${idx + 1}`}</div>
+                            <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                              {doc.snippet || ""}
+                            </div>
+                            {(doc.score !== null && doc.score !== undefined) && (
+                              <div style={{ fontSize: 12, opacity: 0.6 }}>
+                                score: {doc.score.toFixed(3)} {doc.score_percent ? `(${doc.score_percent}%)` : ""}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ),
+                  },
+                ]}
+              />
             </div>
           )}
 

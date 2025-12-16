@@ -54,6 +54,12 @@ class EsChunkDocument:
     pipeline_version: str = "v1"
     content_hash: str = ""
 
+    # Document-level Metadata (extracted from first pages)
+    device_name: str = ""
+    doc_description: str = ""
+    chapter: str = ""
+    chunk_summary: str = ""
+
     # Optional Fields
     page_image_path: str | None = None
     bbox: dict[str, Any] | None = None
@@ -97,6 +103,16 @@ class EsChunkDocument:
             "created_at": self.created_at,
             "updated_at": self.updated_at,
         }
+
+        # Add document-level metadata if set
+        if self.device_name:
+            doc["device_name"] = self.device_name
+        if self.doc_description:
+            doc["doc_description"] = self.doc_description
+        if self.chapter:
+            doc["chapter"] = self.chapter
+        if self.chunk_summary:
+            doc["chunk_summary"] = self.chunk_summary
 
         # Add optional fields only if set
         if self.page_image_path:
@@ -158,9 +174,13 @@ class EsChunkDocument:
         if vlm_model:
             doc_tags.append(f"vlm:{vlm_model}")
 
-        # Extract page_image_path from section metadata if available
+        # Extract metadata from section.metadata
         section_meta = section.metadata or {}
         page_image_path = section_meta.get("page_image_path")
+        device_name = section_meta.get("device_name", "")
+        doc_description = section_meta.get("doc_description", "")
+        chapter = section_meta.get("chapter", "")
+        chunk_summary = section_meta.get("chunk_summary", "")
 
         return cls(
             doc_id=doc_id,
@@ -176,6 +196,10 @@ class EsChunkDocument:
             pipeline_version=pipeline_version,
             tags=doc_tags,
             page_image_path=page_image_path,
+            device_name=device_name,
+            doc_description=doc_description,
+            chapter=chapter,
+            chunk_summary=chunk_summary,
         )
 
 
