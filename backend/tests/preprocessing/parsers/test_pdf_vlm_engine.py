@@ -177,8 +177,8 @@ class TestVlmPdfEngine:
 
         assert mock_client.calls[0]["prompt"] == custom_prompt
 
-    def test_run_passes_max_new_tokens(self):
-        """Test that max_new_tokens is passed to VLM client."""
+    def test_run_passes_max_tokens(self):
+        """Test that max_tokens is passed to VLM client."""
         mock_client = MockVLMClient()
         mock_renderer = MagicMock(return_value=["image1"])
 
@@ -187,7 +187,7 @@ class TestVlmPdfEngine:
         opts = PdfParseOptions(vlm_max_new_tokens=2048)
         engine.run(io.BytesIO(b"dummy"), options=opts)
 
-        assert mock_client.calls[0]["kwargs"]["max_new_tokens"] == 2048
+        assert mock_client.calls[0]["kwargs"]["max_tokens"] == 2048
 
     def test_run_passes_temperature(self):
         """Test that temperature is passed to VLM client."""
@@ -218,7 +218,7 @@ class TestVlmPdfEngine:
 
         # Check VLM client call
         assert mock_client.calls[0]["prompt"] == "Custom prompt"
-        assert mock_client.calls[0]["kwargs"]["max_new_tokens"] == 4096
+        assert mock_client.calls[0]["kwargs"]["max_tokens"] == 4096
         assert mock_client.calls[0]["kwargs"]["temperature"] == 0.2
 
         # Check metadata
@@ -438,7 +438,7 @@ class TestVlmPdfEngine:
         engine.run(io.BytesIO(b"dummy"), options=opts)
 
         # Should not include None values in kwargs
-        assert "max_new_tokens" not in mock_client.calls[0]["kwargs"]
+        assert "max_tokens" not in mock_client.calls[0]["kwargs"]
         assert "temperature" not in mock_client.calls[0]["kwargs"]
 
 
@@ -570,7 +570,7 @@ class TestVlmPdfEngineWithDifferentModels:
             result = engine.run(io.BytesIO(b"dummy"), options=opts)
 
             # Verify max_tokens was passed correctly
-            assert mock_client.calls[0]["kwargs"]["max_new_tokens"] == max_tokens
+            assert mock_client.calls[0]["kwargs"]["max_tokens"] == max_tokens
             assert result.metadata["vlm_model"] == model_name
 
     def test_model_with_version_suffix(self):

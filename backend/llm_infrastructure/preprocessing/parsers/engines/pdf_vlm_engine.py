@@ -70,7 +70,7 @@ class VlmPdfEngine:
             prompt = opts.vlm_prompt or self.default_prompt
             infer_kwargs: Dict[str, Any] = {}
             if opts.vlm_max_new_tokens is not None:
-                infer_kwargs["max_new_tokens"] = opts.vlm_max_new_tokens
+                infer_kwargs["max_tokens"] = opts.vlm_max_new_tokens
             if opts.vlm_temperature is not None:
                 infer_kwargs["temperature"] = opts.vlm_temperature
 
