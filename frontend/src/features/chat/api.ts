@@ -1,32 +1,16 @@
 import { apiClient } from "../../lib/api-client";
-import { connectSse } from "../../lib/sse";
 import { env } from "../../config/env";
-import { Conversation, Message } from "./types";
+import { AgentResponse, Conversation, Message } from "./types";
 
 export async function fetchConversations(): Promise<Conversation[]> {
   return apiClient.get<Conversation[]>("/api/conversations");
 }
 
 export async function sendChatMessage(
-  payload: { conversationId?: string; message: string },
-  handlers: {
-    onMessage: (text: string) => void;
-    onDone?: () => void;
-    onError?: (err: unknown) => void;
-  }
-) {
-  return connectSse(
-    {
-      path: env.chatPath,
-      method: "POST",
-      body: payload,
-    },
-    {
-      onMessage: handlers.onMessage,
-      onClose: handlers.onDone,
-      onError: handlers.onError,
-    }
-  );
+  payload: { message: string }
+): Promise<AgentResponse> {
+  // Agent endpoint returns JSON (non-SSE)
+  return apiClient.post<AgentResponse>(env.chatPath || "/api/agent/run", payload);
 }
 
 export async function saveMessage(

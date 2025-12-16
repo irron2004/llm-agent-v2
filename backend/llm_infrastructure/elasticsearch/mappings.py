@@ -97,6 +97,29 @@ def get_rag_chunks_mapping(dims: int = 1024) -> dict[str, Any]:
                 "doc_values": True,
             },
             # ===================================================================
+            # Document-level Metadata (extracted from first pages)
+            # ===================================================================
+            "device_name": {
+                "type": "keyword",
+                "doc_values": True,
+                # 장비명 (e.g., "SUPRA XP", "EFEM", "RFID")
+            },
+            "doc_description": {
+                "type": "text",
+                "index": False,  # Stored but not searched
+                # 문서 설명 (1~2 sentences)
+            },
+            "chapter": {
+                "type": "keyword",
+                "doc_values": True,
+                # 챕터/섹션 제목 (carry-forward from headings)
+            },
+            "chunk_summary": {
+                "type": "text",
+                "index": False,  # Stored for retrieval, not searched
+                # 청크별 요약 (1~2 sentences)
+            },
+            # ===================================================================
             # Optional Fields
             # ===================================================================
             "page_image_path": {

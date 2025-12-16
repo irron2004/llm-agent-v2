@@ -46,8 +46,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend.config.settings import search_settings, vlm_client_settings
+from backend.config.settings import search_settings, vlm_client_settings, ingest_settings
 from backend.services.ingest.document_ingest_service import DocumentIngestService, Section
+from backend.services.ingest.metadata_extractor import create_metadata_extractor
 from backend.llm_infrastructure.vlm.clients import OpenAIVisionClient
 from backend.services.es_ingest_service import EsIngestService
 
@@ -147,6 +148,45 @@ def parse_args() -> argparse.Namespace:
         type=int,
         default=150,
         help="PDF→이미지 변환 DPI (기본: 150)",
+    )
+    # 메타데이터 추출 옵션
+    parser.add_argument(
+        "--enable-metadata",
+        action="store_true",
+        default=True,
+        help="문서 메타데이터 추출 활성화 (device_name, doc_description)",
+    )
+    parser.add_argument(
+        "--disable-metadata",
+        action="store_true",
+        help="문서 메타데이터 추출 비활성화",
+    )
+    parser.add_argument(
+        "--enable-chapters",
+        action="store_true",
+        default=True,
+        help="챕터 제목 추출 활성화 (carry-forward)",
+    )
+    parser.add_argument(
+        "--disable-chapters",
+        action="store_true",
+        help="챕터 제목 추출 비활성화",
+    )
+    parser.add_argument(
+        "--enable-summaries",
+        action="store_true",
+        help="청크별 요약 생성 활성화 (LLM 필요, 느림)",
+    )
+    parser.add_argument(
+        "--use-llm-fallback",
+        action="store_true",
+        default=True,
+        help="규칙 기반 추출 실패 시 LLM 사용",
+    )
+    parser.add_argument(
+        "--no-llm-fallback",
+        action="store_true",
+        help="LLM fallback 비활성화 (규칙 기반만 사용)",
     )
     return parser.parse_args()
 
@@ -305,13 +345,31 @@ def main() -> None:
     # 기준 경로 설정 (폴더인 경우 해당 폴더, 아니면 None)
     base_path = input_path if input_path.is_dir() else None
 
+    # 메타데이터 추출 설정 결정
+    enable_doc_metadata = not args.disable_metadata
+    enable_chapters = not args.disable_chapters
+    enable_summaries = args.enable_summaries
+    use_llm_fallback = not args.no_llm_fallback
+
+    # MetadataExtractor 초기화 (LLM fallback 사용 시)
+    metadata_extractor = None
+    if enable_doc_metadata or enable_chapters or enable_summaries:
+        metadata_extractor = create_metadata_extractor(use_llm_fallback=use_llm_fallback)
+        print(f"Metadata extraction: doc_meta={enable_doc_metadata}, chapters={enable_chapters}, summaries={enable_summaries}")
+
     # VLM client 초기화 (재사용)
     vlm_client = OpenAIVisionClient(
         base_url=vlm_client_settings.base_url,
         model=vlm_client_settings.model,
         timeout=vlm_client_settings.timeout,
     )
-    ingest_svc = DocumentIngestService.for_vlm(vlm_client=vlm_client)
+    ingest_svc = DocumentIngestService.for_vlm(
+        vlm_client=vlm_client,
+        metadata_extractor=metadata_extractor,
+        enable_doc_metadata=enable_doc_metadata,
+        enable_chapter_extraction=enable_chapters,
+        enable_summarization=enable_summaries,
+    )
 
     # ES ingest 서비스 초기화
     alias = args.index or f"{search_settings.es_index_prefix}_{search_settings.es_env}_current"
@@ -352,6 +410,7 @@ def main() -> None:
     print(f"  Total chunks indexed: {total_indexed}")
     print(f"  Index: {alias}")
     print(f"  doc_type={args.doc_type}, lang={args.lang}, vlm_model={vlm_client_settings.model}")
+    print(f"  Metadata: doc_meta={enable_doc_metadata}, chapters={enable_chapters}, summaries={enable_summaries}")
 
     if failed_files:
         print("\nFailed files:")

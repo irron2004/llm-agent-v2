@@ -48,13 +48,27 @@ class VLLMClient:
         # Allow extra OpenAI-compatible params
         payload.update(kwargs)
 
-        resp = self._client.post(
-            f"{self.base_url}/v1/chat/completions",
-            json=payload,
-        )
-        resp.raise_for_status()
+        try:
+            resp = self._client.post(
+                f"{self.base_url}/v1/chat/completions",
+                json=payload,
+            )
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as exc:
+            # Surface provider error details to the caller for easier debugging.
+            detail = exc.response.text
+            raise RuntimeError(
+                f"vLLM request failed: status={exc.response.status_code}, body={detail}"
+            ) from exc
+
         data = resp.json()
-        text = data["choices"][0]["message"]["content"]
+        # Some OpenAI-compatible providers return tool_calls with content=None.
+        # Normalize to a non-None string so downstream `.strip()` calls do not crash.
+        choice = data["choices"][0]
+        message = choice.get("message", {})
+        text = message.get("content")
+        if text is None:
+            text = choice.get("text", "") or ""
         return LLMResponse(text=text, raw=data)
 
 

@@ -4,9 +4,9 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routers import chat, health, preprocessing, query_expansion, rerank, search
+from backend.api.routers import agent, chat, health, preprocessing, query_expansion, rerank, search
 from backend.api.dependencies import set_search_service
-from backend.config.settings import rag_settings, search_settings
+from backend.config.settings import api_settings, rag_settings, search_settings
 from backend.llm_infrastructure.preprocessing import get_preprocessor
 from backend.services.document_service import DocumentIndexService
 from backend.services.embedding_service import EmbeddingService
@@ -21,8 +21,10 @@ logger = logging.getLogger(__name__)
 def create_app() -> FastAPI:
     """Create and configure the FastAPI app."""
     app = FastAPI(
-        title="LLM Infrastructure API",
-        version=APP_VERSION,
+        title=api_settings.title or "LLM Infrastructure API",
+        version=api_settings.version or APP_VERSION,
+        description=api_settings.description or None,
+        debug=api_settings.reload,  # align debug flag with reload setting
     )
 
     app.add_middleware(
@@ -35,6 +37,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(preprocessing.router)
+    app.include_router(agent.router, prefix="/api")
     app.include_router(chat.router, prefix="/api")
     app.include_router(search.router, prefix="/api")
     app.include_router(rerank.router, prefix="/api")
@@ -51,10 +54,6 @@ def create_app() -> FastAPI:
             logger.warning(f"Search service not configured: {exc}")
 
     return app
-
-
-# Uvicorn entrypoint
-app = create_app()
 
 
 def _configure_search_service() -> None:
@@ -125,9 +124,11 @@ def _configure_search_service() -> None:
         index_alias = index_manager.get_alias_name()
         es_search = EsSearchService.from_settings(index=index_alias)
         set_search_service(es_search)
-        logger.info(
-            "Search service configured with Elasticsearch alias: %s", index_alias
-        )
+        logger.info("Search service configured with Elasticsearch alias: %s", index_alias)
         return
 
     logger.warning("Unknown SEARCH_BACKEND '%s'; search service not configured.", backend)
+
+
+# Uvicorn entrypoint
+app = create_app()
