@@ -12,3 +12,4 @@
 | 2025-12-04 | BE   | LLM 공용 환경 구성 및 VLM 설정 중립화       | hskim  | done | [상세](work_list/2025-12-04_shared_env_and_vlm_settings.md) |
 | 2025-12-05 | BE   | Chunking 파이프라인 검증 (SU-2504)         | hskim  | in-review | [상세](work_list/2025-12-05_chunking_pipeline.md) |
 | 2025-12-09 | BE   | ES Index Manager 구현 (SU-2509)           | hskim  | done | [상세](work_list/2025-12-09_es_index_manager.md) |
+| 2025-12-11 | FE   | VLM Parsing Viewer 화면 구현               | hskim  | done | [상세](work_list/2025-12-11_vlm_parsing_viewer.md) |

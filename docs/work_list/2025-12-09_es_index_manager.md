@@ -17,6 +17,14 @@
 - CLI 스크립트 작성 (`backend/llm_infrastructure/elasticsearch/cli.py`)
 - Settings 확장 (ES 인덱스 관련 설정 추가)
 - elasticsearch 패키지 의존성 추가
+- docker-compose.yml 정리
+  - `version` 속성 제거 (obsolete 경고 해소)
+  - vLLM GPU 설정 활성화 (device_ids로 GPU 지정)
+  - vLLM을 `profiles: [with-vllm]`으로 분리 (기본 실행 시 제외)
+- Makefile 개선
+  - `make up` 시 외부 vLLM 주소 출력 및 profile 안내
+  - `make up-vllm` 추가 (vLLM 포함 실행)
+- `.env`에 `VLLM_TIMEOUT=600` 설정 (10분)
 
 ## 3. 작업 과정(Timeline/Steps)
 1. SU-2509 티켓 요구사항 분석
@@ -34,6 +42,18 @@
 6. SearchSettings 확장 (es_env, es_index_prefix, es_index_version, es_embedding_dims)
 7. .env.example 업데이트
 8. elasticsearch 패키지 의존성 추가
+9. SU-2510 티켓 범위 정리
+   - 문서 파싱(VLM/DeepDoc) 결과부터를 DB/인덱싱 서비스 입력으로 정의
+   - chunking → embedding → ES 인덱싱까지를 하나의 ES 인덱싱 파이프라인으로 정리
+   - ClickUp SU-2510 Description 업데이트 (RAG용 DB 서비스 관점으로 재서술)
+10. docker-compose.yml 정리
+    - `version: "3.9"` 제거 (obsolete)
+    - vLLM GPU 설정: `device_ids`로 GPU 1 지정 (GPU 0은 pe-vllm이 사용 중)
+    - vLLM을 `profiles: [with-vllm]`으로 분리 (기본 실행 시 외부 vLLM 사용)
+11. Makefile 개선
+    - `make up`: api + elasticsearch만 실행, vLLM 주소 및 profile 안내 출력
+    - `make up-vllm`: vLLM 포함 실행 (`--profile with-vllm`)
+12. VLLM_TIMEOUT=600 설정 (FastAPI 요청 timeout 10분으로 증가)
 
 ## 4. 추가/수정한 테스트(Tests)
 - (단위 테스트는 별도 작성 예정)
@@ -83,6 +103,18 @@ python -m backend.llm_infrastructure.elasticsearch.cli switch --version 2
 
 # 인덱스 삭제
 python -m backend.llm_infrastructure.elasticsearch.cli delete --version 1 --force
+```
+
+### vLLM 운영 전략
+- 기본: 외부 vLLM 서버(`pe-vllm`, GPU 0) 사용
+- 필요시: `make up-vllm` 또는 `docker compose --profile with-vllm up -d`로 별도 vLLM 실행 (GPU 1)
+- Timeout: 600초 (10분) - 긴 응답 생성 대응
+
+### Make 명령어
+```bash
+make up        # api + ES만 실행 (외부 vLLM 사용)
+make up-vllm   # api + ES + vLLM 실행
+make logs      # 로그 확인
 ```
 
 ## 6. 회고 및 다음 할 일(Retrospective / Next Steps)

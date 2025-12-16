@@ -84,46 +84,23 @@ class DocumentIngestService:
         }
 
     def _split_sections(self, parsed: ParsedDocument, doc_type: str) -> List[Section]:
-        pattern = self._section_pattern(doc_type)
-        sections: List[Section] = []
-        current_title = "preamble"
-        current_lines: List[str] = []
-        start_page: Optional[int] = None
+        # 현재는 섹션 분리를 하지 않고 VLM 결과 전체를 하나의 섹션으로 반환
+        if not parsed.blocks:
+            return []
 
-        for block in parsed.blocks:
-            for raw_line in (block.text or "").splitlines():
-                line = self._normalize_heading(raw_line)
-                if not line:
-                    continue
-                if pattern.match(line):
-                    if current_lines:
-                        sections.append(
-                            Section(
-                                title=current_title,
-                                text="\n".join(current_lines).strip(),
-                                page_start=start_page,
-                                page_end=block.page,
-                                metadata={"source": "block"},
-                            )
-                        )
-                    current_title = line
-                    current_lines = []
-                    start_page = block.page
-                else:
-                    current_lines.append(self._normalize_text(line))
+        merged_text = "\n".join(
+            self._normalize_text(block.text) for block in parsed.blocks if block.text
+        ).strip()
 
-        if current_lines:
-            sections.append(
-                Section(
-                    title=current_title,
-                    text="\n".join(current_lines).strip(),
-                    page_start=start_page,
-                    page_end=parsed.blocks[-1].page if parsed.blocks else None,
-                    metadata={"source": "block"},
-                )
+        return [
+            Section(
+                title="document",
+                text=merged_text,
+                page_start=parsed.blocks[0].page,
+                page_end=parsed.blocks[-1].page,
+                metadata={"source": "raw"},
             )
-
-        return sections
+        ]
 
     @staticmethod
     def _normalize_heading(value: str) -> str:
@@ -143,6 +120,9 @@ class DocumentIngestService:
             "sop": re.compile(r"^\d+\.\s*"),
             "ts": re.compile(r"^[A-D]-\d+\.\s*"),
             "guide": re.compile(r"^\d+\.\d*\s+"),
+            # raw/none: 매칭되지 않는 패턴으로 섹션 분리를 비활성화
+            "raw": re.compile(r"(?! )"),
+            "none": re.compile(r"(?! )"),
         }
         return patterns.get(token, re.compile(r"^(\d+\.|\w+\s*[:\-])"))
 
