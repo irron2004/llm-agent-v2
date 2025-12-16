@@ -8,6 +8,7 @@ from backend.config.settings import api_settings, rag_settings, vllm_settings
 from backend.llm_infrastructure.embedding import get_embedder
 from backend.llm_infrastructure.embedding.base import BaseEmbedder
 from backend.llm_infrastructure.llm import get_llm
+from backend.llm_infrastructure.llm.langgraph_agent import load_prompt_spec
 from backend.llm_infrastructure.llm.base import BaseLLM
 from backend.llm_infrastructure.preprocessing import get_preprocessor
 from backend.llm_infrastructure.preprocessing.base import BasePreprocessor
@@ -169,6 +170,12 @@ def get_default_llm() -> BaseLLM:
         max_tokens=vllm_settings.max_tokens,
         timeout=vllm_settings.timeout,
     )
+
+
+@lru_cache
+def get_prompt_spec_cached():
+    """Cache된 LangGraph 프롬프트 스펙."""
+    return load_prompt_spec()
 
 
 @lru_cache
