@@ -63,6 +63,13 @@ export function MessageItem({ message, isStreaming, onLike, onDislike }: Message
             )}
           </div>
 
+          {isAssistant && isStreaming && message.currentNode && (
+            <div className="node-indicator">
+              <span className="node-indicator-dot" aria-hidden="true" />
+              <span>처리중: {message.currentNode}</span>
+            </div>
+          )}
+
           {/* Retrieved documents (collapsible) */}
           {isAssistant && message.retrievedDocs && message.retrievedDocs.length > 0 && (
             <div style={{ marginTop: 12 }}>
@@ -88,6 +95,40 @@ export function MessageItem({ message, isStreaming, onLike, onDislike }: Message
                           </div>
                         ))}
                       </div>
+                    ),
+                  },
+                ]}
+              />
+            </div>
+          )}
+
+          {/* Execution logs (collapsible) */}
+          {isAssistant && message.logs && message.logs.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <Collapse
+                size="small"
+                defaultActiveKey={isStreaming ? ["logs"] : undefined}
+                items={[
+                  {
+                    key: "logs",
+                    label: `실행 로그 (${message.logs.length})`,
+                    children: (
+                      <pre
+                        style={{
+                          margin: 0,
+                          maxHeight: 240,
+                          overflow: "auto",
+                          fontSize: 12,
+                          background: "var(--color-code-bg)",
+                          color: "var(--color-code-text)",
+                          borderRadius: 6,
+                          padding: 12,
+                          whiteSpace: "pre-wrap",
+                          wordBreak: "break-word",
+                        }}
+                      >
+                        {message.logs.join("\n")}
+                      </pre>
                     ),
                   },
                 ]}

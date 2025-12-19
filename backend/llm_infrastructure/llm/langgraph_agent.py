@@ -54,6 +54,11 @@ class AgentState(TypedDict, total=False):
     max_attempts: int
     human_action: Optional[Dict[str, Any]]
 
+    # User feedback after retrieval (for ask_user node)
+    user_feedback: Optional[str]
+    retrieval_confirmed: bool
+    thread_id: Optional[str]
+
 
 # -----------------------------
 # 2) Prompt loading
@@ -79,7 +84,7 @@ DEFAULT_JUDGE_SETUP = """
 설치/세팅 답변이 질문과 검색 증거에 충실한지 판정한다.
 
 # 입력
-- 질문, 답변, REF_JSON (검색 결과)
+- 질문, 답변, REFS (검색 결과)
 
 # 출력
 JSON 한 줄: {"faithful": bool, "issues": ["..."], "hint": "..."}
@@ -160,13 +165,24 @@ class SearchServiceRetriever:
 # -----------------------------
 # 4) LLM helpers
 # -----------------------------
+# 노드 타입별 max_tokens 설정
+MAX_TOKENS_CLASSIFICATION = 256   # 라우팅/분류용 (짧은 응답)
+MAX_TOKENS_ANSWER = 4096         # 답변 생성용
+
+
 def _invoke_llm(llm: BaseLLM, system: str, user: str, **kwargs: Any) -> str:
     messages: List[dict[str, str]] = []
     if system:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": user})
+    # max_tokens 기본값: 분류용 (answer_node에서는 명시적으로 더 큰 값 전달)
+    if "max_tokens" not in kwargs:
+        kwargs["max_tokens"] = MAX_TOKENS_CLASSIFICATION
+    logger.debug("_invoke_llm: max_tokens=%s, system_len=%d, user_len=%d", kwargs.get("max_tokens"), len(system), len(user))
     out = llm.generate(messages, **kwargs)
-    return out.text.strip()
+    result = out.text.strip()
+    logger.debug("_invoke_llm: output_len=%d", len(result))
+    return result
 
 
 def _format_prompt(template: str, mapping: Dict[str, str]) -> str:
@@ -217,6 +233,12 @@ def _parse_queries(text: str) -> List[str]:
         if qs:
             return qs[:5]
 
+    if '"queries"' in t:
+        items = re.findall(r'"([^"]+)"', t)
+        qs = [i.strip() for i in items if i.strip() and i.strip().lower() != "queries"]
+        if qs:
+            return qs[:5]
+
     lines = [ln.strip() for ln in t.splitlines() if ln.strip()]
     return lines[:5]
 
@@ -249,6 +271,25 @@ def results_to_ref_json(docs: List[RetrievalResult]) -> List[Dict[str, Any]]:
             }
         )
     return ref
+
+
+def ref_json_to_text(ref_json: List[Dict[str, Any]]) -> str:
+    """Format retrieval evidence as plain text for LLM prompts.
+
+    vLLM + 일부 모델에서 JSON(중괄호/대괄호/따옴표)이 포함된 프롬프트가
+    비정상 토큰('!') 반복/빈 응답으로 붕괴하는 사례가 있어 텍스트로 전달한다.
+    """
+    if not ref_json:
+        return "EMPTY"
+
+    lines: List[str] = []
+    for r in ref_json:
+        rank = r.get("rank", "?")
+        doc_id = str(r.get("doc_id", "")).strip()
+        content = str(r.get("content", "")).strip()
+        content = " ".join(content.split())
+        lines.append(f"[{rank}] {doc_id}: {content}")
+    return "\n".join(lines)
 
 
 # -----------------------------
@@ -326,16 +367,133 @@ def retrieve_node(state: AgentState, *, retriever: Retriever, top_k: int = 8) ->
     return {"docs": docs, "ref_json": results_to_ref_json(docs)}
 
 
+def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["answer", "refine_and_retrieve"]]:
+    """Retrieval 후 사용자에게 검색 결과를 보여주고 피드백을 받는 노드.
+
+    사용자 응답:
+    - True 또는 빈 문자열: 검색 결과 승인 → answer로 진행
+    - 문자열(키워드/피드백): 재검색 쿼리에 반영 → refine_and_retrieve로 이동
+    - False: 검색 결과 부적절 → refine_and_retrieve로 이동 (기존 쿼리 유지)
+    """
+    ref_json = state.get("ref_json", [])
+    search_queries = state.get("search_queries", [])
+
+    payload = {
+        "type": "retrieval_review",
+        "question": state["query"],
+        "route": state.get("route"),
+        "search_queries": search_queries,
+        "retrieved_docs": ref_json,
+        "doc_count": len(ref_json),
+        "instruction": (
+            "검색 결과를 확인하세요.\n"
+            "- 승인(true 또는 빈 문자열): 답변 생성으로 진행\n"
+            "- 추가 키워드/피드백 입력: 해당 내용으로 재검색\n"
+            "- 거절(false): 재검색 시도"
+        ),
+    }
+
+    decision = interrupt(payload)
+
+    # 사용자가 특정 문서를 선택한 경우: 선택 문서만으로 answer 진행
+    if isinstance(decision, dict):
+        selected_ids = decision.get("selected_doc_ids") or decision.get("selected_docs")
+        selected_ranks = decision.get("selected_ranks")
+
+        if isinstance(selected_ids, str):
+            selected_ids = [selected_ids]
+        if isinstance(selected_ranks, (int, str)):
+            selected_ranks = [selected_ranks]
+
+        selected_id_list: list[str] = []
+        if isinstance(selected_ids, list):
+            selected_id_list = [str(x).strip() for x in selected_ids if str(x).strip()]
+
+        selected_rank_list: list[int] = []
+        if isinstance(selected_ranks, list):
+            for r in selected_ranks:
+                try:
+                    selected_rank_list.append(int(r))
+                except Exception:
+                    continue
+
+        if selected_id_list or selected_rank_list:
+            docs = state.get("docs", [])
+            selected_docs = []
+
+            if selected_id_list:
+                selected_docs.extend([d for d in docs if str(d.doc_id) in selected_id_list])
+
+            if selected_rank_list:
+                rank_set = set(selected_rank_list)
+                selected_docs.extend([
+                    d for idx, d in enumerate(docs, start=1) if idx in rank_set
+                ])
+
+            # Deduplicate while preserving order
+            seen_keys = set()
+            deduped_docs = []
+            for d in selected_docs:
+                key = (d.doc_id, id(d))
+                if key in seen_keys:
+                    continue
+                seen_keys.add(key)
+                deduped_docs.append(d)
+
+            if deduped_docs:
+                return Command(
+                    goto="answer",
+                    update={
+                        "docs": deduped_docs,
+                        "ref_json": results_to_ref_json(deduped_docs),
+                        "selected_doc_ids": selected_id_list,
+                        "selected_ranks": selected_rank_list,
+                        "retrieval_confirmed": True,
+                        "user_feedback": None,
+                    },
+                )
+
+    # 승인: True 또는 빈 문자열
+    if decision is True or decision == "":
+        return Command(
+            goto="answer",
+            update={"retrieval_confirmed": True, "user_feedback": None}
+        )
+
+    # 피드백 제공: 문자열로 키워드/피드백 입력
+    if isinstance(decision, str) and decision.strip():
+        feedback = decision.strip()
+        # 기존 쿼리에 피드백 키워드 추가
+        new_queries = [state["query"], feedback] + [
+            q for q in search_queries if q != state["query"]
+        ]
+        return Command(
+            goto="refine_and_retrieve",
+            update={
+                "retrieval_confirmed": False,
+                "user_feedback": feedback,
+                "search_queries": new_queries[:5],
+            }
+        )
+
+    # 거절: False
+    return Command(
+        goto="refine_and_retrieve",
+        update={"retrieval_confirmed": False, "user_feedback": None}
+    )
+
+
 def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     route = state["route"]
-    ref_json = json.dumps(state.get("ref_json", []), ensure_ascii=False)
+    ref_items = state.get("ref_json", [])
+    ref_text = ref_json_to_text(ref_items)
     logger.info(
-        "answer_node: route=%s, ref_json_chars=%d, docs=%d",
+        "answer_node: route=%s, refs_chars=%d, docs=%d",
         route,
-        len(ref_json),
-        len(state.get("ref_json", [])),
+        len(ref_text),
+        len(ref_items),
     )
-    mapping = {"sys.query": state["query"], "ref_json": ref_json}
+    mapping = {"sys.query": state["query"], "ref_text": ref_text}
 
     if route == "setup":
         tmpl = spec.setup_ans
@@ -345,13 +503,15 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
         tmpl = spec.general_ans
 
     user = _format_prompt(tmpl.user, mapping)
-    answer = _invoke_llm(llm, tmpl.system, user)
+    logger.info("answer_node: user_prompt_chars=%d, system_prompt_chars=%d", len(user), len(tmpl.system))
+    answer = _invoke_llm(llm, tmpl.system, user, max_tokens=MAX_TOKENS_ANSWER)
+    logger.info("answer_node: answer_chars=%d, answer_preview=%s", len(answer), answer[:500] if answer else "(empty)")
     return {"answer": answer}
 
 
 def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     route = state["route"]
-    ref_json = json.dumps(state.get("ref_json", []), ensure_ascii=False)
+    ref_text = ref_json_to_text(state.get("ref_json", []))
 
     if route == "setup":
         sys = spec.judge_setup_sys
@@ -363,7 +523,7 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     user = (
         f"질문: {state['query']}\n"
         f"답안: {state.get('answer', '')}\n"
-        f"증거(JSON): {ref_json}\n"
+        f"증거(REFS): {ref_text}\n"
         "JSON 한 줄로 반환: {\"faithful\": bool, \"issues\": [...], \"hint\": \"...\"}"
     )
 
@@ -378,6 +538,8 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
 
 
 def should_retry(state: AgentState) -> Literal["done", "retry", "human"]:
+    if state.get("retrieval_confirmed"):
+        return "done"
     judge = state.get("judge", {})
     faithful = bool(judge.get("faithful", False))
     if faithful:
@@ -412,6 +574,7 @@ def refine_queries_node(state: AgentState, *, llm: BaseLLM) -> Dict[str, Any]:
 
 def human_review_node(state: AgentState) -> Command[Literal["done", "retry"]]:
     payload = {
+        "type": "human_review",
         "question": state["query"],
         "route": state.get("route"),
         "judge": state.get("judge", {}),
@@ -447,6 +610,7 @@ __all__ = [
     "st_gate_node",
     "st_mq_node",
     "retrieve_node",
+    "ask_user_after_retrieve_node",
     "answer_node",
     "judge_node",
     "should_retry",

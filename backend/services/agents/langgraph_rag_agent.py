@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import functools
 import logging
-from typing import Any, Dict, Optional
+import time
+from typing import Any, Callable, Dict, Optional
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
@@ -20,6 +21,7 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     Retriever,
     SearchServiceRetriever,
     answer_node,
+    ask_user_after_retrieve_node,
     human_review_node,
     judge_node,
     load_prompt_spec,
@@ -58,6 +60,8 @@ class LangGraphRAGAgent:
         top_k: int = 8,
         mode: str = "verified",  # base | verified
         checkpointer: Optional[MemorySaver] = None,
+        ask_user_after_retrieve: bool = False,
+        event_sink: Callable[[Dict[str, Any]], None] | None = None,
     ) -> None:
         self.llm = llm
         capped_top_k = min(top_k, self.MAX_TOP_K)
@@ -65,15 +69,24 @@ class LangGraphRAGAgent:
         self.spec = prompt_spec or load_prompt_spec()
         self.top_k = capped_top_k
         self.mode = mode
+        self.ask_user_after_retrieve = ask_user_after_retrieve
         self.checkpointer = checkpointer or MemorySaver()
+        self._event_sink = event_sink
         self._graph = self._build_graph(mode)
+
+    def _emit_event(self, event: Dict[str, Any]) -> None:
+        if self._event_sink is None:
+            return
+        try:
+            self._event_sink(event)
+        except Exception:
+            # Never allow observability hooks to break the agent execution.
+            logger.exception("event_sink failed")
 
     def _wrap_node(self, name: str, fn):
         """Wrap a node to log start/end without leaking user content."""
 
         def _wrapped(state: AgentState, *args: Any, **kwargs: Any):
-            import time
-
             meta = {
                 "route": state.get("route"),
                 "st_gate": state.get("st_gate"),
@@ -82,10 +95,29 @@ class LangGraphRAGAgent:
                 "thread_id": state.get("thread_id"),
             }
             logger.info("[langgraph] node start: %s %s", name, meta)
+            self._emit_event({
+                "type": "log",
+                "level": "info",
+                "node": name,
+                "phase": "start",
+                "meta": meta,
+                "ts": time.time(),
+                "message": f"[langgraph] node start: {name} {meta}",
+            })
             t0 = time.perf_counter()
             result = fn(state, *args, **kwargs)
             elapsed = (time.perf_counter() - t0) * 1000
             logger.info("[langgraph] node done: %s (%.1f ms)", name, elapsed)
+            self._emit_event({
+                "type": "log",
+                "level": "info",
+                "node": name,
+                "phase": "done",
+                "meta": meta,
+                "ts": time.time(),
+                "elapsed_ms": round(elapsed, 1),
+                "message": f"[langgraph] node done: {name} ({elapsed:.1f} ms)",
+            })
             return result
 
         return _wrapped
@@ -102,6 +134,11 @@ class LangGraphRAGAgent:
             "retrieve",
             self._wrap_node("retrieve", functools.partial(retrieve_node, retriever=self.retriever, top_k=self.top_k)),
         )
+        # retry 경로용 retrieve: ask_user 없이 바로 answer로 연결
+        builder.add_node(
+            "retrieve_retry",
+            self._wrap_node("retrieve_retry", functools.partial(retrieve_node, retriever=self.retriever, top_k=self.top_k)),
+        )
         builder.add_node("answer", self._wrap_node("answer", functools.partial(answer_node, llm=self.llm, spec=self.spec)))
         builder.add_node("judge", self._wrap_node("judge", functools.partial(judge_node, llm=self.llm, spec=self.spec)))
 
@@ -110,12 +147,28 @@ class LangGraphRAGAgent:
         builder.add_edge("mq", "st_gate")
         builder.add_edge("st_gate", "st_mq")
         builder.add_edge("st_mq", "retrieve")
-        builder.add_edge("retrieve", "answer")
+
+        # ask_user_after_retrieve 옵션: retrieve 후 사용자 확인
+        if self.ask_user_after_retrieve:
+            builder.add_node("ask_user", self._wrap_node("ask_user", ask_user_after_retrieve_node))
+            # refine_and_retrieve: 사용자 피드백 후 다시 retrieve로
+            builder.add_node("refine_and_retrieve", self._wrap_node("refine_and_retrieve", lambda s: {}))
+
+            builder.add_edge("retrieve", "ask_user")
+            # ask_user_after_retrieve_node는 Command를 반환하므로 conditional edge 불필요
+            # Command의 goto="answer" 또는 goto="refine_and_retrieve"가 라우팅 담당
+            builder.add_edge("refine_and_retrieve", "retrieve")
+            # retry 경로의 retrieve_retry는 ask_user 없이 바로 answer로
+            builder.add_edge("retrieve_retry", "answer")
+        else:
+            builder.add_edge("retrieve", "answer")
+            builder.add_edge("retrieve_retry", "answer")
+
         builder.add_edge("answer", "judge")
 
         if mode == "base":
             builder.add_edge("judge", END)
-            return builder.compile()
+            return builder.compile(checkpointer=self.checkpointer if self.ask_user_after_retrieve else None)
 
         # verified: add retry/human
         builder.add_node("retry_bump", self._wrap_node("retry_bump", retry_bump_node))
@@ -132,7 +185,8 @@ class LangGraphRAGAgent:
         )
 
         builder.add_edge("retry_bump", "refine_queries")
-        builder.add_edge("refine_queries", "retrieve")
+        # retry 경로에서는 retrieve_retry를 사용 (ask_user 건너뛰기)
+        builder.add_edge("refine_queries", "retrieve_retry")
         builder.add_edge("retry", "retry_bump")
         builder.add_edge("human_review", "retry_bump")
         builder.add_edge("human_review", "done")

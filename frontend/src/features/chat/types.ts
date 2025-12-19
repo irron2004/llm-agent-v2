@@ -8,6 +8,8 @@ export type Message = {
   reference?: Reference;
   rawAnswer?: string;
   retrievedDocs?: RetrievedDoc[];
+  logs?: string[];
+  currentNode?: string | null;
 };
 
 export type ReferenceChunk = {
@@ -32,12 +34,33 @@ export type RetrievedDoc = {
   metadata?: Record<string, unknown> | null;
 };
 
+export type ReviewDoc = {
+  docId: string;
+  rank: number;
+  content: string;
+  score?: number | null;
+  metadata?: Record<string, unknown> | null;
+};
+
 export type AgentResponse = {
   query: string;
   answer: string;
   judge?: Record<string, unknown>;
   retrieved_docs?: RetrievedDoc[];
   metadata?: Record<string, unknown>;
+  interrupted?: boolean;
+  interrupt_payload?: Record<string, unknown> | null;
+  thread_id?: string | null;
+};
+
+export type AgentRequest = {
+  message: string;
+  top_k?: number;
+  max_attempts?: number;
+  mode?: string;
+  thread_id?: string | null;
+  ask_user_after_retrieve?: boolean;
+  resume_decision?: unknown;
 };
 
 export type Conversation = {

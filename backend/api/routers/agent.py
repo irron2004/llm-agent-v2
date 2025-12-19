@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+import logging
+import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import StreamingResponse
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.types import Command
 from pydantic import BaseModel, Field
 
 from backend.api.dependencies import (
@@ -18,14 +25,44 @@ from backend.services.search_service import SearchService
 
 
 router = APIRouter(prefix="/agent", tags=["LangGraph Agent"])
+logger = logging.getLogger(__name__)
+
+# =============================================================================
+# 전역 상태: HIL(Human-in-the-Loop) 지원
+# =============================================================================
+# 핵심: interrupt/resume가 동작하려면 동일한 graph 인스턴스와 checkpointer 필요
+_checkpointer: MemorySaver = MemorySaver()
+_hil_agent: Optional[LangGraphRAGAgent] = None
 
 
+def _get_hil_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent:
+    """HIL용 싱글톤 에이전트. 동일한 graph 인스턴스로 interrupt/resume 보장."""
+    global _hil_agent
+    if _hil_agent is None:
+        logger.info("Creating HIL agent singleton")
+        _hil_agent = LangGraphRAGAgent(
+            llm=llm,
+            search_service=search_service,
+            prompt_spec=prompt_spec,
+            top_k=3,
+            mode="verified",
+            ask_user_after_retrieve=True,
+            checkpointer=_checkpointer,
+        )
+    return _hil_agent
+
+
+# =============================================================================
+# Request/Response Models
+# =============================================================================
 class AgentRequest(BaseModel):
     message: str = Field(..., description="사용자 질문")
-    top_k: int = Field(3, ge=1, le=50, description="검색 상위 문서 수 (기본 3)")
+    top_k: int = Field(3, ge=1, le=50, description="검색 상위 문서 수")
     max_attempts: int = Field(1, ge=0, le=3, description="judge 실패 시 재시도 횟수")
     mode: str = Field("verified", description="base 또는 verified")
-    thread_id: Optional[str] = Field(None, description="LangGraph thread_id (checkpoint)")
+    thread_id: Optional[str] = Field(None, description="LangGraph thread_id")
+    ask_user_after_retrieve: bool = Field(False, description="검색 후 사용자 확인")
+    resume_decision: Optional[Any] = Field(None, description="interrupt 재개 응답")
 
 
 class RetrievedDoc(BaseModel):
@@ -43,6 +80,9 @@ class AgentResponse(BaseModel):
     judge: Dict[str, Any]
     retrieved_docs: List[RetrievedDoc]
     metadata: Dict[str, Any] = Field(default_factory=dict)
+    interrupted: bool = Field(False)
+    interrupt_payload: Optional[Dict[str, Any]] = Field(None)
+    thread_id: Optional[str] = Field(None)
 
 
 def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
@@ -58,23 +98,22 @@ def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
         snippet = snippet_source[:400] + ("..." if len(snippet_source) > 400 else "")
 
         score = getattr(r, "score", None)
-        score_percent = None
-        if score is not None:
-            score_percent = int(score * 100) if score <= 1 else int(min(score, 100))
+        score_percent = int(score * 100) if score and score <= 1 else None
 
-        docs.append(
-            RetrievedDoc(
-                id=getattr(r, "doc_id", ""),
-                title=title,
-                snippet=snippet,
-                score=score,
-                score_percent=score_percent,
-                metadata=getattr(r, "metadata", None),
-            )
-        )
+        docs.append(RetrievedDoc(
+            id=getattr(r, "doc_id", ""),
+            title=title,
+            snippet=snippet,
+            score=score,
+            score_percent=score_percent,
+            metadata=getattr(r, "metadata", None),
+        ))
     return docs
 
 
+# =============================================================================
+# API Endpoint
+# =============================================================================
 @router.post("/run", response_model=AgentResponse)
 async def run_agent(
     req: AgentRequest,
@@ -86,40 +125,216 @@ async def run_agent(
     if not hasattr(search_service, "search"):
         raise HTTPException(status_code=503, detail="Search service not configured")
 
+    tid = req.thread_id or str(uuid.uuid4())
+    is_resume = req.resume_decision is not None and req.thread_id is not None
+
     try:
-        agent = LangGraphRAGAgent(
-            llm=llm,
-            search_service=search_service,
-            prompt_spec=prompt_spec,
-            top_k=req.top_k,
-            mode=req.mode,
-        )
+        # HIL 모드 (ask_user 또는 resume)
+        if req.ask_user_after_retrieve or is_resume:
+            agent = _get_hil_agent(llm, search_service, prompt_spec)
+            config = {"configurable": {"thread_id": tid}}
 
-        result = agent.run(
-            req.message,
-            attempts=0,
-            max_attempts=req.max_attempts,
-            thread_id=req.thread_id,
-        )
+            if is_resume:
+                # 체크포인트 확인
+                state = agent._graph.get_state(config)
+                logger.info(f"[resume] tid={tid}, state exists={state is not None}")
 
-        retrieved_docs = _to_retrieved_docs(result.get("docs", []))
+                if state is None or not state.values:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"No checkpoint for thread_id={tid}. Server may have restarted."
+                    )
+
+                logger.info(f"[resume] next={state.next}, keys={list(state.values.keys())}")
+                result = agent._graph.invoke(Command(resume=req.resume_decision), config)
+            else:
+                result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid)
+        else:
+            # 일반 모드: 체크포인터 없이 새 에이전트
+            agent = LangGraphRAGAgent(
+                llm=llm,
+                search_service=search_service,
+                prompt_spec=prompt_spec,
+                top_k=req.top_k,
+                mode=req.mode,
+                ask_user_after_retrieve=False,
+                checkpointer=None,
+            )
+            result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    # Interrupt 체크
+    interrupt_info = result.get("__interrupt__")
+    if interrupt_info:
+        payload = None
+        if len(interrupt_info) > 0:
+            payload = interrupt_info[0].value if hasattr(interrupt_info[0], "value") else None
 
         return AgentResponse(
             query=req.message,
-            answer=result.get("answer", ""),
-            judge=result.get("judge", {}),
-            retrieved_docs=retrieved_docs,
+            answer=result.get("answer", "") or "",
+            judge=result.get("judge", {}) or {},
+            retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
             metadata={
                 "route": result.get("route"),
                 "st_gate": result.get("st_gate"),
                 "search_queries": result.get("search_queries", []),
-                "attempts": result.get("attempts"),
-                "max_attempts": req.max_attempts,
             },
+            interrupted=True,
+            interrupt_payload=payload,
+            thread_id=tid,
         )
-    except Exception as exc:
-        # FastAPI가 스택을 로깅하도록 그대로 re-raise
-        raise
+
+    # 정상 완료
+    return AgentResponse(
+        query=req.message,
+        answer=result.get("answer", ""),
+        judge=result.get("judge", {}),
+        retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+        metadata={
+            "route": result.get("route"),
+            "st_gate": result.get("st_gate"),
+            "search_queries": result.get("search_queries", []),
+        },
+        interrupted=False,
+        thread_id=tid,
+    )
+
+
+@router.post("/run/stream")
+async def run_agent_stream(
+    req: AgentRequest,
+    request: Request,
+    search_service: SearchService = Depends(get_search_service),
+    llm=Depends(get_default_llm),
+    prompt_spec=Depends(get_prompt_spec_cached),
+):
+    """LangGraph RAG 에이전트 실행 (SSE: 노드 실행 로그 스트리밍)."""
+    if not hasattr(search_service, "search"):
+        raise HTTPException(status_code=503, detail="Search service not configured")
+
+    tid = req.thread_id or str(uuid.uuid4())
+    is_resume = req.resume_decision is not None and req.thread_id is not None
+
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=256)
+
+    def _enqueue(event: Dict[str, Any]) -> None:
+        payload = json.dumps(event, ensure_ascii=False)
+
+        def _put() -> None:
+            # Best-effort: do not block the graph thread if the client is slow.
+            if not queue.full():
+                queue.put_nowait(payload)
+
+        loop.call_soon_threadsafe(_put)
+
+    def _close() -> None:
+        loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    def _worker() -> None:
+        try:
+            if req.ask_user_after_retrieve or is_resume:
+                # NOTE: HIL resume requires shared graph/checkpointer; reuse singleton.
+                agent = _get_hil_agent(llm, search_service, prompt_spec)
+                # Attach per-request sink (best-effort; concurrent streams may interleave).
+                agent._event_sink = _enqueue  # type: ignore[attr-defined]
+                config = {"configurable": {"thread_id": tid}}
+
+                if is_resume:
+                    state = agent._graph.get_state(config)
+                    if state is None or not state.values:
+                        _enqueue({
+                            "type": "error",
+                            "status": 400,
+                            "detail": f"No checkpoint for thread_id={tid}. Server may have restarted.",
+                        })
+                        return
+                    result = agent._graph.invoke(Command(resume=req.resume_decision), config)
+                else:
+                    result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid)
+            else:
+                agent = LangGraphRAGAgent(
+                    llm=llm,
+                    search_service=search_service,
+                    prompt_spec=prompt_spec,
+                    top_k=req.top_k,
+                    mode=req.mode,
+                    ask_user_after_retrieve=False,
+                    checkpointer=None,
+                    event_sink=_enqueue,
+                )
+                result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid)
+
+            interrupt_info = result.get("__interrupt__")
+            if interrupt_info:
+                payload = None
+                if len(interrupt_info) > 0:
+                    payload = interrupt_info[0].value if hasattr(interrupt_info[0], "value") else None
+
+                resp = AgentResponse(
+                    query=req.message,
+                    answer=result.get("answer", "") or "",
+                    judge=result.get("judge", {}) or {},
+                    retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+                    metadata={
+                        "route": result.get("route"),
+                        "st_gate": result.get("st_gate"),
+                        "search_queries": result.get("search_queries", []),
+                    },
+                    interrupted=True,
+                    interrupt_payload=payload,
+                    thread_id=tid,
+                )
+            else:
+                resp = AgentResponse(
+                    query=req.message,
+                    answer=result.get("answer", ""),
+                    judge=result.get("judge", {}),
+                    retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+                    metadata={
+                        "route": result.get("route"),
+                        "st_gate": result.get("st_gate"),
+                        "search_queries": result.get("search_queries", []),
+                    },
+                    interrupted=False,
+                    thread_id=tid,
+                )
+
+            _enqueue({"type": "final", "result": resp.model_dump()})
+
+        except RuntimeError as exc:
+            _enqueue({"type": "error", "status": 503, "detail": str(exc)})
+        except Exception as exc:
+            _enqueue({"type": "error", "status": 500, "detail": str(exc)})
+        finally:
+            _close()
+
+    asyncio.create_task(asyncio.to_thread(_worker))
+
+    async def _gen():
+        # Initial handshake event
+        yield f"data: {json.dumps({'type': 'open', 'thread_id': tid}, ensure_ascii=False)}\n\n"
+
+        while True:
+            if await request.is_disconnected():
+                break
+            item = await queue.get()
+            if item is None:
+                break
+            yield f"data: {item}\n\n"
+
+    return StreamingResponse(
+        _gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            # Hint for nginx reverse proxies to disable response buffering for SSE.
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 __all__ = ["router", "AgentRequest", "AgentResponse"]

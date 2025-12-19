@@ -1,13 +1,13 @@
 import { apiClient } from "../../lib/api-client";
 import { env } from "../../config/env";
-import { AgentResponse, Conversation, Message } from "./types";
+import { AgentRequest, AgentResponse, Conversation, Message } from "./types";
 
 export async function fetchConversations(): Promise<Conversation[]> {
   return apiClient.get<Conversation[]>("/api/conversations");
 }
 
 export async function sendChatMessage(
-  payload: { message: string }
+  payload: AgentRequest
 ): Promise<AgentResponse> {
   // Agent endpoint returns JSON (non-SSE)
   return apiClient.post<AgentResponse>(env.chatPath || "/api/agent/run", payload);
