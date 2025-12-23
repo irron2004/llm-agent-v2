@@ -323,6 +323,10 @@ class VLLMSettings(BaseSettings):
         default=0.7,
         description="Sampling temperature"
     )
+    reasoning_effort: str | None = Field(
+        default=None,
+        description="Reasoning effort hint for reasoning models (low|medium|high)."
+    )
     max_tokens: int = Field(
         default=30000,
         description="Maximum tokens to generate"

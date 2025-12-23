@@ -13,11 +13,14 @@ from ..base import LLMResponse
 class VLLMClient:
     """Thin client for vLLM OpenAI-compatible /v1/chat/completions."""
 
+    _ALLOWED_REASONING_EFFORTS = {"low", "medium", "high"}
+
     def __init__(
         self,
         base_url: Optional[str] = None,
         model: Optional[str] = None,
         temperature: Optional[float] = None,
+        reasoning_effort: Optional[str] = None,
         max_tokens: Optional[int] = None,
         timeout: Optional[int] = None,
         client: Optional[httpx.Client] = None,
@@ -25,6 +28,7 @@ class VLLMClient:
         self.base_url = base_url or vllm_settings.base_url
         self.model = model or vllm_settings.model_name
         self.temperature = temperature if temperature is not None else vllm_settings.temperature
+        self.reasoning_effort = reasoning_effort if reasoning_effort is not None else vllm_settings.reasoning_effort
         self.max_tokens = max_tokens if max_tokens is not None else vllm_settings.max_tokens
         self.timeout = timeout if timeout is not None else vllm_settings.timeout
         self._client = client or httpx.Client(timeout=self.timeout)
@@ -45,6 +49,12 @@ class VLLMClient:
             "max_tokens": max_tokens if max_tokens is not None else self.max_tokens,
             "stream": stream,
         }
+        effort = kwargs.pop("reasoning_effort", None)
+        if effort is None:
+            effort = self.reasoning_effort
+        if effort in self._ALLOWED_REASONING_EFFORTS:
+            payload["reasoning_effort"] = effort
+
         # Allow extra OpenAI-compatible params
         payload.update(kwargs)
 
@@ -59,6 +69,10 @@ class VLLMClient:
             detail = exc.response.text
             raise RuntimeError(
                 f"vLLM request failed: status={exc.response.status_code}, body={detail}"
+            ) from exc
+        except httpx.HTTPError as exc:
+            raise RuntimeError(
+                f"vLLM request failed: base_url={self.base_url}, error={exc}"
             ) from exc
 
         data = resp.json()

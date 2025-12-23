@@ -86,6 +86,7 @@ services:
       --tensor-parallel-size ${VLLM_TP_SIZE:-2}
       --max-model-len ${VLLM_MAX_MODEL_LEN:-32768}
       --gpu-memory-utilization ${VLLM_GPU_MEM_UTIL:-0.9}
+      --no-enable-prefix-caching
     environment:
       - HF_HOME=/data/hf_cache
       - HUGGINGFACE_HUB_TOKEN=${HUGGINGFACE_HUB_TOKEN:-}
@@ -140,7 +141,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["${VLM_CUDA_DEVICE:-0}"]
+              device_ids: ["${VLM_CUDA_DEVICE:-0}", "${VLM_CUDA_DEVICE1:-1}"]
               capabilities: [gpu]
     shm_size: ${VLM_SHM_SIZE:-8g}
     restart: unless-stopped

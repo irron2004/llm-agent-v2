@@ -165,15 +165,21 @@ class EsSearchService:
         """
         k = top_k or self.top_k
 
-        return self.retriever.retrieve(
-            query=query,
-            top_k=k,
-            tenant_id=tenant_id,
-            project_id=project_id,
-            doc_type=doc_type,
-            lang=lang,
-            **kwargs,
-        )
+        try:
+            return self.retriever.retrieve(
+                query=query,
+                top_k=k,
+                tenant_id=tenant_id,
+                project_id=project_id,
+                doc_type=doc_type,
+                lang=lang,
+                **kwargs,
+            )
+        except Exception as exc:
+            index = self.es_engine.index_name if self.es_engine is not None else "<unknown>"
+            raise RuntimeError(
+                f"Elasticsearch search failed: host={search_settings.es_host}, index={index}, error={exc}"
+            ) from exc
 
     def health_check(self) -> bool:
         """Check if ES is reachable.
