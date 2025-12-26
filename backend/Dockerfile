@@ -19,11 +19,13 @@ RUN pip install --no-cache-dir uv
 
 # Copy backend dependency metadata first (for layer caching)
 # We keep backend as a proper Python package under /app/backend
-COPY backend/pyproject.toml backend/README.md /app/backend/
+COPY backend/pyproject.toml backend/uv.lock backend/README.md /app/backend/
 
-# Install backend dependencies (use uv inside Docker)
+# Install backend dependencies (use uv lockfile inside Docker)
 WORKDIR /app/backend
-RUN uv pip install --system --no-cache -e .
+RUN uv export --frozen --no-dev --format requirements.txt --no-emit-project -o /tmp/requirements.txt \
+    && uv pip sync --system /tmp/requirements.txt \
+    && rm /tmp/requirements.txt
 
 # Copy application code (entire backend package)
 WORKDIR /app

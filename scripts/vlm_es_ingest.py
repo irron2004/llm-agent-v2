@@ -19,6 +19,14 @@ Usage (example):
         --lang ko \
         --tenant-id tenant1
 
+    # 여러 문서 병렬 처리 (워커 수 직접 지정)
+    python scripts/vlm_es_ingest.py \
+        --input "data/manuals/" \
+        --doc-type sop \
+        --lang ko \
+        --tenant-id tenant1 \
+        --workers 2
+
     # 페이지 이미지 저장 및 ES에 경로 포함
     python scripts/vlm_es_ingest.py \
         --input "data/sample.pdf" \
@@ -36,8 +44,12 @@ Prerequisites:
 from __future__ import annotations
 
 import argparse
+import os
 import re
+import subprocess
 import sys
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Iterable, List, Optional
 
@@ -188,7 +200,139 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="LLM fallback 비활성화 (규칙 기반만 사용)",
     )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="동시 처리할 PDF 수 (기본: GPU 상태 기반 자동 계산)",
+    )
+    parser.add_argument(
+        "--min-workers",
+        type=int,
+        default=1,
+        help="자동 워커 계산 시 최소 워커 수",
+    )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=None,
+        help="자동 워커 계산 시 최대 워커 수",
+    )
+    parser.add_argument(
+        "--gpu-mem-per-request-gb",
+        type=float,
+        default=4.0,
+        help="동시 VLM 요청당 예상 GPU 메모리 (GB)",
+    )
+    parser.add_argument(
+        "--gpu-safety-margin-gb",
+        type=float,
+        default=4.0,
+        help="GPU 메모리 안전 여유분 (GB)",
+    )
+    parser.add_argument(
+        "--auto-workers",
+        dest="auto_workers",
+        action="store_true",
+        help="GPU 상태 기반 자동 워커 계산 활성화 (기본값)",
+    )
+    parser.add_argument(
+        "--no-auto-workers",
+        dest="auto_workers",
+        action="store_false",
+        help="GPU 상태 기반 자동 워커 계산 비활성화",
+    )
+    parser.set_defaults(auto_workers=True)
     return parser.parse_args()
+
+
+def _parse_visible_gpu_indices(raw: Optional[str], total: int) -> Optional[List[int]]:
+    if not raw:
+        return None
+    cleaned = raw.strip()
+    if not cleaned or cleaned.lower() == "all":
+        return None
+    indices: List[int] = []
+    for token in cleaned.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        if token.isdigit():
+            idx = int(token)
+            if 0 <= idx < total:
+                indices.append(idx)
+    return indices or None
+
+
+def _get_gpu_free_gb() -> Optional[List[float]]:
+    try:
+        result = subprocess.run(
+            [
+                "nvidia-smi",
+                "--query-gpu=memory.free",
+                "--format=csv,noheader,nounits",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return None
+
+    free_mib: List[float] = []
+    for line in result.stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            free_mib.append(float(line))
+        except ValueError:
+            continue
+
+    if not free_mib:
+        return None
+
+    free_gib = [mib / 1024.0 for mib in free_mib]
+    visible_raw = (
+        os.environ.get("CUDA_VISIBLE_DEVICES")
+        or os.environ.get("VLM_CUDA_DEVICES")
+        or os.environ.get("VLLM_CUDA_DEVICES")
+    )
+    indices = _parse_visible_gpu_indices(visible_raw, len(free_gib))
+    if indices:
+        free_gib = [free_gib[i] for i in indices]
+
+    return free_gib or None
+
+
+def _resolve_workers(args: argparse.Namespace, pdf_count: int) -> int:
+    if args.workers is not None:
+        return max(1, min(args.workers, pdf_count))
+
+    if not args.auto_workers:
+        return 1
+
+    gpu_free_gb = _get_gpu_free_gb()
+    if not gpu_free_gb:
+        print("Auto workers: nvidia-smi unavailable; defaulting to 1")
+        return 1
+
+    min_free_gb = min(gpu_free_gb)
+    safety = max(args.gpu_safety_margin_gb, 0.0)
+    per_req = max(args.gpu_mem_per_request_gb, 0.1)
+    available = max(min_free_gb - safety, 0.0)
+    workers = int(available // per_req)
+    workers = max(args.min_workers, workers)
+    if args.max_workers is not None:
+        workers = min(workers, args.max_workers)
+    workers = max(1, min(workers, pdf_count))
+
+    print(
+        "Auto workers: min_free_gb={:.1f}, safety_gb={:.1f}, per_req_gb={:.1f} -> {}".format(
+            min_free_gb, safety, per_req, workers
+        )
+    )
+    return workers
 
 
 def to_section_objs(
@@ -351,55 +495,109 @@ def main() -> None:
     enable_summaries = args.enable_summaries
     use_llm_fallback = not args.no_llm_fallback
 
-    # MetadataExtractor 초기화 (LLM fallback 사용 시)
-    metadata_extractor = None
-    if enable_doc_metadata or enable_chapters or enable_summaries:
-        metadata_extractor = create_metadata_extractor(use_llm_fallback=use_llm_fallback)
-        print(f"Metadata extraction: doc_meta={enable_doc_metadata}, chapters={enable_chapters}, summaries={enable_summaries}")
+    # MetadataExtractor 사용 여부 (실제 생성은 워커 단위로 수행)
+    needs_metadata_extractor = enable_doc_metadata or enable_chapters or enable_summaries
+    if needs_metadata_extractor:
+        print(
+            "Metadata extraction: doc_meta={}, chapters={}, summaries={}".format(
+                enable_doc_metadata, enable_chapters, enable_summaries
+            )
+        )
 
-    # VLM client 초기화 (재사용)
-    vlm_client = OpenAIVisionClient(
-        base_url=vlm_client_settings.base_url,
-        model=vlm_client_settings.model,
-        timeout=vlm_client_settings.timeout,
-    )
-    ingest_svc = DocumentIngestService.for_vlm(
-        vlm_client=vlm_client,
-        metadata_extractor=metadata_extractor,
-        enable_doc_metadata=enable_doc_metadata,
-        enable_chapter_extraction=enable_chapters,
-        enable_summarization=enable_summaries,
-    )
-
-    # ES ingest 서비스 초기화
+    # ES ingest 대상 index alias
     alias = args.index or f"{search_settings.es_index_prefix}_{search_settings.es_env}_current"
-    es_ingest = EsIngestService.from_settings(index=alias)
+
+    # Thread-local services to avoid shared clients across workers.
+    thread_state = threading.local()
+
+    def get_services() -> tuple[DocumentIngestService, EsIngestService]:
+        ingest_svc = getattr(thread_state, "ingest_svc", None)
+        es_ingest = getattr(thread_state, "es_ingest", None)
+
+        if ingest_svc is None:
+            local_metadata_extractor = None
+            if needs_metadata_extractor:
+                local_metadata_extractor = create_metadata_extractor(
+                    use_llm_fallback=use_llm_fallback
+                )
+
+            vlm_client = OpenAIVisionClient(
+                base_url=vlm_client_settings.base_url,
+                model=vlm_client_settings.model,
+                timeout=vlm_client_settings.timeout,
+            )
+            ingest_svc = DocumentIngestService.for_vlm(
+                vlm_client=vlm_client,
+                metadata_extractor=local_metadata_extractor,
+                enable_doc_metadata=enable_doc_metadata,
+                enable_chapter_extraction=enable_chapters,
+                enable_summarization=enable_summaries,
+            )
+            thread_state.ingest_svc = ingest_svc
+
+        if es_ingest is None:
+            es_ingest = EsIngestService.from_settings(index=alias)
+            thread_state.es_ingest = es_ingest
+
+        return ingest_svc, es_ingest
 
     # 각 PDF 처리
     total_indexed = 0
     success_count = 0
     failed_files: List[Path] = []
 
+    tasks: List[tuple[Path, str]] = []
     for pdf_path in pdf_files:
-        # doc_id 결정: CLI에서 제공된 경우 사용, 아니면 자동 생성
         if args.doc_id and len(pdf_files) == 1:
             doc_id = args.doc_id
         else:
             doc_id = generate_doc_id(pdf_path, base_path)
+        tasks.append((pdf_path, doc_id))
 
-        try:
-            result = process_single_pdf(
+    workers = _resolve_workers(args, len(tasks))
+    if workers <= 1:
+        for pdf_path, doc_id in tasks:
+            try:
+                ingest_svc, es_ingest = get_services()
+                result = process_single_pdf(
+                    pdf_path=pdf_path,
+                    doc_id=doc_id,
+                    args=args,
+                    ingest_svc=ingest_svc,
+                    es_ingest=es_ingest,
+                )
+                total_indexed += result.get("indexed", 0)
+                success_count += 1
+            except Exception as e:
+                print(f"  ERROR: {e}")
+                failed_files.append(pdf_path)
+    else:
+        print(f"Running with {workers} worker(s)")
+
+        def _worker(pdf_path: Path, doc_id: str) -> dict:
+            ingest_svc, es_ingest = get_services()
+            return process_single_pdf(
                 pdf_path=pdf_path,
                 doc_id=doc_id,
                 args=args,
                 ingest_svc=ingest_svc,
                 es_ingest=es_ingest,
             )
-            total_indexed += result.get("indexed", 0)
-            success_count += 1
-        except Exception as e:
-            print(f"  ERROR: {e}")
-            failed_files.append(pdf_path)
+
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            future_map = {
+                executor.submit(_worker, pdf_path, doc_id): (pdf_path, doc_id)
+                for pdf_path, doc_id in tasks
+            }
+            for future in as_completed(future_map):
+                pdf_path, _doc_id = future_map[future]
+                try:
+                    result = future.result()
+                    total_indexed += result.get("indexed", 0)
+                    success_count += 1
+                except Exception as e:
+                    print(f"  ERROR: {pdf_path} -> {e}")
+                    failed_files.append(pdf_path)
 
     # 최종 요약
     print(f"\n{'='*60}")

@@ -1,0 +1,34 @@
+name: toc_parse
+version: v1
+description: Extract table-of-contents entries from document page
+system: |-
+  You extract table-of-contents entries from a technical SOP/guide.
+  Return ONLY the TOC entries as a JSON object with "entries" array.
+
+  Rules:
+  - Do NOT invent entries that are not in the TOC.
+  - Extract the chapter/section titles exactly as written.
+  - level indicates hierarchy: 1=chapter, 2=section, 3=subsection, etc.
+  - If the TOC mixes Korean/English, keep titles exactly as written.
+  - Preserve numbering in titles (e.g., "1. Introduction", "2.1 Setup").
+
+  For start_page:
+  - If page numbers are shown in the TOC, use them (1-based integer).
+  - If NO page numbers are available, use sequential order (1, 2, 3, ...).
+
+  Output format (JSON):
+  {{
+    "entries": [
+      {{"title": "1. Introduction", "start_page": 1, "level": 1}},
+      {{"title": "1.1 Overview", "start_page": 2, "level": 2}},
+      ...
+    ]
+  }}
+messages:
+  - role: user
+    content: |
+      TOC text:
+
+      {toc_text}
+
+      Extract all TOC entries as JSON. Return {{"entries": [...]}}.

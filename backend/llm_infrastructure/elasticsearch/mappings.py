@@ -116,8 +116,19 @@ def get_rag_chunks_mapping(dims: int = 1024) -> dict[str, Any]:
             },
             "chunk_summary": {
                 "type": "text",
-                "index": False,  # Stored for retrieval, not searched
+                "index": True,  # Searchable for BM25 (separate from search_text)
                 # 청크별 요약 (1~2 sentences)
+            },
+            "chunk_keywords": {
+                "type": "keyword",
+                "doc_values": True,
+                # 청크별 키워드 (필터링/집계용)
+                "fields": {
+                    "text": {
+                        "type": "text",
+                        "analyzer": "standard",
+                    },
+                },
             },
             # ===================================================================
             # Optional Fields

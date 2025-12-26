@@ -488,6 +488,43 @@ class APISettings(BaseSettings):
     )
 
 
+class SummarizationSettings(BaseSettings):
+    """Document summarization settings."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="SUMMARIZATION_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    llm_method: str = Field(
+        default="vllm",
+        description="LLM method for summarization",
+    )
+    llm_version: str = Field(
+        default="v1",
+        description="LLM method version",
+    )
+    chunk_size: int = Field(
+        default=900,
+        ge=100,
+        le=4000,
+        description="Default chunk size for document splitting",
+    )
+    chunk_overlap: int = Field(
+        default=120,
+        ge=0,
+        le=500,
+        description="Overlap between chunks",
+    )
+    prompt_version: str = Field(
+        default="v1",
+        description="Prompt template version",
+    )
+
+
 class SearchSettings(BaseSettings):
     """Search service wiring settings."""
 
@@ -552,6 +589,7 @@ deepdoc_settings = DeepDocSettings()
 vlm_parser_settings = VlmParserSettings()
 search_settings = SearchSettings()
 ingest_settings = IngestSettings()
+summarization_settings = SummarizationSettings()
 
 
 __all__ = [
@@ -561,12 +599,14 @@ __all__ = [
     "TEISettings",
     "APISettings",
     "IngestSettings",
+    "SummarizationSettings",
     "rag_settings",
     "vllm_settings",
     "vlm_client_settings",
     "tei_settings",
     "api_settings",
     "ingest_settings",
+    "summarization_settings",
     "DeepDocSettings",
     "deepdoc_settings",
     "VlmParserSettings",
