@@ -4,7 +4,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routers import agent, chat, health, preprocessing, query_expansion, rerank, search
+from backend.api.routers import agent, chat, health, preprocessing, query_expansion, rerank, search, summarization
 from backend.api.dependencies import set_search_service
 from backend.config.settings import api_settings, rag_settings, search_settings
 from backend.llm_infrastructure.preprocessing import get_preprocessor
@@ -14,6 +14,7 @@ from backend.services.search_service import SearchService
 from backend.services.es_search_service import EsSearchService
 from backend.llm_infrastructure.elasticsearch.manager import EsIndexManager
 
+logging.basicConfig(level=logging.INFO)
 APP_VERSION = "0.1.0"
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ def create_app() -> FastAPI:
     app.include_router(search.router, prefix="/api")
     app.include_router(rerank.router, prefix="/api")
     app.include_router(query_expansion.router, prefix="/api")
+    app.include_router(summarization.router, prefix="/api")
 
     @app.on_event("startup")
     async def startup_search_service():

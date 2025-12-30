@@ -1,5 +1,6 @@
 """Search Service API (검색 결과 + 페이지네이션)."""
 
+import inspect
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -21,7 +22,13 @@ class SearchResultItem(BaseModel):
                 "snippet": "PM 예방 점검은 장비의 안정적인 운영을 위해...",
                 "score": 0.92,
                 "score_display": "92%",
-                "highlight_terms": ["PM", "점검"]
+                "highlight_terms": ["PM", "점검"],
+                "chunk_summary": "PM 점검 절차 요약",
+                "chunk_keywords": ["PM", "점검", "장비"],
+                "chapter": "3. 예방 점검",
+                "page": 15,
+                "doc_type": "SOP",
+                "device_name": "SUPRAN",
             }
         }
     )
@@ -33,6 +40,12 @@ class SearchResultItem(BaseModel):
     score: float
     score_display: str
     highlight_terms: List[str] = Field(default_factory=list)
+    chunk_summary: Optional[str] = None
+    chunk_keywords: List[str] = Field(default_factory=list)
+    chapter: Optional[str] = None
+    page: Optional[int] = None
+    doc_type: Optional[str] = None
+    device_name: Optional[str] = None
 
 
 class SearchResponse(BaseModel):
@@ -64,6 +77,10 @@ async def search(
     rerank_top_k: Optional[int] = Query(
         default=None, ge=1, le=100, description="Number of results after reranking"
     ),
+    field_weights: Optional[str] = Query(
+        default=None,
+        description="Field weights in format: field1^weight1,field2^weight2 (e.g. search_text^1.0,chunk_summary^0.7)"
+    ),
     search_service: SearchService = Depends(get_search_service),
 ):
     """문서 검색 API.
@@ -76,19 +93,32 @@ async def search(
         multi_query_n: 확장 쿼리 개수
         rerank: 리랭킹 활성화 여부 (None이면 서비스 기본값 사용)
         rerank_top_k: 리랭킹 후 반환할 결과 수
+        field_weights: 필드별 가중치 (e.g. search_text^1.0,chunk_summary^0.7)
     """
     try:
         top_k = page * size + size  # 여유분 포함
         # If rerank_top_k not specified, use top_k to avoid pagination mismatch
         effective_rerank_top_k = rerank_top_k if rerank_top_k is not None else top_k
-        results = search_service.search(
-            q,
-            top_k=top_k,
-            multi_query=multi_query,
-            multi_query_n=multi_query_n,
-            rerank=rerank,
-            rerank_top_k=effective_rerank_top_k,
-        )
+
+        # Parse field weights if provided
+        text_fields = None
+        if field_weights:
+            text_fields = [f.strip() for f in field_weights.split(",") if f.strip()]
+
+        search_kwargs = {
+            "top_k": top_k,
+            "multi_query": multi_query,
+            "multi_query_n": multi_query_n,
+            "rerank": rerank,
+            "rerank_top_k": effective_rerank_top_k,
+        }
+
+        if text_fields is not None:
+            signature = inspect.signature(search_service.search)
+            if "text_fields" in signature.parameters:
+                search_kwargs["text_fields"] = text_fields
+
+        results = search_service.search(q, **search_kwargs)
 
         start_idx = (page - 1) * size
         end_idx = start_idx + size
@@ -99,14 +129,16 @@ async def search(
         has_next = end_idx < total
 
         # Determine if multi-query was actually applied
+        service_multi_query_enabled = bool(getattr(search_service, "multi_query_enabled", False))
         was_multi_query = (
-            multi_query if multi_query is not None else search_service.multi_query_enabled
-        ) and search_service.query_expander is not None
+            multi_query if multi_query is not None else service_multi_query_enabled
+        ) and getattr(search_service, "query_expander", None) is not None
 
         # Determine if reranking was actually applied
+        service_rerank_enabled = bool(getattr(search_service, "rerank_enabled", False))
         was_reranked = (
-            rerank if rerank is not None else search_service.rerank_enabled
-        ) and search_service.reranker is not None
+            rerank if rerank is not None else service_rerank_enabled
+        ) and getattr(search_service, "reranker", None) is not None
 
         return SearchResponse(
             query=q,
@@ -127,9 +159,9 @@ async def search(
 def _to_search_items(results, start_idx: int, query: str) -> list[SearchResultItem]:
     items: list[SearchResultItem] = []
     for idx, result in enumerate(results):
-        title = ""
-        if getattr(result, "metadata", None):
-            title = result.metadata.get("title", "")
+        metadata = getattr(result, "metadata", {}) or {}
+
+        title = metadata.get("title", "")
         if not title:
             title = (result.raw_text or result.content or "").split("\n")[0][:50]
 
@@ -138,6 +170,19 @@ def _to_search_items(results, start_idx: int, query: str) -> list[SearchResultIt
 
         score = getattr(result, "score", 0.0) or 0.0
         score_display = f"{int(score * 100)}%" if score <= 1 else f"{score:.2f}"
+
+        # Extract new fields from metadata
+        chunk_summary = metadata.get("chunk_summary")
+        chunk_keywords = metadata.get("chunk_keywords", [])
+        if isinstance(chunk_keywords, str):
+            chunk_keywords = [chunk_keywords]
+        elif not isinstance(chunk_keywords, list):
+            chunk_keywords = []
+
+        chapter = metadata.get("chapter")
+        page = metadata.get("page")
+        doc_type = metadata.get("doc_type")
+        device_name = metadata.get("device_name")
 
         items.append(
             SearchResultItem(
@@ -148,6 +193,12 @@ def _to_search_items(results, start_idx: int, query: str) -> list[SearchResultIt
                 score=score,
                 score_display=score_display,
                 highlight_terms=query.split()[:3],
+                chunk_summary=chunk_summary,
+                chunk_keywords=chunk_keywords,
+                chapter=chapter,
+                page=page,
+                doc_type=doc_type,
+                device_name=device_name,
             )
         )
     return items

@@ -1,0 +1,29 @@
+name: chapter_summary
+version: v1
+description: Summarize a chapter from chunk summaries
+system: |-
+  You summarize a whole chapter of a technical SOP/manual based on chunk summaries.
+
+  Rules:
+  - Do not invent information not present in the chunk summaries.
+  - Keep the summary actionable and focused on key procedures/concepts.
+  - Write in Korean unless the chapter content is clearly English.
+  - Consolidate overlapping information from different chunks.
+
+  Output format (JSON):
+  {
+    "chapter_title": "Chapter title",
+    "summary": "1-2 paragraphs summarizing the chapter",
+    "key_points": ["point 1", "point 2", ...],  // 5-10 bullet points
+    "keywords": ["keyword1", "keyword2", ...]  // 8-20 keywords
+  }
+messages:
+  - role: user
+    content: |
+      Chapter title:
+      {chapter_title}
+
+      Chunk summaries (in order):
+      {chunk_summaries}
+
+      Create a chapter summary as JSON.

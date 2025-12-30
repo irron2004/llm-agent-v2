@@ -118,6 +118,11 @@ class EsSearchService:
         es_engine = EsSearchEngine(
             es_client=es_client,
             index_name=index,
+            text_fields=[
+                "search_text^1.0",
+                "chunk_summary^0.7",
+                "chunk_keywords.text^0.8",
+            ],
         )
 
         # ES Hybrid Retriever
@@ -147,6 +152,7 @@ class EsSearchService:
         project_id: str | None = None,
         doc_type: str | None = None,
         lang: str | None = None,
+        text_fields: list[str] | None = None,
         **kwargs: Any,
     ) -> list[RetrievalResult]:
         """Search for relevant documents.
@@ -158,6 +164,7 @@ class EsSearchService:
             project_id: Optional project filter.
             doc_type: Optional document type filter.
             lang: Optional language filter.
+            text_fields: Optional list of text fields with weights (e.g. ["search_text^1.0", "chunk_summary^0.7"])
             **kwargs: Additional parameters.
 
         Returns:
@@ -166,15 +173,27 @@ class EsSearchService:
         k = top_k or self.top_k
 
         try:
-            return self.retriever.retrieve(
-                query=query,
-                top_k=k,
-                tenant_id=tenant_id,
-                project_id=project_id,
-                doc_type=doc_type,
-                lang=lang,
-                **kwargs,
-            )
+            # If custom text_fields are provided, temporarily override the engine's text_fields
+            original_text_fields = None
+            if text_fields is not None and self.es_engine is not None:
+                original_text_fields = self.es_engine.text_fields
+                self.es_engine.text_fields = text_fields
+
+            try:
+                return self.retriever.retrieve(
+                    query=query,
+                    top_k=k,
+                    tenant_id=tenant_id,
+                    project_id=project_id,
+                    doc_type=doc_type,
+                    lang=lang,
+                    **kwargs,
+                )
+            finally:
+                # Restore original text_fields
+                if original_text_fields is not None and self.es_engine is not None:
+                    self.es_engine.text_fields = original_text_fields
+
         except Exception as exc:
             index = self.es_engine.index_name if self.es_engine is not None else "<unknown>"
             raise RuntimeError(

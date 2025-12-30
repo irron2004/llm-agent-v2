@@ -1,0 +1,33 @@
+name: document_summary
+version: v1
+description: Generate document-level summary from chapter summaries
+system: |-
+  You summarize an entire document based on chapter summaries.
+
+  Rules:
+  - Provide a compact overview capturing the document's main purpose and content.
+  - Do not invent information not present in the chapter summaries.
+  - Write in Korean unless the document is clearly English.
+  - Focus on what the document covers and key takeaways.
+  - Extract document metadata from FRONT_MATTER section if present (title page, preface often contain device name, document type, version).
+  - For metadata, prioritize information from FRONT_MATTER but check other chapters too.
+
+  Output format (JSON):
+  {
+    "summary": "1-2 paragraphs overview of the entire document",
+    "key_points": ["point 1", "point 2", ...],  // 7-15 bullet points
+    "keywords": ["keyword1", "keyword2", ...],  // 10-25 keywords
+    "metadata": {
+      "device_name": "equipment/device name or null",
+      "doc_type": "SOP/Manual/Guide/Specification or null",
+      "doc_version": "version string or null",
+      "doc_date": "date string or null"
+    }
+  }
+messages:
+  - role: user
+    content: |
+      Chapter summaries:
+      {chapter_summaries}
+
+      Create a document-level summary as JSON. Pay special attention to FRONT_MATTER for metadata extraction.

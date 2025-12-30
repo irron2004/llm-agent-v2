@@ -18,18 +18,23 @@ Usage:
 
 from __future__ import annotations
 
+import json
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, BinaryIO, Iterable, List, Optional, Sequence
 
 import numpy as np
+import yaml
 from elasticsearch import Elasticsearch, helpers
 
-from backend.config.settings import rag_settings, search_settings
+from backend.config.settings import rag_settings, search_settings, vllm_settings
 from backend.llm_infrastructure.elasticsearch.document import EsChunkDocument
+from backend.llm_infrastructure.llm import get_llm
 from backend.llm_infrastructure.preprocessing.registry import get_preprocessor
 from backend.services.embedding_service import EmbeddingService
 from backend.services.ingest.document_ingest_service import Section, DocumentIngestService
+from backend.services.ingest.txt_parser import parse_maintenance_txt
 
 logger = logging.getLogger(__name__)
 
@@ -379,6 +384,242 @@ class EsIngestService:
                 "vlm_model": vlm_model,
             },
         )
+
+    def ingest_txt(
+        self,
+        file: BinaryIO | str,
+        doc_id: str,
+        *,
+        doc_type: str = "maintenance",
+        tenant_id: str = "",
+        project_id: str = "",
+        lang: str = "ko",
+        tags: list[str] | None = None,
+        refresh: bool = False,
+        use_llm_summary: bool = True,
+    ) -> IngestResult:
+        """Full pipeline: txt → parse → LLM summary → ES index.
+
+        Ingests maintenance report text files with structured sections.
+        Creates separate ES documents for each section (status/action/cause/result).
+
+        Args:
+            file: Text file (BinaryIO) or file path (str).
+            doc_id: Document identifier (e.g., Order No.).
+            doc_type: Document type (default: "maintenance").
+            tenant_id: Tenant identifier for multi-tenancy.
+            project_id: Project identifier.
+            lang: Language code.
+            tags: Optional tags to attach to chunks.
+            refresh: Whether to refresh ES index after insert.
+            use_llm_summary: Whether to generate LLM summaries (default: True).
+
+        Returns:
+            IngestResult with indexed chunk count.
+
+        Note:
+            Each section becomes a separate ES document with the same doc_id.
+            Use doc_id to retrieve all sections of the same maintenance event.
+        """
+        # Read file content
+        if isinstance(file, str):
+            with open(file, "r", encoding="utf-8") as f:
+                content = f.read()
+        else:
+            content = file.read()
+            if isinstance(content, bytes):
+                content = content.decode("utf-8")
+
+        # Parse maintenance report
+        logger.info("Parsing maintenance report for doc_id=%s", doc_id)
+        report = parse_maintenance_txt(content)
+
+        if not report.sections:
+            logger.warning("No sections extracted from txt for doc_id=%s", doc_id)
+            return IngestResult(
+                doc_id=doc_id,
+                index=self.index,
+                total_sections=0,
+                total_chunks=0,
+                indexed_chunks=0,
+                metadata=report.meta,
+            )
+
+        # Generate LLM summary if enabled
+        llm_analysis = {}
+        if use_llm_summary:
+            try:
+                llm_analysis = self._generate_maintenance_summary(report)
+            except Exception as e:
+                logger.error("Failed to generate LLM summary: %s", e)
+                # Continue without summary
+
+        # Extract device info from meta
+        device_name = report.meta.get("Model Name", "") or report.meta.get("Equip. NO", "")
+        doc_description = report.meta.get("Title", "")
+        order_no = report.meta.get("Order No.", "")
+
+        # Build common metadata for all sections
+        common_meta = {
+            "device_name": device_name,
+            "doc_description": doc_description,
+            "order_no": order_no,
+        }
+
+        # Add overall summary/keywords from LLM if available
+        if "chunk_summary" in llm_analysis:
+            common_meta["overall_summary"] = llm_analysis["chunk_summary"]
+        if "chunk_keywords" in llm_analysis:
+            common_meta["overall_keywords"] = llm_analysis["chunk_keywords"]
+
+        # Create Section objects for each section
+        sections = []
+        section_names = ["status", "action", "cause", "result"]
+
+        for section_name in section_names:
+            section_text = report.sections.get(section_name, "")
+            if not section_text.strip():
+                continue
+
+            # Build section-specific metadata
+            section_meta = common_meta.copy()
+            section_meta["section_type"] = section_name
+            section_meta["chapter"] = section_name  # For ES chapter field
+
+            # Add LLM-generated section summary/keywords
+            llm_sections = llm_analysis.get("llm_analysis", {}).get("sections", {})
+            if section_name in llm_sections:
+                section_info = llm_sections[section_name]
+                if "summary" in section_info:
+                    section_meta["chunk_summary"] = section_info["summary"]
+                if "keywords" in section_info:
+                    section_meta["chunk_keywords"] = section_info["keywords"]
+
+            # Create Section object
+            section = Section(
+                title=section_name,
+                text=section_text,
+                page_start=0,
+                page_end=0,
+                metadata=section_meta,
+            )
+            sections.append(section)
+
+        if not sections:
+            logger.warning("No valid sections to ingest for doc_id=%s", doc_id)
+            return IngestResult(
+                doc_id=doc_id,
+                index=self.index,
+                total_sections=0,
+                total_chunks=0,
+                indexed_chunks=0,
+                metadata=report.meta,
+            )
+
+        # Ingest all sections (each becomes a separate ES document)
+        ingest_result = self.ingest_sections(
+            base_doc_id=doc_id,
+            sections=sections,
+            doc_type=doc_type,
+            lang=lang,
+            tenant_id=tenant_id,
+            project_id=project_id,
+            vlm_model="",
+            tags=tags,
+            refresh=refresh,
+        )
+
+        return IngestResult(
+            doc_id=doc_id,
+            index=self.index,
+            total_sections=len(sections),
+            total_chunks=ingest_result.get("indexed", 0),
+            indexed_chunks=ingest_result.get("indexed", 0),
+            metadata={
+                **report.meta,
+                "tenant_id": tenant_id,
+                "project_id": project_id,
+                "lang": lang,
+                "llm_analysis": llm_analysis,
+            },
+        )
+
+    def _generate_maintenance_summary(
+        self,
+        report,
+    ) -> dict[str, Any]:
+        """Generate LLM-based summary and keywords for maintenance report.
+
+        Args:
+            report: Parsed MaintenanceReport.
+
+        Returns:
+            Dict with chunk_summary, chunk_keywords, and sections metadata.
+        """
+        # Load prompt
+        prompt_path = (
+            Path(__file__).parent.parent
+            / "llm_infrastructure"
+            / "summarization"
+            / "prompts"
+            / "maintenance_summary_v1.yaml"
+        )
+
+        with open(prompt_path, encoding="utf-8") as f:
+            prompt_data = yaml.safe_load(f)
+
+        system_msg = prompt_data.get("system", "")
+        user_template = prompt_data["messages"][0]["content"]
+
+        # Format user message
+        user_msg = user_template.format(report_text=report.full_text)
+
+        # Initialize LLM
+        llm = get_llm(
+            "vllm",
+            version="v1",
+            base_url=vllm_settings.base_url,
+            model=vllm_settings.model_name,
+            temperature=0,
+            max_tokens=vllm_settings.max_tokens,
+            timeout=vllm_settings.timeout,
+        )
+
+        # Generate summary
+        messages = [
+            {"role": "system", "content": system_msg},
+            {"role": "user", "content": user_msg},
+        ]
+
+        response = llm.generate(messages, response_format={"type": "json_object"})
+
+        # Parse response
+        try:
+            data = json.loads(response.text)
+        except json.JSONDecodeError:
+            logger.warning("Failed to parse LLM response as JSON")
+            return {}
+
+        # Extract summary and keywords for ES schema
+        result = {
+            "chunk_summary": data.get("summary", ""),
+            "chunk_keywords": data.get("keywords", []),
+        }
+
+        # Add device info if extracted
+        if "device_info" in data:
+            device_info = data["device_info"]
+            if device_info.get("device_name"):
+                result["device_name"] = device_info["device_name"]
+            if device_info.get("part_changed"):
+                result["part_changed"] = device_info["part_changed"]
+            if device_info.get("issue_type"):
+                result["issue_type"] = device_info["issue_type"]
+
+        # Store full LLM response in metadata
+        result["llm_analysis"] = data
+
+        return result
 
 
 __all__ = ["EsIngestService", "IngestResult"]

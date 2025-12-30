@@ -68,6 +68,7 @@ class EsSearchEngine:
         index_name: str,
         vector_field: str = "embedding",
         text_field: str = "search_text",
+        text_fields: list[str] | None = None,
         content_field: str = "content",
     ) -> None:
         """Initialize ES search engine.
@@ -76,13 +77,17 @@ class EsSearchEngine:
             es_client: Elasticsearch client instance.
             index_name: Index name or alias to search.
             vector_field: Field name for dense vectors.
-            text_field: Field name for BM25 text search.
+            text_field: Field name for BM25 text search (legacy single-field).
+            text_fields: Field names for BM25 text search (multi-field).
             content_field: Field name for content retrieval.
         """
         self.es = es_client
         self.index_name = index_name
         self.vector_field = vector_field
         self.text_field = text_field
+        if text_fields is None:
+            text_fields = [text_field]
+        self.text_fields = list(text_fields)
         self.content_field = content_field
 
     def dense_search(
@@ -141,11 +146,7 @@ class EsSearchEngine:
         """
         query: dict[str, Any] = {
             "bool": {
-                "must": {
-                    "match": {
-                        self.text_field: query_text,
-                    }
-                }
+                "must": self._build_text_query(query_text),
             }
         }
         if filters:
@@ -220,11 +221,7 @@ class EsSearchEngine:
         if filters:
             knn_query["filter"] = filters
 
-        text_query: dict[str, Any] = {
-            "match": {
-                self.text_field: query_text,
-            }
-        }
+        text_query = self._build_text_query(query_text)
         if filters:
             text_query = {
                 "bool": {
@@ -274,11 +271,7 @@ class EsSearchEngine:
             f"+ params.sparse_weight * _score + 1.0"  # +1.0 to avoid negative scores
         )
 
-        match_query: dict[str, Any] = {
-            "match": {
-                self.text_field: query_text,
-            }
-        }
+        match_query = self._build_text_query(query_text)
 
         query: dict[str, Any] = {
             "script_score": {
@@ -324,6 +317,8 @@ class EsSearchEngine:
             "chunk_id",
             self.content_field,
             "search_text",
+            "chunk_summary",
+            "chunk_keywords",
             "page",
             "doc_type",
             "tenant_id",
@@ -331,6 +326,17 @@ class EsSearchEngine:
             "lang",
             "tags",
         ]
+
+    def _build_text_query(self, query_text: str) -> dict[str, Any]:
+        """Build text query for single or multi-field BM25."""
+        if len(self.text_fields) > 1 or any("^" in f for f in self.text_fields):
+            return {
+                "multi_match": {
+                    "query": query_text,
+                    "fields": self.text_fields,
+                }
+            }
+        return {"match": {self.text_fields[0]: query_text}}
 
     def _parse_hits(self, resp: dict[str, Any]) -> list[EsSearchHit]:
         """Parse ES response into EsSearchHit objects."""

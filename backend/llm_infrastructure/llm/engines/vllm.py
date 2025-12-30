@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable, Optional, TypeVar
 
 import httpx
+from pydantic import BaseModel
 
 from backend.config.settings import vllm_settings
 from ..base import LLMResponse
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class VLLMClient:
@@ -40,8 +43,9 @@ class VLLMClient:
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         stream: bool = False,
+        response_model: Optional[type[T]] = None,
         **kwargs: Any,
-    ) -> LLMResponse:
+    ) -> LLMResponse | T:
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": list(messages),
@@ -49,6 +53,11 @@ class VLLMClient:
             "max_tokens": max_tokens if max_tokens is not None else self.max_tokens,
             "stream": stream,
         }
+
+        # If response_model is provided, force JSON mode
+        if response_model is not None:
+            payload["response_format"] = {"type": "json_object"}
+
         effort = kwargs.pop("reasoning_effort", None)
         if effort is None:
             effort = self.reasoning_effort
@@ -83,6 +92,11 @@ class VLLMClient:
         text = message.get("content")
         if text is None:
             text = choice.get("text", "") or ""
+
+        # Parse to Pydantic model if requested
+        if response_model is not None:
+            return response_model.model_validate_json(text)
+
         return LLMResponse(text=text, raw=data)
 
 
