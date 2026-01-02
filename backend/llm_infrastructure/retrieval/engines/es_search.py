@@ -382,16 +382,32 @@ class EsSearchEngine:
         Returns:
             ES filter clause or None if no filters.
         """
+        def _term_or_keyword(field: str, value: str) -> dict[str, Any]:
+            """Build a robust exact-match filter for both keyword and dynamic text mappings.
+
+            Many indices map strings as `text` + `.keyword` multi-field via dynamic mapping.
+            Some indices may map them as pure `keyword`. This helper matches either.
+            """
+            return {
+                "bool": {
+                    "should": [
+                        {"term": {field: value}},
+                        {"term": {f"{field}.keyword": value}},
+                    ],
+                    "minimum_should_match": 1,
+                }
+            }
+
         terms: list[dict[str, Any]] = []
 
         if tenant_id:
-            terms.append({"term": {"tenant_id": tenant_id}})
+            terms.append(_term_or_keyword("tenant_id", tenant_id))
         if project_id:
-            terms.append({"term": {"project_id": project_id}})
+            terms.append(_term_or_keyword("project_id", project_id))
         if doc_type:
-            terms.append({"term": {"doc_type": doc_type}})
+            terms.append(_term_or_keyword("doc_type", doc_type))
         if lang:
-            terms.append({"term": {"lang": lang}})
+            terms.append(_term_or_keyword("lang", lang))
 
         if not terms:
             return None

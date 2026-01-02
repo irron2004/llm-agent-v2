@@ -1,0 +1,23 @@
+{
+    "rag_chunks_dev_current": {
+        "settings": {
+            "index": {
+                "routing": {
+                    "allocation": {
+                        "include": {
+                            "_tier_preference": "data_content"
+                        }
+                    }
+                },
+                "number_of_shards": "1",
+                "provided_name": "rag_chunks_dev_current",
+                "creation_date": "1765383124785",
+                "number_of_replicas": "1",
+                "uuid": "H6yw8NGET9SgDrYrqvYKWA",
+                "version": {
+                    "created": "8505000"
+                }
+            }
+        }
+    }
+}

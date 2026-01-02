@@ -13,11 +13,11 @@ Rolling strategy:
 from typing import Any
 
 
-def get_rag_chunks_mapping(dims: int = 1024) -> dict[str, Any]:
+def get_rag_chunks_mapping(dims: int = 768) -> dict[str, Any]:
     """Get RAG chunks index mapping with specified embedding dimensions.
 
     Args:
-        dims: Embedding vector dimensions (default: 1024 for KoE5/multilingual-e5)
+        dims: Embedding vector dimensions (default: 768 for BGE-base, 1024 for KoE5/multilingual-e5)
 
     Returns:
         Elasticsearch mapping definition
@@ -245,8 +245,8 @@ def get_index_meta(
     return meta
 
 
-# Default mapping with 1024 dimensions (KoE5/multilingual-e5-large)
-RAG_CHUNKS_MAPPING = get_rag_chunks_mapping(dims=1024)
+# Default mapping with 768 dimensions (BGE-base)
+RAG_CHUNKS_MAPPING = get_rag_chunks_mapping(dims=768)
 
 
 __all__ = [
