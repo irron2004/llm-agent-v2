@@ -62,7 +62,7 @@ class EsHybridRetriever(BaseRetriever):
         sparse_weight: float = 0.3,
         top_k: int = 10,
         normalize_vectors: bool = True,
-        use_rrf: bool = False,
+        use_rrf: bool = True,
         rrf_k: int = 60,
         preprocessor: Any = None,
         **kwargs: Any,
@@ -72,11 +72,11 @@ class EsHybridRetriever(BaseRetriever):
         Args:
             es_engine: EsSearchEngine instance.
             embedder: Embedding model for query vectorization.
-            dense_weight: Weight for dense (vector) scores.
-            sparse_weight: Weight for sparse (BM25) scores.
+            dense_weight: Weight for dense (vector) scores (only used if use_rrf=False).
+            sparse_weight: Weight for sparse (BM25) scores (only used if use_rrf=False).
             top_k: Default number of results to return.
             normalize_vectors: Whether to L2 normalize query vectors.
-            use_rrf: Whether to use RRF for score combination.
+            use_rrf: Whether to use RRF for score combination (default: True to avoid candidate limiting).
             rrf_k: RRF constant (only used if use_rrf=True).
             preprocessor: Optional query preprocessor.
             **kwargs: Additional config.

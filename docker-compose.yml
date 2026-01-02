@@ -18,6 +18,9 @@ services:
     environment:
       - HF_HOME=/data/hf_cache
       - TRANSFORMERS_CACHE=/data/hf_cache
+      # Inside the docker network, ES is reachable via service name + internal port.
+      # (Using localhost here would point to the api container itself.)
+      - SEARCH_ES_HOST=http://elasticsearch:9200
 
     volumes:
       # Code hot-reload (development): mount backend source into /app/backend

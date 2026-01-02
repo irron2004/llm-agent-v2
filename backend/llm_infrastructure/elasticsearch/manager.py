@@ -113,15 +113,16 @@ class EsIndexManager:
     def create_index(
         self,
         version: int,
-        dims: int = 1024,
+        dims: int = 768,
         number_of_shards: int = 1,
         number_of_replicas: int = 0,
-        embedding_model: str = "nlpai-lab/KoE5",
+        embedding_model: str = "BAAI/bge-base-en-v1.5",
         chunking_method: str = "fixed_size",
         chunking_size: int = 512,
         chunking_overlap: int = 50,
         preprocess_method: str = "normalize",
         skip_if_exists: bool = False,
+        validate_dims: bool = True,
     ) -> dict[str, Any]:
         """Create a new index with the RAG chunks mapping.
 
@@ -136,11 +137,13 @@ class EsIndexManager:
             chunking_overlap: Chunk overlap for _meta
             preprocess_method: Preprocessing method for _meta
             skip_if_exists: Skip creation if index already exists
+            validate_dims: Validate dims against global config (default: True)
 
         Returns:
             Elasticsearch response
 
         Raises:
+            ValueError: If dims doesn't match global config and validate_dims=True
             Exception: If index creation fails
         """
         index_name = self.get_index_name(version)
@@ -148,6 +151,26 @@ class EsIndexManager:
         if skip_if_exists and self.index_exists(version):
             logger.info(f"Index {index_name} already exists, skipping creation")
             return {"acknowledged": True, "skipped": True}
+
+        # Dimension validation against global config
+        if validate_dims:
+            try:
+                from backend.config.settings import search_settings
+                config_dims = search_settings.es_embedding_dims
+                if dims != config_dims:
+                    logger.warning(
+                        f"Dimension mismatch detected during index creation!\n"
+                        f"  Requested dims: {dims}\n"
+                        f"  Config (SEARCH_ES_EMBEDDING_DIMS): {config_dims}\n"
+                        f"  This may cause ingestion/search failures.\n"
+                        f"  Set validate_dims=False to bypass this check."
+                    )
+                    raise ValueError(
+                        f"Index dimension ({dims}) doesn't match config ({config_dims}). "
+                        f"Update SEARCH_ES_EMBEDDING_DIMS or use validate_dims=False."
+                    )
+            except ImportError:
+                logger.warning("Could not import settings for dimension validation")
 
         body = {
             "settings": get_index_settings(
@@ -342,6 +365,88 @@ class EsIndexManager:
             Cluster health information
         """
         return self.es.cluster.health()
+
+    def get_index_dims(self, version: int | None = None, use_alias: bool = False) -> int | None:
+        """Get embedding dimension from an index's mapping.
+
+        Args:
+            version: Index version number (if None, uses current alias)
+            use_alias: If True, reads from alias instead of version
+
+        Returns:
+            Embedding dimension or None if not found
+
+        Example:
+            >>> manager.get_index_dims(version=1)  # Get dims from v1
+            768
+            >>> manager.get_index_dims(use_alias=True)  # Get dims from current alias
+            768
+        """
+        if use_alias:
+            index_name = self.get_alias_name()
+        elif version is not None:
+            index_name = self.get_index_name(version)
+        else:
+            raise ValueError("Must specify either version or use_alias=True")
+
+        try:
+            response = self.es.indices.get_mapping(index=index_name)
+            for idx_name, idx_data in response.items():
+                props = idx_data.get("mappings", {}).get("properties", {})
+                embedding = props.get("embedding", {})
+                dims = embedding.get("dims")
+                if dims is not None:
+                    return int(dims)
+            return None
+        except NotFoundError:
+            logger.warning(f"Index {index_name} not found")
+            return None
+
+    def validate_dims(
+        self,
+        expected_dims: int,
+        version: int | None = None,
+        use_alias: bool = False,
+    ) -> bool:
+        """Validate that index embedding dimension matches expected value.
+
+        Args:
+            expected_dims: Expected embedding dimension
+            version: Index version number (if None, uses current alias)
+            use_alias: If True, validates alias instead of version
+
+        Returns:
+            True if dimensions match
+
+        Raises:
+            ValueError: If dimensions don't match
+
+        Example:
+            >>> manager.validate_dims(expected_dims=768, use_alias=True)
+            True
+        """
+        actual_dims = self.get_index_dims(version=version, use_alias=use_alias)
+
+        if actual_dims is None:
+            if use_alias:
+                index_ref = self.get_alias_name()
+            else:
+                index_ref = self.get_index_name(version) if version else "unknown"
+            raise ValueError(
+                f"Could not determine embedding dimension for index: {index_ref}"
+            )
+
+        if actual_dims != expected_dims:
+            if use_alias:
+                index_ref = self.get_alias_name()
+            else:
+                index_ref = self.get_index_name(version) if version else "unknown"
+            raise ValueError(
+                f"Dimension mismatch for {index_ref}: "
+                f"expected={expected_dims}, actual={actual_dims}"
+            )
+
+        return True
 
 
 __all__ = ["EsIndexManager"]
