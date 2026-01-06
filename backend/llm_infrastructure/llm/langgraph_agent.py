@@ -33,10 +33,10 @@ class AgentState(TypedDict, total=False):
     query: str
     route: Route
 
-    # Multi-query outputs (raw strings)
-    setup_mq: str
-    ts_mq: str
-    general_mq: str
+    # Multi-query outputs (parsed lists)
+    setup_mq_list: List[str]
+    ts_mq_list: List[str]
+    general_mq_list: List[str]
 
     st_gate: Gate
     search_queries: List[str]
@@ -305,27 +305,44 @@ def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, A
     route = state["route"]
     q = state["query"]
 
-    setup_mq = ts_mq = general_mq = ""
+    setup_mq_list: List[str] = []
+    ts_mq_list: List[str] = []
+    general_mq_list: List[str] = []
+
+    # MQ generation needs more tokens than classification (3 queries ~300 tokens)
+    # Reasoning models need extra tokens for thinking process (~1000) + output (~200)
+    mq_kwargs = {"max_tokens": 4096}
 
     if route == "setup":
         user = _format_prompt(spec.setup_mq.user, {"sys.query": q})
-        setup_mq = _invoke_llm(llm, spec.setup_mq.system, user)
+        raw = _invoke_llm(llm, spec.setup_mq.system, user, **mq_kwargs)
+        setup_mq_list = _parse_queries(raw)
+        logger.info("mq_node(setup): generated %d queries: %s", len(setup_mq_list), setup_mq_list)
     elif route == "ts":
         user = _format_prompt(spec.ts_mq.user, {"sys.query": q})
-        ts_mq = _invoke_llm(llm, spec.ts_mq.system, user)
+        raw = _invoke_llm(llm, spec.ts_mq.system, user, **mq_kwargs)
+        ts_mq_list = _parse_queries(raw)
+        logger.info("mq_node(ts): generated %d queries: %s", len(ts_mq_list), ts_mq_list)
     else:
         user = _format_prompt(spec.general_mq.user, {"sys.query": q})
-        general_mq = _invoke_llm(llm, spec.general_mq.system, user)
+        raw = _invoke_llm(llm, spec.general_mq.system, user, **mq_kwargs)
+        general_mq_list = _parse_queries(raw)
+        logger.info("mq_node(general): generated %d queries: %s", len(general_mq_list), general_mq_list)
 
-    return {"setup_mq": setup_mq, "ts_mq": ts_mq, "general_mq": general_mq}
+    return {"setup_mq_list": setup_mq_list, "ts_mq_list": ts_mq_list, "general_mq_list": general_mq_list}
 
 
 def st_gate_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
+    # Convert lists back to text for the prompt
+    setup_mq_list = state.get("setup_mq_list", [])
+    ts_mq_list = state.get("ts_mq_list", [])
+    general_mq_list = state.get("general_mq_list", [])
+
     mapping = {
         "sys.query": state["query"],
-        "setup_mq": state.get("setup_mq", ""),
-        "ts_mq": state.get("ts_mq", ""),
-        "general_mq": state.get("general_mq", ""),
+        "setup_mq": "\n".join(setup_mq_list),
+        "ts_mq": "\n".join(ts_mq_list),
+        "general_mq": "\n".join(general_mq_list),
     }
     user = _format_prompt(spec.st_gate.user, mapping)
     gate = _parse_gate(_invoke_llm(llm, spec.st_gate.system, user))
@@ -333,11 +350,16 @@ def st_gate_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[s
 
 
 def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
+    # Get MQ lists from previous node
+    setup_mq_list = state.get("setup_mq_list", [])
+    ts_mq_list = state.get("ts_mq_list", [])
+    general_mq_list = state.get("general_mq_list", [])
+
     mapping = {
         "sys.query": state["query"],
-        "setup_mq": state.get("setup_mq", ""),
-        "ts_mq": state.get("ts_mq", ""),
-        "general_mq": state.get("general_mq", ""),
+        "setup_mq": "\n".join(setup_mq_list),
+        "ts_mq": "\n".join(ts_mq_list),
+        "general_mq": "\n".join(general_mq_list),
         "st_gate": state.get("st_gate", "no_st"),
     }
     user = _format_prompt(spec.st_mq.user, mapping)
@@ -346,6 +368,7 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
 
     q0 = state["query"].strip()
     merged = [q0] + [q for q in queries if q and q != q0]
+    logger.info("st_mq_node: final search_queries=%s", merged[:5])
     return {"search_queries": merged[:5]}
 
 

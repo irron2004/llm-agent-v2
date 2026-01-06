@@ -91,7 +91,13 @@ class VLLMClient:
         message = choice.get("message", {})
         text = message.get("content")
         if text is None:
-            text = choice.get("text", "") or ""
+            # Reasoning models may return reasoning_content instead of content
+            text = (
+                message.get("reasoning_content")
+                or message.get("reasoning")
+                or choice.get("text", "")
+                or ""
+            )
 
         # Parse to Pydantic model if requested
         if response_model is not None:
