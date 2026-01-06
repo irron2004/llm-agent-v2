@@ -81,6 +81,12 @@ async def search(
         default=None,
         description="Field weights in format: field1^weight1,field2^weight2 (e.g. search_text^1.0,chunk_summary^0.7)"
     ),
+    dense_weight: Optional[float] = Query(
+        default=None, ge=0.0, le=1.0, description="Dense (vector) weight for hybrid search (0.0 = BM25 only)"
+    ),
+    sparse_weight: Optional[float] = Query(
+        default=None, ge=0.0, le=1.0, description="Sparse (BM25) weight for hybrid search (1.0 = BM25 only)"
+    ),
     search_service: SearchService = Depends(get_search_service),
 ):
     """문서 검색 API.
@@ -117,6 +123,12 @@ async def search(
             signature = inspect.signature(search_service.search)
             if "text_fields" in signature.parameters:
                 search_kwargs["text_fields"] = text_fields
+
+        # Add hybrid search weights if provided (for EsSearchService)
+        if dense_weight is not None:
+            search_kwargs["dense_weight"] = dense_weight
+        if sparse_weight is not None:
+            search_kwargs["sparse_weight"] = sparse_weight
 
         results = search_service.search(q, **search_kwargs)
 
