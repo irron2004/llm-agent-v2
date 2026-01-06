@@ -39,12 +39,13 @@ def _get_hil_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent:
     """HIL용 싱글톤 에이전트. 동일한 graph 인스턴스로 interrupt/resume 보장."""
     global _hil_agent
     if _hil_agent is None:
-        logger.info("Creating HIL agent singleton")
+        from backend.config.settings import rag_settings
+        logger.info("Creating HIL agent singleton with top_k=%d", rag_settings.retrieval_top_k)
         _hil_agent = LangGraphRAGAgent(
             llm=llm,
             search_service=search_service,
             prompt_spec=prompt_spec,
-            top_k=3,
+            top_k=rag_settings.retrieval_top_k,
             mode="verified",
             ask_user_after_retrieve=True,
             checkpointer=_checkpointer,
@@ -57,7 +58,7 @@ def _get_hil_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent:
 # =============================================================================
 class AgentRequest(BaseModel):
     message: str = Field(..., description="사용자 질문")
-    top_k: int = Field(3, ge=1, le=50, description="검색 상위 문서 수")
+    top_k: int = Field(10, ge=1, le=50, description="검색 상위 문서 수")
     max_attempts: int = Field(1, ge=0, le=3, description="judge 실패 시 재시도 횟수")
     mode: str = Field("verified", description="base 또는 verified")
     thread_id: Optional[str] = Field(None, description="LangGraph thread_id")
