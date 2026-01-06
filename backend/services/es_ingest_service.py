@@ -164,10 +164,51 @@ class EsIngestService:
         if index is None:
             index = f"{search_settings.es_index_prefix}_{search_settings.es_env}_current"
 
+        # Dimension validation (guardrail)
+        embedder_instance = embed_svc.get_raw_embedder()
+        embedder_dims = embedder_instance.get_dimension()
+        config_dims = search_settings.es_embedding_dims
+
+        logger.info(
+            f"Dimension check: embedder={embedder_dims}, config={config_dims}"
+        )
+
+        if embedder_dims != config_dims:
+            raise ValueError(
+                f"Embedding dimension mismatch detected!\n"
+                f"  Embedder dimension: {embedder_dims}\n"
+                f"  Config (SEARCH_ES_EMBEDDING_DIMS): {config_dims}\n"
+                f"  Embedder method: {rag_settings.embedding_method}\n"
+                f"  Action: Update SEARCH_ES_EMBEDDING_DIMS to {embedder_dims} "
+                f"or use a different embedder"
+            )
+
+        # Optional: Validate against actual ES index if it exists
+        try:
+            from backend.llm_infrastructure.elasticsearch import EsIndexManager
+            manager = EsIndexManager(
+                es_client=es_client,
+                env=search_settings.es_env,
+                index_prefix=search_settings.es_index_prefix,
+            )
+            es_dims = manager.get_index_dims(use_alias=True)
+            if es_dims is not None and es_dims != embedder_dims:
+                raise ValueError(
+                    f"ES index dimension mismatch detected!\n"
+                    f"  Embedder dimension: {embedder_dims}\n"
+                    f"  ES index dimension: {es_dims}\n"
+                    f"  Index: {index}\n"
+                    f"  Action: Reindex with correct dimensions or use matching embedder"
+                )
+        except ImportError:
+            logger.warning("Could not import EsIndexManager for dimension validation")
+        except Exception as e:
+            logger.warning(f"Could not validate ES index dimensions: {e}")
+
         return cls(
             es_client=es_client,
             index=index,
-            embedder=embed_svc.get_raw_embedder(),
+            embedder=embedder_instance,
             preprocessor=preprocessor,
             normalize_vectors=rag_settings.vector_normalize,
             vlm_client=vlm_client,

@@ -49,8 +49,6 @@ logger.propagate = False
 
 
 class LangGraphRAGAgent:
-    MAX_TOP_K = 3  # tighter cap to avoid overlong prompts
-
     def __init__(
         self,
         *,
@@ -64,10 +62,10 @@ class LangGraphRAGAgent:
         event_sink: Callable[[Dict[str, Any]], None] | None = None,
     ) -> None:
         self.llm = llm
-        capped_top_k = min(top_k, self.MAX_TOP_K)
-        self.retriever: Retriever = SearchServiceRetriever(search_service, top_k=capped_top_k)
+        # Use the provided top_k directly without capping
+        self.retriever: Retriever = SearchServiceRetriever(search_service, top_k=top_k)
         self.spec = prompt_spec or load_prompt_spec()
-        self.top_k = capped_top_k
+        self.top_k = top_k
         self.mode = mode
         self.ask_user_after_retrieve = ask_user_after_retrieve
         self.checkpointer = checkpointer or MemorySaver()

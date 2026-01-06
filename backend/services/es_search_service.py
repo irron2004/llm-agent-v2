@@ -121,14 +121,55 @@ class EsSearchService:
             text_fields=[
                 "search_text^1.0",
                 "chunk_summary^0.7",
-                "chunk_keywords.text^0.8",
+                "chunk_keywords^0.8",
             ],
         )
+
+        # Dimension validation (guardrail)
+        embedder_instance = embed_svc.get_raw_embedder()
+        embedder_dims = embedder_instance.get_dimension()
+        config_dims = search_settings.es_embedding_dims
+
+        logger.info(
+            f"Dimension check: embedder={embedder_dims}, config={config_dims}"
+        )
+
+        if embedder_dims != config_dims:
+            raise ValueError(
+                f"Embedding dimension mismatch detected!\n"
+                f"  Embedder dimension: {embedder_dims}\n"
+                f"  Config (SEARCH_ES_EMBEDDING_DIMS): {config_dims}\n"
+                f"  Embedder method: {rag_settings.embedding_method}\n"
+                f"  Action: Update SEARCH_ES_EMBEDDING_DIMS to {embedder_dims} "
+                f"or use a different embedder"
+            )
+
+        # Optional: Validate against actual ES index if it exists
+        try:
+            from backend.llm_infrastructure.elasticsearch import EsIndexManager
+            manager = EsIndexManager(
+                es_client=es_client,
+                env=search_settings.es_env,
+                index_prefix=search_settings.es_index_prefix,
+            )
+            es_dims = manager.get_index_dims(use_alias=True)
+            if es_dims is not None and es_dims != embedder_dims:
+                raise ValueError(
+                    f"ES index dimension mismatch detected!\n"
+                    f"  Embedder dimension: {embedder_dims}\n"
+                    f"  ES index dimension: {es_dims}\n"
+                    f"  Index: {index}\n"
+                    f"  Action: Reindex with correct dimensions or use matching embedder"
+                )
+        except ImportError:
+            logger.warning("Could not import EsIndexManager for dimension validation")
+        except Exception as e:
+            logger.warning(f"Could not validate ES index dimensions: {e}")
 
         # ES Hybrid Retriever
         retriever = EsHybridRetriever(
             es_engine=es_engine,
-            embedder=embed_svc.get_raw_embedder(),
+            embedder=embedder_instance,
             dense_weight=rag_settings.hybrid_dense_weight,
             sparse_weight=rag_settings.hybrid_sparse_weight,
             top_k=rag_settings.retrieval_top_k,
@@ -153,6 +194,8 @@ class EsSearchService:
         doc_type: str | None = None,
         lang: str | None = None,
         text_fields: list[str] | None = None,
+        dense_weight: float | None = None,
+        sparse_weight: float | None = None,
         **kwargs: Any,
     ) -> list[RetrievalResult]:
         """Search for relevant documents.
@@ -165,6 +208,8 @@ class EsSearchService:
             doc_type: Optional document type filter.
             lang: Optional language filter.
             text_fields: Optional list of text fields with weights (e.g. ["search_text^1.0", "chunk_summary^0.7"])
+            dense_weight: Optional dense (vector) weight for hybrid search (overrides default)
+            sparse_weight: Optional sparse (BM25) weight for hybrid search (overrides default)
             **kwargs: Additional parameters.
 
         Returns:
@@ -178,6 +223,16 @@ class EsSearchService:
             if text_fields is not None and self.es_engine is not None:
                 original_text_fields = self.es_engine.text_fields
                 self.es_engine.text_fields = text_fields
+
+            # If custom hybrid weights are provided, temporarily override retriever's weights
+            original_dense_weight = None
+            original_sparse_weight = None
+            if dense_weight is not None:
+                original_dense_weight = self.retriever.dense_weight
+                self.retriever.dense_weight = dense_weight
+            if sparse_weight is not None:
+                original_sparse_weight = self.retriever.sparse_weight
+                self.retriever.sparse_weight = sparse_weight
 
             try:
                 return self.retriever.retrieve(
@@ -193,6 +248,12 @@ class EsSearchService:
                 # Restore original text_fields
                 if original_text_fields is not None and self.es_engine is not None:
                     self.es_engine.text_fields = original_text_fields
+
+                # Restore original hybrid weights
+                if original_dense_weight is not None:
+                    self.retriever.dense_weight = original_dense_weight
+                if original_sparse_weight is not None:
+                    self.retriever.sparse_weight = original_sparse_weight
 
         except Exception as exc:
             index = self.es_engine.index_name if self.es_engine is not None else "<unknown>"

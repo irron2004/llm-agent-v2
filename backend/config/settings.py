@@ -574,8 +574,8 @@ class SearchSettings(BaseSettings):
         description="Current index version number",
     )
     es_embedding_dims: int = Field(
-        default=1024,
-        description="Embedding vector dimensions (1024 for KoE5/multilingual-e5)",
+        default=768,
+        description="Embedding vector dimensions (768 for BGE-base, 1024 for KoE5/multilingual-e5)",
     )
 
 
