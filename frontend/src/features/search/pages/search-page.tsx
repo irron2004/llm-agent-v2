@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Input, Card, List, Slider, Space, Typography, Row, Col, Button, Spin, Checkbox } from "antd";
+import { Input, Card, List, Slider, Space, Typography, Row, Col, Button, Spin, Checkbox, Switch, Alert } from "antd";
 import { SearchOutlined } from "@ant-design/icons";
 import { buildUrl } from "@/config/env";
 
@@ -114,6 +114,7 @@ export default function SearchPage() {
   const [fields, setFields] = useState<FieldConfig[]>(
     AVAILABLE_FIELDS.map((f) => ({ ...f }))
   );
+  const [bm25Only, setBm25Only] = useState(true); // BM25 전용 모드 (기본 true)
 
   const buildFieldWeightsParam = () => {
     return fields
@@ -134,13 +135,24 @@ export default function SearchPage() {
     setLoading(true);
     try {
       const fieldWeights = buildFieldWeightsParam();
-      const url = buildUrl(
-        `/api/search?q=${encodeURIComponent(searchQuery)}&field_weights=${encodeURIComponent(
-          fieldWeights
-        )}&size=20`
-      );
+
+      // Build search params
+      const params = new URLSearchParams({
+        q: searchQuery,
+        field_weights: fieldWeights,
+        size: "20",
+      });
+
+      // Add hybrid search weights if BM25-only mode is enabled
+      if (bm25Only) {
+        params.append("dense_weight", "0.0");
+        params.append("sparse_weight", "1.0");
+      }
+
+      const url = buildUrl(`/api/search?${params.toString()}`);
 
       console.log("[Search] Request URL:", url);
+      console.log("[Search] BM25 Only Mode:", bm25Only);
 
       const response = await fetch(url);
       console.log("[Search] Response status:", response.status);
@@ -205,6 +217,32 @@ export default function SearchPage() {
                   onChange={(e) => setQuery(e.target.value)}
                   onSearch={handleSearch}
                 />
+              </div>
+
+              <div
+                style={{
+                  padding: "12px",
+                  background: bm25Only ? "#e6f7ff" : "#fff7e6",
+                  border: `1px solid ${bm25Only ? "#91d5ff" : "#ffd591"}`,
+                  borderRadius: "4px",
+                }}
+              >
+                <Space direction="vertical" style={{ width: "100%" }} size="small">
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <Text strong>검색 모드</Text>
+                    <Switch
+                      checked={bm25Only}
+                      onChange={setBm25Only}
+                      checkedChildren="BM25"
+                      unCheckedChildren="하이브리드"
+                    />
+                  </div>
+                  <Text type="secondary" style={{ fontSize: "12px" }}>
+                    {bm25Only
+                      ? "BM25 전용 모드: 필드 가중치 변경 효과가 명확하게 나타납니다"
+                      : "하이브리드 모드: 벡터 검색(70%) + BM25(30%)"}
+                  </Text>
+                </Space>
               </div>
 
               <div>
