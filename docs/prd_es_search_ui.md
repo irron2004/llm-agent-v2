@@ -76,7 +76,7 @@ So that 최적의 검색 파라미터를 찾을 수 있다
 **필수 필드** (ES 인덱스에 존재하는 필드):
 - `search_text` - 본문 텍스트
 - `chunk_summary` - 청크 요약
-- `chunk_keywords.text` - 키워드
+- `chunk_keywords` - 키워드
 - `content` - 원본 콘텐츠
 - `chapter` - 챕터명
 - `doc_description` - 문서 설명
