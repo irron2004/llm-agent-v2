@@ -40,9 +40,10 @@ server {
     }
 
     # API proxy (api container listens on internal port 8000)
-    # Use explicit container name to avoid DNS ambiguity
+    # When debugging: proxy to host machine instead of rag-api container
     location /api/ {
-        proxy_pass http://rag-api:8000/api/;
+        # Use host.docker.internal for Docker Desktop or host IP for Linux
+        proxy_pass http://10.10.100.45:8001/api/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
