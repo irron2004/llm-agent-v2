@@ -3,6 +3,7 @@ import Layout from "../components/layout";
 import ChatPage from "../features/chat/pages/chat-page";
 import ParsingPage from "../features/parsing/pages/parsing-page";
 import SearchPage from "../features/search/pages/search-page";
+import RetrievalTestPage from "../features/retrieval-test/pages/retrieval-test-page";
 import NotFoundPage from "../components/not-found-page";
 
 const router = createBrowserRouter([
@@ -21,6 +22,10 @@ const router = createBrowserRouter([
       {
         path: "search",
         element: <SearchPage />,
+      },
+      {
+        path: "retrieval-test",
+        element: <RetrievalTestPage />,
       },
       {
         path: "*",

@@ -1,6 +1,6 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Layout as AntLayout, Menu, Typography } from "antd";
-import { MessageOutlined, SearchOutlined, FileTextOutlined } from "@ant-design/icons";
+import { MessageOutlined, SearchOutlined, FileTextOutlined, ExperimentOutlined } from "@ant-design/icons";
 
 const { Header, Content } = AntLayout;
 const { Title } = Typography;
@@ -19,6 +19,11 @@ export default function Layout() {
       key: "/search",
       icon: <SearchOutlined />,
       label: "Search",
+    },
+    {
+      key: "/retrieval-test",
+      icon: <ExperimentOutlined />,
+      label: "Retrieval Test",
     },
     {
       key: "/parsing",
