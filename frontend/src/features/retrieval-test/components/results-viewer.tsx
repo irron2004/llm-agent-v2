@@ -160,9 +160,10 @@ export default function ResultsViewer({ result }: Props) {
       />
 
       {/* Search Results List */}
-      <List
-        dataSource={searchResults.slice(0, 20)}
-        renderItem={(item) => {
+      <div style={{ maxHeight: "60vh", overflowY: "auto" }}>
+        <List
+          dataSource={searchResults}
+          renderItem={(item) => {
           const isGroundTruth = groundTruthDocIds.includes(item.id);
           const isTopRank = item.rank <= 3;
 
@@ -259,12 +260,13 @@ export default function ResultsViewer({ result }: Props) {
             </List.Item>
           );
         }}
-      />
+        />
+      </div>
 
-      {searchResults.length > 20 && (
+      {searchResults.length > 0 && (
         <div style={{ textAlign: "center", marginTop: "16px" }}>
           <Text type="secondary" style={{ fontSize: "12px" }}>
-            상위 20개 결과만 표시 (전체 {searchResults.length}개)
+            총 {searchResults.length}개 결과
           </Text>
         </div>
       )}

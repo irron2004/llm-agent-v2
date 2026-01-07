@@ -119,6 +119,8 @@ export function useRetrievalTest() {
         }
 
         const url = buildUrl(`/api/search?${params.toString()}`);
+        console.log("[RetrievalTest] API Request URL:", url);
+        console.log("[RetrievalTest] Config:", { size: config.size, denseWeight: config.denseWeight, sparseWeight: config.sparseWeight });
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -142,7 +144,11 @@ export function useRetrievalTest() {
           timestamp: new Date().toISOString(),
         };
 
-        setResults((prev) => [...prev, result]);
+        // 같은 질문의 기존 결과를 새 결과로 교체
+        setResults((prev) => {
+          const filtered = prev.filter((r) => r.questionId !== question.id);
+          return [...filtered, result];
+        });
 
         return result;
       } catch (err) {
