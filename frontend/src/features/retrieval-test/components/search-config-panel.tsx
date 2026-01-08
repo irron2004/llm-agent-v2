@@ -30,15 +30,13 @@ export default function SearchConfigPanel({ config, onChange }: Props) {
       { field: "chunk_summary", label: "청크 요약", enabled: true, weight: 0.7 },
       { field: "chunk_keywords.text", label: "키워드", enabled: true, weight: 0.8 },
       { field: "content", label: "원본 콘텐츠", enabled: false, weight: 0.6 },
-      { field: "chapter", label: "챕터명", enabled: false, weight: 1.2 },
-      { field: "doc_description", label: "문서 설명", enabled: false, weight: 0.9 },
-      { field: "device_name", label: "장비명", enabled: false, weight: 1.5 },
-      { field: "doc_type", label: "문서 타입", enabled: false, weight: 1.0 },
     ];
     onChange({
       fieldWeights: defaultFields,
       denseWeight: 0.7,
       sparseWeight: 0.3,
+      useRrf: true,
+      rrfK: 60,
       rerank: false,
       rerankTopK: 10,
       multiQuery: false,
@@ -80,38 +78,78 @@ export default function SearchConfigPanel({ config, onChange }: Props) {
 
         <Divider style={{ margin: "8px 0" }} />
 
-        {/* Hybrid Weights */}
+        {/* Hybrid Search Mode */}
         <div>
-          <Text strong>Hybrid Search 가중치</Text>
-          <div style={{ marginTop: "8px" }}>
+          <Text strong>Hybrid Search 모드</Text>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginTop: "8px",
+            }}
+          >
             <Text type="secondary" style={{ fontSize: "12px" }}>
-              Dense (벡터 검색): {config.denseWeight.toFixed(1)}
+              RRF (Reciprocal Rank Fusion)
             </Text>
-            <Slider
-              min={0}
-              max={1}
-              step={0.1}
-              value={config.denseWeight}
-              onChange={(v) => onChange({ denseWeight: v })}
-              marks={{ 0: "0.0", 0.5: "0.5", 1.0: "1.0" }}
+            <Switch
+              checked={config.useRrf}
+              onChange={(checked) => onChange({ useRrf: checked })}
             />
           </div>
-          <div style={{ marginTop: "8px" }}>
-            <Text type="secondary" style={{ fontSize: "12px" }}>
-              Sparse (BM25): {config.sparseWeight.toFixed(1)}
-            </Text>
-            <Slider
-              min={0}
-              max={1}
-              step={0.1}
-              value={config.sparseWeight}
-              onChange={(v) => onChange({ sparseWeight: v })}
-              marks={{ 0: "0.0", 0.5: "0.5", 1.0: "1.0" }}
-            />
-          </div>
-          <Text type="secondary" style={{ fontSize: "11px", fontStyle: "italic" }}>
-            💡 Dense=0, Sparse=1 → BM25 전용 모드
-          </Text>
+
+          {config.useRrf ? (
+            // RRF 모드: K 상수만 조절 가능
+            <div style={{ marginTop: "12px", paddingLeft: "8px" }}>
+              <Text type="secondary" style={{ fontSize: "12px" }}>
+                RRF K (rank constant): {config.rrfK}
+              </Text>
+              <Slider
+                min={1}
+                max={100}
+                step={1}
+                value={config.rrfK}
+                onChange={(v) => onChange({ rrfK: v })}
+                marks={{ 1: "1", 60: "60", 100: "100" }}
+              />
+              <Text type="secondary" style={{ fontSize: "11px", fontStyle: "italic" }}>
+                💡 RRF는 순위 기반 병합으로 가중치를 사용하지 않음
+              </Text>
+            </div>
+          ) : (
+            // 가중치 모드: Dense/Sparse 가중치 조절
+            <>
+              <div style={{ marginTop: "12px" }}>
+                <Text type="secondary" style={{ fontSize: "12px" }}>
+                  Dense (벡터 검색): {config.denseWeight.toFixed(1)}
+                </Text>
+                <Slider
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={config.denseWeight}
+                  onChange={(v) => onChange({ denseWeight: v })}
+                  marks={{ 0: "0.0", 0.5: "0.5", 1.0: "1.0" }}
+                />
+              </div>
+              <div style={{ marginTop: "8px" }}>
+                <Text type="secondary" style={{ fontSize: "12px" }}>
+                  Sparse (BM25): {config.sparseWeight.toFixed(1)}
+                </Text>
+                <Slider
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={config.sparseWeight}
+                  onChange={(v) => onChange({ sparseWeight: v })}
+                  marks={{ 0: "0.0", 0.5: "0.5", 1.0: "1.0" }}
+                />
+              </div>
+              <Text type="secondary" style={{ fontSize: "11px", fontStyle: "italic" }}>
+                💡 Dense=0, Sparse=1 → BM25 전용 모드
+              </Text>
+            </>
+          )}
         </div>
 
         <Divider style={{ margin: "8px 0" }} />

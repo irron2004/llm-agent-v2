@@ -87,6 +87,12 @@ async def search(
     sparse_weight: Optional[float] = Query(
         default=None, ge=0.0, le=1.0, description="Sparse (BM25) weight for hybrid search (1.0 = BM25 only)"
     ),
+    use_rrf: Optional[bool] = Query(
+        default=None, description="Use RRF (Reciprocal Rank Fusion) for score combination. When True, weights are ignored."
+    ),
+    rrf_k: Optional[int] = Query(
+        default=None, ge=1, le=100, description="RRF rank constant (only used if use_rrf=True)"
+    ),
     search_service: SearchService = Depends(get_search_service),
 ):
     """문서 검색 API.
@@ -129,6 +135,12 @@ async def search(
             search_kwargs["dense_weight"] = dense_weight
         if sparse_weight is not None:
             search_kwargs["sparse_weight"] = sparse_weight
+
+        # Add RRF parameters if provided
+        if use_rrf is not None:
+            search_kwargs["use_rrf"] = use_rrf
+        if rrf_k is not None:
+            search_kwargs["rrf_k"] = rrf_k
 
         results = search_service.search(q, **search_kwargs)
 

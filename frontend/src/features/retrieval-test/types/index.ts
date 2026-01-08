@@ -16,6 +16,8 @@ export interface FieldConfig {
 export interface SearchConfig {
   denseWeight: number;
   sparseWeight: number;
+  useRrf: boolean; // RRF 사용 시 가중치 무시됨
+  rrfK: number; // RRF constant
   rerank: boolean;
   rerankModel: string;
   rerankTopK: number;
