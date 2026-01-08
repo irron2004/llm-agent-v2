@@ -167,6 +167,8 @@ class EsSearchService:
             logger.warning(f"Could not validate ES index dimensions: {e}")
 
         # ES Hybrid Retriever
+        # use_rrf defaults to True (RRF mode), can be overridden per-request via API
+        # When use_rrf=False, dense_weight/sparse_weight control the score combination
         retriever = EsHybridRetriever(
             es_engine=es_engine,
             embedder=embedder_instance,
@@ -196,6 +198,8 @@ class EsSearchService:
         text_fields: list[str] | None = None,
         dense_weight: float | None = None,
         sparse_weight: float | None = None,
+        use_rrf: bool | None = None,
+        rrf_k: int | None = None,
         **kwargs: Any,
     ) -> list[RetrievalResult]:
         """Search for relevant documents.
@@ -210,6 +214,8 @@ class EsSearchService:
             text_fields: Optional list of text fields with weights (e.g. ["search_text^1.0", "chunk_summary^0.7"])
             dense_weight: Optional dense (vector) weight for hybrid search (overrides default)
             sparse_weight: Optional sparse (BM25) weight for hybrid search (overrides default)
+            use_rrf: Whether to use RRF for score combination (True=RRF, False=weights)
+            rrf_k: RRF rank constant (only used if use_rrf=True)
             **kwargs: Additional parameters.
 
         Returns:
@@ -227,12 +233,21 @@ class EsSearchService:
             # If custom hybrid weights are provided, temporarily override retriever's weights
             original_dense_weight = None
             original_sparse_weight = None
+            original_use_rrf = None
+            original_rrf_k = None
+
             if dense_weight is not None:
                 original_dense_weight = self.retriever.dense_weight
                 self.retriever.dense_weight = dense_weight
             if sparse_weight is not None:
                 original_sparse_weight = self.retriever.sparse_weight
                 self.retriever.sparse_weight = sparse_weight
+            if use_rrf is not None:
+                original_use_rrf = self.retriever.use_rrf
+                self.retriever.use_rrf = use_rrf
+            if rrf_k is not None:
+                original_rrf_k = self.retriever.rrf_k
+                self.retriever.rrf_k = rrf_k
 
             try:
                 return self.retriever.retrieve(
@@ -254,6 +269,10 @@ class EsSearchService:
                     self.retriever.dense_weight = original_dense_weight
                 if original_sparse_weight is not None:
                     self.retriever.sparse_weight = original_sparse_weight
+                if original_use_rrf is not None:
+                    self.retriever.use_rrf = original_use_rrf
+                if original_rrf_k is not None:
+                    self.retriever.rrf_k = original_rrf_k
 
         except Exception as exc:
             index = self.es_engine.index_name if self.es_engine is not None else "<unknown>"

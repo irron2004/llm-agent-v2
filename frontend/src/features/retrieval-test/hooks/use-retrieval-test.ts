@@ -21,6 +21,8 @@ function getDefaultConfig(): SearchConfig {
   return {
     denseWeight: 0.7,
     sparseWeight: 0.3,
+    useRrf: true, // RRF 기본 활성화 (가중치 무시)
+    rrfK: 60, // RRF constant
     rerank: false,
     rerankModel: "cross-encoder/ms-marco-MiniLM-L-6-v2",
     rerankTopK: 10,
@@ -52,30 +54,9 @@ function getDefaultConfig(): SearchConfig {
         enabled: false,
         weight: 0.6,
       },
-      {
-        field: "chapter",
-        label: "챕터명",
-        enabled: false,
-        weight: 1.2,
-      },
-      {
-        field: "doc_description",
-        label: "문서 설명",
-        enabled: false,
-        weight: 0.9,
-      },
-      {
-        field: "device_name",
-        label: "장비명",
-        enabled: false,
-        weight: 1.5,
-      },
-      {
-        field: "doc_type",
-        label: "문서 타입",
-        enabled: false,
-        weight: 1.0,
-      },
+      // Note: chapter, doc_description, device_name, doc_type are not searchable
+      // chapter/device_name/doc_type are keyword fields (not text-searchable)
+      // doc_description has index: false in ES mapping
     ],
   };
 }
@@ -104,9 +85,16 @@ export function useRetrievalTest() {
           q: question.question,
           field_weights: fieldWeights,
           size: config.size.toString(),
-          dense_weight: config.denseWeight.toString(),
-          sparse_weight: config.sparseWeight.toString(),
+          use_rrf: config.useRrf.toString(),
         });
+
+        // 가중치는 RRF 비활성화 시에만 전달
+        if (!config.useRrf) {
+          params.append("dense_weight", config.denseWeight.toString());
+          params.append("sparse_weight", config.sparseWeight.toString());
+        } else {
+          params.append("rrf_k", config.rrfK.toString());
+        }
 
         if (config.multiQuery) {
           params.append("multi_query", "true");
