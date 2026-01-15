@@ -1,10 +1,15 @@
 import { apiClient } from "../../lib/api-client";
 import { env } from "../../config/env";
-import { AgentRequest, AgentResponse, Conversation, Message } from "./types";
+import {
+  AgentRequest,
+  AgentResponse,
+  SessionListResponse,
+  SessionDetailResponse,
+  SaveTurnRequest,
+  TurnResponse,
+} from "./types";
 
-export async function fetchConversations(): Promise<Conversation[]> {
-  return apiClient.get<Conversation[]>("/api/conversations");
-}
+// ─── Agent API ───
 
 export async function sendChatMessage(
   payload: AgentRequest
@@ -13,9 +18,35 @@ export async function sendChatMessage(
   return apiClient.post<AgentResponse>(env.chatPath || "/api/agent/run", payload);
 }
 
-export async function saveMessage(
-  conversationId: string,
-  message: Message
-): Promise<void> {
-  await apiClient.post(`/api/conversations/${conversationId}/messages`, message);
+// ─── Conversations API ───
+
+export async function fetchSessions(
+  limit = 50,
+  offset = 0
+): Promise<SessionListResponse> {
+  return apiClient.get<SessionListResponse>(
+    `/api/conversations?limit=${limit}&offset=${offset}`
+  );
+}
+
+export async function fetchSession(
+  sessionId: string
+): Promise<SessionDetailResponse> {
+  return apiClient.get<SessionDetailResponse>(
+    `/api/conversations/${sessionId}`
+  );
+}
+
+export async function saveTurn(
+  sessionId: string,
+  turn: SaveTurnRequest
+): Promise<TurnResponse> {
+  return apiClient.post<TurnResponse>(
+    `/api/conversations/${sessionId}/turns`,
+    turn
+  );
+}
+
+export async function deleteSession(sessionId: string): Promise<void> {
+  await apiClient.delete(`/api/conversations/${sessionId}`);
 }

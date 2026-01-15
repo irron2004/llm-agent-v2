@@ -1,12 +1,16 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { nanoid } from "nanoid";
-import { sendChatMessage } from "../api";
-import { AgentResponse, Message, ReviewDoc } from "../types";
+import { sendChatMessage, saveTurn, fetchSession } from "../api";
+import { AgentResponse, Message, ReviewDoc, DocRefResponse, RetrievedDoc } from "../types";
 import { connectSse } from "../../../lib/sse";
 import { env } from "../../../config/env";
+import { useChatLogs } from "../context/chat-logs-context";
+import { useChatReview } from "../context/chat-review-context";
+
+// Session change callback type
+export type SessionChangeCallback = (info: { sessionId: string; title: string; isNew: boolean }) => void;
 
 type SendOptions = {
-  conversationId?: string;
   text: string;
   decisionOverride?: unknown;
 };
@@ -73,12 +77,46 @@ const normalizeReviewDocs = (payload?: Record<string, unknown> | null): ReviewDo
   });
 };
 
-export function useChatSession() {
+// Convert RetrievedDoc[] to DocRefResponse[] for API
+const toDocRefs = (docs: RetrievedDoc[]): DocRefResponse[] => {
+  return docs.map((doc, index) => ({
+    slot: index + 1,
+    doc_id: doc.id,
+    title: doc.title,
+    snippet: doc.snippet,
+    page: doc.page ?? null,
+    score: doc.score ?? null,
+  }));
+};
+
+export type UseChatSessionOptions = {
+  onSessionChange?: SessionChangeCallback;
+  onTurnSaved?: () => void;
+};
+
+export function useChatSession(options: UseChatSessionOptions = {}) {
+  const { onSessionChange, onTurnSaved } = options;
+  const [sessionId, setSessionId] = useState<string>(() => nanoid());
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingInterrupt, setPendingInterrupt] = useState<PendingInterrupt | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const isFirstMessageRef = useRef(true);
+  const currentUserTextRef = useRef<string>("");
+  const sessionTitleRef = useRef<string | null>(null);
+  const turnCountRef = useRef(0);
+  const onSessionChangeRef = useRef(onSessionChange);
+  const onTurnSavedRef = useRef(onTurnSaved);
+  onSessionChangeRef.current = onSessionChange;
+  onTurnSavedRef.current = onTurnSaved;
+
+  // Get chat logs context (Provider is always available in AppProviders)
+  const { addLog, clearLogs } = useChatLogs();
+  
+  // Get chat review context for setting completed retrieved docs
+  const { setCompletedRetrievedDocs } = useChatReview();
 
   const appendMessage = useCallback((msg: Message) => {
     setMessages((prev) => [...prev, msg]);
@@ -136,7 +174,17 @@ export function useChatSession() {
         return;
       }
 
+      // Conversation completed - clear logs and set retrieved docs
       setPendingInterrupt(null);
+      clearLogs();
+
+      // Set completed retrieved docs in context if available
+      if (res.retrieved_docs && res.retrieved_docs.length > 0) {
+        setCompletedRetrievedDocs(res.retrieved_docs);
+      } else {
+        setCompletedRetrievedDocs(null);
+      }
+
       updateMessage(assistantId, (m) => ({
         ...m,
         content: res.answer || "",
@@ -144,19 +192,57 @@ export function useChatSession() {
         rawAnswer: JSON.stringify(res, null, 2),
         currentNode: null,
       }));
+
+      // Save turn to backend
+      const userText = currentUserTextRef.current;
+      const assistantText = res.answer || "";
+      const docRefs = toDocRefs(res.retrieved_docs || []);
+
+      // Determine title (only for first turn)
+      turnCountRef.current += 1;
+      const title = turnCountRef.current === 1
+        ? (userText.length > 50 ? userText.slice(0, 50) + "..." : userText)
+        : null;
+      if (title) {
+        sessionTitleRef.current = title;
+      }
+
+      saveTurn(sessionId, {
+        user_text: userText,
+        assistant_text: assistantText,
+        doc_refs: docRefs,
+        title,
+      }).then(() => {
+        onTurnSavedRef.current?.();
+      }).catch((err) => {
+        console.error("Failed to save turn:", err);
+      });
     },
-    [updateMessage, setIsStreaming]
+    [sessionId, updateMessage, setIsStreaming, clearLogs, setCompletedRetrievedDocs]
   );
 
   const send = useCallback(
-    async ({ conversationId, text, decisionOverride }: SendOptions) => {
+    async ({ text, decisionOverride }: SendOptions) => {
       stop();
       setError(null);
+      currentUserTextRef.current = text;
       const pending = pendingInterrupt;
       const isResume = Boolean(pending);
       if (isResume && !pending?.threadId) {
         setError("thread_id가 없어 검색 결과 확인을 이어갈 수 없습니다.");
         return;
+      }
+
+      // Clear logs when starting a new conversation (not resuming)
+      if (!isResume && isFirstMessageRef.current) {
+        clearLogs();
+      }
+
+      // Notify on first message of this session
+      if (isFirstMessageRef.current && !isResume) {
+        isFirstMessageRef.current = false;
+        const title = text.length > 50 ? text.slice(0, 50) + "..." : text;
+        onSessionChangeRef.current?.({ sessionId, title, isNew: true });
       }
 
       const userId = nanoid();
@@ -169,11 +255,11 @@ export function useChatSession() {
       });
 
       // Assistant placeholder so the UI shows progress immediately.
+      // Note: logs are stored in context, not in message object
       appendMessage({
         id: assistantId,
         role: "assistant",
         content: "처리 중...",
-        logs: [],
         currentNode: null,
       });
       setIsStreaming(true);
@@ -217,11 +303,16 @@ export function useChatSession() {
               }
 
               if (evt?.type === "log") {
+                const logMessage = typeof evt?.message === "string" ? evt.message : "";
+                const logNode = typeof evt?.node === "string" ? evt.node : null;
+                
+                // Add log to context (for right sidebar display)
+                if (logMessage) {
+                  addLog(assistantId, logMessage, logNode);
+                }
+                
+                // Update only currentNode for message (logs are shown in right sidebar only)
                 updateMessage(assistantId, (m) => {
-                  const logs =
-                    typeof evt?.message === "string"
-                      ? [...(m.logs ?? []), evt.message]
-                      : m.logs;
                   let currentNode = m.currentNode ?? null;
                   if (typeof evt?.node === "string") {
                     if (evt?.phase === "start") {
@@ -232,7 +323,6 @@ export function useChatSession() {
                   }
                   return {
                     ...m,
-                    logs,
                     currentNode,
                   };
                 });
@@ -273,7 +363,7 @@ export function useChatSession() {
         setIsStreaming(false);
       }
     },
-    [appendMessage, stop, updateMessage, handleAgentResponse, pendingInterrupt]
+    [appendMessage, stop, updateMessage, handleAgentResponse, pendingInterrupt, sessionId, addLog, clearLogs]
   );
 
   const submitReview = useCallback(
@@ -301,29 +391,127 @@ export function useChatSession() {
     [pendingInterrupt, send]
   );
 
+  const submitSearchQueries = useCallback(
+    (modifiedQueries: string[]) => {
+      if (!pendingInterrupt || pendingInterrupt.kind !== "retrieval_review") return;
+
+      const validQueries = modifiedQueries.map((q) => q.trim()).filter((q) => q.length > 0);
+
+      if (validQueries.length === 0) {
+        setError("최소 1개 이상의 검색어를 입력해야 합니다.");
+        return;
+      }
+
+      const summary = `검색어 수정: ${validQueries.join(", ")}`;
+      setPendingInterrupt(null);
+
+      send({
+        text: summary,
+        decisionOverride: {
+          type: "modify_search_queries",
+          search_queries: validQueries,
+        },
+      });
+    },
+    [pendingInterrupt, send]
+  );
+
   const reset = useCallback(() => {
     stop();
     setMessages([]);
     setError(null);
     setPendingInterrupt(null);
-  }, [stop]);
+    clearLogs();
+    setCompletedRetrievedDocs(null);
+    // Generate new session ID for next chat
+    const newSessionId = nanoid();
+    setSessionId(newSessionId);
+    isFirstMessageRef.current = true;
+    currentUserTextRef.current = "";
+    sessionTitleRef.current = null;
+    turnCountRef.current = 0;
+  }, [stop, clearLogs, setCompletedRetrievedDocs]);
+
+  // Load an existing session from the backend
+  const loadSession = useCallback(
+    async (targetSessionId: string) => {
+      console.log("[loadSession] Loading session:", targetSessionId);
+      stop();
+      setError(null);
+      setIsLoadingSession(true);
+
+      try {
+        const session = await fetchSession(targetSessionId);
+        console.log("[loadSession] Session loaded:", session);
+
+        // Convert turns to messages
+        const loadedMessages: Message[] = [];
+        for (const turn of session.turns) {
+          // User message
+          loadedMessages.push({
+            id: nanoid(),
+            role: "user",
+            content: turn.user_text,
+            createdAt: turn.ts,
+          });
+          // Assistant message
+          loadedMessages.push({
+            id: nanoid(),
+            role: "assistant",
+            content: turn.assistant_text,
+            createdAt: turn.ts,
+            retrievedDocs: turn.doc_refs.map((ref) => ({
+              id: ref.doc_id,
+              title: ref.title,
+              snippet: ref.snippet,
+              page: ref.page,
+              score: ref.score,
+            })),
+          });
+        }
+
+        // Update state
+        setSessionId(targetSessionId);
+        setMessages(loadedMessages);
+        setPendingInterrupt(null);
+        clearLogs();
+        setCompletedRetrievedDocs(null);
+
+        // Update refs
+        isFirstMessageRef.current = false;
+        sessionTitleRef.current = session.title;
+        turnCountRef.current = session.turn_count;
+        currentUserTextRef.current = "";
+      } catch (err) {
+        console.error("[loadSession] Error:", err);
+        setError(err instanceof Error ? err.message : "세션을 불러오는데 실패했습니다.");
+      } finally {
+        setIsLoadingSession(false);
+      }
+    },
+    [stop, clearLogs, setCompletedRetrievedDocs]
+  );
 
   return useMemo(
     () => ({
+      sessionId,
       messages,
       isStreaming,
+      isLoadingSession,
       error,
       send,
       stop,
       pendingReview: pendingInterrupt?.kind === "retrieval_review" ? pendingInterrupt : null,
       submitReview,
+      submitSearchQueries,
       inputPlaceholder: pendingInterrupt
         ? pendingInterrupt.kind === "retrieval_review"
           ? "검색 결과 승인/거절 또는 추가 키워드를 입력하세요..."
           : "승인/거절 또는 수정 답변을 입력하세요..."
         : "메시지를 입력하세요...",
       reset,
+      loadSession,
     }),
-    [messages, isStreaming, error, send, stop, pendingInterrupt, submitReview, reset]
+    [sessionId, messages, isStreaming, isLoadingSession, error, send, stop, pendingInterrupt, submitReview, submitSearchQueries, reset, loadSession]
   );
 }

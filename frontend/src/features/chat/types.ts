@@ -32,6 +32,8 @@ export type RetrievedDoc = {
   score?: number | null;
   score_percent?: number | null;
   metadata?: Record<string, unknown> | null;
+  page?: number | null;
+  page_image_url?: string | null;
 };
 
 export type ReviewDoc = {
@@ -67,4 +69,53 @@ export type Conversation = {
   id: string;
   title?: string;
   messages: Message[];
+};
+
+// ─── Conversation API Types ───
+
+export type DocRefResponse = {
+  slot: number;
+  doc_id: string;
+  title: string;
+  snippet: string;
+  page?: number | null;
+  score?: number | null;
+};
+
+export type TurnResponse = {
+  session_id: string;
+  turn_id: number;
+  user_text: string;
+  assistant_text: string;
+  doc_refs: DocRefResponse[];
+  title?: string | null;
+  ts: string;
+};
+
+export type SessionListItem = {
+  id: string;
+  title: string;
+  preview: string;
+  turnCount: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SessionListResponse = {
+  sessions: SessionListItem[];
+  total: number;
+};
+
+export type SessionDetailResponse = {
+  session_id: string;
+  title: string;
+  turns: TurnResponse[];
+  turn_count: number;
+};
+
+export type SaveTurnRequest = {
+  user_text: string;
+  assistant_text: string;
+  doc_refs: DocRefResponse[];
+  title?: string | null;
 };
