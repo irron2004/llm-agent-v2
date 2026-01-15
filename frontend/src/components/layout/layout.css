@@ -1,0 +1,164 @@
+/* ============================================
+   GPT-style 3-Column Layout
+   ============================================ */
+
+.gpt-layout {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  background-color: var(--color-bg-canvas);
+  overflow: hidden;
+  transition:
+    background-color var(--theme-transition-duration, 0.3s) var(--theme-transition-timing, ease);
+}
+
+/* Layout CSS Variables */
+.gpt-layout {
+  --sidebar-width: 288px;
+  --sidebar-collapsed-width: 0px;
+  --right-sidebar-width: 480px;
+  --main-content-max-width: 900px;
+}
+
+/* Mobile overlay backdrop */
+.sidebar-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar-backdrop.visible {
+  display: block;
+  opacity: 1;
+}
+
+/* Mobile menu toggle button */
+.mobile-menu-toggle {
+  display: none;
+  position: fixed;
+  top: var(--spacing-md);
+  left: var(--spacing-md);
+  z-index: 1001;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-card);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-md);
+}
+
+.mobile-menu-toggle:hover {
+  background-color: var(--color-action-bg-hover);
+}
+
+/* Desktop sidebar toggle (when collapsed) */
+.desktop-menu-toggle {
+  display: none;
+  position: fixed;
+  top: var(--spacing-md);
+  left: var(--spacing-md);
+  z-index: 100;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-card);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-items: center;
+  justify-content: center;
+}
+
+.desktop-menu-toggle:hover {
+  background-color: var(--color-action-bg-hover);
+}
+
+.gpt-layout.sidebar-collapsed .desktop-menu-toggle {
+  display: flex;
+}
+
+/* Responsive breakpoints */
+@media (max-width: 768px) {
+  .mobile-menu-toggle {
+    display: flex;
+  }
+
+  .desktop-menu-toggle {
+    display: none !important;
+  }
+}
+
+/* Smooth transitions for layout changes */
+.gpt-layout.sidebar-collapsed .main-content {
+  margin-left: 0;
+}
+
+/* Right sidebar expand button (when collapsed) */
+.right-sidebar-toggle {
+  position: fixed;
+  right: var(--spacing-md);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-card);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  z-index: 100;
+  transition:
+    all 0.2s ease,
+    background-color var(--theme-transition-duration, 0.3s) var(--theme-transition-timing, ease),
+    border-color var(--theme-transition-duration, 0.3s) var(--theme-transition-timing, ease);
+  box-shadow: var(--shadow-sm);
+}
+
+.right-sidebar-toggle:hover {
+  background-color: var(--color-action-bg-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-text-secondary);
+}
+
+/* Animation classes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
