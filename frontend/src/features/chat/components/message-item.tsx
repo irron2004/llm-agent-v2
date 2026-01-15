@@ -4,6 +4,69 @@ import { Message } from "../types";
 import { MarkdownContent } from "./markdown-content";
 import { Collapse } from "antd";
 
+// Preprocess snippet for better markdown rendering
+function preprocessSnippet(snippet: string): string {
+  if (!snippet) return "";
+
+  let processed = snippet;
+
+  // Remove page_X or page_\d+ prefixes at the start
+  processed = processed.replace(/^page_[X\d]+\s*/gi, "");
+
+  // Remove leading prefixes like ">>>> " or ">>> "
+  processed = processed.replace(/^>+\s*/gm, "");
+
+  // Remove markdown code block wrappers more thoroughly
+  // Handle cases like: ```markdown, ```, ```json, etc.
+  // Match code blocks that span multiple lines
+  processed = processed.replace(/```[a-z]*\s*\n?/gi, "");
+  processed = processed.replace(/\n?```\s*/g, "");
+  
+  // Also handle inline code blocks that might be at the start
+  processed = processed.replace(/^`{1,3}[a-z]*\s*/gi, "");
+  processed = processed.replace(/`{1,3}\s*$/gi, "");
+
+  // Remove any remaining backticks that are standalone
+  processed = processed.replace(/^`+\s*/gm, "");
+  processed = processed.replace(/\s*`+$/gm, "");
+
+  // Convert HTML <br> tags to newlines
+  processed = processed.replace(/<br\s*\/?>/gi, "\n");
+
+  // Remove other common HTML tags that shouldn't be rendered
+  processed = processed.replace(/<\/?(?:div|span|p)[^>]*>/gi, "\n");
+
+  // Clean up lines that start with just markdown syntax characters
+  processed = processed.split("\n")
+    .map(line => {
+      // Remove lines that are just markdown syntax
+      const trimmed = line.trim();
+      if (/^[#`|>\-\*_]+$/.test(trimmed) && trimmed.length < 5) {
+        return "";
+      }
+      return line;
+    })
+    .join("\n");
+
+  // Format markdown tables that are on single line
+  if (processed.includes("|") && /\|\s*:?-{2,}:?\s*\|/.test(processed) && !processed.includes("\n|")) {
+    processed = processed.replace(/\s*\|\s*\|\s*/g, " |\n| ");
+  }
+
+  // Clean up excessive newlines (more than 2 consecutive)
+  processed = processed.replace(/\n{3,}/g, "\n\n");
+
+  // Remove leading/trailing whitespace from each line
+  processed = processed.split("\n")
+    .map(line => line.trimEnd())
+    .join("\n");
+
+  // Trim overall whitespace
+  processed = processed.trim();
+
+  return processed;
+}
+
 type MessageItemProps = {
   message: Message;
   isStreaming?: boolean;
@@ -82,11 +145,37 @@ export function MessageItem({ message, isStreaming, onLike, onDislike }: Message
                     children: (
                       <div className="reference-list">
                         {message.retrievedDocs.map((doc, idx) => (
-                          <div key={doc.id || idx} className="reference-item" style={{ marginBottom: 8 }}>
-                            <div style={{ fontWeight: 600 }}>{doc.title || `Document ${idx + 1}`}</div>
-                            <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-                              {doc.snippet || ""}
+                          <div key={doc.id || idx} className="reference-item" style={{ marginBottom: 12 }}>
+                            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                              {doc.title || `Document ${idx + 1}`}
+                              {doc.page && <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, color: "var(--color-text-secondary)" }}>p.{doc.page}</span>}
                             </div>
+                            {doc.page_image_url ? (
+                              <div className="reference-image-wrapper" style={{ marginBottom: 8 }}>
+                                <img
+                                  src={doc.page_image_url}
+                                  alt={`${doc.title || "Document"} page ${doc.page || ""}`}
+                                  style={{
+                                    maxWidth: "100%",
+                                    maxHeight: 200,
+                                    borderRadius: 4,
+                                    border: "1px solid var(--color-border)",
+                                  }}
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = "none";
+                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                                    if (fallback) fallback.style.display = "block";
+                                  }}
+                                />
+                                <div style={{ display: "none", fontSize: 12, color: "var(--color-text-secondary)" }}>
+                                  <MarkdownContent content={preprocessSnippet(doc.snippet || "")} />
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                                <MarkdownContent content={preprocessSnippet(doc.snippet || "")} />
+                              </div>
+                            )}
                             {(doc.score !== null && doc.score !== undefined) && (
                               <div style={{ fontSize: 12, opacity: 0.6 }}>
                                 score: {doc.score.toFixed(3)} {doc.score_percent ? `(${doc.score_percent}%)` : ""}
@@ -102,39 +191,7 @@ export function MessageItem({ message, isStreaming, onLike, onDislike }: Message
             </div>
           )}
 
-          {/* Execution logs (collapsible) */}
-          {isAssistant && message.logs && message.logs.length > 0 && (
-            <div style={{ marginTop: 12 }}>
-              <Collapse
-                size="small"
-                defaultActiveKey={isStreaming ? ["logs"] : undefined}
-                items={[
-                  {
-                    key: "logs",
-                    label: `실행 로그 (${message.logs.length})`,
-                    children: (
-                      <pre
-                        style={{
-                          margin: 0,
-                          maxHeight: 240,
-                          overflow: "auto",
-                          fontSize: 12,
-                          background: "var(--color-code-bg)",
-                          color: "var(--color-code-text)",
-                          borderRadius: 6,
-                          padding: 12,
-                          whiteSpace: "pre-wrap",
-                          wordBreak: "break-word",
-                        }}
-                      >
-                        {message.logs.join("\n")}
-                      </pre>
-                    ),
-                  },
-                ]}
-              />
-            </div>
-          )}
+          {/* Execution logs moved to right sidebar */}
 
           {/* Action buttons - only for assistant messages */}
           {isAssistant && !isStreaming && (
