@@ -525,6 +525,41 @@ class SummarizationSettings(BaseSettings):
     )
 
 
+class MinioSettings(BaseSettings):
+    """MinIO object storage settings for document images."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="MINIO_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    endpoint: str = Field(
+        default="http://minio:9000",
+        description="MinIO server endpoint URL",
+    )
+    access_key: str = Field(
+        default="minioadmin",
+        validation_alias=AliasChoices("MINIO_ACCESS_KEY", "MINIO_ROOT_USER"),
+        description="MinIO access key (root user)",
+    )
+    secret_key: str = Field(
+        default="minioadmin",
+        validation_alias=AliasChoices("MINIO_SECRET_KEY", "MINIO_ROOT_PASSWORD"),
+        description="MinIO secret key (root password)",
+    )
+    bucket: str = Field(
+        default="doc-images",
+        description="Default bucket name for document images",
+    )
+    secure: bool = Field(
+        default=False,
+        description="Use HTTPS for MinIO connection",
+    )
+
+
 class SearchSettings(BaseSettings):
     """Search service wiring settings."""
 
@@ -590,6 +625,7 @@ vlm_parser_settings = VlmParserSettings()
 search_settings = SearchSettings()
 ingest_settings = IngestSettings()
 summarization_settings = SummarizationSettings()
+minio_settings = MinioSettings()
 
 
 __all__ = [
@@ -613,4 +649,6 @@ __all__ = [
     "vlm_parser_settings",
     "SearchSettings",
     "search_settings",
+    "MinioSettings",
+    "minio_settings",
 ]

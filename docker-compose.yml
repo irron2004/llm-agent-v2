@@ -26,7 +26,7 @@ services:
       # Code hot-reload (development): mount backend source into /app/backend
       - ./backend:/app/backend
       # Ingestion data (original pdf, pages, parsed.json)
-      - /home/llm-share/ingestions:/data/ingestions
+      - ./data/ingestions:/data/ingestions
       # Vector store persistence (local-only; can be moved later)
       - ./data/vector_store:/data/vector_store
       # HuggingFace model cache (shared host cache)
@@ -46,13 +46,15 @@ services:
   # ---------------------------------------------------------------------------
   elasticsearch:
     container_name: rag-elasticsearch
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.0
+    build:
+      context: ./backend/elasticsearch
+      dockerfile: Dockerfile
     environment:
       - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms2g -Xmx2g
       - xpack.security.enabled=false
       - xpack.security.enrollment.enabled=false
-      # For Korean analysis, consider building custom image with nori plugin
+      # Nori plugin (Korean analyzer) installed via custom Dockerfile
     ulimits:
       memlock:
         soft: -1
@@ -173,6 +175,50 @@ services:
       - with-tei  # Only start with: docker compose --profile with-tei up
 
   # ---------------------------------------------------------------------------
+  # MinIO (S3-compatible object storage for document images)
+  # ---------------------------------------------------------------------------
+  minio:
+    container_name: rag-minio
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ./data/minio:/data
+    networks:
+      - rag_net
+    # Expose for local script access
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  minio-init:
+    container_name: rag-minio-init
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} &&
+      /usr/bin/mc mb -p local/$${MINIO_BUCKET} || true
+      "
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - MINIO_BUCKET=${MINIO_BUCKET}
+    networks:
+      - rag_net
+
+  # ---------------------------------------------------------------------------
   # Frontend (Vite dev server)
   # ---------------------------------------------------------------------------
   frontend:
@@ -190,7 +236,7 @@ services:
       - .env
     volumes:
       # Ingestion data (shared with backend)
-      - /home/llm-share/ingestions:/data/ingestions
+      - ./data/ingestions:/data/ingestions
     ports:
       - "${FRONTEND_PORT:-9097}:9097"
     depends_on:

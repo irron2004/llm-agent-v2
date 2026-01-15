@@ -18,6 +18,9 @@ dependencies = [
     "rank-bm25>=0.2.2",
     "elasticsearch>=8.0.0,<9.0.0",
     "langgraph>=1.0.5",
+    "minio>=7.2.0",
+    "pillow>=10.0.0",
+    "pdf2image>=1.16.0",
 ]
 
 [project.optional-dependencies]
