@@ -40,6 +40,9 @@ export type ReviewDoc = {
   docId: string;
   rank: number;
   content: string;
+  title?: string | null;
+  page?: number | null;
+  page_image_url?: string | null;
   score?: number | null;
   metadata?: Record<string, unknown> | null;
 };

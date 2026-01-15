@@ -67,10 +67,16 @@ const normalizeReviewDocs = (payload?: Record<string, unknown> | null): ReviewDo
         : typeof doc?.snippet === "string"
           ? doc.snippet
           : "";
+    const title = typeof doc?.title === "string" ? doc.title : null;
+    const page = typeof doc?.page === "number" ? doc.page : null;
+    const page_image_url = typeof doc?.page_image_url === "string" ? doc.page_image_url : null;
     return {
       docId,
       rank,
       content,
+      title,
+      page,
+      page_image_url,
       score: typeof doc?.score === "number" ? doc.score : null,
       metadata: typeof doc?.metadata === "object" ? doc.metadata : null,
     };
@@ -150,7 +156,17 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           typeof payload?.instruction === "string" && payload.instruction.trim()
             ? payload.instruction.trim()
             : "검색 결과를 확인한 뒤 승인/거절/키워드를 입력하세요.";
-        const docs = normalizeReviewDocs(payload);
+        // Use res.retrieved_docs directly (same source as message.retrievedDocs)
+        const docs: ReviewDoc[] = (res.retrieved_docs || []).map((doc, index) => ({
+          docId: doc.id,
+          rank: index + 1,
+          content: doc.snippet,
+          title: doc.title,
+          page: doc.page ?? null,
+          page_image_url: doc.page_image_url ?? null,
+          score: doc.score ?? null,
+          metadata: doc.metadata ?? null,
+        }));
 
         if (threadId) {
           setPendingInterrupt({
@@ -180,6 +196,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
       // Set completed retrieved docs in context if available
       if (res.retrieved_docs && res.retrieved_docs.length > 0) {
+        console.log("[useChatSession] Setting completedRetrievedDocs:", res.retrieved_docs);
+        console.log("[useChatSession] First doc page_image_url:", res.retrieved_docs[0]?.page_image_url);
         setCompletedRetrievedDocs(res.retrieved_docs);
       } else {
         setCompletedRetrievedDocs(null);
