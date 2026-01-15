@@ -30,10 +30,9 @@ export default function RetrievalTestPage() {
   return (
     <div style={{
       padding: "24px",
-      maxWidth: "1600px",
+      width: "100%",
+      maxWidth: "100%",
       margin: "0 auto",
-      minHeight: "calc(100vh - 64px)",
-      overflow: "auto",
       background: "var(--color-bg-canvas)",
       color: "var(--color-text-primary)",
     }}>

@@ -2,6 +2,10 @@ import { PropsWithChildren, useMemo } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ConfigProvider, theme as antdTheme } from "antd";
 import { ThemeProvider, useTheme } from "../components/theme-provider";
+import { ChatHistoryProvider } from "../features/chat/context/chat-history-context";
+import { ChatLogsProvider } from "../features/chat/context/chat-logs-context";
+import { ChatReviewProvider } from "../features/chat/context/chat-review-context";
+import { GlobalSearchProvider } from "../components/global-search";
 
 function createClient() {
   return new QueryClient({
@@ -39,7 +43,17 @@ export default function AppProviders({ children }: PropsWithChildren) {
   return (
     <QueryClientProvider client={client}>
       <ThemeProvider>
-        <AntdConfigProvider>{children}</AntdConfigProvider>
+        <ChatHistoryProvider>
+          <ChatLogsProvider>
+            <ChatReviewProvider>
+              <GlobalSearchProvider>
+                <AntdConfigProvider>
+                  {children}
+                </AntdConfigProvider>
+              </GlobalSearchProvider>
+            </ChatReviewProvider>
+          </ChatLogsProvider>
+        </ChatHistoryProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
