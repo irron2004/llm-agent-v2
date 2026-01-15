@@ -179,6 +179,7 @@ def migrate_to_alias_strategy(
                 },
                 wait_for_completion=True,
                 refresh=True,
+                request_timeout=3600,  # 1 hour timeout for large indices
             )
 
             created = result.get("created", 0)

@@ -35,6 +35,7 @@ from backend.llm_infrastructure.preprocessing.registry import get_preprocessor
 from backend.services.embedding_service import EmbeddingService
 from backend.services.ingest.document_ingest_service import Section, DocumentIngestService
 from backend.services.ingest.txt_parser import parse_maintenance_txt
+from backend.services.storage import ImageUploadRenderer
 
 logger = logging.getLogger(__name__)
 
@@ -334,6 +335,7 @@ class EsIngestService:
         lang: str = "ko",
         tags: list[str] | None = None,
         refresh: bool = False,
+        upload_page_images: bool = True,
     ) -> IngestResult:
         """Full pipeline: PDF → VLM parse → sections → ES index.
 
@@ -346,6 +348,7 @@ class EsIngestService:
             lang: Language code.
             tags: Optional tags to attach to chunks.
             refresh: Whether to refresh ES index after bulk insert.
+            upload_page_images: Whether to upload page images to MinIO.
 
         Returns:
             IngestResult with indexed chunk counts.
@@ -359,15 +362,17 @@ class EsIngestService:
                 "Pass vlm_client to constructor or set VLM_CLIENT_* env vars."
             )
 
-        # Create or reuse DocumentIngestService
-        if self._document_ingest_service is None:
-            self._document_ingest_service = DocumentIngestService.for_vlm(
-                vlm_client=self.vlm_client,
-            )
+        # Create DocumentIngestService with ImageUploadRenderer for this doc_id
+        # Each document needs its own renderer with the correct doc_id
+        renderer = ImageUploadRenderer(doc_id=doc_id, upload_enabled=upload_page_images)
+        doc_ingest_service = DocumentIngestService.for_vlm(
+            vlm_client=self.vlm_client,
+            renderer=renderer,
+        )
 
-        # Parse PDF with VLM
+        # Parse PDF with VLM (images are automatically uploaded to MinIO by renderer)
         logger.info("Parsing PDF with VLM for doc_id=%s", doc_id)
-        result = self._document_ingest_service.ingest_pdf(file, doc_type=doc_type)
+        result = doc_ingest_service.ingest_pdf(file, doc_type=doc_type)
 
         sections_data = result.get("sections", [])
         if not sections_data:

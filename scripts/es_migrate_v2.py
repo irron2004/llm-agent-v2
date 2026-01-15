@@ -36,6 +36,111 @@ from backend.config.settings import search_settings
 from backend.llm_infrastructure.elasticsearch.manager import EsIndexManager
 
 
+def verify_nori_plugin(manager: EsIndexManager) -> bool:
+    """Verify that Nori plugin is installed in Elasticsearch."""
+    try:
+        response = manager.es.cat.plugins(format="json")
+        for plugin in response:
+            if plugin.get("component") == "analysis-nori":
+                version = plugin.get("version", "unknown")
+                print(f"[✓] Nori plugin verified: analysis-nori v{version}")
+                return True
+        print("[✗] Nori plugin NOT found")
+        return False
+    except Exception as e:
+        print(f"[✗] Error checking plugins: {e}")
+        return False
+
+
+def test_nori_analyzer(manager: EsIndexManager, version: int) -> bool:
+    """Test Nori analyzer on the target index with sample Korean text."""
+    index_name = manager.get_index_name(version)
+    test_text = "한국어 형태소 분석 테스트"
+
+    try:
+        response = manager.es.indices.analyze(
+            index=index_name,
+            body={"analyzer": "nori", "text": test_text}
+        )
+        tokens = response.get("tokens", [])
+        if len(tokens) > 0:
+            token_text = ", ".join([t["token"] for t in tokens[:5]])
+            print(f"[✓] Nori analyzer working: '{test_text}' → [{token_text}...]")
+            return True
+        else:
+            print("[✗] Nori analyzer returned no tokens")
+            return False
+    except Exception as e:
+        print(f"[✗] Error testing Nori analyzer: {e}")
+        return False
+
+
+def validate_embeddings_preserved(
+    manager: EsIndexManager,
+    from_version: int,
+    to_version: int,
+    sample_size: int = 10
+) -> bool:
+    """Validate that embedding vectors are preserved during reindex."""
+    source_index = manager.get_index_name(from_version)
+    target_index = manager.get_index_name(to_version)
+
+    print(f"[→] Validating embeddings preserved (sample size: {sample_size})...")
+
+    try:
+        # Get random sample from source
+        sample_query = {
+            "size": sample_size,
+            "query": {
+                "function_score": {
+                    "query": {"match_all": {}},
+                    "random_score": {}
+                }
+            },
+            "_source": ["embedding"]
+        }
+
+        source_docs = manager.es.search(index=source_index, body=sample_query)
+        hits = source_docs.get("hits", {}).get("hits", [])
+
+        if not hits:
+            print("[✗] No documents found in source index")
+            return False
+
+        mismatches = 0
+        for hit in hits:
+            doc_id = hit["_id"]
+            source_embedding = hit["_source"].get("embedding")
+
+            if not source_embedding:
+                continue
+
+            # Get same document from target
+            try:
+                target_doc = manager.es.get(index=target_index, id=doc_id)
+                target_embedding = target_doc["_source"].get("embedding")
+
+                # Compare embeddings
+                if source_embedding != target_embedding:
+                    mismatches += 1
+                    print(f"[✗] Embedding mismatch for doc {doc_id}")
+
+            except Exception as e:
+                print(f"[✗] Error getting doc {doc_id} from target: {e}")
+                mismatches += 1
+
+        if mismatches == 0:
+            print(f"[✓] All {len(hits)} sampled embeddings preserved correctly")
+            return True
+        else:
+            print(f"[✗] {mismatches}/{len(hits)} embeddings have mismatches")
+            return False
+
+    except Exception as e:
+        print(f"[✗] Error validating embeddings: {e}")
+        return False
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="ES index migration for metadata fields")
     parser.add_argument(
@@ -79,6 +184,21 @@ def parse_args() -> argparse.Namespace:
         "--delete-old",
         action="store_true",
         help="Delete old index after successful migration",
+    )
+    parser.add_argument(
+        "--verify-nori",
+        action="store_true",
+        help="Verify Nori plugin is installed before migration",
+    )
+    parser.add_argument(
+        "--test-analyzer",
+        action="store_true",
+        help="Test Nori analyzer after index creation",
+    )
+    parser.add_argument(
+        "--validate-embeddings",
+        action="store_true",
+        help="Validate embeddings are preserved during reindex",
     )
     return parser.parse_args()
 
@@ -186,6 +306,15 @@ def main() -> None:
 
     print()
 
+    # Verify Nori plugin if requested
+    if args.verify_nori:
+        if not verify_nori_plugin(manager):
+            print("ERROR: Nori plugin verification failed!")
+            if not args.dry_run:
+                print("Please ensure Nori plugin is installed before proceeding.")
+                sys.exit(1)
+        print()
+
     # Migration plan
     print("Migration Plan:")
     steps = []
@@ -236,6 +365,11 @@ def main() -> None:
     )
     print("  Done")
 
+    # Test Nori analyzer if requested
+    if args.test_analyzer:
+        print()
+        test_nori_analyzer(manager, to_version)
+
     # Step 3: Reindex data
     if source_exists and not args.no_reindex and doc_count > 0:
         print(f"Reindexing {doc_count:,} documents...")
@@ -260,6 +394,14 @@ def main() -> None:
         # Verify document count
         new_count = get_doc_count(manager, to_version)
         print(f"  Target document count: {new_count:,}")
+
+        # Validate embeddings if requested
+        if args.validate_embeddings:
+            print()
+            if not validate_embeddings_preserved(manager, from_version, to_version):
+                print("ERROR: Embedding validation failed!")
+                print("Aborting migration. Target index has been created but alias not switched.")
+                sys.exit(1)
 
     # Step 4: Switch alias
     if not args.no_switch:
