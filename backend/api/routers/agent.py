@@ -73,6 +73,8 @@ class RetrievedDoc(BaseModel):
     score: float | None = None
     score_percent: int | None = None
     metadata: Dict[str, Any] | None = None
+    page: int | None = None
+    page_image_url: str | None = None
 
 
 class AgentResponse(BaseModel):
@@ -90,8 +92,9 @@ def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
     docs: List[RetrievedDoc] = []
     for r in results or []:
         title = ""
-        if getattr(r, "metadata", None):
-            title = r.metadata.get("title", "")
+        metadata = getattr(r, "metadata", None)
+        if metadata:
+            title = metadata.get("title", "")
         if not title:
             title = (r.raw_text or r.content or "").split("\n")[0][:80]
 
@@ -101,13 +104,24 @@ def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
         score = getattr(r, "score", None)
         score_percent = int(score * 100) if score and score <= 1 else None
 
+        # Extract page from metadata for image URL
+        doc_id = getattr(r, "doc_id", "")
+        page = None
+        page_image_url = None
+        if metadata:
+            page = metadata.get("page_start") or metadata.get("page")
+            if isinstance(page, int) and doc_id:
+                page_image_url = f"/api/assets/docs/{doc_id}/pages/{page}"
+
         docs.append(RetrievedDoc(
-            id=getattr(r, "doc_id", ""),
+            id=doc_id,
             title=title,
             snippet=snippet,
             score=score,
             score_percent=score_percent,
-            metadata=getattr(r, "metadata", None),
+            metadata=metadata,
+            page=page,
+            page_image_url=page_image_url,
         ))
     return docs
 

@@ -46,6 +46,8 @@ class RetrievedDoc(BaseModel):
     snippet: str
     score: float
     score_percent: int
+    page: int | None = None
+    page_image_url: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -142,9 +144,10 @@ async def retrieval_chat(
 def _to_retrieved_docs(results):
     docs: list[RetrievedDoc] = []
     for result in results or []:
+        metadata = getattr(result, "metadata", None)
         title = ""
-        if getattr(result, "metadata", None):
-            title = result.metadata.get("title", "")
+        if metadata:
+            title = metadata.get("title", "")
         if not title:
             title = (result.raw_text or result.content or "").split("\n")[0][:50]
 
@@ -154,13 +157,24 @@ def _to_retrieved_docs(results):
         score = getattr(result, "score", 0.0) or 0.0
         score_percent = int(score * 100) if score <= 1 else int(min(score, 100))
 
+        # Extract page from metadata for image URL
+        doc_id = getattr(result, "doc_id", "")
+        page = None
+        page_image_url = None
+        if metadata:
+            page = metadata.get("page_start") or metadata.get("page")
+            if isinstance(page, int) and doc_id:
+                page_image_url = f"/api/assets/docs/{doc_id}/pages/{page}"
+
         docs.append(
             RetrievedDoc(
-                id=getattr(result, "doc_id", ""),
+                id=doc_id,
                 title=title,
                 snippet=snippet,
                 score=score,
                 score_percent=score_percent,
+                page=page,
+                page_image_url=page_image_url,
             )
         )
     return docs
