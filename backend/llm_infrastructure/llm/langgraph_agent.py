@@ -239,8 +239,24 @@ def _parse_queries(text: str) -> List[str]:
         if qs:
             return qs[:5]
 
+    # Filter out meta-explanation lines (English prompt patterns)
     lines = [ln.strip() for ln in t.splitlines() if ln.strip()]
-    return lines[:5]
+    filtered = []
+    for line in lines:
+        lower = line.lower()
+        # Skip lines that look like prompt/explanation patterns
+        if any(pattern in lower for pattern in [
+            "given original", "they want", "from mq:", "we need", "could be:",
+            "example output", "example input", "output only", "no explanations",
+            "# ", "q1:", "q2:", "q3:", "query generation", "output format"
+        ]):
+            continue
+        # Skip numbered lines like "1.", "2.", "3."
+        if re.match(r'^\d+[\.\)]\s', line):
+            continue
+        filtered.append(line)
+
+    return filtered[:5]
 
 
 # -----------------------------
@@ -250,7 +266,11 @@ def results_to_ref_json(docs: List[RetrievalResult]) -> List[Dict[str, Any]]:
     ref: List[Dict[str, Any]] = []
     max_chars = 200  # ultra-compact to avoid context overflow
     for i, d in enumerate(docs, start=1):
-        content = d.metadata['search_text']
+        content = ""
+        if isinstance(d.metadata, dict):
+            content = str(d.metadata.get("search_text") or "").strip()
+        if not content:
+            content = str(d.raw_text or d.content or "").strip()
         truncated = False
         if len(content) > max_chars:
             content = content[:max_chars]
@@ -418,8 +438,41 @@ def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["answer",
 
     decision = interrupt(payload)
 
-    # 사용자가 특정 문서를 선택한 경우: 선택 문서만으로 answer 진행
+    # 사용자가 검색어를 수정한 경우: 수정된 검색어로 재검색
     if isinstance(decision, dict):
+        decision_type = decision.get("type")
+
+        # Handle search query modification
+        if decision_type == "modify_search_queries":
+            modified_queries = decision.get("search_queries", [])
+
+            if isinstance(modified_queries, list) and len(modified_queries) > 0:
+                valid_queries = [
+                    str(q).strip()
+                    for q in modified_queries
+                    if str(q).strip()
+                ]
+
+                if valid_queries:
+                    return Command(
+                        goto="refine_and_retrieve",
+                        update={
+                            "retrieval_confirmed": False,
+                            "user_feedback": f"Modified queries: {', '.join(valid_queries)}",
+                            "search_queries": valid_queries[:5],
+                        }
+                    )
+                else:
+                    # Empty queries - fall back to refine_and_retrieve
+                    return Command(
+                        goto="refine_and_retrieve",
+                        update={
+                            "retrieval_confirmed": False,
+                            "user_feedback": "Empty queries provided",
+                        }
+                    )
+
+        # 사용자가 특정 문서를 선택한 경우: 선택 문서만으로 answer 진행
         selected_ids = decision.get("selected_doc_ids") or decision.get("selected_docs")
         selected_ranks = decision.get("selected_ranks")
 

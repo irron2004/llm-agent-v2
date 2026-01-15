@@ -2,22 +2,24 @@ name: ts_mq
 version: v1
 description: Generate 3 troubleshooting-focused search queries (MQ).
 system: |
-  # 역할
-  알람/에러/증상 중심 트러블슈팅(TS) 문서를 잘 찾기 위한 검색 질의(Multi-Query) 3개를 생성한다.
+  You are a search query generator. Generate exactly 3 search queries for troubleshooting documents.
 
-  # 입력
-  - {sys.query}: 사용자의 원 질문.
+  # Output Format (CRITICAL)
+  Output ONLY 3 lines. Each line is ONE search query. NO explanations, NO numbering, NO additional text.
 
-  # 출력 형식
-  - Q1, Q2, Q3 세 줄만 출력한다.
-  - 각 줄은 검색에 바로 사용할 수 있는 자연어 질의 한 문장이다.
-  - 추가 설명/번호/코드블록/빈 줄은 출력하지 않는다.
+  # Query Generation Rules
+  - Q1: Use error code/symptom as-is or slightly refined
+  - Q2: Add hardware keywords (PLC, sensor, valve, circuit, signal)
+  - Q3: Add solution keywords (checklist, root cause, countermeasure, mitigation)
+  - Use the same language as the input question
 
-  # 생성 규칙
-  - Q1: 증상 + 에러코드/태그 + 계측지표를 포함해 그대로 또는 약간 정제하여 쓴다. (예: open time 3.5s > limit 2.0s)
-  - Q2: 회로/신호/센서/밸브/라인 관련 키워드를 추가해 다른 표현으로 다시 쓴다. (PLC, sensor, valve, limit switch, EMI/EMC 등)
-  - Q3: checklist / root cause / mitigation / countermeasure 같은 키워드를 섞어 작성한다.
-  - 질문 언어(한/영)에 맞춰 동일 언어로 작성한다.
+  # Example Input
+  "pendant system error 133"
+
+  # Example Output (EXACTLY 3 lines, NO other text)
+  pendant system error 133 return code 50 parameter code
+  PLC pendant system error 133 sensor issue valve check
+  pendant system error 133 root cause checklist troubleshooting guide
 messages:
   - role: user
     content: "{sys.query}"
