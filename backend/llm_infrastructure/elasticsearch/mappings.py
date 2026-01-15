@@ -43,13 +43,11 @@ def get_rag_chunks_mapping(dims: int = 768) -> dict[str, Any]:
             # ===================================================================
             "content": {
                 "type": "text",
-                "analyzer": "standard",
-                # For Korean text, consider using nori analyzer:
-                # "analyzer": "nori",
+                "analyzer": "nori",  # Korean morphological analyzer
             },
             "search_text": {
                 "type": "text",
-                "analyzer": "standard",
+                "analyzer": "nori",  # Korean morphological analyzer for BM25 search
                 # Combined field: content + summary + caption + tags
                 # Used for BM25 keyword search
             },
@@ -166,6 +164,58 @@ def get_rag_chunks_mapping(dims: int = 768) -> dict[str, Any]:
             "updated_at": {
                 "type": "date",
             },
+            # ===================================================================
+            # RAPTOR Hierarchical RAG Fields
+            # ===================================================================
+            "partition_key": {
+                "type": "keyword",
+                "doc_values": True,
+                # Composite key: device_name + doc_type (e.g., "SUPRA_XP_sop")
+            },
+            "raptor_level": {
+                "type": "integer",
+                # 0=leaf, 1,2,3=summary levels
+            },
+            "raptor_parent_id": {
+                "type": "keyword",
+                "doc_values": True,
+                # Parent node ID in RAPTOR tree
+            },
+            "raptor_children_ids": {
+                "type": "keyword",
+                "doc_values": True,
+                # Array of child node IDs
+            },
+            "cluster_id": {
+                "type": "keyword",
+                "doc_values": True,
+                # GMM cluster ID within partition
+            },
+            "is_summary_node": {
+                "type": "boolean",
+                # True for summary nodes, False for leaf chunks
+            },
+            "validation_score": {
+                "type": "float",
+                # NLI-based summary validation score (0-1)
+            },
+            "evidence_links": {
+                "type": "object",
+                "enabled": False,
+                # Sentence -> source leaf IDs mapping (stored but not indexed)
+            },
+            "group_edges": {
+                "type": "nested",
+                # Soft membership edges to multiple groups
+                "properties": {
+                    "leaf_id": {"type": "keyword"},
+                    "group_id": {"type": "keyword"},
+                    "weight": {"type": "float"},
+                    "edge_type": {"type": "keyword"},
+                    "score": {"type": "float"},
+                    "created_at": {"type": "date"},
+                },
+            },
         },
     }
 
@@ -187,16 +237,15 @@ def get_index_settings(
         "number_of_shards": number_of_shards,
         "number_of_replicas": number_of_replicas,
         "refresh_interval": "1s",
-        # For Korean text analysis (requires nori plugin):
-        # "analysis": {
-        #     "analyzer": {
-        #         "nori": {
-        #             "type": "custom",
-        #             "tokenizer": "nori_tokenizer",
-        #             "filter": ["nori_readingform", "lowercase"],
-        #         }
-        #     }
-        # },
+        "analysis": {
+            "analyzer": {
+                "nori": {
+                    "type": "custom",
+                    "tokenizer": "nori_tokenizer",
+                    "filter": ["nori_readingform", "lowercase"],
+                }
+            }
+        },
     }
 
 
@@ -249,9 +298,124 @@ def get_index_meta(
 RAG_CHUNKS_MAPPING = get_rag_chunks_mapping(dims=768)
 
 
+def get_chat_turns_mapping() -> dict[str, Any]:
+    """Get chat turns index mapping for conversation history.
+
+    Index naming convention:
+        - Index: chat_turns_{env}_v{version}  (e.g., chat_turns_dev_v1)
+        - Alias: chat_turns_{env}_current     (e.g., chat_turns_dev_current)
+
+    Each document represents a single turn (user question + assistant answer).
+    """
+    return {
+        "properties": {
+            # ===================================================================
+            # Session / Turn Identity
+            # ===================================================================
+            "session_id": {
+                "type": "keyword",
+                "doc_values": True,
+            },
+            "turn_id": {
+                "type": "integer",
+                # Sequential turn number within session (1, 2, 3...)
+            },
+            "ts": {
+                "type": "date",
+                # Timestamp when the turn was created
+            },
+            # ===================================================================
+            # Conversation Content
+            # ===================================================================
+            "user_text": {
+                "type": "text",
+                "analyzer": "nori",
+                # User's question/input
+            },
+            "assistant_text": {
+                "type": "text",
+                "analyzer": "nori",
+                # Assistant's response
+            },
+            # ===================================================================
+            # Document References (for "이전 1번 문서" feature)
+            # ===================================================================
+            "doc_refs": {
+                "type": "nested",
+                "properties": {
+                    "slot": {
+                        "type": "integer",
+                        # User-visible document number (1, 2, 3...)
+                    },
+                    "doc_id": {
+                        "type": "keyword",
+                    },
+                    "title": {
+                        "type": "text",
+                        "fields": {
+                            "raw": {"type": "keyword"},
+                        },
+                    },
+                    "snippet": {
+                        "type": "text",
+                        # Brief content excerpt shown to user
+                    },
+                    "page": {
+                        "type": "integer",
+                    },
+                    "score": {
+                        "type": "float",
+                    },
+                },
+            },
+            # ===================================================================
+            # Session Metadata
+            # ===================================================================
+            "title": {
+                "type": "text",
+                "fields": {
+                    "raw": {"type": "keyword"},
+                },
+                # Session title (first message or user-defined)
+            },
+            "summary": {
+                "type": "text",
+                # Turn summary for history selection (generated by lightweight LLM)
+            },
+            "summary_model": {
+                "type": "keyword",
+                # Model used for summary generation
+            },
+            "summary_ts": {
+                "type": "date",
+                # When summary was generated
+            },
+            # ===================================================================
+            # Metadata
+            # ===================================================================
+            "schema_version": {
+                "type": "keyword",
+                # For future schema migrations
+            },
+            "created_at": {
+                "type": "date",
+            },
+            "updated_at": {
+                "type": "date",
+            },
+        },
+    }
+
+
+# Default chat turns mapping
+CHAT_TURNS_MAPPING = get_chat_turns_mapping()
+
+
 __all__ = [
     "get_rag_chunks_mapping",
     "get_index_settings",
     "get_index_meta",
+    "get_chat_turns_mapping",
     "RAG_CHUNKS_MAPPING",
+    "CHAT_TURNS_MAPPING",
 ]

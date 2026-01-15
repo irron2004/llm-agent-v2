@@ -4,7 +4,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routers import agent, chat, health, preprocessing, query_expansion, rerank, search, summarization
+from backend.api.routers import agent, assets, chat, conversations, health, ingestions, preprocessing, query_expansion, rerank, search, summarization
 from backend.api.dependencies import set_search_service
 from backend.config.settings import api_settings, rag_settings, search_settings
 from backend.llm_infrastructure.preprocessing import get_preprocessor
@@ -39,11 +39,14 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(preprocessing.router)
     app.include_router(agent.router, prefix="/api")
+    app.include_router(assets.router, prefix="/api")
     app.include_router(chat.router, prefix="/api")
     app.include_router(search.router, prefix="/api")
     app.include_router(rerank.router, prefix="/api")
     app.include_router(query_expansion.router, prefix="/api")
     app.include_router(summarization.router, prefix="/api")
+    app.include_router(ingestions.router, prefix="/api")
+    app.include_router(conversations.router, prefix="/api")
 
     @app.on_event("startup")
     async def startup_search_service():
