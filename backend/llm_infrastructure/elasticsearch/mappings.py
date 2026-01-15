@@ -391,6 +391,14 @@ def get_chat_turns_mapping() -> dict[str, Any]:
                 # When summary was generated
             },
             # ===================================================================
+            # Visibility / Soft Delete
+            # ===================================================================
+            "is_hidden": {
+                "type": "boolean",
+                # True = hidden from UI (soft delete), False = visible
+                # Default is False (visible)
+            },
+            # ===================================================================
             # Metadata
             # ===================================================================
             "schema_version": {

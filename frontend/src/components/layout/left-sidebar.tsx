@@ -37,7 +37,7 @@ export default function LeftSidebar({
   const navigate = useNavigate();
   const location = useLocation();
   const [searchQuery, setSearchQuery] = useState("");
-  const { history, deleteChat } = useChatHistoryContext();
+  const { history, hideChat } = useChatHistoryContext();
 
   const menuItems: MenuItem[] = [
     {
@@ -91,9 +91,9 @@ export default function LeftSidebar({
     onClose();
   };
 
-  const handleDeleteChat = (e: React.MouseEvent, id: string) => {
+  const handleHideChat = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    deleteChat(id);
+    hideChat(id);
   };
 
   const isActiveRoute = (key: string) => {
@@ -208,8 +208,8 @@ export default function LeftSidebar({
                 <div className="history-item-actions">
                   <button
                     className="history-item-action delete"
-                    onClick={(e) => handleDeleteChat(e, item.id)}
-                    title="Delete chat"
+                    onClick={(e) => handleHideChat(e, item.id)}
+                    title="Hide chat"
                   >
                     <DeleteOutlined />
                   </button>

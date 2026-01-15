@@ -276,18 +276,33 @@ class ChatHistoryService:
         except NotFoundError:
             return None
 
-    def list_sessions(self, limit: int = 50, offset: int = 0) -> list[SessionSummary]:
+    def list_sessions(self, limit: int = 50, offset: int = 0, include_hidden: bool = False) -> list[SessionSummary]:
         """List recent chat sessions.
 
         Args:
             limit: Maximum number of sessions to return.
             offset: Number of sessions to skip.
+            include_hidden: If True, include hidden (soft-deleted) sessions.
 
         Returns:
             List of SessionSummary objects sorted by most recent.
         """
+        # Build filter clause
+        filter_clause = []
+        if not include_hidden:
+            # Exclude hidden sessions: is_hidden must be false or missing
+            filter_clause.append({
+                "bool": {
+                    "should": [
+                        {"term": {"is_hidden": False}},
+                        {"bool": {"must_not": {"exists": {"field": "is_hidden"}}}},
+                    ],
+                    "minimum_should_match": 1,
+                }
+            })
+
         # Aggregate by session_id, get latest turn per session
-        query = {
+        query: dict[str, Any] = {
             "size": 0,
             "aggs": {
                 "sessions": {
@@ -311,6 +326,10 @@ class ChatHistoryService:
                 }
             },
         }
+
+        # Add filter if needed
+        if filter_clause:
+            query["query"] = {"bool": {"filter": filter_clause}}
         try:
             result = self.es.search(index=self.index, body=query)
             buckets = result.get("aggregations", {}).get("sessions", {}).get("buckets", [])
@@ -342,7 +361,7 @@ class ChatHistoryService:
             return []
 
     def delete_session(self, session_id: str) -> int:
-        """Delete all turns for a session.
+        """Delete all turns for a session (hard delete).
 
         Args:
             session_id: Session ID to delete.
@@ -361,6 +380,56 @@ class ChatHistoryService:
         deleted = result.get("deleted", 0)
         logger.info(f"Deleted {deleted} turns for session {session_id}")
         return deleted
+
+    def hide_session(self, session_id: str) -> int:
+        """Hide a session (soft delete) - marks all turns as hidden.
+
+        Args:
+            session_id: Session ID to hide.
+
+        Returns:
+            Number of documents updated.
+        """
+        query = {
+            "script": {
+                "source": "ctx._source.is_hidden = true",
+                "lang": "painless",
+            },
+            "query": {"term": {"session_id": session_id}},
+        }
+        result = self.es.update_by_query(
+            index=self.index,
+            body=query,
+            routing=session_id,
+        )
+        updated = result.get("updated", 0)
+        logger.info(f"Hid {updated} turns for session {session_id}")
+        return updated
+
+    def unhide_session(self, session_id: str) -> int:
+        """Unhide a session - marks all turns as visible.
+
+        Args:
+            session_id: Session ID to unhide.
+
+        Returns:
+            Number of documents updated.
+        """
+        query = {
+            "script": {
+                "source": "ctx._source.is_hidden = false",
+                "lang": "painless",
+            },
+            "query": {"term": {"session_id": session_id}},
+        }
+        result = self.es.update_by_query(
+            index=self.index,
+            body=query,
+            routing=session_id,
+        )
+        updated = result.get("updated", 0)
+        logger.info(f"Unhid {updated} turns for session {session_id}")
+        return updated
 
     def get_next_turn_id(self, session_id: str) -> int:
         """Get the next turn ID for a session.

@@ -6,6 +6,7 @@ interface ChatHistoryContextValue {
   isLoading: boolean;
   error: Error | null;
   deleteChat: (id: string) => Promise<void>;
+  hideChat: (id: string) => Promise<void>;
   getChat: (id: string) => ChatHistoryItem | null;
   refresh: () => void;
 }

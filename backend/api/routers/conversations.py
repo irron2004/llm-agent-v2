@@ -220,8 +220,39 @@ async def delete_session(
     session_id: str,
     service: ChatHistoryService = Depends(get_chat_history_service),
 ):
-    """Delete a session and all its turns."""
+    """Delete a session and all its turns (hard delete)."""
     deleted = service.delete_session(session_id)
     if deleted == 0:
         raise HTTPException(status_code=404, detail="Session not found")
     return {"deleted": deleted, "session_id": session_id}
+
+
+@router.post("/{session_id}/hide")
+async def hide_session(
+    session_id: str,
+    service: ChatHistoryService = Depends(get_chat_history_service),
+):
+    """Hide a session (soft delete).
+
+    The session is hidden from the UI but remains in the database.
+    Can be restored later using the unhide endpoint.
+    """
+    updated = service.hide_session(session_id)
+    if updated == 0:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"hidden": updated, "session_id": session_id}
+
+
+@router.post("/{session_id}/unhide")
+async def unhide_session(
+    session_id: str,
+    service: ChatHistoryService = Depends(get_chat_history_service),
+):
+    """Unhide a session (restore from soft delete).
+
+    Makes a previously hidden session visible again.
+    """
+    updated = service.unhide_session(session_id)
+    if updated == 0:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return {"unhidden": updated, "session_id": session_id}

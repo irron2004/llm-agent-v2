@@ -50,3 +50,11 @@ export async function saveTurn(
 export async function deleteSession(sessionId: string): Promise<void> {
   await apiClient.delete(`/api/conversations/${sessionId}`);
 }
+
+export async function hideSession(sessionId: string): Promise<void> {
+  await apiClient.post(`/api/conversations/${sessionId}/hide`, {});
+}
+
+export async function unhideSession(sessionId: string): Promise<void> {
+  await apiClient.post(`/api/conversations/${sessionId}/unhide`, {});
+}

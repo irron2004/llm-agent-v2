@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { fetchSessions, deleteSession as deleteSessionApi } from "../api";
+import { fetchSessions, deleteSession as deleteSessionApi, hideSession as hideSessionApi } from "../api";
 import { SessionListItem } from "../types";
 
 export interface ChatHistoryItem {
@@ -61,6 +61,20 @@ export function useChatHistory() {
     []
   );
 
+  // Soft delete - hides from UI but keeps in DB
+  const hideChat = useCallback(
+    async (id: string) => {
+      try {
+        await hideSessionApi(id);
+        setHistory((prev) => prev.filter((item) => item.id !== id));
+      } catch (err) {
+        console.error("Failed to hide session:", err);
+        throw err;
+      }
+    },
+    []
+  );
+
   const getChat = useCallback(
     (id: string) => {
       return history.find((item) => item.id === id) || null;
@@ -79,9 +93,10 @@ export function useChatHistory() {
       isLoading,
       error,
       deleteChat,
+      hideChat,
       getChat,
       refresh,
     }),
-    [history, isLoading, error, deleteChat, getChat, refresh]
+    [history, isLoading, error, deleteChat, hideChat, getChat, refresh]
   );
 }
