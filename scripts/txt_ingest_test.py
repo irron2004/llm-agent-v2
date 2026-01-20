@@ -37,18 +37,14 @@ def main():
     print("Initializing EsIngestService...")
     service = EsIngestService.from_settings()
 
-    # Ingest txt file
-    doc_id = txt_path.stem  # Use filename as doc_id
-    print(f"Doc ID: {doc_id}")
-    print(f"Calling ingest_txt()...")
+    # Ingest txt file (doc_id is auto-generated as "myservice_{title}")
+    print(f"Calling ingest_myservice_txt()...")
 
     try:
-        result = service.ingest_txt(
+        result = service.ingest_myservice_txt(
             file=str(txt_path),
-            doc_id=doc_id,
-            doc_type="maintenance",
             lang="ko",
-            tags=["test", "maintenance"],
+            tags=["test", "myservice"],
             refresh=True,  # Refresh for immediate search
             use_llm_summary=True,
         )

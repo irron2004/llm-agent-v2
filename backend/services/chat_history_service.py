@@ -226,6 +226,7 @@ class ChatHistoryService:
             id=doc_id,
             body=turn.to_dict(),
             routing=turn.session_id,  # Route by session for colocation
+            refresh=True,  # Immediate refresh for correct next turn_id calculation
         )
         logger.debug(f"Saved turn {doc_id}")
         return doc_id

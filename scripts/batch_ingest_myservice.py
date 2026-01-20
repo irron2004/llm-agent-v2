@@ -163,12 +163,9 @@ def print_progress_stats(es, index, success, failed, processed, total, elapsed):
 
 def ingest_single_file(txt_file, service):
     """Ingest a single txt file. Returns (success, doc_id, error_msg)."""
-    doc_id = txt_file.stem
     try:
-        result = service.ingest_txt(
+        result = service.ingest_myservice_txt(
             file=str(txt_file),
-            doc_id=doc_id,
-            doc_type="myservice",
             lang="ko",
             tags=["myservice", "batch"],
             refresh=False,
@@ -176,12 +173,12 @@ def ingest_single_file(txt_file, service):
         )
 
         if result.indexed_chunks > 0:
-            return (True, doc_id, None, result.total_sections)
+            return (True, result.doc_id, None, result.total_sections)
         else:
-            return (False, doc_id, "No chunks indexed", 0)
+            return (False, result.doc_id, "No chunks indexed", 0)
 
     except Exception as e:
-        return (False, doc_id, str(e), 0)
+        return (False, txt_file.stem, str(e), 0)
 
 
 def main():

@@ -96,7 +96,7 @@ export type TurnResponse = {
 };
 
 export type SessionListItem = {
-  id: string;
+  session_id: string;  // API returns session_id, not id
   title: string;
   preview: string;
   turnCount: number;

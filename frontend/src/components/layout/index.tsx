@@ -351,7 +351,7 @@ function ReviewPanelContent({
                     {doc.title || `문서 ${doc.rank ?? idx + 1}`}
                     {doc.page && <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, color: "var(--color-text-secondary)" }}>p.{doc.page}</span>}
                   </div>
-                  {doc.page_image_url && (
+                  {doc.page_image_url ? (
                     <div className="review-doc-image-wrapper" style={{ marginBottom: 8 }}>
                       <img
                         src={doc.page_image_url}
@@ -364,13 +364,19 @@ function ReviewPanelContent({
                         }}
                         onError={(e) => {
                           e.currentTarget.style.display = "none";
+                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
+                          if (fallback) fallback.style.display = "block";
                         }}
                       />
+                      <div className="review-doc-content" style={{ display: "none" }}>
+                        <MarkdownContent content={preprocessSnippet(doc.content)} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="review-doc-content">
+                      <MarkdownContent content={preprocessSnippet(doc.content)} />
                     </div>
                   )}
-                  <div className="review-doc-content">
-                    <MarkdownContent content={preprocessSnippet(doc.content)} />
-                  </div>
                 </div>
               </label>
             ))}

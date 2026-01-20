@@ -26,7 +26,7 @@ export function useChatHistory() {
       console.log("[useChatHistory] API response:", response);
       const items: ChatHistoryItem[] = response.sessions.map(
         (session: SessionListItem) => ({
-          id: session.id,
+          id: session.session_id,
           title: session.title,
           preview: session.preview,
           createdAt: session.createdAt,
