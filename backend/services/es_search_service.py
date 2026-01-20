@@ -29,6 +29,8 @@ from backend.llm_infrastructure.preprocessing.registry import get_preprocessor
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
 from backend.llm_infrastructure.retrieval.engines.es_search import EsSearchEngine
 from backend.llm_infrastructure.retrieval.adapters.es_hybrid import EsHybridRetriever
+from backend.llm_infrastructure.reranking import get_reranker
+from backend.llm_infrastructure.reranking.base import BaseReranker
 from backend.services.embedding_service import EmbeddingService
 
 logger = logging.getLogger(__name__)
@@ -51,6 +53,7 @@ class EsSearchService:
         es_engine: EsSearchEngine | None = None,
         top_k: int = 10,
         method: str = "hybrid",
+        reranker: Optional[BaseReranker] = None,
     ) -> None:
         """Initialize ES search service.
 
@@ -59,11 +62,13 @@ class EsSearchService:
             es_engine: Optional EsSearchEngine (for direct access).
             top_k: Default number of results.
             method: Search method (hybrid, dense).
+            reranker: Optional reranker instance for reranking results.
         """
         self.retriever = retriever
         self.es_engine = es_engine
         self.top_k = top_k
         self.method = method
+        self.reranker = reranker
 
     @classmethod
     def from_settings(
@@ -179,11 +184,26 @@ class EsSearchService:
             preprocessor=preprocessor,
         )
 
+        # Reranker (optional)
+        reranker: Optional[BaseReranker] = None
+        if rag_settings.rerank_enabled:
+            logger.info(
+                f"Building reranker: method={rag_settings.rerank_method}, "
+                f"model={rag_settings.rerank_model}"
+            )
+            reranker = get_reranker(
+                rag_settings.rerank_method,
+                version="v1",
+                model_name=rag_settings.rerank_model,
+                device=rag_settings.embedding_device,
+            )
+
         return cls(
             retriever=retriever,
             es_engine=es_engine,
             top_k=rag_settings.retrieval_top_k,
             method=rag_settings.retrieval_method,
+            reranker=reranker,
         )
 
     def search(
@@ -200,6 +220,8 @@ class EsSearchService:
         sparse_weight: float | None = None,
         use_rrf: bool | None = None,
         rrf_k: int | None = None,
+        device_name: str | None = None,
+        device_boost_weight: float = 2.0,
         **kwargs: Any,
     ) -> list[RetrievalResult]:
         """Search for relevant documents.
@@ -216,6 +238,8 @@ class EsSearchService:
             sparse_weight: Optional sparse (BM25) weight for hybrid search (overrides default)
             use_rrf: Whether to use RRF for score combination (True=RRF, False=weights)
             rrf_k: RRF rank constant (only used if use_rrf=True)
+            device_name: Optional device_name to boost (not filter).
+            device_boost_weight: Boost weight for matching device (default: 2.0).
             **kwargs: Additional parameters.
 
         Returns:
@@ -257,6 +281,8 @@ class EsSearchService:
                     project_id=project_id,
                     doc_type=doc_type,
                     lang=lang,
+                    device_name=device_name,
+                    device_boost_weight=device_boost_weight,
                     **kwargs,
                 )
             finally:

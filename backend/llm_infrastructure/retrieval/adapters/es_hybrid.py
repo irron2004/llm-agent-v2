@@ -101,6 +101,9 @@ class EsHybridRetriever(BaseRetriever):
         project_id: str | None = None,
         doc_type: str | None = None,
         lang: str | None = None,
+        device_name: str | None = None,
+        device_names: list[str] | None = None,
+        device_boost_weight: float = 2.0,
         **kwargs: Any,
     ) -> list[RetrievalResult]:
         """Retrieve relevant documents for a query.
@@ -112,6 +115,9 @@ class EsHybridRetriever(BaseRetriever):
             project_id: Optional project filter.
             doc_type: Optional document type filter.
             lang: Optional language filter.
+            device_name: Optional single device_name to boost (legacy, for backward compat).
+            device_names: Optional list of device names to filter (OR logic).
+            device_boost_weight: Boost weight for matching device (default: 2.0).
             **kwargs: Additional parameters.
 
         Returns:
@@ -132,12 +138,13 @@ class EsHybridRetriever(BaseRetriever):
         # Embed query
         query_vec = self._embed_query(processed_query)
 
-        # Build filter
+        # Build filter (device_names is used as filter, device_name is used as boost)
         filters = self.es_engine.build_filter(
             tenant_id=tenant_id,
             project_id=project_id,
             doc_type=doc_type,
             lang=lang,
+            device_names=device_names,
         )
 
         # Perform hybrid search
@@ -150,6 +157,8 @@ class EsHybridRetriever(BaseRetriever):
             filters=filters,
             use_rrf=self.use_rrf,
             rrf_k=self.rrf_k,
+            device_boost=device_name,
+            device_boost_weight=device_boost_weight,
         )
 
         # Convert to RetrievalResult

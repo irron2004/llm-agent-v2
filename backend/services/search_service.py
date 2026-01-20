@@ -218,6 +218,8 @@ class SearchService:
         multi_query_n: Optional[int] = None,
         rerank: Optional[bool] = None,
         rerank_top_k: Optional[int] = None,
+        device_name: Optional[str] = None,
+        device_names: Optional[list[str]] = None,
     ) -> list[RetrievalResult]:
         """Search for relevant documents with optional multi-query expansion and reranking.
 
@@ -230,6 +232,8 @@ class SearchService:
             multi_query_n: Override number of expanded queries (None = use service setting)
             rerank: Override reranking setting (None = use service setting)
             rerank_top_k: Number of results after reranking (None = use service setting)
+            device_name: Optional single device_name to boost (legacy)
+            device_names: Optional list of device names to filter (OR logic)
 
         Returns:
             List of retrieval results
@@ -245,6 +249,13 @@ class SearchService:
         if should_rerank and self.reranker is not None:
             retrieval_top_k = max(final_top_k * 2, 20)
 
+        # Build retriever kwargs for device filtering
+        retriever_kwargs: dict = {}
+        if device_names:
+            retriever_kwargs["device_names"] = device_names
+        elif device_name:
+            retriever_kwargs["device_name"] = device_name
+
         # Step 1: Multi-Query Expansion (if enabled)
         if should_expand and self.query_expander is not None:
             n = multi_query_n or self.multi_query_n
@@ -259,7 +270,7 @@ class SearchService:
             # Step 2: Retrieve for each query
             all_results: list[list[RetrievalResult]] = []
             for q in queries:
-                results = self.retriever.retrieve(q, top_k=retrieval_top_k)
+                results = self.retriever.retrieve(q, top_k=retrieval_top_k, **retriever_kwargs)
                 all_results.append(results)
 
             # Step 3: Merge results using RRF
@@ -268,7 +279,7 @@ class SearchService:
 
         else:
             # Single query retrieval
-            results = self.retriever.retrieve(query, top_k=retrieval_top_k)
+            results = self.retriever.retrieve(query, top_k=retrieval_top_k, **retriever_kwargs)
 
         # Step 4: Reranking (if enabled)
         if should_rerank and self.reranker is not None and results:

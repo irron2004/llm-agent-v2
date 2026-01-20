@@ -175,6 +175,8 @@ class EsSearchEngine:
         filters: dict[str, Any] | None = None,
         use_rrf: bool = False,
         rrf_k: int = 60,
+        device_boost: str | None = None,
+        device_boost_weight: float = 2.0,
     ) -> list[EsSearchHit]:
         """Perform hybrid search combining dense and sparse.
 
@@ -191,16 +193,20 @@ class EsSearchEngine:
             filters: Optional ES filter clause.
             use_rrf: Whether to use RRF (requires ES 8.x+).
             rrf_k: RRF constant (only used if use_rrf=True).
+            device_boost: Optional device_name to boost.
+            device_boost_weight: Boost weight for matching device (default: 2.0).
 
         Returns:
             List of search hits.
         """
         if use_rrf:
             return self._hybrid_search_rrf(
-                query_vector, query_text, top_k, filters, rrf_k
+                query_vector, query_text, top_k, filters, rrf_k,
+                device_boost, device_boost_weight,
             )
         return self._hybrid_search_script_score(
-            query_vector, query_text, top_k, dense_weight, sparse_weight, filters
+            query_vector, query_text, top_k, dense_weight, sparse_weight, filters,
+            device_boost, device_boost_weight,
         )
 
     def _hybrid_search_rrf(
@@ -210,6 +216,8 @@ class EsSearchEngine:
         top_k: int,
         filters: dict[str, Any] | None,
         rrf_k: int,
+        device_boost: str | None = None,
+        device_boost_weight: float = 2.0,
     ) -> list[EsSearchHit]:
         """Hybrid search using ES 8.x RRF."""
         knn_query: dict[str, Any] = {
@@ -221,7 +229,7 @@ class EsSearchEngine:
         if filters:
             knn_query["filter"] = filters
 
-        text_query = self._build_text_query(query_text)
+        text_query = self._build_text_query(query_text, device_boost, device_boost_weight)
         if filters:
             text_query = {
                 "bool": {
@@ -252,7 +260,8 @@ class EsSearchEngine:
             # RRF may not be supported in all ES versions
             logger.warning("RRF search failed, falling back to script_score: %s", e)
             return self._hybrid_search_script_score(
-                query_vector, query_text, top_k, 0.7, 0.3, filters
+                query_vector, query_text, top_k, 0.7, 0.3, filters,
+                device_boost, device_boost_weight,
             )
 
     def _hybrid_search_script_score(
@@ -263,6 +272,8 @@ class EsSearchEngine:
         dense_weight: float,
         sparse_weight: float,
         filters: dict[str, Any] | None,
+        device_boost: str | None = None,
+        device_boost_weight: float = 2.0,
     ) -> list[EsSearchHit]:
         """Hybrid search using script_score with weighted combination."""
         # Combine BM25 and cosine similarity using script_score
@@ -271,7 +282,7 @@ class EsSearchEngine:
             f"+ params.sparse_weight * _score + 1.0"  # +1.0 to avoid negative scores
         )
 
-        match_query = self._build_text_query(query_text)
+        match_query = self._build_text_query(query_text, device_boost, device_boost_weight)
 
         query: dict[str, Any] = {
             "script_score": {
@@ -325,18 +336,59 @@ class EsSearchEngine:
             "project_id",
             "lang",
             "tags",
+            "device_name",
+            "title",
         ]
 
-    def _build_text_query(self, query_text: str) -> dict[str, Any]:
-        """Build text query for single or multi-field BM25."""
+    def _build_text_query(
+        self,
+        query_text: str,
+        device_boost: str | None = None,
+        device_boost_weight: float = 2.0,
+    ) -> dict[str, Any]:
+        """Build text query for single or multi-field BM25 with optional device boost.
+
+        Args:
+            query_text: Search query text.
+            device_boost: Optional device_name to boost.
+            device_boost_weight: Boost weight for matching device.
+
+        Returns:
+            ES query clause.
+        """
+        # Base text query
         if len(self.text_fields) > 1 or any("^" in f for f in self.text_fields):
-            return {
+            base_query: dict[str, Any] = {
                 "multi_match": {
                     "query": query_text,
                     "fields": self.text_fields,
                 }
             }
-        return {"match": {self.text_fields[0]: query_text}}
+        else:
+            base_query = {"match": {self.text_fields[0]: query_text}}
+
+        # If no device boost, return base query
+        if not device_boost:
+            return base_query
+
+        # Wrap in bool query with should clause for device boost
+        # This boosts documents with matching device_name without filtering others
+        return {
+            "bool": {
+                "must": base_query,
+                "should": [
+                    {
+                        "bool": {
+                            "should": [
+                                {"term": {"device_name": {"value": device_boost, "boost": device_boost_weight}}},
+                                {"term": {"device_name.keyword": {"value": device_boost, "boost": device_boost_weight}}},
+                            ],
+                            "minimum_should_match": 1,
+                        }
+                    }
+                ],
+            }
+        }
 
     def _parse_hits(self, resp: dict[str, Any]) -> list[EsSearchHit]:
         """Parse ES response into EsSearchHit objects."""
@@ -370,6 +422,7 @@ class EsSearchEngine:
         project_id: str | None = None,
         doc_type: str | None = None,
         lang: str | None = None,
+        device_names: list[str] | None = None,
     ) -> dict[str, Any] | None:
         """Build ES filter clause from common filter parameters.
 
@@ -378,6 +431,7 @@ class EsSearchEngine:
             project_id: Filter by project.
             doc_type: Filter by document type.
             lang: Filter by language.
+            device_names: Filter by device names (OR logic - match any).
 
         Returns:
             ES filter clause or None if no filters.
@@ -398,6 +452,19 @@ class EsSearchEngine:
                 }
             }
 
+        def _terms_or_keyword(field: str, values: list[str]) -> dict[str, Any]:
+            """Build OR filter for multiple values."""
+            should_clauses = []
+            for value in values:
+                should_clauses.append({"term": {field: value}})
+                should_clauses.append({"term": {f"{field}.keyword": value}})
+            return {
+                "bool": {
+                    "should": should_clauses,
+                    "minimum_should_match": 1,
+                }
+            }
+
         terms: list[dict[str, Any]] = []
 
         if tenant_id:
@@ -408,6 +475,8 @@ class EsSearchEngine:
             terms.append(_term_or_keyword("doc_type", doc_type))
         if lang:
             terms.append(_term_or_keyword("lang", lang))
+        if device_names:
+            terms.append(_terms_or_keyword("device_name", device_names))
 
         if not terms:
             return None
