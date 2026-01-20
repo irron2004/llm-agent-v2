@@ -52,7 +52,7 @@ def _create_device_fetcher(search_service):
                 "devices": {
                     "terms": {
                         "field": "device_name",
-                        "size": 100,
+                        "size": 10,  # Top 10 devices only
                         "order": {"_count": "desc"},
                     }
                 }
