@@ -204,7 +204,8 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
                                   </span>
                                 )}
                               </div>
-                              {pageUrls.length > 0 ? (
+                              {/* Show page images if available */}
+                              {pageUrls.length > 0 && (
                                 <div
                                   className="reference-images-container"
                                   style={{
@@ -234,9 +235,11 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
                                     </div>
                                   ))}
                                 </div>
-                              ) : (
-                                <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-                                  <MarkdownContent content={preprocessSnippet(doc.snippet || "")} />
+                              )}
+                              {/* Always show snippet text */}
+                              {doc.snippet && (
+                                <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: pageUrls.length > 0 ? 8 : 0 }}>
+                                  <MarkdownContent content={preprocessSnippet(doc.snippet)} />
                                 </div>
                               )}
                               {(doc.score !== null && doc.score !== undefined) && (

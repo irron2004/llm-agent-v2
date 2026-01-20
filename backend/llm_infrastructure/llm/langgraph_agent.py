@@ -360,7 +360,8 @@ def _extract_page_value(metadata: Dict[str, Any] | None) -> int | None:
         page_num = int(page)
     except (TypeError, ValueError):
         return None
-    return page_num if page_num > 0 else None
+    # Allow page 0 (valid for myservice docs)
+    return page_num if page_num >= 0 else None
 
 
 def _combine_related_text(docs: List[RetrievalResult]) -> str:

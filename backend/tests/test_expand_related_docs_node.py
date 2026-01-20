@@ -364,3 +364,24 @@ class TestExpandedPagesMetadata:
         doc = result["docs"][0]
         # Original doc preserved, no expanded_pages
         assert doc.metadata.get("expanded_pages") is None
+
+    def test_myservice_page_zero_expansion(self):
+        """myservice 문서의 page 0도 정상적으로 확장됨"""
+        docs = [_make_doc("myservice_doc", page=0, doc_type="myservice")]
+        state = {"docs": docs}
+
+        # doc_fetcher returns chunks with page 0
+        related = [
+            _make_doc("chunk1", page=0),
+            _make_doc("chunk2", page=0),
+        ]
+        doc_fetcher = MagicMock(return_value=related)
+
+        # When
+        result = expand_related_docs_node(state, doc_fetcher=doc_fetcher)
+
+        # Then
+        expanded_doc = result["docs"][0]
+        assert expanded_doc.metadata is not None
+        assert "expanded_pages" in expanded_doc.metadata
+        assert expanded_doc.metadata["expanded_pages"] == [0]  # page 0 should be included
