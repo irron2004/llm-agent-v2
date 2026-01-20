@@ -1,5 +1,9 @@
 # 기기 필터 UI 화면 기획
 
+> **구현 완료 (2026-01-15)**: HIL (Human-in-the-Loop) 방식으로 구현됨
+> - 원래 계획: 입력창 위 드롭다운 필터
+> - 실제 구현: Agent가 질문 시작 시 기기 선택 HIL Interrupt 발생 → 사용자 선택 → Device Boost 검색
+
 ## 1. 목표
 
 - 조회된 문서에서 기기정보(device_name)를 별도로 표시
@@ -218,25 +222,43 @@
 
 ## 5. 구현 범위
 
-### Phase 1: 기본 필터 (MVP)
+### ✅ 실제 구현 (2026-01-15) - HIL 방식
 
-- [ ] 입력창 위 기기 드롭다운 필터
-- [ ] 기기 목록 API (`GET /api/devices`)
-- [ ] 검색 시 기기 필터 적용
+**구현된 기능:**
+- [x] 기기 목록 API (`GET /api/devices`) - ES Terms Aggregation 사용
+- [x] Agent 시작 시 기기 선택 HIL Interrupt (LangGraph `interrupt()`)
+- [x] `DeviceSelectionPanel` UI 컴포넌트 (Radio 선택 + 전체 문서 검색 버튼)
+- [x] Device Boost 검색 (선택한 기기 문서 우선 표시, 다른 기기 문서도 포함)
+- [x] 기기별 문서 수 표시 (API 응답에 `doc_count` 포함)
+
+**구현 파일:**
+- `backend/api/routers/devices.py` - 기기 목록 API
+- `backend/llm_infrastructure/llm/langgraph_agent.py` - `device_selection_node`, AgentState 확장
+- `backend/llm_infrastructure/retrieval/engines/es_search.py` - Device Boost 쿼리
+- `frontend/src/features/chat/components/device-selection-panel.tsx` - 기기 선택 UI
+- `frontend/src/features/chat/hooks/use-chat-session.ts` - HIL 상태 관리
+
+### 원래 계획 (참고용) - 드롭다운 필터 방식
+
+~~Phase 1: 기본 필터 (MVP)~~
+
+- [x] ~~입력창 위 기기 드롭다운 필터~~ → HIL 방식으로 대체
+- [x] 기기 목록 API (`GET /api/devices`) ✅ 구현됨
+- [x] ~~검색 시 기기 필터 적용~~ → Device Boost로 구현 (필터가 아닌 우선순위 부여)
 - [ ] 참조 문서에 기기 태그 표시
 
-### Phase 2: 고급 필터
+### Phase 2: 고급 필터 (미구현)
 
 - [ ] 문서 타입 드롭다운 필터
 - [ ] 다중 기기 선택
 - [ ] 필터 상태 URL 파라미터 저장
 - [ ] 기기 태그 클릭 시 필터 적용
 
-### Phase 3: UX 개선
+### Phase 3: UX 개선 (미구현)
 
 - [ ] 자주 사용 기기 저장 (로컬스토리지)
 - [ ] 기기 검색 (자동완성)
-- [ ] 기기별 문서 수 표시
+- [x] 기기별 문서 수 표시 ✅ 구현됨
 - [ ] 필터 프리셋 저장
 
 ---
@@ -326,14 +348,211 @@ interface FilterState {
 
 ## 8. 타임라인
 
-| 단계 | 작업 | 예상 |
+| 단계 | 작업 | 상태 |
 |------|------|------|
-| 1 | API 설계 및 구현 | - |
-| 2 | 기기 목록 컴포넌트 | - |
-| 3 | 필터 드롭다운 UI | - |
-| 4 | 검색 API 필터 연동 | - |
-| 5 | 참조 문서 태그 표시 | - |
-| 6 | 테스트 및 개선 | - |
+| 1 | API 설계 및 구현 | ✅ 완료 |
+| 2 | ~~기기 목록 컴포넌트~~ → HIL Interrupt Node | ✅ 완료 |
+| 3 | ~~필터 드롭다운 UI~~ → DeviceSelectionPanel | ✅ 완료 |
+| 4 | ~~검색 API 필터 연동~~ → Device Boost 연동 | ✅ 완료 |
+| 5 | 참조 문서 태그 표시 | ❌ 미구현 |
+| 6 | 테스트 및 개선 | ✅ 완료 |
+
+---
+
+## 8.1. 실제 구현 상세 (2026-01-15)
+
+### 8.1.1 아키텍처 개요
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        User Question                            │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    device_selection_node                        │
+│  - GET /api/devices 호출 (ES Terms Aggregation)                 │
+│  - interrupt() 발생 → 프론트엔드에 기기 목록 전송               │
+└─────────────────────────────────────────────────────────────────┘
+                                │
+                    ┌───────────┴───────────┐
+                    ▼                       ▼
+          ┌─────────────────┐     ┌─────────────────┐
+          │ 기기 선택       │     │ 전체 문서 검색  │
+          │ (device_name)   │     │ (skip)          │
+          └─────────────────┘     └─────────────────┘
+                    │                       │
+                    └───────────┬───────────┘
+                                ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       retrieve_node                             │
+│  - selected_device가 있으면 device_boost 적용                   │
+│  - ES bool query의 should 절에 device_name 추가                 │
+│  - 선택한 기기 문서 우선, 다른 기기 문서도 결과에 포함          │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 8.1.2 Backend 구현
+
+**1. 기기 목록 API (`backend/api/routers/devices.py`)**
+
+```python
+@router.get("/devices", response_model=DeviceListResponse)
+async def list_devices(
+    limit: int = 100,
+    search_service: EsSearchService = Depends(get_search_service),
+) -> DeviceListResponse:
+    agg_query = {
+        "size": 0,
+        "aggs": {
+            "devices": {
+                "terms": {
+                    "field": "device_name",
+                    "size": limit,
+                    "order": {"_count": "desc"},
+                }
+            }
+        }
+    }
+    result = es.search(index=index, body=agg_query)
+    # Returns: { "devices": [{ "name": "SUPRA N", "doc_count": 267786 }, ...] }
+```
+
+**2. AgentState 확장 (`langgraph_agent.py`)**
+
+```python
+class AgentState(TypedDict, total=False):
+    # ... existing fields ...
+    # Device selection (HIL)
+    available_devices: List[Dict[str, Any]]
+    selected_device: Optional[str]
+    device_selection_skipped: bool
+```
+
+**3. device_selection_node (`langgraph_agent.py`)**
+
+```python
+def device_selection_node(state: AgentState, *, device_fetcher) -> Command[Literal["mq"]]:
+    available_devices = device_fetcher()  # GET /api/devices 호출
+    payload = {
+        "type": "device_selection",
+        "question": state["query"],
+        "devices": available_devices,
+        "instruction": "검색에 사용할 기기를 선택하세요...",
+    }
+    decision = interrupt(payload)  # HIL Interrupt 발생
+
+    if decision == "skip":
+        return Command(goto="mq", update={"device_selection_skipped": True})
+    else:
+        return Command(goto="mq", update={"selected_device": decision})
+```
+
+**4. Device Boost 검색 (`es_search.py`)**
+
+```python
+def _build_text_query(self, query_text: str, device_boost: str | None = None, device_boost_weight: float = 2.0):
+    if not device_boost:
+        return base_query
+
+    return {
+        "bool": {
+            "must": base_query,
+            "should": [{
+                "bool": {
+                    "should": [
+                        {"term": {"device_name": {"value": device_boost, "boost": device_boost_weight}}},
+                        {"term": {"device_name.keyword": {"value": device_boost, "boost": device_boost_weight}}},
+                    ]
+                }
+            }]
+        }
+    }
+```
+
+### 8.1.3 Frontend 구현
+
+**1. InterruptKind 타입 (`use-chat-session.ts`)**
+
+```typescript
+type InterruptKind = "device_selection" | "retrieval_review" | "human_review" | "unknown";
+
+type DeviceInfo = { name: string; doc_count: number; };
+
+type PendingInterrupt = {
+  threadId: string;
+  kind: InterruptKind;
+  question: string;
+  instruction?: string;
+  docs?: RetrievedDoc[];
+  devices?: DeviceInfo[];  // device_selection용
+};
+```
+
+**2. DeviceSelectionPanel 컴포넌트**
+
+```typescript
+export function DeviceSelectionPanel({ question, devices, onSelect, instruction }) {
+  const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+
+  return (
+    <Card>
+      <Radio.Group value={selectedDevice} onChange={(e) => setSelectedDevice(e.target.value)}>
+        {devices.map((device) => (
+          <Radio key={device.name} value={device.name}>
+            {device.name} ({device.doc_count.toLocaleString()} 문서)
+          </Radio>
+        ))}
+      </Radio.Group>
+
+      <Button icon={<GlobalOutlined />} onClick={() => onSelect(null)}>
+        전체 문서 검색
+      </Button>
+      <Button type="primary" onClick={() => onSelect(selectedDevice)} disabled={!selectedDevice}>
+        선택한 기기로 검색
+      </Button>
+    </Card>
+  );
+}
+```
+
+### 8.1.4 실제 UI 화면
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Chat Page                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  [User] SUPRA N의 PM 절차를 알려줘                              │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │ 💻 기기 선택                                                ││
+│  │ 검색에 사용할 기기를 선택하세요. 선택한 기기의 문서가       ││
+│  │ 우선 표시됩니다.                                            ││
+│  │                                                             ││
+│  │ 질문: SUPRA N의 PM 절차를 알려줘                            ││
+│  │                                                             ││
+│  │ ○ SUPRA N (267,786 문서)                                   ││
+│  │ ○ SUPRA Vplus (101,826 문서)                               ││
+│  │ ○ SUPRA V (49,862 문서)                                    ││
+│  │ ○ INTEGER plus (37,344 문서)                               ││
+│  │ ...                                                         ││
+│  │                                                             ││
+│  │         [🌐 전체 문서 검색]  [선택한 기기로 검색]           ││
+│  └─────────────────────────────────────────────────────────────┘│
+│                                                                 │
+│  [입력창]                                                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 8.1.5 Device Boost vs Filter 차이점
+
+| 구분 | Filter (원래 계획) | Boost (실제 구현) |
+|------|-------------------|-------------------|
+| 동작 | 선택한 기기 문서만 표시 | 선택한 기기 문서 우선, 다른 기기도 표시 |
+| 검색 결과 | 제한적 | 포괄적 |
+| ES 쿼리 | `filter` 절 사용 | `should` 절 + `boost` 가중치 사용 |
+| 장점 | 정확한 기기별 필터링 | 관련 문서 누락 방지 |
 
 ---
 
@@ -346,6 +565,10 @@ interface FilterState {
 ---
 
 # 검색 문서 이미지 표시 화면 기획
+
+> **부분 구현 완료 (2026-01-15)**
+> - ✅ 텍스트 스니펫 Markdown 렌더링 적용 (`MarkdownContent` 컴포넌트 재사용)
+> - ❌ 이미지 라이트박스(확대 보기) 미구현
 
 ## 1. 목표
 
@@ -734,48 +957,49 @@ interface RetrievedDoc {
 
 **목표**: 텍스트 스니펫 가독성 문제 해결
 
-#### 1-1. 텍스트 스니펫 Markdown 렌더링 (최우선) 🔥
+#### 1-1. 텍스트 스니펫 Markdown 렌더링 (최우선) 🔥 ✅ 구현 완료
 
-- [ ] **Markdown 렌더링 적용**
+- [x] **Markdown 렌더링 적용** ✅
   - 기존 `MarkdownContent` 컴포넌트 재사용 (`frontend/src/features/chat/components/markdown-content.tsx`)
   - `RetrievedDocsContent` 컴포넌트에서 텍스트 스니펫을 `<div>{doc.snippet}</div>` 대신 `<MarkdownContent content={doc.snippet} />` 사용
   - HTML 태그 제거 및 markdown 파싱 적용
   - 표 형식 데이터를 실제 표로 렌더링
 
-- [ ] **텍스트 전처리**
+- [x] **텍스트 전처리** ✅
   - markdown 코드 블록 제거 (예: ````markdown` 제거)
   - HTML 태그 정리 (`<br>` → 줄바꿈)
   - 불필요한 공백 정리
 
-- [ ] **스타일 적용**
+- [x] **스타일 적용** ✅
   - markdown 콘텐츠에 적절한 스타일 적용
   - 표 스크롤 처리 (가로 스크롤)
   - 코드 블록 스타일 적용
 
-**예상 효과**:
+**구현 결과**:
 - ✅ 텍스트 스니펫이 보기 좋은 형태로 표시됨
 - ✅ 표 형식 데이터가 실제 표로 렌더링되어 구조 파악 가능
 - ✅ HTML 태그가 제거되고 적절히 렌더링됨
 - ✅ Markdown 형식이 제대로 적용됨 (제목, 리스트, 강조 등)
 
-#### 1-2. 이미지 표시 개선
+**구현 파일**:
+- `frontend/src/features/chat/components/message-item.tsx` - Markdown 렌더링 적용
 
-- [ ] **모든 문서에 이미지 표시** (현재는 첫 번째만 표시됨)
-  - `RetrievedDocsContent` 컴포넌트 수정
-  - 모든 문서에 대해 `page_image_url` 확인 및 이미지 표시
-- [ ] **이미지 크기 증가** (max-height: 300px → 500px)
-  - CSS 수정: `.retrieved-doc-image` 스타일 업데이트
-- [ ] **이미지 로딩 상태 표시**
-  - 스켈레톤 UI 또는 스피너 추가
-- [ ] **이미지 에러 처리 개선**
+#### 1-2. 이미지 표시 개선 (부분 구현)
+
+- [x] **모든 문서에 이미지 표시** ✅ (기존 구현 유지)
+  - `RetrievedDocsContent` 컴포넌트에서 `page_image_url` 있으면 이미지 표시
+- [x] **이미지 로딩 상태 표시** ✅ (기존 구현 유지)
+- [x] **이미지 에러 처리 개선** ✅ (기존 구현 유지)
   - 이미지 로딩 실패 시 텍스트 스니펫으로 fallback
-- [ ] **텍스트/이미지 토글 기능** (선택사항)
+- [ ] **이미지 크기 증가** (max-height: 300px → 500px) - 미구현
+  - CSS 수정: `.retrieved-doc-image` 스타일 업데이트
+- [ ] **텍스트/이미지 토글 기능** (선택사항) - 미구현
   - 이미지와 텍스트 스니펫 간 전환 가능
 
-**예상 효과**:
-- ✅ 텍스트 스니펫의 가독성 문제 완전 해결
-- ✅ 모든 문서에 일관된 표시 방식 적용
-- ✅ 문서의 실제 레이아웃 확인 가능
+**현재 상태**:
+- ✅ 텍스트 스니펫의 가독성 문제 해결됨 (Markdown 렌더링)
+- ✅ 모든 문서에 이미지/텍스트 표시 가능
+- ⏳ 이미지 크기 확대 및 토글 기능은 추후 구현
 
 ### Phase 2: 확대 기능 추가
 
@@ -1037,20 +1261,20 @@ function DocCard({ doc, index, viewMode, onImageClick }: DocCardProps) {
 
 ## 12. 타임라인
 
-| 단계 | 작업 | 예상 시간 | 우선순위 |
-|------|------|----------|---------|
-| 1-1 | 텍스트 스니펫 Markdown 렌더링 적용 | 2-3시간 | 🔥 최우선 |
-| 1-2 | 텍스트 전처리 함수 구현 | 1시간 | 🔥 최우선 |
-| 1-3 | Markdown 스타일 적용 및 테스트 | 1시간 | 🔥 최우선 |
-| 2 | 모든 문서에 이미지 표시 | 1-2시간 | ⚡ 높음 |
-| 3 | 이미지 크기 증가 및 스타일 개선 | 1시간 | ⚡ 높음 |
-| 4 | 이미지 로딩 상태 및 에러 처리 | 1시간 | 중간 |
-| 5 | 텍스트/이미지 토글 기능 | 1-2시간 | 중간 |
-| 6 | 확대 모달 구현 | 2-3시간 | 낮음 |
-| 7 | 네비게이션 및 키보드 단축키 | 1-2시간 | 낮음 |
-| 8 | 테스트 및 버그 수정 | 1-2시간 | - |
-| **Phase 1 총계** | | **5-7시간** | |
-| **전체 총계** | | **12-18시간** | |
+| 단계 | 작업 | 상태 | 우선순위 |
+|------|------|------|---------|
+| 1-1 | 텍스트 스니펫 Markdown 렌더링 적용 | ✅ 완료 | 🔥 최우선 |
+| 1-2 | 텍스트 전처리 함수 구현 | ✅ 완료 | 🔥 최우선 |
+| 1-3 | Markdown 스타일 적용 및 테스트 | ✅ 완료 | 🔥 최우선 |
+| 2 | 모든 문서에 이미지 표시 | ✅ 완료 (기존) | ⚡ 높음 |
+| 3 | 이미지 크기 증가 및 스타일 개선 | ❌ 미구현 | ⚡ 높음 |
+| 4 | 이미지 로딩 상태 및 에러 처리 | ✅ 완료 (기존) | 중간 |
+| 5 | 텍스트/이미지 토글 기능 | ❌ 미구현 | 중간 |
+| 6 | 확대 모달 구현 (라이트박스) | ❌ 미구현 | 낮음 |
+| 7 | 네비게이션 및 키보드 단축키 | ❌ 미구현 | 낮음 |
+| 8 | 테스트 및 버그 수정 | ✅ 완료 | - |
+| **Phase 1 총계** | | **대부분 완료** | |
+| **전체 총계** | | **60% 완료** | |
 
 ---
 
@@ -1169,20 +1393,43 @@ function DocCard({ doc, index, viewMode, onImageClick }: DocCardProps) {
 ## 14. 체크리스트
 
 ### 개발 전
-- [ ] 디자인 리뷰 및 승인
-- [ ] API 응답 구조 확인
-- [ ] 이미지 URL 형식 확인
+- [x] 디자인 리뷰 및 승인 ✅
+- [x] API 응답 구조 확인 ✅
+- [x] 이미지 URL 형식 확인 ✅
 
 ### 개발 중
-- [ ] 이미지 크기 조정
-- [ ] 로딩 상태 표시
-- [ ] 에러 처리
-- [ ] 토글 기능
-- [ ] 모달 구현
+- [ ] 이미지 크기 조정 (300px → 500px)
+- [x] 로딩 상태 표시 ✅
+- [x] 에러 처리 ✅
+- [ ] 토글 기능 (이미지/텍스트 전환)
+- [ ] 모달 구현 (라이트박스)
 - [ ] 키보드 단축키
 
 ### 개발 후
+- [x] 기본 기능 테스트 ✅
 - [ ] 다양한 화면 크기 테스트
 - [ ] 이미지 로딩 성능 테스트
 - [ ] 접근성 테스트
 - [ ] 사용자 피드백 수집
+
+---
+
+## 15. 구현 요약 (2026-01-15)
+
+### 기기 필터 UI
+- **상태**: ✅ 완료
+- **구현 방식**: HIL (Human-in-the-Loop) Interrupt
+- **주요 기능**:
+  - Agent 시작 시 기기 선택 요청
+  - Device Boost 검색 (선택 기기 우선, 다른 기기도 포함)
+  - 기기별 문서 수 표시
+
+### 검색 문서 이미지 표시
+- **상태**: 부분 완료 (60%)
+- **완료된 기능**:
+  - Markdown 렌더링 (텍스트 스니펫 가독성 개선)
+  - 기본 이미지 표시 및 에러 처리
+- **미완료 기능**:
+  - 이미지 라이트박스 (확대 보기)
+  - 이미지/텍스트 토글
+  - 이미지 크기 증가

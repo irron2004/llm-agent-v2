@@ -35,6 +35,45 @@ _checkpointer: MemorySaver = MemorySaver()
 _hil_agent: Optional[LangGraphRAGAgent] = None
 
 
+def _create_device_fetcher(search_service):
+    """Create a device fetcher function using ES aggregation."""
+    def _fetch_devices() -> list[Dict[str, Any]]:
+        # Check if ES engine is available
+        if not hasattr(search_service, 'es_engine') or search_service.es_engine is None:
+            logger.warning("ES engine not available for device fetching")
+            return []
+
+        es = search_service.es_engine.es
+        index = search_service.es_engine.index_name
+
+        agg_query = {
+            "size": 0,
+            "aggs": {
+                "devices": {
+                    "terms": {
+                        "field": "device_name",
+                        "size": 100,
+                        "order": {"_count": "desc"},
+                    }
+                }
+            }
+        }
+
+        try:
+            result = es.search(index=index, body=agg_query)
+            buckets = result.get("aggregations", {}).get("devices", {}).get("buckets", [])
+            return [
+                {"name": bucket["key"], "doc_count": bucket["doc_count"]}
+                for bucket in buckets
+                if bucket["key"]
+            ]
+        except Exception as e:
+            logger.error(f"Failed to fetch device list: {e}")
+            return []
+
+    return _fetch_devices
+
+
 def _get_hil_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent:
     """HIL용 싱글톤 에이전트. 동일한 graph 인스턴스로 interrupt/resume 보장."""
     global _hil_agent
@@ -48,6 +87,8 @@ def _get_hil_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent:
             top_k=rag_settings.retrieval_top_k,
             mode="verified",
             ask_user_after_retrieve=True,
+            ask_device_selection=True,
+            device_fetcher=_create_device_fetcher(search_service),
             checkpointer=_checkpointer,
         )
     return _hil_agent
@@ -94,7 +135,8 @@ def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
         title = ""
         metadata = getattr(r, "metadata", None)
         if metadata:
-            title = metadata.get("title", "")
+            # Try title first, then doc_description (used by myservice/gcb)
+            title = metadata.get("title", "") or metadata.get("doc_description", "")
         if not title:
             title = (r.raw_text or r.content or "").split("\n")[0][:80]
 
@@ -195,6 +237,7 @@ async def run_agent(
                 "route": result.get("route"),
                 "st_gate": result.get("st_gate"),
                 "search_queries": result.get("search_queries", []),
+                "selected_device": result.get("selected_device"),
             },
             interrupted=True,
             interrupt_payload=payload,
@@ -211,6 +254,7 @@ async def run_agent(
             "route": result.get("route"),
             "st_gate": result.get("st_gate"),
             "search_queries": result.get("search_queries", []),
+            "selected_device": result.get("selected_device"),
         },
         interrupted=False,
         thread_id=tid,
@@ -283,6 +327,8 @@ async def run_agent_stream(
                 result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid)
 
             interrupt_info = result.get("__interrupt__")
+            logger.info(f"[agent stream] result keys: {list(result.keys())}")
+            logger.info(f"[agent stream] interrupt_info: {interrupt_info}")
             if interrupt_info:
                 payload = None
                 if len(interrupt_info) > 0:
@@ -297,6 +343,7 @@ async def run_agent_stream(
                         "route": result.get("route"),
                         "st_gate": result.get("st_gate"),
                         "search_queries": result.get("search_queries", []),
+                        "selected_device": result.get("selected_device"),
                     },
                     interrupted=True,
                     interrupt_payload=payload,
@@ -312,6 +359,7 @@ async def run_agent_stream(
                         "route": result.get("route"),
                         "st_gate": result.get("st_gate"),
                         "search_queries": result.get("search_queries", []),
+                        "selected_device": result.get("selected_device"),
                     },
                     interrupted=False,
                     thread_id=tid,

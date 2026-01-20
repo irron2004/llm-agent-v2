@@ -9,6 +9,7 @@ import {
   InputArea,
   MessageItem,
   ChatInput,
+  DeviceSelectionPanel,
 } from "../components";
 import { Alert, Spin } from "antd";
 
@@ -40,8 +41,10 @@ export default function ChatPage() {
     loadSession,
     inputPlaceholder,
     pendingReview,
+    pendingDeviceSelection,
     submitReview,
     submitSearchQueries,
+    submitDeviceSelection,
   } = useChatSession({ onTurnSaved: handleTurnSaved });
 
   // Load session from URL parameter
@@ -172,6 +175,16 @@ export default function ChatPage() {
                 ))
               )}
             </MessageList>
+          )}
+
+          {/* Device selection panel */}
+          {pendingDeviceSelection && pendingDeviceSelection.devices && pendingDeviceSelection.devices.length > 0 && (
+            <DeviceSelectionPanel
+              question={pendingDeviceSelection.question}
+              devices={pendingDeviceSelection.devices}
+              instruction={pendingDeviceSelection.instruction}
+              onSelect={submitDeviceSelection}
+            />
           )}
 
           {/* Review panel moved to right sidebar */}

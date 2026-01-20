@@ -41,6 +41,11 @@ class AgentState(TypedDict, total=False):
     st_gate: Gate
     search_queries: List[str]
 
+    # Device selection (HIL)
+    available_devices: List[Dict[str, Any]]
+    selected_devices: List[str]  # Multiple devices can be selected
+    device_selection_skipped: bool
+
     # Retrieval outputs
     docs: List[RetrievalResult]
     ref_json: List[Dict[str, Any]]
@@ -151,15 +156,29 @@ class SearchServiceRetriever:
         self.search_service = search_service
         self.top_k = top_k
 
-    def retrieve(self, query: str, *, top_k: int | None = None) -> List[RetrievalResult]:
+    def retrieve(
+        self,
+        query: str,
+        *,
+        top_k: int | None = None,
+        device_name: str | None = None,
+        device_names: List[str] | None = None,
+        **kwargs: Any,
+    ) -> List[RetrievalResult]:
         k = top_k or self.top_k
         # 그래프 레벨에서 MQ/재시도를 수행하므로 내부 MQ/rerank는 끈다.
-        return self.search_service.search(
-            query,
-            top_k=k,
-            multi_query=False,
-            rerank=False,
-        )
+        search_kwargs: Dict[str, Any] = {
+            "top_k": k,
+            "multi_query": False,
+            "rerank": False,
+        }
+        # Pass device_names for filtering (OR logic)
+        if device_names:
+            search_kwargs["device_names"] = device_names
+        # Legacy: device_name for boosting if provided
+        elif device_name:
+            search_kwargs["device_name"] = device_name
+        return self.search_service.search(query, **search_kwargs)
 
 
 # -----------------------------
@@ -392,21 +411,77 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     return {"search_queries": merged[:5]}
 
 
-def retrieve_node(state: AgentState, *, retriever: Retriever, top_k: int = 8) -> Dict[str, Any]:
+def retrieve_node(
+    state: AgentState,
+    *,
+    retriever: Retriever,
+    reranker: Any = None,
+    retrieval_top_k: int = 30,
+    final_top_k: int = 10,
+) -> Dict[str, Any]:
+    """Retrieve documents with dual search strategy and rerank.
+
+    If devices are selected:
+      - Search 1: 30 docs filtered by selected devices (OR filter)
+      - Search 2: 30 docs without filter (general search)
+      - Combine and rerank to get final 10 docs
+
+    If no devices selected:
+      - Search 60 docs without filter
+      - Rerank to get final 10 docs
+    """
     queries = state.get("search_queries", [state["query"]])
+    selected_devices = state.get("selected_devices", [])
+    original_query = state["query"]
+
     all_docs: List[RetrievalResult] = []
-    seen = set()
+    seen: set = set()
 
-    for q in queries:
-        for d in retriever.retrieve(q, top_k=top_k):
+    def _add_docs(docs_to_add: List[RetrievalResult]) -> None:
+        """Add docs to all_docs, avoiding duplicates."""
+        for d in docs_to_add:
             key = (d.doc_id, hash(d.raw_text or d.content))
-            if key in seen:
-                continue
-            seen.add(key)
-            all_docs.append(d)
+            if key not in seen:
+                seen.add(key)
+                all_docs.append(d)
 
-    docs = all_docs[:top_k]
-    logger.info("retrieve_node: keeping %d docs (top_k=%d)", len(docs), top_k)
+    if selected_devices:
+        # Dual search strategy: device-filtered + general
+        logger.info("retrieve_node: dual search with devices=%s", selected_devices)
+
+        # Search 1: Device-filtered search (30 docs) with device_names as OR filter
+        for q in queries:
+            device_docs = retriever.retrieve(q, top_k=retrieval_top_k, device_names=selected_devices)
+            _add_docs(device_docs)
+
+        device_filtered_count = len(all_docs)
+        logger.info("retrieve_node: device-filtered search found %d docs", device_filtered_count)
+
+        # Search 2: General search without device filter (30 docs)
+        for q in queries:
+            general_docs = retriever.retrieve(q, top_k=retrieval_top_k)
+            _add_docs(general_docs)
+
+        logger.info("retrieve_node: after general search, total %d docs", len(all_docs))
+
+    else:
+        # No device selection: search 60 docs without filter
+        logger.info("retrieve_node: general search (no device filter)")
+        for q in queries:
+            docs = retriever.retrieve(q, top_k=retrieval_top_k * 2)
+            _add_docs(docs)
+
+    logger.info("retrieve_node: collected %d unique docs before rerank", len(all_docs))
+
+    # Rerank if reranker is available
+    if reranker is not None and all_docs:
+        logger.info("retrieve_node: reranking %d docs to top %d", len(all_docs), final_top_k)
+        docs = reranker.rerank(original_query, all_docs, top_k=final_top_k)
+    else:
+        # No reranker: just take top final_top_k by score
+        docs = sorted(all_docs, key=lambda d: d.score, reverse=True)[:final_top_k]
+
+    logger.info("retrieve_node: returning %d docs", len(docs))
     return {"docs": docs, "ref_json": results_to_ref_json(docs)}
 
 
@@ -672,6 +747,108 @@ def human_review_node(state: AgentState) -> Command[Literal["done", "retry"]]:
         return Command(goto="retry_bump", update={"human_action": {"approved": False}})
 
 
+def device_selection_node(
+    state: AgentState,
+    *,
+    device_fetcher: Optional[Any] = None,
+) -> Command[Literal["mq"]]:
+    """Device selection node - interrupts to let user select devices (multiple).
+
+    Args:
+        state: Agent state.
+        device_fetcher: Callable that returns list of devices.
+            Each device should have 'name' and 'doc_count'.
+
+    Returns:
+        Command to proceed to 'mq' node with selected devices.
+    """
+    # Fetch available devices if fetcher provided
+    available_devices: List[Dict[str, Any]] = []
+    if device_fetcher is not None:
+        try:
+            available_devices = device_fetcher()
+        except Exception as e:
+            logger.warning(f"Failed to fetch devices: {e}")
+            available_devices = []
+
+    if not available_devices:
+        # No devices available, skip selection
+        logger.info("device_selection_node: no devices available, skipping")
+        return Command(
+            goto="mq",
+            update={
+                "available_devices": [],
+                "selected_devices": [],
+                "device_selection_skipped": True,
+            }
+        )
+
+    payload = {
+        "type": "device_selection",
+        "question": state["query"],
+        "route": state.get("route"),
+        "devices": available_devices,
+        "device_count": len(available_devices),
+        "instruction": (
+            "검색할 기기를 선택하세요 (다중 선택 가능).\n"
+            "- 기기 선택: 선택 기기 문서 10개 + 전체 문서 10개 검색\n"
+            "- 건너뛰기: 전체 문서 20개 검색"
+        ),
+    }
+
+    decision = interrupt(payload)
+    logger.info(f"device_selection_node: user decision={decision}")
+
+    # User skipped device selection
+    if decision is None or decision == "" or decision == "skip":
+        return Command(
+            goto="mq",
+            update={
+                "available_devices": available_devices,
+                "selected_devices": [],
+                "device_selection_skipped": True,
+            }
+        )
+
+    # Parse selected devices (can be single string, list, or dict with selected_devices)
+    selected_devices: List[str] = []
+
+    if isinstance(decision, dict):
+        # New format: {"type": "device_selection", "selected_devices": [...]}
+        devices_from_dict = decision.get("selected_devices", [])
+        if isinstance(devices_from_dict, list):
+            selected_devices = [str(d).strip() for d in devices_from_dict if d]
+        elif isinstance(devices_from_dict, str):
+            selected_devices = [devices_from_dict.strip()]
+        # Also check legacy format
+        legacy_device = decision.get("device") or decision.get("selected_device")
+        if legacy_device and isinstance(legacy_device, str):
+            if legacy_device.strip() not in selected_devices:
+                selected_devices.append(legacy_device.strip())
+    elif isinstance(decision, list):
+        selected_devices = [str(d).strip() for d in decision if d]
+    elif isinstance(decision, str):
+        selected_devices = [decision.strip()]
+
+    # Validate selections against available devices
+    valid_names = {d.get("name") for d in available_devices if d.get("name")}
+    selected_devices = [d for d in selected_devices if d in valid_names]
+
+    if not selected_devices:
+        logger.warning("No valid device selections after validation")
+
+    logger.info(f"device_selection_node: validated selected_devices={selected_devices}")
+
+    return Command(
+        goto="mq",
+        update={
+            "available_devices": available_devices,
+            "selected_devices": selected_devices,
+            "device_selection_skipped": len(selected_devices) == 0,
+        }
+    )
+
+
 __all__ = [
     "AgentState",
     "Route",
@@ -693,4 +870,5 @@ __all__ = [
     "retry_bump_node",
     "refine_queries_node",
     "human_review_node",
+    "device_selection_node",
 ]

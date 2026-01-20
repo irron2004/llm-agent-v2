@@ -22,6 +22,7 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     SearchServiceRetriever,
     answer_node,
     ask_user_after_retrieve_node,
+    device_selection_node,
     human_review_node,
     judge_node,
     load_prompt_spec,
@@ -55,19 +56,27 @@ class LangGraphRAGAgent:
         llm: BaseLLM,
         search_service: SearchService,
         prompt_spec: Optional[PromptSpec] = None,
-        top_k: int = 8,
+        top_k: int = 10,
+        retrieval_top_k: int = 30,
         mode: str = "verified",  # base | verified
         checkpointer: Optional[MemorySaver] = None,
         ask_user_after_retrieve: bool = False,
+        ask_device_selection: bool = False,
+        device_fetcher: Callable[[], list[Dict[str, Any]]] | None = None,
         event_sink: Callable[[Dict[str, Any]], None] | None = None,
     ) -> None:
         self.llm = llm
-        # Use the provided top_k directly without capping
-        self.retriever: Retriever = SearchServiceRetriever(search_service, top_k=top_k)
+        self.search_service = search_service
+        # Use the provided retrieval_top_k for initial retrieval
+        self.retriever: Retriever = SearchServiceRetriever(search_service, top_k=retrieval_top_k)
         self.spec = prompt_spec or load_prompt_spec()
-        self.top_k = top_k
+        self.top_k = top_k  # Final top_k after rerank
+        self.retrieval_top_k = retrieval_top_k  # Initial retrieval top_k
+        self.reranker = search_service.reranker  # Use reranker from search_service
         self.mode = mode
         self.ask_user_after_retrieve = ask_user_after_retrieve
+        self.ask_device_selection = ask_device_selection
+        self.device_fetcher = device_fetcher
         self.checkpointer = checkpointer or MemorySaver()
         self._event_sink = event_sink
         self._graph = self._build_graph(mode)
@@ -130,18 +139,44 @@ class LangGraphRAGAgent:
         builder.add_node("st_mq", self._wrap_node("st_mq", functools.partial(st_mq_node, llm=self.llm, spec=self.spec)))
         builder.add_node(
             "retrieve",
-            self._wrap_node("retrieve", functools.partial(retrieve_node, retriever=self.retriever, top_k=self.top_k)),
+            self._wrap_node("retrieve", functools.partial(
+                retrieve_node,
+                retriever=self.retriever,
+                reranker=self.reranker,
+                retrieval_top_k=self.retrieval_top_k,
+                final_top_k=self.top_k,
+            )),
         )
         # retry 경로용 retrieve: ask_user 없이 바로 answer로 연결
         builder.add_node(
             "retrieve_retry",
-            self._wrap_node("retrieve_retry", functools.partial(retrieve_node, retriever=self.retriever, top_k=self.top_k)),
+            self._wrap_node("retrieve_retry", functools.partial(
+                retrieve_node,
+                retriever=self.retriever,
+                reranker=self.reranker,
+                retrieval_top_k=self.retrieval_top_k,
+                final_top_k=self.top_k,
+            )),
         )
         builder.add_node("answer", self._wrap_node("answer", functools.partial(answer_node, llm=self.llm, spec=self.spec)))
         builder.add_node("judge", self._wrap_node("judge", functools.partial(judge_node, llm=self.llm, spec=self.spec)))
 
         builder.add_edge(START, "route")
-        builder.add_edge("route", "mq")
+
+        # Device selection node (optional HIL)
+        if self.ask_device_selection:
+            builder.add_node(
+                "device_selection",
+                self._wrap_node(
+                    "device_selection",
+                    functools.partial(device_selection_node, device_fetcher=self.device_fetcher),
+                ),
+            )
+            builder.add_edge("route", "device_selection")
+            # device_selection_node returns Command(goto="mq"), so no explicit edge needed
+        else:
+            builder.add_edge("route", "mq")
+
         builder.add_edge("mq", "st_gate")
         builder.add_edge("st_gate", "st_mq")
         builder.add_edge("st_mq", "retrieve")

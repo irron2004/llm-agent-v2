@@ -15,13 +15,19 @@ type SendOptions = {
   decisionOverride?: unknown;
 };
 
-type InterruptKind = "retrieval_review" | "human_review" | "unknown";
+type InterruptKind = "device_selection" | "retrieval_review" | "human_review" | "unknown";
+
+type DeviceInfo = {
+  name: string;
+  doc_count: number;
+};
 
 type PendingInterrupt = {
   threadId: string;
   question: string;
   instruction: string;
   docs: ReviewDoc[];
+  devices?: DeviceInfo[];
   kind: InterruptKind;
   payload?: Record<string, unknown> | null;
 };
@@ -38,12 +44,16 @@ const resolveDecision = (text: string): boolean | string => {
 };
 
 const resolveInterruptKind = (payload?: Record<string, unknown> | null): InterruptKind => {
+  if (payload?.type === "device_selection") return "device_selection";
   if (payload?.type === "retrieval_review") return "retrieval_review";
   if (payload?.type === "human_review") return "human_review";
   return "unknown";
 };
 
 const buildInterruptPrompt = (kind: InterruptKind, instruction?: string) => {
+  if (kind === "device_selection") {
+    return "검색에 사용할 기기를 선택하세요. 선택하지 않으면 전체 문서에서 검색합니다.";
+  }
   if (kind === "retrieval_review") {
     return "검색 결과가 준비되었습니다. 아래에서 문서를 선택하거나 추가 키워드를 입력해 주세요.";
   }
@@ -168,12 +178,21 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           metadata: doc.metadata ?? null,
         }));
 
+        // Extract devices for device_selection interrupt
+        const devices: DeviceInfo[] = Array.isArray(payload?.devices)
+          ? payload.devices.map((d: any) => ({
+              name: typeof d?.name === "string" ? d.name : "",
+              doc_count: typeof d?.doc_count === "number" ? d.doc_count : 0,
+            })).filter((d: DeviceInfo) => d.name)
+          : [];
+
         if (threadId) {
           setPendingInterrupt({
             threadId,
             question,
             instruction,
             docs,
+            devices: kind === "device_selection" ? devices : undefined,
             kind,
             payload,
           });
@@ -243,8 +262,11 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     async ({ text, decisionOverride }: SendOptions) => {
       stop();
       setError(null);
-      currentUserTextRef.current = text;
       const pending = pendingInterrupt;
+      // Only update user text if not resuming (keep original question for saves)
+      if (!pending) {
+        currentUserTextRef.current = text;
+      }
       const isResume = Boolean(pending);
       if (isResume && !pending?.threadId) {
         setError("thread_id가 없어 검색 결과 확인을 이어갈 수 없습니다.");
@@ -434,6 +456,32 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     [pendingInterrupt, send]
   );
 
+  const submitDeviceSelection = useCallback(
+    (selectedDevices: string[]) => {
+      if (!pendingInterrupt || pendingInterrupt.kind !== "device_selection") return;
+
+      setPendingInterrupt(null);
+
+      if (selectedDevices.length === 0) {
+        // Skip device selection - search all documents
+        send({
+          text: "전체 문서에서 검색",
+          decisionOverride: "skip",
+        });
+      } else {
+        // Send selected devices as array
+        send({
+          text: `기기 선택: ${selectedDevices.join(", ")}`,
+          decisionOverride: {
+            type: "device_selection",
+            selected_devices: selectedDevices,
+          },
+        });
+      }
+    },
+    [pendingInterrupt, send]
+  );
+
   const reset = useCallback(() => {
     stop();
     setMessages([]);
@@ -520,16 +568,20 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       send,
       stop,
       pendingReview: pendingInterrupt?.kind === "retrieval_review" ? pendingInterrupt : null,
+      pendingDeviceSelection: pendingInterrupt?.kind === "device_selection" ? pendingInterrupt : null,
       submitReview,
       submitSearchQueries,
+      submitDeviceSelection,
       inputPlaceholder: pendingInterrupt
-        ? pendingInterrupt.kind === "retrieval_review"
-          ? "검색 결과 승인/거절 또는 추가 키워드를 입력하세요..."
-          : "승인/거절 또는 수정 답변을 입력하세요..."
+        ? pendingInterrupt.kind === "device_selection"
+          ? "기기를 선택하거나 건너뛰기를 클릭하세요..."
+          : pendingInterrupt.kind === "retrieval_review"
+            ? "검색 결과 승인/거절 또는 추가 키워드를 입력하세요..."
+            : "승인/거절 또는 수정 답변을 입력하세요..."
         : "메시지를 입력하세요...",
       reset,
       loadSession,
     }),
-    [sessionId, messages, isStreaming, isLoadingSession, error, send, stop, pendingInterrupt, submitReview, submitSearchQueries, reset, loadSession]
+    [sessionId, messages, isStreaming, isLoadingSession, error, send, stop, pendingInterrupt, submitReview, submitSearchQueries, submitDeviceSelection, reset, loadSession]
   );
 }
