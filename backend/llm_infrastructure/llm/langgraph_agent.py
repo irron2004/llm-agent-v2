@@ -48,6 +48,7 @@ class AgentState(TypedDict, total=False):
 
     # Retrieval outputs
     docs: List[RetrievalResult]
+    display_docs: List[RetrievalResult]
     ref_json: List[Dict[str, Any]]
     answer_ref_json: List[Dict[str, Any]]
 
@@ -588,9 +589,17 @@ def expand_related_docs_node(
         doc_type = _normalize_doc_type(meta.get("doc_type"))
         related_docs: List[RetrievalResult] = []
 
+        expanded_pages: List[int] = []
         if doc_type in DOC_TYPES_SAME_DOC and doc_fetcher is not None:
             same_doc_targets += 1
             related_docs = doc_fetcher(doc.doc_id)
+            # Extract all pages from fetched chunks
+            for rd in related_docs:
+                rd_meta = rd.metadata if isinstance(rd.metadata, dict) else {}
+                rd_page = _extract_page_value(rd_meta)
+                if rd_page is not None and rd_page not in expanded_pages:
+                    expanded_pages.append(rd_page)
+            expanded_pages.sort()
         elif page_fetcher is not None:
             page = _extract_page_value(meta)
             if page is not None:
@@ -598,6 +607,7 @@ def expand_related_docs_node(
                 page_min = max(1, page - page_window)
                 page_max = page + page_window
                 pages = list(range(page_min, page_max + 1))
+                expanded_pages = pages
                 related_docs = page_fetcher(doc.doc_id, pages)
             else:
                 skipped_targets += 1
@@ -609,12 +619,16 @@ def expand_related_docs_node(
             combined = _combine_related_text(related_docs)
             if combined:
                 expanded_count += 1
+                # Update metadata with expanded pages info
+                updated_meta = dict(meta) if meta else {}
+                if expanded_pages:
+                    updated_meta["expanded_pages"] = expanded_pages
                 expanded_docs.append(
                     RetrievalResult(
                         doc_id=doc.doc_id,
                         content=doc.content,
                         score=doc.score,
-                        metadata=doc.metadata,
+                        metadata=updated_meta,
                         raw_text=combined,
                     )
                 )
@@ -637,8 +651,10 @@ def expand_related_docs_node(
     )
     logger.info(summary)
 
+    display_docs = expanded_docs[:min(total_docs, max_expand)]
     return {
         "docs": expanded_docs,
+        "display_docs": display_docs,
         "answer_ref_json": results_to_ref_json(
             expanded_docs,
             max_chars=max_ref_chars,

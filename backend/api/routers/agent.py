@@ -116,6 +116,8 @@ class RetrievedDoc(BaseModel):
     metadata: Dict[str, Any] | None = None
     page: int | None = None
     page_image_url: str | None = None
+    expanded_pages: List[int] | None = None
+    expanded_page_urls: List[str] | None = None
 
 
 class ExpandedDoc(BaseModel):
@@ -154,6 +156,13 @@ def _to_expanded_docs(answer_ref_json: List[Dict[str, Any]] | None) -> List[Expa
     return docs if docs else None
 
 
+def _select_display_docs(result: Dict[str, Any]) -> List[RetrievalResult]:
+    """Prefer UI display docs from expansion, fallback to full docs list."""
+    if "display_docs" in result:
+        return result.get("display_docs") or []
+    return result.get("docs", []) or []
+
+
 def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
     docs: List[RetrievedDoc] = []
     for r in results or []:
@@ -175,10 +184,20 @@ def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
         doc_id = getattr(r, "doc_id", "")
         page = None
         page_image_url = None
+        expanded_pages = None
+        expanded_page_urls = None
         if metadata:
             page = metadata.get("page_start") or metadata.get("page")
             if isinstance(page, int) and doc_id:
                 page_image_url = f"/api/assets/docs/{doc_id}/pages/{page}"
+
+            # Extract expanded pages if available
+            exp_pages = metadata.get("expanded_pages")
+            if exp_pages and isinstance(exp_pages, list):
+                expanded_pages = exp_pages
+                expanded_page_urls = [
+                    f"/api/assets/docs/{doc_id}/pages/{p}" for p in exp_pages
+                ]
 
         docs.append(RetrievedDoc(
             id=doc_id,
@@ -189,6 +208,8 @@ def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
             metadata=metadata,
             page=page,
             page_image_url=page_image_url,
+            expanded_pages=expanded_pages,
+            expanded_page_urls=expanded_page_urls,
         ))
     return docs
 
@@ -257,7 +278,7 @@ async def run_agent(
             query=req.message,
             answer=result.get("answer", "") or "",
             judge=result.get("judge", {}) or {},
-            retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+            retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
             expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
             metadata={
                 "route": result.get("route"),
@@ -275,7 +296,7 @@ async def run_agent(
         query=req.message,
         answer=result.get("answer", ""),
         judge=result.get("judge", {}),
-        retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+        retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
         expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
         metadata={
             "route": result.get("route"),
@@ -365,7 +386,7 @@ async def run_agent_stream(
                     query=req.message,
                     answer=result.get("answer", "") or "",
                     judge=result.get("judge", {}) or {},
-                    retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+                    retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
                     expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
                     metadata={
                         "route": result.get("route"),
@@ -382,7 +403,7 @@ async def run_agent_stream(
                     query=req.message,
                     answer=result.get("answer", ""),
                     judge=result.get("judge", {}),
-                    retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+                    retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
                     expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
                     metadata={
                         "route": result.get("route"),

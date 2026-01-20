@@ -213,7 +213,8 @@ class TestEdgeCases:
         result = expand_related_docs_node(state, page_fetcher=MagicMock())
 
         # Then
-        assert result == {}
+        assert "docs" not in result
+        assert "_events" in result
 
     def test_no_fetchers_returns_empty(self):
         """fetcher 없으면 빈 결과"""
@@ -224,7 +225,8 @@ class TestEdgeCases:
         result = expand_related_docs_node(state)
 
         # Then
-        assert result == {}
+        assert "docs" not in result
+        assert "_events" in result
 
     def test_mixed_doc_types(self):
         """여러 doc_type 혼합 시 각각 적절한 fetcher 사용"""
@@ -281,3 +283,84 @@ class TestExpansionResultFormat:
         assert "rank" in ref
         assert "doc_id" in ref
         assert "content" in ref
+
+
+class TestExpandedPagesMetadata:
+    """확장된 페이지 정보가 metadata에 저장되는지 테스트"""
+
+    def test_page_expansion_stores_expanded_pages(self):
+        """페이지 기반 확장 시 expanded_pages가 metadata에 저장됨"""
+        docs = [_make_doc("doc1", page=5, doc_type="manual")]
+        state = {"docs": docs}
+
+        related = [
+            _make_doc("doc1_p3", page=3),
+            _make_doc("doc1_p4", page=4),
+            _make_doc("doc1_p5", page=5),
+            _make_doc("doc1_p6", page=6),
+            _make_doc("doc1_p7", page=7),
+        ]
+        page_fetcher = MagicMock(return_value=related)
+
+        # When
+        result = expand_related_docs_node(state, page_fetcher=page_fetcher)
+
+        # Then
+        expanded_doc = result["docs"][0]
+        assert expanded_doc.metadata is not None
+        assert "expanded_pages" in expanded_doc.metadata
+        assert expanded_doc.metadata["expanded_pages"] == [3, 4, 5, 6, 7]
+
+    def test_page_expansion_at_boundary(self):
+        """페이지 1에서 시작 시 expanded_pages가 1부터 시작"""
+        docs = [_make_doc("doc1", page=1, doc_type="manual")]
+        state = {"docs": docs}
+
+        related = [_make_doc("doc1_p1", page=1)]
+        page_fetcher = MagicMock(return_value=related)
+
+        # When
+        result = expand_related_docs_node(state, page_fetcher=page_fetcher)
+
+        # Then
+        expanded_doc = result["docs"][0]
+        # page_window=2이면 max(1,1-2)=1부터 1+2=3까지
+        assert expanded_doc.metadata["expanded_pages"] == [1, 2, 3]
+
+    def test_gcb_doc_collects_pages_from_chunks(self):
+        """gcb 문서는 모든 청크에서 페이지 정보 수집"""
+        docs = [_make_doc("gcb_doc", page=1, doc_type="gcb")]
+        state = {"docs": docs}
+
+        related = [
+            _make_doc("chunk1", page=1),
+            _make_doc("chunk2", page=2),
+            _make_doc("chunk3", page=5),
+            _make_doc("chunk4", page=3),  # 순서가 바뀌어도 정렬됨
+        ]
+        doc_fetcher = MagicMock(return_value=related)
+
+        # When
+        result = expand_related_docs_node(state, doc_fetcher=doc_fetcher)
+
+        # Then
+        expanded_doc = result["docs"][0]
+        assert expanded_doc.metadata is not None
+        assert "expanded_pages" in expanded_doc.metadata
+        assert expanded_doc.metadata["expanded_pages"] == [1, 2, 3, 5]  # sorted
+
+    def test_no_expansion_no_expanded_pages(self):
+        """확장되지 않은 문서에는 expanded_pages 없음"""
+        docs = [_make_doc("doc1", page=1, doc_type="manual")]
+        state = {"docs": docs}
+
+        # fetcher returns empty - no expansion
+        page_fetcher = MagicMock(return_value=[])
+
+        # When
+        result = expand_related_docs_node(state, page_fetcher=page_fetcher)
+
+        # Then
+        doc = result["docs"][0]
+        # Original doc preserved, no expanded_pages
+        assert doc.metadata.get("expanded_pages") is None
