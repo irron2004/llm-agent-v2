@@ -1,5 +1,13 @@
 export type MessageRole = "user" | "assistant" | "system";
 
+export type FeedbackRating = "up" | "down";
+
+export type MessageFeedback = {
+  rating: FeedbackRating;
+  reason?: string | null;
+  ts?: string | null;
+};
+
 export type Message = {
   id: string;
   role: MessageRole;
@@ -10,6 +18,9 @@ export type Message = {
   retrievedDocs?: RetrievedDoc[];
   logs?: string[];
   currentNode?: string | null;
+  sessionId?: string;
+  turnId?: number;
+  feedback?: MessageFeedback | null;
 };
 
 export type ReferenceChunk = {
@@ -34,6 +45,8 @@ export type RetrievedDoc = {
   metadata?: Record<string, unknown> | null;
   page?: number | null;
   page_image_url?: string | null;
+  expanded_pages?: number[] | null;
+  expanded_page_urls?: string[] | null;
 };
 
 export type ReviewDoc = {
@@ -93,6 +106,9 @@ export type TurnResponse = {
   doc_refs: DocRefResponse[];
   title?: string | null;
   ts: string;
+  feedback_rating?: FeedbackRating | null;
+  feedback_reason?: string | null;
+  feedback_ts?: string | null;
 };
 
 export type SessionListItem = {

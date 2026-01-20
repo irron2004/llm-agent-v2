@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CopyOutlined, LikeOutlined, DislikeOutlined, CheckOutlined } from "@ant-design/icons";
-import { Message } from "../types";
+import { Message, FeedbackRating } from "../types";
 import { MarkdownContent } from "./markdown-content";
 import { Collapse } from "antd";
 
@@ -70,17 +70,25 @@ function preprocessSnippet(snippet: string): string {
 type MessageItemProps = {
   message: Message;
   isStreaming?: boolean;
-  onLike?: (id: string) => void;
-  onDislike?: (id: string) => void;
+  onFeedback?: (payload: {
+    messageId: string;
+    sessionId?: string;
+    turnId?: number;
+    rating: FeedbackRating;
+    reason?: string | null;
+  }) => void;
 };
 
-export function MessageItem({ message, isStreaming, onLike, onDislike }: MessageItemProps) {
+export function MessageItem({ message, isStreaming, onFeedback }: MessageItemProps) {
   const [copied, setCopied] = useState(false);
-  const [liked, setLiked] = useState(false);
-  const [disliked, setDisliked] = useState(false);
+  const [showReasonInput, setShowReasonInput] = useState(false);
+  const [reasonText, setReasonText] = useState("");
+  const [reasonError, setReasonError] = useState<string | null>(null);
 
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
+  const rating = message.feedback?.rating ?? null;
+  const canFeedback = Boolean(message.sessionId && message.turnId);
 
   const handleCopy = async () => {
     try {
@@ -93,15 +101,46 @@ export function MessageItem({ message, isStreaming, onLike, onDislike }: Message
   };
 
   const handleLike = () => {
-    setLiked(!liked);
-    setDisliked(false);
-    onLike?.(message.id);
+    if (!canFeedback) return;
+    setShowReasonInput(false);
+    setReasonError(null);
+    onFeedback?.({
+      messageId: message.id,
+      sessionId: message.sessionId,
+      turnId: message.turnId,
+      rating: "up",
+    });
   };
 
   const handleDislike = () => {
-    setDisliked(!disliked);
-    setLiked(false);
-    onDislike?.(message.id);
+    if (!canFeedback) return;
+    const existingReason = message.feedback?.rating === "down" ? message.feedback.reason ?? "" : "";
+    setReasonText(existingReason);
+    setReasonError(null);
+    setShowReasonInput(true);
+  };
+
+  const handleReasonSubmit = () => {
+    if (!canFeedback) return;
+    const reason = reasonText.trim();
+    if (!reason) {
+      setReasonError("불만족 사유를 입력해 주세요.");
+      return;
+    }
+    onFeedback?.({
+      messageId: message.id,
+      sessionId: message.sessionId,
+      turnId: message.turnId,
+      rating: "down",
+      reason,
+    });
+    setShowReasonInput(false);
+    setReasonError(null);
+  };
+
+  const handleReasonCancel = () => {
+    setShowReasonInput(false);
+    setReasonError(null);
   };
 
   return (
@@ -141,48 +180,73 @@ export function MessageItem({ message, isStreaming, onLike, onDislike }: Message
                 items={[
                   {
                     key: "retrieved",
-                    label: `검색 문서 (${message.retrievedDocs.length})`,
+                    label: `확장 문서/참고 문서 (${message.retrievedDocs.length})`,
                     children: (
                       <div className="reference-list">
-                        {message.retrievedDocs.map((doc, idx) => (
-                          <div key={doc.id || idx} className="reference-item" style={{ marginBottom: 12 }}>
-                            <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                              {doc.title || `Document ${idx + 1}`}
-                              {doc.page && <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, color: "var(--color-text-secondary)" }}>p.{doc.page}</span>}
-                            </div>
-                            {doc.page_image_url ? (
-                              <div className="reference-image-wrapper" style={{ marginBottom: 8 }}>
-                                <img
-                                  src={doc.page_image_url}
-                                  alt={`${doc.title || "Document"} page ${doc.page || ""}`}
+                        {message.retrievedDocs.map((doc, idx) => {
+                          // Use expanded_page_urls if available, otherwise fall back to single page
+                          const pageUrls = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
+                            ? doc.expanded_page_urls
+                            : doc.page_image_url ? [doc.page_image_url] : [];
+                          const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
+                            ? doc.expanded_pages
+                            : doc.page ? [doc.page] : [];
+
+                          return (
+                            <div key={doc.id || idx} className="reference-item" style={{ marginBottom: 16 }}>
+                              <div style={{ fontWeight: 600, marginBottom: 4 }}>
+                                {doc.title || `Document ${idx + 1}`}
+                                {pageNumbers.length > 0 && (
+                                  <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, color: "var(--color-text-secondary)" }}>
+                                    {pageNumbers.length === 1
+                                      ? `p.${pageNumbers[0]}`
+                                      : `p.${pageNumbers[0]}-${pageNumbers[pageNumbers.length - 1]}`}
+                                  </span>
+                                )}
+                              </div>
+                              {pageUrls.length > 0 ? (
+                                <div
+                                  className="reference-images-container"
                                   style={{
-                                    maxWidth: "100%",
-                                    maxHeight: 200,
-                                    borderRadius: 4,
-                                    border: "1px solid var(--color-border)",
+                                    display: "flex",
+                                    flexWrap: "wrap",
+                                    gap: 8,
+                                    marginBottom: 8,
                                   }}
-                                  onError={(e) => {
-                                    e.currentTarget.style.display = "none";
-                                    const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                                    if (fallback) fallback.style.display = "block";
-                                  }}
-                                />
-                                <div style={{ display: "none", fontSize: 12, color: "var(--color-text-secondary)" }}>
+                                >
+                                  {pageUrls.map((url, pageIdx) => (
+                                    <div key={pageIdx} className="reference-image-wrapper">
+                                      <img
+                                        src={url}
+                                        alt={`${doc.title || "Document"} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
+                                        style={{
+                                          maxWidth: pageUrls.length > 1 ? 150 : "100%",
+                                          maxHeight: pageUrls.length > 1 ? 200 : 300,
+                                          borderRadius: 4,
+                                          border: "1px solid var(--color-border)",
+                                          cursor: "pointer",
+                                        }}
+                                        title={`페이지 ${pageNumbers[pageIdx] || pageIdx + 1}`}
+                                        onError={(e) => {
+                                          e.currentTarget.style.display = "none";
+                                        }}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
                                   <MarkdownContent content={preprocessSnippet(doc.snippet || "")} />
                                 </div>
-                              </div>
-                            ) : (
-                              <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-                                <MarkdownContent content={preprocessSnippet(doc.snippet || "")} />
-                              </div>
-                            )}
-                            {(doc.score !== null && doc.score !== undefined) && (
-                              <div style={{ fontSize: 12, opacity: 0.6 }}>
-                                score: {doc.score.toFixed(3)} {doc.score_percent ? `(${doc.score_percent}%)` : ""}
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                              )}
+                              {(doc.score !== null && doc.score !== undefined) && (
+                                <div style={{ fontSize: 12, opacity: 0.6 }}>
+                                  score: {doc.score.toFixed(3)} {doc.score_percent ? `(${doc.score_percent}%)` : ""}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     ),
                   },
@@ -204,19 +268,72 @@ export function MessageItem({ message, isStreaming, onLike, onDislike }: Message
                 {copied ? <CheckOutlined /> : <CopyOutlined />}
               </button>
               <button
-                className={`action-button ${liked ? "active" : ""}`}
+                className={`action-button ${rating === "up" ? "active" : ""}`}
                 onClick={handleLike}
-                title="Like"
+                title="만족"
+                disabled={!canFeedback}
               >
                 <LikeOutlined />
               </button>
               <button
-                className={`action-button ${disliked ? "active" : ""}`}
+                className={`action-button ${rating === "down" ? "active" : ""}`}
                 onClick={handleDislike}
-                title="Dislike"
+                title="불만족"
+                disabled={!canFeedback}
               >
                 <DislikeOutlined />
               </button>
+            </div>
+          )}
+
+          {isAssistant && showReasonInput && (
+            <div style={{ marginTop: 8 }}>
+              <div style={{ fontSize: 12, marginBottom: 6, color: "var(--color-text-secondary)" }}>
+                불만족 사유
+              </div>
+              <textarea
+                value={reasonText}
+                onChange={(e) => {
+                  setReasonText(e.target.value);
+                  if (reasonError) setReasonError(null);
+                }}
+                rows={3}
+                placeholder="어떤 점이 불만족이었는지 입력해 주세요."
+                style={{
+                  width: "100%",
+                  borderRadius: 6,
+                  border: "1px solid var(--color-border)",
+                  padding: "8px 10px",
+                  fontSize: 12,
+                  resize: "vertical",
+                  background: "var(--color-bg-secondary)",
+                  color: "var(--color-text-primary)",
+                }}
+              />
+              {reasonError && (
+                <div style={{ marginTop: 6, fontSize: 12, color: "var(--color-danger, #c0392b)" }}>
+                  {reasonError}
+                </div>
+              )}
+              <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                <button className="action-button" onClick={handleReasonSubmit} disabled={!canFeedback}>
+                  저장
+                </button>
+                <button className="action-button" onClick={handleReasonCancel}>
+                  취소
+                </button>
+              </div>
+            </div>
+          )}
+
+          {isAssistant && message.feedback?.rating && (
+            <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 6 }}>
+              만족도: {message.feedback.rating === "up" ? "만족" : "불만족"}
+            </div>
+          )}
+          {isAssistant && message.feedback?.rating === "down" && message.feedback?.reason && (
+            <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 4 }}>
+              불만족 사유: {message.feedback.reason}
             </div>
           )}
 
