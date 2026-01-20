@@ -118,15 +118,40 @@ class RetrievedDoc(BaseModel):
     page_image_url: str | None = None
 
 
+class ExpandedDoc(BaseModel):
+    """확장된 문서 정보 (답변 생성에 사용된 컨텍스트)"""
+    rank: int
+    doc_id: str
+    content: str  # 확장된 전체 내용
+    content_length: int  # 내용 길이
+
+
 class AgentResponse(BaseModel):
     query: str
     answer: str
     judge: Dict[str, Any]
     retrieved_docs: List[RetrievedDoc]
+    expanded_docs: Optional[List[ExpandedDoc]] = Field(None, description="확장된 문서 (답변 생성용)")
     metadata: Dict[str, Any] = Field(default_factory=dict)
     interrupted: bool = Field(False)
     interrupt_payload: Optional[Dict[str, Any]] = Field(None)
     thread_id: Optional[str] = Field(None)
+
+
+def _to_expanded_docs(answer_ref_json: List[Dict[str, Any]] | None) -> List[ExpandedDoc] | None:
+    """answer_ref_json을 ExpandedDoc 리스트로 변환."""
+    if not answer_ref_json:
+        return None
+    docs: List[ExpandedDoc] = []
+    for ref in answer_ref_json:
+        content = ref.get("content", "")
+        docs.append(ExpandedDoc(
+            rank=ref.get("rank", 0),
+            doc_id=ref.get("doc_id", ""),
+            content=content,
+            content_length=len(content),
+        ))
+    return docs if docs else None
 
 
 def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
@@ -233,6 +258,7 @@ async def run_agent(
             answer=result.get("answer", "") or "",
             judge=result.get("judge", {}) or {},
             retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+            expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
             metadata={
                 "route": result.get("route"),
                 "st_gate": result.get("st_gate"),
@@ -250,6 +276,7 @@ async def run_agent(
         answer=result.get("answer", ""),
         judge=result.get("judge", {}),
         retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+        expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
         metadata={
             "route": result.get("route"),
             "st_gate": result.get("st_gate"),
@@ -339,6 +366,7 @@ async def run_agent_stream(
                     answer=result.get("answer", "") or "",
                     judge=result.get("judge", {}) or {},
                     retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+                    expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
                     metadata={
                         "route": result.get("route"),
                         "st_gate": result.get("st_gate"),
@@ -355,6 +383,7 @@ async def run_agent_stream(
                     answer=result.get("answer", ""),
                     judge=result.get("judge", {}),
                     retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+                    expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
                     metadata={
                         "route": result.get("route"),
                         "st_gate": result.get("st_gate"),

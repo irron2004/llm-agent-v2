@@ -14,18 +14,20 @@
 검색된 문서의 doc_type에 따라 컨텍스트 확장 방식을 분기한다.
 - gcb / myservice: 같은 doc_id의 모든 섹션(청크) 조회
 - 그 외 doc_type: 선택 문서의 앞뒤 ±2 페이지 청크 조회
-- 확장된 컨텍스트는 답변 생성에만 사용하고 UI에는 표시하지 않는다
+- 확장된 컨텍스트로 답변을 생성하고, 답변 아래 문서 목록에도 확장 결과를 표시한다
 
 ### 1.4 현재 반영 상태
 **반영됨**
 - doc_type 기반 확장 규칙 (gcb/myservice vs 기타)
 - 확장 대상은 검색 결과 상위 5개로 제한
-- expand_related 노드 추가 및 answer/judge에만 확장 refs 사용
+- expand_related 노드 추가 및 answer/judge에 확장 refs 사용
 - ES helper (`fetch_doc_pages`, `fetch_doc_chunks`) 추가
+- 확장 요약 로그를 백엔드/SSE로 기록
+- 답변 이후 표시 문서 목록에 확장 결과 반영
 
 **제거/보류**
 - context_expansion_node (rerank 기반 확장, expansion_stats, fetch_surrounding_chunks) 제거: 요구사항과 불일치
-- 확장 통계(expansion_stats) 로깅
+- 상세 통계(expansion_stats) 로깅
 - 확장 범위/최대 개수 설정을 config로 노출
 - msearch 등 성능 최적화
 - 테스트 코드 추가
@@ -41,7 +43,7 @@
 | FR-02 | gcb/myservice 문서는 같은 doc_id의 모든 섹션 조회 | 필수 | 적용 |
 | FR-03 | 확장된 청크의 중복 제거 | 필수 | 적용 |
 | FR-04 | 토큰 제한 고려한 청크 수 제한 | 필수 | 부분 적용 (답변 refs 길이 제한) |
-| FR-05 | 확장 통계 로깅 (디버깅용) | 권장 | 미적용 |
+| FR-05 | 확장 통계 로깅 (디버깅용) | 권장 | 부분 적용 (요약 로그) |
 | FR-06 | 확장 대상은 검색 결과 상위 5개로 제한 | 필수 | 적용 |
 
 ### 2.2 비기능 요구사항
@@ -89,7 +91,7 @@
 retrieve_node
     │
     ├── docs: List[RetrievalResult] (검색 결과)
-    ├── ref_json: List[Dict] (UI/리뷰용)
+    ├── ref_json: List[Dict] (리뷰용)
     │
     ▼
 ask_user_after_retrieve_node
@@ -99,7 +101,8 @@ ask_user_after_retrieve_node
     ▼
 expand_related_docs_node
     │
-    ├── answer_ref_json: List[Dict] (답변용 확장 참조)
+    ├── docs: List[RetrievalResult] (확장된 문서로 교체)
+    ├── answer_ref_json: List[Dict] (답변/판정용 확장 참조)
     │
     ▼
 answer_node / judge_node

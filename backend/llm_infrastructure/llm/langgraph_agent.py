@@ -560,14 +560,24 @@ def expand_related_docs_node(
 ) -> Dict[str, Any]:
     """Expand answer references by doc_type rules."""
     if page_fetcher is None and doc_fetcher is None:
-        return {}
+        msg = "expand_related: skipped (no fetcher available)"
+        logger.info(msg)
+        return {"_events": [msg]}
 
     docs = state.get("docs", [])
     if not docs:
-        return {}
+        msg = "expand_related: skipped (no docs)"
+        logger.info(msg)
+        return {"_events": [msg]}
 
     expanded_docs: List[RetrievalResult] = []
     max_expand = max(0, int(EXPAND_TOP_K))
+    total_docs = len(docs)
+    same_doc_targets = 0
+    page_targets = 0
+    skipped_targets = 0
+    fetched_related_total = 0
+    expanded_count = 0
 
     for idx, doc in enumerate(docs):
         if idx >= max_expand:
@@ -579,18 +589,26 @@ def expand_related_docs_node(
         related_docs: List[RetrievalResult] = []
 
         if doc_type in DOC_TYPES_SAME_DOC and doc_fetcher is not None:
+            same_doc_targets += 1
             related_docs = doc_fetcher(doc.doc_id)
         elif page_fetcher is not None:
             page = _extract_page_value(meta)
             if page is not None:
+                page_targets += 1
                 page_min = max(1, page - page_window)
                 page_max = page + page_window
                 pages = list(range(page_min, page_max + 1))
                 related_docs = page_fetcher(doc.doc_id, pages)
+            else:
+                skipped_targets += 1
+        else:
+            skipped_targets += 1
 
         if related_docs:
+            fetched_related_total += len(related_docs)
             combined = _combine_related_text(related_docs)
             if combined:
+                expanded_count += 1
                 expanded_docs.append(
                     RetrievalResult(
                         doc_id=doc.doc_id,
@@ -604,12 +622,29 @@ def expand_related_docs_node(
 
         expanded_docs.append(doc)
 
+    summary = (
+        "expand_related: total_docs=%d expand_top_k=%d same_doc_targets=%d "
+        "page_targets=%d skipped_targets=%d fetched_related=%d expanded=%d"
+        % (
+            total_docs,
+            min(total_docs, max_expand),
+            same_doc_targets,
+            page_targets,
+            skipped_targets,
+            fetched_related_total,
+            expanded_count,
+        )
+    )
+    logger.info(summary)
+
     return {
+        "docs": expanded_docs,
         "answer_ref_json": results_to_ref_json(
             expanded_docs,
             max_chars=max_ref_chars,
             prefer_raw_text=True,
-        )
+        ),
+        "_events": [summary],
     }
 
 

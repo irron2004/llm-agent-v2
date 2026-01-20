@@ -116,6 +116,9 @@ class LangGraphRAGAgent:
             })
             t0 = time.perf_counter()
             result = fn(state, *args, **kwargs)
+            extra_events = None
+            if isinstance(result, dict):
+                extra_events = result.pop("_events", None)
             elapsed = (time.perf_counter() - t0) * 1000
             logger.info("[langgraph] node done: %s (%.1f ms)", name, elapsed)
             self._emit_event({
@@ -128,6 +131,26 @@ class LangGraphRAGAgent:
                 "elapsed_ms": round(elapsed, 1),
                 "message": f"[langgraph] node done: {name} ({elapsed:.1f} ms)",
             })
+            if extra_events:
+                for evt in extra_events:
+                    payload: Dict[str, Any]
+                    if isinstance(evt, str):
+                        payload = {
+                            "type": "log",
+                            "level": "info",
+                            "node": name,
+                            "message": evt,
+                            "ts": time.time(),
+                        }
+                    elif isinstance(evt, dict):
+                        payload = dict(evt)
+                        payload.setdefault("type", "log")
+                        payload.setdefault("level", "info")
+                        payload.setdefault("node", name)
+                        payload.setdefault("ts", time.time())
+                    else:
+                        continue
+                    self._emit_event(payload)
             return result
 
         return _wrapped
