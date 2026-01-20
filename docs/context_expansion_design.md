@@ -19,12 +19,12 @@
 ### 1.4 현재 반영 상태
 **반영됨**
 - doc_type 기반 확장 규칙 (gcb/myservice vs 기타)
+- 확장 대상은 검색 결과 상위 5개로 제한
 - expand_related 노드 추가 및 answer/judge에만 확장 refs 사용
 - ES helper (`fetch_doc_pages`, `fetch_doc_chunks`) 추가
 
 **제거/보류**
 - context_expansion_node (rerank 기반 확장, expansion_stats, fetch_surrounding_chunks) 제거: 요구사항과 불일치
-- Rerank 상위 N개 문서 확장
 - 확장 통계(expansion_stats) 로깅
 - 확장 범위/최대 개수 설정을 config로 노출
 - msearch 등 성능 최적화
@@ -42,6 +42,7 @@
 | FR-03 | 확장된 청크의 중복 제거 | 필수 | 적용 |
 | FR-04 | 토큰 제한 고려한 청크 수 제한 | 필수 | 부분 적용 (답변 refs 길이 제한) |
 | FR-05 | 확장 통계 로깅 (디버깅용) | 권장 | 미적용 |
+| FR-06 | 확장 대상은 검색 결과 상위 5개로 제한 | 필수 | 적용 |
 
 ### 2.2 비기능 요구사항
 | ID | 요구사항 | 기준 | 구현 상태 |
@@ -175,7 +176,10 @@ def expand_related_docs_node(
     docs = state.get("docs", [])
     expanded_docs = []
 
-    for doc in docs:
+    for idx, doc in enumerate(docs):
+        if idx >= 5:
+            expanded_docs.append(doc)
+            continue
         doc_type = normalize(doc.metadata.get("doc_type"))
         if doc_type in {"gcb", "myservice"}:
             related = doc_fetcher(doc.doc_id)
@@ -229,6 +233,7 @@ builder.add_edge("expand_related", "answer")
 | page_window | 2 | 상수 |
 | doc_type 분기 | gcb/myservice | 상수 |
 | answer ref 길이 | 1200 | 상수 |
+| expand_top_k | 5 | 상수 |
 
 ---
 

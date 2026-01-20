@@ -192,6 +192,7 @@ MAX_REF_CHARS_REVIEW = 200       # 검색 결과 리뷰용
 MAX_REF_CHARS_ANSWER = 1200      # 답변 생성용
 RELATED_PAGE_WINDOW = 2          # 인접 페이지 범위 (±N)
 DOC_TYPES_SAME_DOC = {"gcb", "myservice"}
+EXPAND_TOP_K = 5                 # 확장 대상 최대 개수 (rerank 상위)
 
 
 def _invoke_llm(llm: BaseLLM, system: str, user: str, **kwargs: Any) -> str:
@@ -566,8 +567,13 @@ def expand_related_docs_node(
         return {}
 
     expanded_docs: List[RetrievalResult] = []
+    max_expand = max(0, int(EXPAND_TOP_K))
 
-    for doc in docs:
+    for idx, doc in enumerate(docs):
+        if idx >= max_expand:
+            expanded_docs.append(doc)
+            continue
+
         meta = doc.metadata if isinstance(doc.metadata, dict) else {}
         doc_type = _normalize_doc_type(meta.get("doc_type"))
         related_docs: List[RetrievalResult] = []
