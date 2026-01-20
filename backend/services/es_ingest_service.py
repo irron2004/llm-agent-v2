@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, BinaryIO, Iterable, List, Optional, Sequence
@@ -35,6 +36,7 @@ from backend.llm_infrastructure.preprocessing.registry import get_preprocessor
 from backend.services.embedding_service import EmbeddingService
 from backend.services.ingest.document_ingest_service import Section, DocumentIngestService
 from backend.services.ingest.txt_parser import parse_maintenance_txt
+from backend.services.ingest.gcb_parser import parse_gcb_txt
 from backend.services.storage import ImageUploadRenderer
 
 logger = logging.getLogger(__name__)
@@ -215,6 +217,24 @@ class EsIngestService:
             vlm_client=vlm_client,
             pipeline_version=pipeline_version,
         )
+
+    def _read_txt_file(self, file: BinaryIO | str) -> str:
+        """Read txt file content as string.
+
+        Args:
+            file: Text file (BinaryIO) or file path (str).
+
+        Returns:
+            File content as string.
+        """
+        if isinstance(file, str):
+            with open(file, "r", encoding="utf-8") as f:
+                return f.read()
+        else:
+            content = file.read()
+            if isinstance(content, bytes):
+                content = content.decode("utf-8")
+            return content
 
     def _preprocess(self, texts: Sequence[str]) -> List[str]:
         """Preprocess texts for embedding/search."""
@@ -431,12 +451,81 @@ class EsIngestService:
             },
         )
 
-    def ingest_txt(
+    def _ingest_txt_common(
+        self,
+        doc_id: str,
+        sections: List[Section],
+        meta: dict[str, Any],
+        llm_analysis: dict[str, Any],
+        *,
+        doc_type: str,
+        tenant_id: str,
+        project_id: str,
+        lang: str,
+        tags: list[str] | None,
+        refresh: bool,
+    ) -> IngestResult:
+        """Common logic for txt ingestion after parsing and section building.
+
+        Args:
+            doc_id: Document identifier.
+            sections: List of Section objects to ingest.
+            meta: Parsed metadata from the report.
+            llm_analysis: LLM-generated summary/keywords.
+            doc_type: Document type.
+            tenant_id: Tenant identifier.
+            project_id: Project identifier.
+            lang: Language code.
+            tags: Optional tags.
+            refresh: Whether to refresh ES index.
+
+        Returns:
+            IngestResult with indexed chunk count.
+        """
+        if not sections:
+            logger.warning("No valid sections to ingest for doc_id=%s", doc_id)
+            return IngestResult(
+                doc_id=doc_id,
+                index=self.index,
+                total_sections=0,
+                total_chunks=0,
+                indexed_chunks=0,
+                metadata=meta,
+            )
+
+        # Ingest all sections (each becomes a separate ES document)
+        ingest_result = self.ingest_sections(
+            base_doc_id=doc_id,
+            sections=sections,
+            doc_type=doc_type,
+            lang=lang,
+            tenant_id=tenant_id,
+            project_id=project_id,
+            vlm_model="",
+            tags=tags,
+            refresh=refresh,
+        )
+
+        return IngestResult(
+            doc_id=doc_id,
+            index=self.index,
+            total_sections=len(sections),
+            total_chunks=ingest_result.get("indexed", 0),
+            indexed_chunks=ingest_result.get("indexed", 0),
+            metadata={
+                **meta,
+                "tenant_id": tenant_id,
+                "project_id": project_id,
+                "lang": lang,
+                "llm_analysis": llm_analysis,
+            },
+        )
+
+    def ingest_myservice_txt(
         self,
         file: BinaryIO | str,
-        doc_id: str,
         *,
-        doc_type: str = "maintenance",
+        doc_type: str = "myservice",
         tenant_id: str = "",
         project_id: str = "",
         lang: str = "ko",
@@ -444,15 +533,15 @@ class EsIngestService:
         refresh: bool = False,
         use_llm_summary: bool = True,
     ) -> IngestResult:
-        """Full pipeline: txt → parse → LLM summary → ES index.
+        """Ingest myservice maintenance report txt file.
 
-        Ingests maintenance report text files with structured sections.
+        Full pipeline: txt → parse → LLM summary → ES index.
         Creates separate ES documents for each section (status/action/cause/result).
+        doc_id is automatically generated as "myservice_{title}" from the report metadata.
 
         Args:
             file: Text file (BinaryIO) or file path (str).
-            doc_id: Document identifier (e.g., Order No.).
-            doc_type: Document type (default: "maintenance").
+            doc_type: Document type (default: "myservice").
             tenant_id: Tenant identifier for multi-tenancy.
             project_id: Project identifier.
             lang: Language code.
@@ -467,18 +556,19 @@ class EsIngestService:
             Each section becomes a separate ES document with the same doc_id.
             Use doc_id to retrieve all sections of the same maintenance event.
         """
-        # Read file content
+        # Generate doc_id from filename (without prefix)
         if isinstance(file, str):
-            with open(file, "r", encoding="utf-8") as f:
-                content = f.read()
+            doc_id = Path(file).stem
         else:
-            content = file.read()
-            if isinstance(content, bytes):
-                content = content.decode("utf-8")
+            doc_id = Path(getattr(file, "name", "unknown")).stem
+
+        # Read file content
+        content = self._read_txt_file(file)
 
         # Parse maintenance report
-        logger.info("Parsing maintenance report for doc_id=%s", doc_id)
         report = parse_maintenance_txt(content)
+
+        logger.info("Parsing myservice maintenance report: doc_id=%s", doc_id)
 
         if not report.sections:
             logger.warning("No sections extracted from txt for doc_id=%s", doc_id)
@@ -500,6 +590,36 @@ class EsIngestService:
                 logger.error("Failed to generate LLM summary: %s", e)
                 # Continue without summary
 
+        # Build sections for myservice format
+        sections = self._build_myservice_sections(report, llm_analysis)
+
+        return self._ingest_txt_common(
+            doc_id=doc_id,
+            sections=sections,
+            meta=report.meta,
+            llm_analysis=llm_analysis,
+            doc_type=doc_type,
+            tenant_id=tenant_id,
+            project_id=project_id,
+            lang=lang,
+            tags=tags,
+            refresh=refresh,
+        )
+
+    def _build_myservice_sections(
+        self,
+        report,
+        llm_analysis: dict[str, Any],
+    ) -> List[Section]:
+        """Build Section objects for myservice maintenance report.
+
+        Args:
+            report: Parsed MaintenanceReport.
+            llm_analysis: LLM-generated summary/keywords.
+
+        Returns:
+            List of Section objects.
+        """
         # Extract device info from meta
         device_name = report.meta.get("Model Name", "") or report.meta.get("Equip. NO", "")
         doc_description = report.meta.get("Title", "")
@@ -508,7 +628,7 @@ class EsIngestService:
         # Build common metadata for all sections
         common_meta = {
             "device_name": device_name,
-            "doc_description": doc_description,
+            "doc_description": doc_description,  # Used as title in search results
             "order_no": order_no,
         }
 
@@ -551,8 +671,55 @@ class EsIngestService:
             )
             sections.append(section)
 
-        if not sections:
-            logger.warning("No valid sections to ingest for doc_id=%s", doc_id)
+        return sections
+
+    def ingest_gcb_txt(
+        self,
+        file: BinaryIO | str,
+        *,
+        doc_type: str = "gcb",
+        tenant_id: str = "",
+        project_id: str = "",
+        lang: str = "en",
+        tags: list[str] | None = None,
+        refresh: bool = False,
+        use_llm_summary: bool = True,
+    ) -> IngestResult:
+        """Ingest GCB (Global Customer Bulletin) txt file.
+
+        Full pipeline: txt → parse → LLM summary → ES index.
+        Creates separate ES documents for each section (question, resolution).
+        doc_id is automatically generated as "gcb_{title}" from the report metadata.
+
+        Args:
+            file: Text file (BinaryIO) or file path (str).
+            doc_type: Document type (default: "gcb").
+            tenant_id: Tenant identifier for multi-tenancy.
+            project_id: Project identifier.
+            lang: Language code.
+            tags: Optional list of tags.
+            refresh: Whether to refresh ES index after ingestion.
+            use_llm_summary: Whether to generate LLM summary.
+
+        Returns:
+            IngestResult with doc_id, index, and chunk counts.
+        """
+        # Generate doc_id from filename (without prefix)
+        if isinstance(file, str):
+            doc_id = Path(file).stem
+        else:
+            doc_id = Path(getattr(file, "name", "unknown")).stem
+
+        # Read file content
+        content = self._read_txt_file(file)
+
+        # Parse GCB report
+        report = parse_gcb_txt(content)
+
+        logger.info("Parsing GCB report: doc_id=%s", doc_id)
+
+        if not report.sections:
+            logger.warning("No sections extracted from GCB txt for doc_id=%s", doc_id)
             return IngestResult(
                 doc_id=doc_id,
                 index=self.index,
@@ -562,33 +729,180 @@ class EsIngestService:
                 metadata=report.meta,
             )
 
-        # Ingest all sections (each becomes a separate ES document)
-        ingest_result = self.ingest_sections(
-            base_doc_id=doc_id,
+        # Generate LLM summary if requested
+        llm_analysis = {}
+        if use_llm_summary:
+            try:
+                llm_analysis = self._generate_gcb_summary(report)
+            except Exception as e:
+                logger.error("Failed to generate LLM summary for GCB: %s", e)
+                # Continue without summary
+
+        # Build sections for GCB format
+        sections = self._build_gcb_sections(report, llm_analysis)
+
+        return self._ingest_txt_common(
+            doc_id=doc_id,
             sections=sections,
+            meta=report.meta,
+            llm_analysis=llm_analysis,
             doc_type=doc_type,
-            lang=lang,
             tenant_id=tenant_id,
             project_id=project_id,
-            vlm_model="",
+            lang=lang,
             tags=tags,
             refresh=refresh,
         )
 
-        return IngestResult(
-            doc_id=doc_id,
-            index=self.index,
-            total_sections=len(sections),
-            total_chunks=ingest_result.get("indexed", 0),
-            indexed_chunks=ingest_result.get("indexed", 0),
-            metadata={
-                **report.meta,
-                "tenant_id": tenant_id,
-                "project_id": project_id,
-                "lang": lang,
-                "llm_analysis": llm_analysis,
-            },
+    def _build_gcb_sections(
+        self,
+        report,
+        llm_analysis: dict[str, Any],
+    ) -> List[Section]:
+        """Build Section objects for GCB report.
+
+        Args:
+            report: Parsed GCBReport.
+            llm_analysis: LLM-generated summary/keywords.
+
+        Returns:
+            List of Section objects.
+        """
+        # Extract metadata from parsed report
+        device_name = report.meta.get("device_name", "") or report.meta.get("model", "")
+        doc_description = report.meta.get("title", "")
+        gcb_number = report.meta.get("gcb_number", "")
+
+        # Build common metadata for all sections
+        common_meta = {
+            "device_name": device_name,
+            "doc_description": doc_description,  # Used as title in search results
+            "gcb_number": gcb_number,
+            "status": report.meta.get("status", ""),
+            "model": report.meta.get("model", ""),
+            "os": report.meta.get("os", ""),
+            "patch": report.meta.get("patch", ""),
+            "module": report.meta.get("module", ""),
+        }
+
+        # Add overall summary/keywords from LLM if available
+        if "chunk_summary" in llm_analysis:
+            common_meta["overall_summary"] = llm_analysis["chunk_summary"]
+        if "chunk_keywords" in llm_analysis:
+            common_meta["overall_keywords"] = llm_analysis["chunk_keywords"]
+
+        # Create Section objects for each section
+        sections = []
+        section_names = ["question", "resolution"]
+
+        for section_name in section_names:
+            section_text = report.sections.get(section_name, "")
+            if not section_text.strip():
+                continue
+
+            # Build section-specific metadata
+            section_meta = common_meta.copy()
+            section_meta["section_type"] = section_name
+            section_meta["chapter"] = section_name  # For ES chapter field
+
+            # Add LLM-generated section summary/keywords
+            llm_sections = llm_analysis.get("sections", {})
+            if section_name in llm_sections:
+                section_info = llm_sections[section_name]
+                if "summary" in section_info:
+                    section_meta["chunk_summary"] = section_info["summary"]
+                if "keywords" in section_info:
+                    section_meta["chunk_keywords"] = section_info["keywords"]
+
+            # Create Section object
+            section = Section(
+                title=section_name,
+                text=section_text,
+                page_start=0,
+                page_end=0,
+                metadata=section_meta,
+            )
+            sections.append(section)
+
+        return sections
+
+    def _generate_gcb_summary(
+        self,
+        report,
+    ) -> dict[str, Any]:
+        """Generate LLM-based summary and keywords for GCB report.
+
+        Args:
+            report: Parsed GCBReport.
+
+        Returns:
+            Dict with chunk_summary, chunk_keywords, and sections metadata.
+        """
+        # Load prompt (reuse chunk_summary_v1 for now, can create gcb-specific later)
+        prompt_path = (
+            Path(__file__).parent.parent
+            / "llm_infrastructure"
+            / "summarization"
+            / "prompts"
+            / "chunk_summary_v1.yaml"
         )
+
+        with open(prompt_path, encoding="utf-8") as f:
+            prompt_config = yaml.safe_load(f)
+
+        system_prompt = prompt_config.get("system", "")
+        user_template = prompt_config.get("user", "{text}")
+
+        # Build input text for LLM
+        input_text = f"Title: {report.meta.get('title', '')}\n\n"
+        input_text += f"Question:\n{report.sections.get('question', '')}\n\n"
+        input_text += f"Resolution:\n{report.sections.get('resolution', '')}"
+
+        user_prompt = user_template.format(text=input_text)
+
+        # Call vLLM for summary generation
+        llm = get_llm(
+            "vllm",
+            version="v1",
+            base_url=vllm_settings.base_url,
+            model=vllm_settings.model_name,
+            temperature=0,
+            max_tokens=vllm_settings.max_tokens,
+            timeout=vllm_settings.timeout,
+        )
+
+        try:
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ]
+            response = llm.generate(messages, response_format={"type": "json_object"})
+
+            # Parse JSON response
+            result_text = response if isinstance(response, str) else str(response)
+
+            # Try to extract JSON from response
+            json_match = re.search(r"\{.*\}", result_text, re.DOTALL)
+            if json_match:
+                result = json.loads(json_match.group(0))
+                return {
+                    "chunk_summary": result.get("summary", ""),
+                    "chunk_keywords": result.get("keywords", []),
+                    "sections": {
+                        "question": {
+                            "summary": result.get("summary", ""),
+                            "keywords": result.get("keywords", []),
+                        },
+                        "resolution": {
+                            "summary": result.get("summary", ""),
+                            "keywords": result.get("keywords", []),
+                        },
+                    },
+                }
+        except Exception as e:
+            logger.warning("Failed to parse LLM response for GCB summary: %s", e)
+
+        return {}
 
     def _generate_maintenance_summary(
         self,
