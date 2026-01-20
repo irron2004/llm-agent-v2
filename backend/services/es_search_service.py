@@ -306,6 +306,105 @@ class EsSearchService:
                 f"Elasticsearch search failed: host={search_settings.es_host}, index={index}, error={exc}"
             ) from exc
 
+    def fetch_doc_pages(
+        self,
+        doc_id: str,
+        pages: list[int],
+        *,
+        max_docs: int | None = None,
+    ) -> list[RetrievalResult]:
+        """Fetch specific pages for a document by doc_id."""
+        if self.es_engine is None:
+            return []
+
+        page_values = sorted({p for p in pages if isinstance(p, int) and p > 0})
+        if not doc_id or not page_values:
+            return []
+
+        size = max_docs or len(page_values)
+
+        doc_filter = {
+            "bool": {
+                "should": [
+                    {"term": {"doc_id": doc_id}},
+                    {"term": {"doc_id.keyword": doc_id}},
+                ],
+                "minimum_should_match": 1,
+            }
+        }
+
+        body: dict[str, Any] = {
+            "query": {
+                "bool": {
+                    "filter": [
+                        doc_filter,
+                        {"terms": {"page": page_values}},
+                    ]
+                }
+            },
+            "size": size,
+            "sort": [{"page": "asc"}],
+            "_source": self.es_engine._source_fields(),
+            "track_total_hits": False,
+        }
+
+        try:
+            resp = self.es_engine.es.search(index=self.es_engine.index_name, body=body)
+            hits = self.es_engine._parse_hits(resp)
+            return [hit.to_retrieval_result() for hit in hits]
+        except Exception as exc:
+            index = self.es_engine.index_name if self.es_engine is not None else "<unknown>"
+            logger.warning(
+                "fetch_doc_pages failed: doc_id=%s pages=%s index=%s err=%s",
+                doc_id,
+                page_values,
+                index,
+                exc,
+            )
+            return []
+
+    def fetch_doc_chunks(
+        self,
+        doc_id: str,
+        *,
+        max_chunks: int = 50,
+    ) -> list[RetrievalResult]:
+        """Fetch all chunks for a document by doc_id."""
+        if self.es_engine is None or not doc_id:
+            return []
+
+        doc_filter = {
+            "bool": {
+                "should": [
+                    {"term": {"doc_id": doc_id}},
+                    {"term": {"doc_id.keyword": doc_id}},
+                ],
+                "minimum_should_match": 1,
+            }
+        }
+
+        body: dict[str, Any] = {
+            "query": {"bool": {"filter": [doc_filter]}},
+            "size": max_chunks,
+            "sort": [{"chunk_id": "asc"}],
+            "_source": self.es_engine._source_fields(),
+            "track_total_hits": False,
+        }
+
+        try:
+            resp = self.es_engine.es.search(index=self.es_engine.index_name, body=body)
+            hits = self.es_engine._parse_hits(resp)
+            return [hit.to_retrieval_result() for hit in hits]
+        except Exception as exc:
+            index = self.es_engine.index_name if self.es_engine is not None else "<unknown>"
+            logger.warning(
+                "fetch_doc_chunks failed: doc_id=%s index=%s err=%s",
+                doc_id,
+                index,
+                exc,
+            )
+            return []
+
     def health_check(self) -> bool:
         """Check if ES is reachable.
 

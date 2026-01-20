@@ -23,6 +23,7 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     answer_node,
     ask_user_after_retrieve_node,
     device_selection_node,
+    expand_related_docs_node,
     human_review_node,
     judge_node,
     load_prompt_spec,
@@ -73,6 +74,8 @@ class LangGraphRAGAgent:
         self.top_k = top_k  # Final top_k after rerank
         self.retrieval_top_k = retrieval_top_k  # Initial retrieval top_k
         self.reranker = search_service.reranker  # Use reranker from search_service
+        self.page_fetcher = getattr(search_service, "fetch_doc_pages", None)
+        self.doc_fetcher = getattr(search_service, "fetch_doc_chunks", None)
         self.mode = mode
         self.ask_user_after_retrieve = ask_user_after_retrieve
         self.ask_device_selection = ask_device_selection
@@ -158,6 +161,17 @@ class LangGraphRAGAgent:
                 final_top_k=self.top_k,
             )),
         )
+        builder.add_node(
+            "expand_related",
+            self._wrap_node(
+                "expand_related",
+                functools.partial(
+                    expand_related_docs_node,
+                    page_fetcher=self.page_fetcher,
+                    doc_fetcher=self.doc_fetcher,
+                ),
+            ),
+        )
         builder.add_node("answer", self._wrap_node("answer", functools.partial(answer_node, llm=self.llm, spec=self.spec)))
         builder.add_node("judge", self._wrap_node("judge", functools.partial(judge_node, llm=self.llm, spec=self.spec)))
 
@@ -189,13 +203,15 @@ class LangGraphRAGAgent:
 
             builder.add_edge("retrieve", "ask_user")
             # ask_user_after_retrieve_node는 Command를 반환하므로 conditional edge 불필요
-            # Command의 goto="answer" 또는 goto="refine_and_retrieve"가 라우팅 담당
+            # Command의 goto="expand_related" 또는 goto="refine_and_retrieve"가 라우팅 담당
             builder.add_edge("refine_and_retrieve", "retrieve")
-            # retry 경로의 retrieve_retry는 ask_user 없이 바로 answer로
-            builder.add_edge("retrieve_retry", "answer")
+            # retry 경로의 retrieve_retry는 ask_user 없이 바로 expand_related로
+            builder.add_edge("retrieve_retry", "expand_related")
         else:
-            builder.add_edge("retrieve", "answer")
-            builder.add_edge("retrieve_retry", "answer")
+            builder.add_edge("retrieve", "expand_related")
+            builder.add_edge("retrieve_retry", "expand_related")
+
+        builder.add_edge("expand_related", "answer")
 
         builder.add_edge("answer", "judge")
 

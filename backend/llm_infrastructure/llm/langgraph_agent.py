@@ -49,6 +49,7 @@ class AgentState(TypedDict, total=False):
     # Retrieval outputs
     docs: List[RetrievalResult]
     ref_json: List[Dict[str, Any]]
+    answer_ref_json: List[Dict[str, Any]]
 
     # Answer + judge
     answer: str
@@ -187,6 +188,10 @@ class SearchServiceRetriever:
 # 노드 타입별 max_tokens 설정
 MAX_TOKENS_CLASSIFICATION = 256   # 라우팅/분류용 (짧은 응답)
 MAX_TOKENS_ANSWER = 4096         # 답변 생성용
+MAX_REF_CHARS_REVIEW = 200       # 검색 결과 리뷰용
+MAX_REF_CHARS_ANSWER = 1200      # 답변 생성용
+RELATED_PAGE_WINDOW = 2          # 인접 페이지 범위 (±N)
+DOC_TYPES_SAME_DOC = {"gcb", "myservice"}
 
 
 def _invoke_llm(llm: BaseLLM, system: str, user: str, **kwargs: Any) -> str:
@@ -281,12 +286,18 @@ def _parse_queries(text: str) -> List[str]:
 # -----------------------------
 # 5) Retrieval helpers
 # -----------------------------
-def results_to_ref_json(docs: List[RetrievalResult]) -> List[Dict[str, Any]]:
+def results_to_ref_json(
+    docs: List[RetrievalResult],
+    *,
+    max_chars: int = MAX_REF_CHARS_REVIEW,
+    prefer_raw_text: bool = False,
+) -> List[Dict[str, Any]]:
     ref: List[Dict[str, Any]] = []
-    max_chars = 200  # ultra-compact to avoid context overflow
     for i, d in enumerate(docs, start=1):
         content = ""
-        if isinstance(d.metadata, dict):
+        if prefer_raw_text:
+            content = str(d.raw_text or d.content or "").strip()
+        if not content and isinstance(d.metadata, dict):
             content = str(d.metadata.get("search_text") or "").strip()
         if not content:
             content = str(d.raw_text or d.content or "").strip()
@@ -329,6 +340,59 @@ def ref_json_to_text(ref_json: List[Dict[str, Any]]) -> str:
         content = " ".join(content.split())
         lines.append(f"[{rank}] {doc_id}: {content}")
     return "\n".join(lines)
+
+
+def _normalize_doc_type(doc_type: str | None) -> str:
+    if not doc_type:
+        return ""
+    return str(doc_type).strip().lower()
+
+
+def _extract_page_value(metadata: Dict[str, Any] | None) -> int | None:
+    if not isinstance(metadata, dict):
+        return None
+    page = metadata.get("page")
+    if page is None:
+        page = metadata.get("page_start") or metadata.get("page_end")
+    try:
+        page_num = int(page)
+    except (TypeError, ValueError):
+        return None
+    return page_num if page_num > 0 else None
+
+
+def _combine_related_text(docs: List[RetrievalResult]) -> str:
+    seen: set = set()
+    parts: List[str] = []
+
+    def _sort_key(item: RetrievalResult) -> tuple[int, int, str]:
+        meta = item.metadata if isinstance(item.metadata, dict) else {}
+        page = _extract_page_value(meta)
+        chunk_id = str(meta.get("chunk_id", ""))
+        if page is not None:
+            return (0, page, chunk_id)
+        return (1, 0, chunk_id)
+
+    for d in sorted(docs, key=_sort_key):
+        meta = d.metadata if isinstance(d.metadata, dict) else {}
+        page = _extract_page_value(meta)
+        section = meta.get("section_type") or meta.get("chapter")
+        text = (d.raw_text or d.content or "").strip()
+        if not text:
+            continue
+        chunk_id = meta.get("chunk_id")
+        key = chunk_id or (d.doc_id, page, section, text[:80])
+        if key in seen:
+            continue
+        seen.add(key)
+        if page is not None:
+            parts.append(f"p{page}: {text}")
+        elif section:
+            parts.append(f"{section}: {text}")
+        else:
+            parts.append(text)
+
+    return "\n\n".join(parts)
 
 
 # -----------------------------
@@ -485,11 +549,69 @@ def retrieve_node(
     return {"docs": docs, "ref_json": results_to_ref_json(docs)}
 
 
-def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["answer", "refine_and_retrieve"]]:
+def expand_related_docs_node(
+    state: AgentState,
+    *,
+    page_fetcher: Any = None,
+    doc_fetcher: Any = None,
+    page_window: int = RELATED_PAGE_WINDOW,
+    max_ref_chars: int = MAX_REF_CHARS_ANSWER,
+) -> Dict[str, Any]:
+    """Expand answer references by doc_type rules."""
+    if page_fetcher is None and doc_fetcher is None:
+        return {}
+
+    docs = state.get("docs", [])
+    if not docs:
+        return {}
+
+    expanded_docs: List[RetrievalResult] = []
+
+    for doc in docs:
+        meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+        doc_type = _normalize_doc_type(meta.get("doc_type"))
+        related_docs: List[RetrievalResult] = []
+
+        if doc_type in DOC_TYPES_SAME_DOC and doc_fetcher is not None:
+            related_docs = doc_fetcher(doc.doc_id)
+        elif page_fetcher is not None:
+            page = _extract_page_value(meta)
+            if page is not None:
+                page_min = max(1, page - page_window)
+                page_max = page + page_window
+                pages = list(range(page_min, page_max + 1))
+                related_docs = page_fetcher(doc.doc_id, pages)
+
+        if related_docs:
+            combined = _combine_related_text(related_docs)
+            if combined:
+                expanded_docs.append(
+                    RetrievalResult(
+                        doc_id=doc.doc_id,
+                        content=doc.content,
+                        score=doc.score,
+                        metadata=doc.metadata,
+                        raw_text=combined,
+                    )
+                )
+                continue
+
+        expanded_docs.append(doc)
+
+    return {
+        "answer_ref_json": results_to_ref_json(
+            expanded_docs,
+            max_chars=max_ref_chars,
+            prefer_raw_text=True,
+        )
+    }
+
+
+def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["expand_related", "refine_and_retrieve"]]:
     """Retrieval 후 사용자에게 검색 결과를 보여주고 피드백을 받는 노드.
 
     사용자 응답:
-    - True 또는 빈 문자열: 검색 결과 승인 → answer로 진행
+    - True 또는 빈 문자열: 검색 결과 승인 → expand_related로 진행
     - 문자열(키워드/피드백): 재검색 쿼리에 반영 → refine_and_retrieve로 이동
     - False: 검색 결과 부적절 → refine_and_retrieve로 이동 (기존 쿼리 유지)
     """
@@ -593,12 +715,10 @@ def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["answer",
 
             if deduped_docs:
                 return Command(
-                    goto="answer",
+                    goto="expand_related",
                     update={
                         "docs": deduped_docs,
                         "ref_json": results_to_ref_json(deduped_docs),
-                        "selected_doc_ids": selected_id_list,
-                        "selected_ranks": selected_rank_list,
                         "retrieval_confirmed": True,
                         "user_feedback": None,
                     },
@@ -607,7 +727,7 @@ def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["answer",
     # 승인: True 또는 빈 문자열
     if decision is True or decision == "":
         return Command(
-            goto="answer",
+            goto="expand_related",
             update={"retrieval_confirmed": True, "user_feedback": None}
         )
 
@@ -636,7 +756,7 @@ def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["answer",
 
 def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     route = state["route"]
-    ref_items = state.get("ref_json", [])
+    ref_items = state.get("answer_ref_json") or state.get("ref_json", [])
     ref_text = ref_json_to_text(ref_items)
     logger.info(
         "answer_node: route=%s, refs_chars=%d, docs=%d",
@@ -662,7 +782,8 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
 
 def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     route = state["route"]
-    ref_text = ref_json_to_text(state.get("ref_json", []))
+    ref_items = state.get("answer_ref_json") or state.get("ref_json", [])
+    ref_text = ref_json_to_text(ref_items)
 
     if route == "setup":
         sys = spec.judge_setup_sys
@@ -863,6 +984,7 @@ __all__ = [
     "st_gate_node",
     "st_mq_node",
     "retrieve_node",
+    "expand_related_docs_node",
     "ask_user_after_retrieve_node",
     "answer_node",
     "judge_node",
