@@ -174,8 +174,8 @@ def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
         if not title:
             title = (r.raw_text or r.content or "").split("\n")[0][:80]
 
-        snippet_source = r.raw_text or r.content or ""
-        snippet = snippet_source[:400] + ("..." if len(snippet_source) > 400 else "")
+        # Use full expanded content (raw_text) or original content without truncation
+        snippet = r.raw_text or r.content or ""
 
         score = getattr(r, "score", None)
         score_percent = int(score * 100) if score and score <= 1 else None
