@@ -878,8 +878,8 @@ class EsIngestService:
             ]
             response = llm.generate(messages, response_format={"type": "json_object"})
 
-            # Parse JSON response
-            result_text = response if isinstance(response, str) else str(response)
+            # Parse JSON response - use response.text for LLM response objects
+            result_text = response.text if hasattr(response, "text") else str(response)
 
             # Try to extract JSON from response
             json_match = re.search(r"\{.*\}", result_text, re.DOTALL)

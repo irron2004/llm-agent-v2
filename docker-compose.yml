@@ -25,12 +25,16 @@ services:
     volumes:
       # Code hot-reload (development): mount backend source into /app/backend
       - ./backend:/app/backend
+      # Scripts for batch jobs
+      - ./scripts:/app/scripts
       # Ingestion data (original pdf, pages, parsed.json)
       - ./data/ingestions:/data/ingestions
       # Vector store persistence (local-only; can be moved later)
       - ./data/vector_store:/data/vector_store
       # HuggingFace model cache (shared host cache)
       - /home/llm-share/hf:/data/hf_cache
+      # GCB and other PE data
+      - /home/llm-share/datasets/pe_agent_data:/data/pe_agent_data
     ports:
       - "${API_PORT}:8000"
     depends_on:

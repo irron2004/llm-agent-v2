@@ -59,6 +59,30 @@ def get_gcb_stats(es, index):
         return {"total": 0, "chapters": {}}
 
 
+def get_existing_gcb_doc_ids(es, index):
+    """Get set of already ingested GCB doc_ids."""
+    try:
+        result = es.search(
+            index=index,
+            body={
+                "query": {"term": {"doc_type.keyword": "gcb"}},
+                "size": 0,
+                "aggs": {
+                    "doc_ids": {
+                        "terms": {"field": "doc_id", "size": 50000}
+                    }
+                }
+            }
+        )
+        doc_ids = {
+            bucket["key"]
+            for bucket in result["aggregations"]["doc_ids"]["buckets"]
+        }
+        return doc_ids
+    except Exception:
+        return set()
+
+
 def ingest_single_file(txt_file, service):
     """Ingest a single txt file. Returns (success, doc_id, error_msg, num_sections)."""
     try:
@@ -81,8 +105,11 @@ def ingest_single_file(txt_file, service):
 
 def main():
     """Batch ingest all GCB txt files."""
-    # Source directory
-    source_dir = Path("/home/llm-share/datasets/pe_agent_data/pe_preprocess_data/gcb")
+    # Source directory (Docker mount: /data/pe_agent_data, Host: /home/llm-share/datasets/pe_agent_data)
+    source_dir = Path("/data/pe_agent_data/pe_preprocess_data/gcb")
+    if not source_dir.exists():
+        # Fallback to host path
+        source_dir = Path("/home/llm-share/datasets/pe_agent_data/pe_preprocess_data/gcb")
 
     if not source_dir.exists():
         print(f"Error: Directory not found: {source_dir}")
@@ -111,7 +138,24 @@ def main():
     initial_stats = get_es_stats(es, index)
     print(f"  Total docs: {initial_stats['doc_count']}")
     print(f"  Index size: {initial_stats['size_mb']:.2f} MB")
+
+    # Get already ingested doc_ids and filter out
+    print("\n🔍 Checking existing GCB documents...")
+    existing_doc_ids = get_existing_gcb_doc_ids(es, index)
+    print(f"  Already ingested: {len(existing_doc_ids)} GCB files")
+
+    # Filter out already ingested files
+    txt_files = [f for f in txt_files if f.stem not in existing_doc_ids]
+    files_to_process = len(txt_files)
+    skipped_count = total_files - files_to_process
+
+    print(f"  Skipping: {skipped_count} files")
+    print(f"  To process: {files_to_process} files")
     print("=" * 80)
+
+    if files_to_process == 0:
+        print("\n✅ All GCB files already ingested. Nothing to do.")
+        return
 
     # Batch processing
     success_count = 0
@@ -123,7 +167,7 @@ def main():
     report_interval = 50
     max_workers = 4
 
-    print(f"\nProcessing {total_files} files with {max_workers} workers...")
+    print(f"\nProcessing {files_to_process} files with {max_workers} workers...")
     print("=" * 80)
 
     # Parallel processing with ThreadPoolExecutor
@@ -133,7 +177,7 @@ def main():
             for txt_file in txt_files
         }
 
-        with tqdm(total=total_files, desc="Ingesting GCB", unit="file") as pbar:
+        with tqdm(total=files_to_process, desc="Ingesting GCB", unit="file") as pbar:
             processed = 0
             for future in as_completed(future_to_file):
                 processed += 1
@@ -163,7 +207,7 @@ def main():
                 if processed % report_interval == 0:
                     elapsed = time.time() - start_time
                     gcb_stats = get_gcb_stats(es, index)
-                    print(f"\n[Progress] {processed}/{total_files} | Success: {success_count} | GCB docs: {gcb_stats['total']} | Elapsed: {elapsed:.1f}s")
+                    print(f"\n[Progress] {processed}/{files_to_process} | Success: {success_count} | GCB docs: {gcb_stats['total']} | Elapsed: {elapsed:.1f}s")
 
     # Refresh index once at the end
     print("\nRefreshing index...")
@@ -175,11 +219,13 @@ def main():
     print("🎉 GCB BATCH INGESTION COMPLETE")
     print("=" * 80)
     print(f"Total files:     {total_files}")
+    print(f"Skipped:         {skipped_count} (already ingested)")
+    print(f"Processed:       {files_to_process}")
     print(f"✓ Success:       {success_count}")
     print(f"✗ Failed:        {failed_count}")
     print(f"⏱️  Total time:    {total_time:.1f}s ({total_time/60:.1f}min)")
-    if total_files > 0:
-        print(f"⚡ Avg speed:     {total_time/total_files:.2f}s/file")
+    if files_to_process > 0:
+        print(f"⚡ Avg speed:     {total_time/files_to_process:.2f}s/file")
 
     # Final ES stats
     print("\n" + "-" * 80)
