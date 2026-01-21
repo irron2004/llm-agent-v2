@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, BinaryIO, Dict, List, Optional
 from backend.config.settings import deepdoc_settings, vlm_parser_settings
 from backend.llm_infrastructure.preprocessing.parsers import ParsedDocument, PdfParseOptions
 from backend.llm_infrastructure.preprocessing.parsers.registry import get_parser
+from backend.llm_infrastructure.text_quality import is_noisy_chunk, strip_noisy_lines
 from .normalizer import get_normalizer
 
 if TYPE_CHECKING:
@@ -238,7 +239,15 @@ class DocumentIngestService:
         # Step 6: Normalize text (for indexing, after chapter extraction)
         normalizer = get_normalizer(level="L3")
         for section in sections:
-            section.text = normalizer(section.text)
+            cleaned = strip_noisy_lines(section.text)
+            cleaned = normalizer(cleaned)
+            if is_noisy_chunk(cleaned):
+                logger.debug("Dropping noisy chunk page=%s", section.page_start)
+                section.text = ""
+                continue
+            section.text = cleaned
+
+        sections = [section for section in sections if section.text]
 
         return {
             "sections": [section.to_dict() for section in sections],

@@ -19,6 +19,7 @@ from backend.api.dependencies import (
     get_prompt_spec_cached,
     get_search_service,
 )
+from backend.domain.doc_type_mapping import group_doc_type_buckets
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
 from backend.services.agents.langgraph_rag_agent import LangGraphRAGAgent
 from backend.services.search_service import SearchService
@@ -36,8 +37,8 @@ _hil_agent: Optional[LangGraphRAGAgent] = None
 
 
 def _create_device_fetcher(search_service):
-    """Create a device fetcher function using ES aggregation."""
-    def _fetch_devices() -> list[Dict[str, Any]]:
+    """Create a device/doc_type fetcher function using ES aggregation."""
+    def _fetch_devices() -> Dict[str, Any] | list[Dict[str, Any]]:
         # Check if ES engine is available
         if not hasattr(search_service, 'es_engine') or search_service.es_engine is None:
             logger.warning("ES engine not available for device fetching")
@@ -55,18 +56,28 @@ def _create_device_fetcher(search_service):
                         "size": 10,  # Top 10 devices only
                         "order": {"_count": "desc"},
                     }
-                }
+                },
+                "doc_types": {
+                    "terms": {
+                        "field": "doc_type",
+                        "size": 12,
+                        "order": {"_count": "desc"},
+                    }
+                },
             }
         }
 
         try:
             result = es.search(index=index, body=agg_query)
-            buckets = result.get("aggregations", {}).get("devices", {}).get("buckets", [])
-            return [
+            device_buckets = result.get("aggregations", {}).get("devices", {}).get("buckets", [])
+            doc_type_buckets = result.get("aggregations", {}).get("doc_types", {}).get("buckets", [])
+            devices = [
                 {"name": bucket["key"], "doc_count": bucket["doc_count"]}
-                for bucket in buckets
-                if bucket["key"]
+                for bucket in device_buckets
+                if bucket.get("key")
             ]
+            doc_types = group_doc_type_buckets(doc_type_buckets)
+            return {"devices": devices, "doc_types": doc_types}
         except Exception as e:
             logger.error(f"Failed to fetch device list: {e}")
             return []

@@ -11,6 +11,7 @@ from backend.llm_infrastructure.retrieval import get_retriever
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
 from backend.llm_infrastructure.reranking import get_reranker
 from backend.llm_infrastructure.reranking.base import BaseReranker
+from backend.llm_infrastructure.text_quality import is_noisy_chunk, strip_noisy_lines
 from backend.llm_infrastructure.query_expansion import get_query_expander
 from backend.llm_infrastructure.query_expansion.base import BaseQueryExpander
 from backend.services.embedding_service import EmbeddingService
@@ -159,6 +160,23 @@ class SearchService:
             device=self.rerank_device,
         )
 
+    @staticmethod
+    def _filter_noisy_results(results: list[RetrievalResult]) -> list[RetrievalResult]:
+        if not results:
+            return results
+        filtered: list[RetrievalResult] = []
+        dropped = 0
+        for result in results:
+            text = result.raw_text or result.content or ""
+            cleaned = strip_noisy_lines(text)
+            if not cleaned or is_noisy_chunk(cleaned):
+                dropped += 1
+                continue
+            filtered.append(result)
+        if dropped:
+            logger.debug("Filtered %d noisy chunks from retrieval", dropped)
+        return filtered
+
     def _merge_results_rrf(
         self,
         result_lists: list[list[RetrievalResult]],
@@ -220,6 +238,7 @@ class SearchService:
         rerank_top_k: Optional[int] = None,
         device_name: Optional[str] = None,
         device_names: Optional[list[str]] = None,
+        doc_types: Optional[list[str]] = None,
     ) -> list[RetrievalResult]:
         """Search for relevant documents with optional multi-query expansion and reranking.
 
@@ -281,11 +300,23 @@ class SearchService:
             # Single query retrieval
             results = self.retriever.retrieve(query, top_k=retrieval_top_k, **retriever_kwargs)
 
+        results = self._filter_noisy_results(results)
+
         # Step 4: Reranking (if enabled)
         if should_rerank and self.reranker is not None and results:
             rerank_k = rerank_top_k or self.rerank_top_k or final_top_k
             logger.debug(f"Reranking {len(results)} results to top_k={rerank_k}")
             results = self.reranker.rerank(query, results, top_k=rerank_k)
+
+        if doc_types:
+            normalized = {str(dt).strip().lower() for dt in doc_types if str(dt).strip()}
+
+            def _matches_doc_type(doc: RetrievalResult) -> bool:
+                meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+                doc_type = str(meta.get("doc_type", "")).strip().lower()
+                return bool(doc_type) and doc_type in normalized
+
+            results = [doc for doc in results if _matches_doc_type(doc)]
 
         # Limit to final top_k
         return results[:final_top_k]

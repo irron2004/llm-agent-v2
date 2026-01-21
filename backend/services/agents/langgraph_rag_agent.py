@@ -58,12 +58,12 @@ class LangGraphRAGAgent:
         search_service: SearchService,
         prompt_spec: Optional[PromptSpec] = None,
         top_k: int = 10,
-        retrieval_top_k: int = 30,
+        retrieval_top_k: int = 20,
         mode: str = "verified",  # base | verified
         checkpointer: Optional[MemorySaver] = None,
         ask_user_after_retrieve: bool = False,
         ask_device_selection: bool = False,
-        device_fetcher: Callable[[], list[Dict[str, Any]]] | None = None,
+        device_fetcher: Callable[[], Dict[str, Any] | list[Dict[str, Any]]] | None = None,
         event_sink: Callable[[Dict[str, Any]], None] | None = None,
     ) -> None:
         self.llm = llm

@@ -1,4 +1,4 @@
-.PHONY: clean clean-pyc clean-test clean-build help run-api stop-api up up-vllm logs logs-api logs-es logs-vllm logs-tei
+.PHONY: clean clean-pyc clean-test clean-build help run-api stop-api up up-vllm build-up logs logs-api logs-es logs-vllm logs-tei
 
 ROOT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 PYTHON ?= $(shell if [ -x "$(ROOT_DIR).venv/bin/python" ]; then echo "$(ROOT_DIR).venv/bin/python"; else echo python3; fi)
@@ -23,6 +23,7 @@ help:
 	@echo "stop-api     - stop FastAPI dev server started via run-api"
 	@echo "up           - docker compose up -d (api + ES, uses external vLLM)"
 	@echo "up-vllm      - docker compose up -d with vLLM (--profile with-vllm)"
+	@echo "build-up     - docker compose build && up -d (rebuild and start)"
 	@echo "logs         - tail docker logs for core services"
 	@echo "logs-api     - tail docker logs for api"
 	@echo "logs-es      - tail docker logs for elasticsearch"
@@ -66,6 +67,14 @@ up:
 
 up-vllm:
 	$(DOCKER_COMPOSE) --profile with-vllm up -d
+
+build-up:
+	$(DOCKER_COMPOSE) build $(DOCKER_SERVICES)
+	$(DOCKER_COMPOSE) up -d $(DOCKER_SERVICES)
+	@echo ""
+	@echo "=========================================="
+	@echo " Rebuilt and started: $(DOCKER_SERVICES)"
+	@echo "=========================================="
 
 logs:
 	$(DOCKER_COMPOSE) logs -f $(DOCKER_SERVICES)

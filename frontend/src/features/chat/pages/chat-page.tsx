@@ -180,10 +180,14 @@ export default function ChatPage() {
           )}
 
           {/* Device selection panel */}
-          {pendingDeviceSelection && pendingDeviceSelection.devices && pendingDeviceSelection.devices.length > 0 && (
+          {pendingDeviceSelection && (
+            (pendingDeviceSelection.devices && pendingDeviceSelection.devices.length > 0) ||
+            (pendingDeviceSelection.docTypes && pendingDeviceSelection.docTypes.length > 0)
+          ) && (
             <DeviceSelectionPanel
               question={pendingDeviceSelection.question}
-              devices={pendingDeviceSelection.devices}
+              devices={pendingDeviceSelection.devices ?? []}
+              docTypes={pendingDeviceSelection.docTypes ?? []}
               instruction={pendingDeviceSelection.instruction}
               onSelect={submitDeviceSelection}
             />

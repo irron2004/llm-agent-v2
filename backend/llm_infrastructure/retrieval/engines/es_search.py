@@ -421,6 +421,7 @@ class EsSearchEngine:
         tenant_id: str | None = None,
         project_id: str | None = None,
         doc_type: str | None = None,
+        doc_types: list[str] | None = None,
         lang: str | None = None,
         device_names: list[str] | None = None,
     ) -> dict[str, Any] | None:
@@ -471,7 +472,13 @@ class EsSearchEngine:
             terms.append(_term_or_keyword("tenant_id", tenant_id))
         if project_id:
             terms.append(_term_or_keyword("project_id", project_id))
-        if doc_type:
+        if doc_types:
+            normalized = [dt for dt in doc_types if dt]
+            if doc_type and doc_type not in normalized:
+                normalized.append(doc_type)
+            if normalized:
+                terms.append(_terms_or_keyword("doc_type", normalized))
+        elif doc_type:
             terms.append(_term_or_keyword("doc_type", doc_type))
         if lang:
             terms.append(_term_or_keyword("lang", lang))

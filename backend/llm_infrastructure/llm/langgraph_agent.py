@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Literal, Optional, Protocol, TypedDict
 
 from langgraph.types import Command, interrupt
 
+from backend.domain.doc_type_mapping import expand_doc_type_selection, normalize_doc_type
 from backend.llm_infrastructure.llm.base import BaseLLM
 from backend.llm_infrastructure.llm.prompt_loader import PromptTemplate, load_prompt_template
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
@@ -45,6 +46,9 @@ class AgentState(TypedDict, total=False):
     available_devices: List[Dict[str, Any]]
     selected_devices: List[str]  # Multiple devices can be selected
     device_selection_skipped: bool
+    available_doc_types: List[Dict[str, Any]]
+    selected_doc_types: List[str]
+    doc_type_selection_skipped: bool
 
     # Retrieval outputs
     docs: List[RetrievalResult]
@@ -165,6 +169,7 @@ class SearchServiceRetriever:
         top_k: int | None = None,
         device_name: str | None = None,
         device_names: List[str] | None = None,
+        doc_types: List[str] | None = None,
         **kwargs: Any,
     ) -> List[RetrievalResult]:
         k = top_k or self.top_k
@@ -180,6 +185,8 @@ class SearchServiceRetriever:
         # Legacy: device_name for boosting if provided
         elif device_name:
             search_kwargs["device_name"] = device_name
+        if doc_types:
+            search_kwargs["doc_types"] = doc_types
         return self.search_service.search(query, **search_kwargs)
 
 
@@ -408,9 +415,13 @@ def ref_json_to_text(ref_json: List[Dict[str, Any]]) -> str:
 
 
 def _normalize_doc_type(doc_type: str | None) -> str:
-    if not doc_type:
+    return normalize_doc_type(doc_type or "")
+
+
+def _normalize_device_name(device_name: str | None) -> str:
+    if not device_name:
         return ""
-    return str(doc_type).strip().lower()
+    return str(device_name).strip().lower()
 
 
 def _extract_page_value(metadata: Dict[str, Any] | None) -> int | None:
@@ -616,30 +627,59 @@ def retrieve_node(
     *,
     retriever: Retriever,
     reranker: Any = None,
-    retrieval_top_k: int = 30,
+    retrieval_top_k: int = 20,
     final_top_k: int = 10,
 ) -> Dict[str, Any]:
     """Retrieve documents with dual search strategy and rerank.
 
     If devices are selected:
-      - Search 1: 30 docs filtered by selected devices (OR filter)
-      - Search 2: 30 docs without filter (general search)
+      - Search 1: 20 docs filtered by selected devices (OR filter)
+      - Search 2: 20 docs without filter (general search)
       - Combine and rerank to get final 10 docs
 
     If no devices selected:
-      - Search 60 docs without filter
+      - Search 20 docs without filter
       - Rerank to get final 10 docs
     """
     queries = state.get("search_queries", [state["query"]])
     selected_devices = state.get("selected_devices", [])
+    selected_doc_types = state.get("selected_doc_types", [])
+    selected_doc_type_filters = expand_doc_type_selection(selected_doc_types)
     original_query = state["query"]
+
+    selected_device_set = {
+        _normalize_device_name(d) for d in selected_devices if _normalize_device_name(d)
+    }
+    selected_doc_type_set = {
+        _normalize_doc_type(dt) for dt in selected_doc_type_filters if _normalize_doc_type(dt)
+    }
+
+    candidate_k = max(retrieval_top_k, final_top_k * 2, 20)
 
     all_docs: List[RetrievalResult] = []
     seen: set = set()
 
-    def _add_docs(docs_to_add: List[RetrievalResult]) -> None:
-        """Add docs to all_docs, avoiding duplicates."""
+    def _matches_doc_type(doc: RetrievalResult) -> bool:
+        if not selected_doc_type_set:
+            return True
+        meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+        doc_type = _normalize_doc_type(meta.get("doc_type"))
+        return bool(doc_type) and doc_type in selected_doc_type_set
+
+    def _matches_device(doc: RetrievalResult) -> bool:
+        if not selected_device_set:
+            return True
+        meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+        device_name = _normalize_device_name(meta.get("device_name"))
+        return bool(device_name) and device_name in selected_device_set
+
+    def _add_docs(docs_to_add: List[RetrievalResult], *, filter_devices: bool) -> None:
+        """Add docs to all_docs, avoiding duplicates and honoring filters."""
         for d in docs_to_add:
+            if not _matches_doc_type(d):
+                continue
+            if filter_devices and not _matches_device(d):
+                continue
             key = (d.doc_id, hash(d.raw_text or d.content))
             if key not in seen:
                 seen.add(key)
@@ -651,16 +691,25 @@ def retrieve_node(
 
         # Search 1: Device-filtered search (30 docs) with device_names as OR filter
         for q in queries:
-            device_docs = retriever.retrieve(q, top_k=retrieval_top_k, device_names=selected_devices)
-            _add_docs(device_docs)
+            device_docs = retriever.retrieve(
+                q,
+                top_k=candidate_k,
+                device_names=selected_devices,
+                doc_types=selected_doc_type_filters,
+            )
+            _add_docs(device_docs, filter_devices=True)
 
         device_filtered_count = len(all_docs)
         logger.info("retrieve_node: device-filtered search found %d docs", device_filtered_count)
 
-        # Search 2: General search without device filter (30 docs)
+        # Search 2: General search without device filter (20 docs)
         for q in queries:
-            general_docs = retriever.retrieve(q, top_k=retrieval_top_k)
-            _add_docs(general_docs)
+            general_docs = retriever.retrieve(
+                q,
+                top_k=candidate_k,
+                doc_types=selected_doc_type_filters,
+            )
+            _add_docs(general_docs, filter_devices=False)
 
         logger.info("retrieve_node: after general search, total %d docs", len(all_docs))
 
@@ -668,10 +717,16 @@ def retrieve_node(
         # No device selection: search 60 docs without filter
         logger.info("retrieve_node: general search (no device filter)")
         for q in queries:
-            docs = retriever.retrieve(q, top_k=retrieval_top_k * 2)
-            _add_docs(docs)
+            docs = retriever.retrieve(
+                q,
+                top_k=candidate_k,
+                doc_types=selected_doc_type_filters,
+            )
+            _add_docs(docs, filter_devices=False)
 
     logger.info("retrieve_node: collected %d unique docs before rerank", len(all_docs))
+    if len(all_docs) > candidate_k:
+        all_docs = sorted(all_docs, key=lambda d: d.score, reverse=True)[:candidate_k]
 
     # Rerank if reranker is available
     if reranker is not None and all_docs:
@@ -1081,30 +1136,41 @@ def device_selection_node(
 
     Args:
         state: Agent state.
-        device_fetcher: Callable that returns list of devices.
-            Each device should have 'name' and 'doc_count'.
+        device_fetcher: Callable that returns devices (and optionally doc types).
+            Devices/doc types should have 'name' and 'doc_count'.
 
     Returns:
         Command to proceed to 'mq' node with selected devices.
     """
     # Fetch available devices if fetcher provided
     available_devices: List[Dict[str, Any]] = []
+    available_doc_types: List[Dict[str, Any]] = []
     if device_fetcher is not None:
         try:
-            available_devices = device_fetcher()
+            fetched = device_fetcher()
+            if isinstance(fetched, dict):
+                available_devices = fetched.get("devices", []) or []
+                available_doc_types = fetched.get("doc_types", []) or []
+            elif isinstance(fetched, list):
+                available_devices = fetched
+            else:
+                available_devices = []
         except Exception as e:
             logger.warning(f"Failed to fetch devices: {e}")
             available_devices = []
 
-    if not available_devices:
-        # No devices available, skip selection
-        logger.info("device_selection_node: no devices available, skipping")
+    if not available_devices and not available_doc_types:
+        # No selection options available, skip selection
+        logger.info("device_selection_node: no devices/doc_types available, skipping")
         return Command(
             goto="mq",
             update={
                 "available_devices": [],
                 "selected_devices": [],
                 "device_selection_skipped": True,
+                "available_doc_types": [],
+                "selected_doc_types": [],
+                "doc_type_selection_skipped": True,
             }
         )
 
@@ -1114,10 +1180,13 @@ def device_selection_node(
         "route": state.get("route"),
         "devices": available_devices,
         "device_count": len(available_devices),
+        "doc_types": available_doc_types,
+        "doc_type_count": len(available_doc_types),
         "instruction": (
-            "검색할 기기를 선택하세요 (다중 선택 가능).\n"
-            "- 기기 선택: 선택 기기 문서 10개 + 전체 문서 10개 검색\n"
-            "- 건너뛰기: 전체 문서 20개 검색"
+            "검색할 기기/문서 종류를 선택하세요 (다중 선택 가능).\n"
+            "- 전체 기기: 기기 필터 없이 전체에서 검색\n"
+            "- 문서 종류 선택: 선택한 문서 종류로 검색 범위 제한\n"
+            "- 전체 문서: 문서 종류 필터 없이 검색"
         ),
     }
 
@@ -1132,11 +1201,15 @@ def device_selection_node(
                 "available_devices": available_devices,
                 "selected_devices": [],
                 "device_selection_skipped": True,
+                "available_doc_types": available_doc_types,
+                "selected_doc_types": [],
+                "doc_type_selection_skipped": True,
             }
         )
 
     # Parse selected devices (can be single string, list, or dict with selected_devices)
     selected_devices: List[str] = []
+    selected_doc_types: List[str] = []
 
     if isinstance(decision, dict):
         # New format: {"type": "device_selection", "selected_devices": [...]}
@@ -1150,6 +1223,12 @@ def device_selection_node(
         if legacy_device and isinstance(legacy_device, str):
             if legacy_device.strip() not in selected_devices:
                 selected_devices.append(legacy_device.strip())
+
+        doc_types_from_dict = decision.get("selected_doc_types") or decision.get("doc_types") or []
+        if isinstance(doc_types_from_dict, list):
+            selected_doc_types = [str(d).strip() for d in doc_types_from_dict if d]
+        elif isinstance(doc_types_from_dict, str):
+            selected_doc_types = [doc_types_from_dict.strip()]
     elif isinstance(decision, list):
         selected_devices = [str(d).strip() for d in decision if d]
     elif isinstance(decision, str):
@@ -1164,12 +1243,21 @@ def device_selection_node(
 
     logger.info(f"device_selection_node: validated selected_devices={selected_devices}")
 
+    valid_doc_types = {d.get("name") for d in available_doc_types if d.get("name")}
+    selected_doc_types = [d for d in selected_doc_types if d in valid_doc_types]
+
+    if selected_doc_types:
+        logger.info(f"device_selection_node: validated selected_doc_types={selected_doc_types}")
+
     return Command(
         goto="mq",
         update={
             "available_devices": available_devices,
             "selected_devices": selected_devices,
             "device_selection_skipped": len(selected_devices) == 0,
+            "available_doc_types": available_doc_types,
+            "selected_doc_types": selected_doc_types,
+            "doc_type_selection_skipped": len(selected_doc_types) == 0,
         }
     )
 
