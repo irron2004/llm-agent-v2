@@ -519,18 +519,9 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       const hasDevices = selectedDevices.length > 0;
       const hasDocTypes = selectedDocTypes.length > 0;
 
-      if (!hasDevices && !hasDocTypes) {
-        // Skip selections - search all documents
-        send({
-          text: "전체 문서에서 검색",
-          decisionOverride: "skip",
-        });
-        return;
-      }
-
       const summaryParts: string[] = [];
-      if (hasDevices) summaryParts.push(`기기: ${selectedDevices.join(", ")}`);
-      if (hasDocTypes) summaryParts.push(`문서: ${selectedDocTypes.join(", ")}`);
+      summaryParts.push(hasDevices ? `기기: ${selectedDevices.join(", ")}` : "전체 기기");
+      summaryParts.push(hasDocTypes ? `문서: ${selectedDocTypes.join(", ")}` : "전체 문서");
 
       send({
         text: summaryParts.length > 0 ? `선택: ${summaryParts.join(" / ")}` : "선택 조건 검색",

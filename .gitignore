@@ -62,3 +62,4 @@ data/
 .npm-cache/
 examples/
 papers/
+docs/refactoring_analysis_report.md
