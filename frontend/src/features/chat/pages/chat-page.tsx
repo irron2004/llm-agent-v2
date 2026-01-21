@@ -45,6 +45,7 @@ export default function ChatPage() {
     submitReview,
     submitSearchQueries,
     submitDeviceSelection,
+    submitFeedback,
   } = useChatSession({ onTurnSaved: handleTurnSaved });
 
   // Load session from URL parameter
@@ -171,6 +172,7 @@ export default function ChatPage() {
                     key={msg.id}
                     message={msg}
                     isStreaming={isStreaming && idx === messages.length - 1 && msg.role === "assistant"}
+                    onFeedback={submitFeedback}
                   />
                 ))
               )}

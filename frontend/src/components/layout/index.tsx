@@ -72,7 +72,7 @@ export default function Layout() {
     }
     if (completedRetrievedDocs && completedRetrievedDocs.length > 0) {
       return {
-        title: "검색된 문서",
+        title: "확장 문서/참고 문서",
         subtitle: `${completedRetrievedDocs.length}개 문서`,
       };
     }
@@ -508,50 +508,78 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
   metadata?: Record<string, unknown> | null;
   page?: number | null;
   page_image_url?: string | null;
+  expanded_pages?: number[] | null;
+  expanded_page_urls?: string[] | null;
 }> }) {
   return (
     <div className="retrieved-docs-container">
-      {docs.map((doc, index) => (
-        <div key={doc.id || index} className="retrieved-doc-item">
-          <div className="retrieved-doc-header">
-            <span className="retrieved-doc-rank">#{index + 1}</span>
-            {doc.title && (
-              <span className="retrieved-doc-title">{doc.title}</span>
-            )}
-            {doc.page && (
-              <span className="retrieved-doc-page">p.{doc.page}</span>
-            )}
-            {doc.score !== null && doc.score !== undefined && (
-              <span className="retrieved-doc-score">
-                {typeof doc.score_percent === "number"
-                  ? `${doc.score_percent.toFixed(1)}%`
-                  : doc.score.toFixed(3)}
-              </span>
-            )}
-          </div>
-          {doc.page_image_url ? (
-            <div className="retrieved-doc-image-wrapper">
-              <img
-                src={doc.page_image_url}
-                alt={`${doc.title || "Document"} page ${doc.page || ""}`}
-                className="retrieved-doc-image"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                  const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                  if (fallback) fallback.style.display = "block";
-                }}
-              />
-              <div className="retrieved-doc-snippet" style={{ display: "none" }}>
+      {docs.map((doc, index) => {
+        const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
+          ? doc.expanded_pages
+          : doc.page !== null && doc.page !== undefined
+            ? [doc.page]
+            : [];
+        const pageUrls = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
+          ? doc.expanded_page_urls
+          : doc.page_image_url
+            ? [doc.page_image_url]
+            : doc.id && pageNumbers.length > 0
+              ? pageNumbers.map((p) => `/api/assets/docs/${doc.id}/pages/${p}`)
+              : [];
+
+        return (
+          <div key={doc.id || index} className="retrieved-doc-item">
+            <div className="retrieved-doc-header">
+              <span className="retrieved-doc-rank">#{index + 1}</span>
+              {doc.title && (
+                <span className="retrieved-doc-title">{doc.title}</span>
+              )}
+              {pageNumbers.length > 0 && (
+                <span className="retrieved-doc-page">
+                  {pageNumbers.length === 1
+                    ? `p.${pageNumbers[0]}`
+                    : `p.${pageNumbers[0]}-${pageNumbers[pageNumbers.length - 1]}`}
+                </span>
+              )}
+              {doc.score !== null && doc.score !== undefined && (
+                <span className="retrieved-doc-score">
+                  {typeof doc.score_percent === "number"
+                    ? `${doc.score_percent.toFixed(1)}%`
+                    : doc.score.toFixed(3)}
+                </span>
+              )}
+            </div>
+            {pageUrls.length > 0 ? (
+              <>
+                <div className="retrieved-doc-image-wrapper">
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {pageUrls.map((url, pageIdx) => (
+                      <img
+                        key={`${url}-${pageIdx}`}
+                        src={url}
+                        alt={`${doc.title || "Document"} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
+                        className="retrieved-doc-image"
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {doc.snippet && (
+                  <div className="retrieved-doc-snippet" style={{ marginTop: 8 }}>
+                    <MarkdownContent content={preprocessSnippet(doc.snippet)} />
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="retrieved-doc-snippet">
                 <MarkdownContent content={preprocessSnippet(doc.snippet)} />
               </div>
-            </div>
-          ) : (
-            <div className="retrieved-doc-snippet">
-              <MarkdownContent content={preprocessSnippet(doc.snippet)} />
-            </div>
-          )}
-        </div>
-      ))}
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

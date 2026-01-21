@@ -1,7 +1,16 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { nanoid } from "nanoid";
-import { sendChatMessage, saveTurn, fetchSession } from "../api";
-import { AgentResponse, Message, ReviewDoc, DocRefResponse, RetrievedDoc } from "../types";
+import { sendChatMessage, saveTurn, fetchSession, saveFeedback } from "../api";
+import {
+  AgentResponse,
+  Message,
+  ReviewDoc,
+  DocRefResponse,
+  RetrievedDoc,
+  MessageFeedback,
+  FeedbackRating,
+  TurnResponse,
+} from "../types";
 import { connectSse } from "../../../lib/sse";
 import { env } from "../../../config/env";
 import { useChatLogs } from "../context/chat-logs-context";
@@ -20,6 +29,14 @@ type InterruptKind = "device_selection" | "retrieval_review" | "human_review" | 
 type DeviceInfo = {
   name: string;
   doc_count: number;
+};
+
+type FeedbackPayload = {
+  messageId: string;
+  sessionId?: string;
+  turnId?: number;
+  rating: FeedbackRating;
+  reason?: string | null;
 };
 
 type PendingInterrupt = {
@@ -101,8 +118,22 @@ const toDocRefs = (docs: RetrievedDoc[]): DocRefResponse[] => {
     title: doc.title,
     snippet: doc.snippet,
     page: doc.page ?? null,
+    pages: Array.isArray(doc.expanded_pages) && doc.expanded_pages.length > 0
+      ? doc.expanded_pages
+      : doc.page !== null && doc.page !== undefined
+        ? [doc.page]
+        : null,
     score: doc.score ?? null,
   }));
+};
+
+const extractFeedback = (turn?: TurnResponse | null): MessageFeedback | null => {
+  if (!turn?.feedback_rating) return null;
+  return {
+    rating: turn.feedback_rating,
+    reason: turn.feedback_reason ?? null,
+    ts: turn.feedback_ts ?? null,
+  };
 };
 
 export type UseChatSessionOptions = {
@@ -204,6 +235,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           retrievedDocs: res.retrieved_docs || [],
           rawAnswer: JSON.stringify(res, null, 2),
           currentNode: null,
+          sessionId,
         }));
         setIsStreaming(false);
         return;
@@ -228,6 +260,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         retrievedDocs: res.retrieved_docs || [],
         rawAnswer: JSON.stringify(res, null, 2),
         currentNode: null,
+        sessionId,
       }));
 
       // Save turn to backend
@@ -249,7 +282,13 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         assistant_text: assistantText,
         doc_refs: docRefs,
         title,
-      }).then(() => {
+      }).then((turn) => {
+        updateMessage(assistantId, (m) => ({
+          ...m,
+          sessionId,
+          turnId: turn.turn_id,
+          feedback: extractFeedback(turn),
+        }));
         onTurnSavedRef.current?.();
       }).catch((err) => {
         console.error("Failed to save turn:", err);
@@ -292,6 +331,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         id: userId,
         role: "user",
         content: text,
+        sessionId,
       });
 
       // Assistant placeholder so the UI shows progress immediately.
@@ -301,6 +341,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         role: "assistant",
         content: "처리 중...",
         currentNode: null,
+        sessionId,
       });
       setIsStreaming(true);
 
@@ -498,6 +539,41 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     turnCountRef.current = 0;
   }, [stop, clearLogs, setCompletedRetrievedDocs]);
 
+  const submitFeedback = useCallback(
+    async ({ messageId, sessionId: msgSessionId, turnId, rating, reason }: FeedbackPayload) => {
+      const targetSessionId = msgSessionId || sessionId;
+      if (!targetSessionId || !turnId) {
+        setError("만족도를 저장하려면 turn 정보가 필요합니다.");
+        return;
+      }
+
+      const feedback: MessageFeedback = {
+        rating,
+        reason: reason ?? null,
+        ts: new Date().toISOString(),
+      };
+      updateMessage(messageId, (m) => ({
+        ...m,
+        feedback,
+      }));
+
+      try {
+        const updated = await saveFeedback(targetSessionId, turnId, {
+          rating,
+          reason,
+        });
+        updateMessage(messageId, (m) => ({
+          ...m,
+          feedback: extractFeedback(updated),
+        }));
+      } catch (err) {
+        console.error("Failed to save feedback:", err);
+        setError(err instanceof Error ? err.message : "만족도 저장에 실패했습니다.");
+      }
+    },
+    [sessionId, updateMessage]
+  );
+
   // Load an existing session from the backend
   const loadSession = useCallback(
     async (targetSessionId: string) => {
@@ -519,6 +595,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
             role: "user",
             content: turn.user_text,
             createdAt: turn.ts,
+            sessionId: session.session_id,
           });
           // Assistant message
           loadedMessages.push({
@@ -526,11 +603,27 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
             role: "assistant",
             content: turn.assistant_text,
             createdAt: turn.ts,
+            sessionId: session.session_id,
+            turnId: turn.turn_id,
+            feedback: extractFeedback(turn),
             retrievedDocs: turn.doc_refs.map((ref) => ({
               id: ref.doc_id,
               title: ref.title,
               snippet: ref.snippet,
               page: ref.page,
+              expanded_pages: Array.isArray(ref.pages) && ref.pages.length > 0
+                ? ref.pages
+                : ref.page !== null && ref.page !== undefined
+                  ? [ref.page]
+                  : null,
+              expanded_page_urls: Array.isArray(ref.pages) && ref.pages.length > 0
+                ? ref.pages.map((p) => `/api/assets/docs/${ref.doc_id}/pages/${p}`)
+                : ref.page !== null && ref.page !== undefined
+                  ? [`/api/assets/docs/${ref.doc_id}/pages/${ref.page}`]
+                  : null,
+              page_image_url: ref.page !== null && ref.page !== undefined
+                ? `/api/assets/docs/${ref.doc_id}/pages/${ref.page}`
+                : null,
               score: ref.score,
             })),
           });
@@ -572,6 +665,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       submitReview,
       submitSearchQueries,
       submitDeviceSelection,
+      submitFeedback,
       inputPlaceholder: pendingInterrupt
         ? pendingInterrupt.kind === "device_selection"
           ? "기기를 선택하거나 건너뛰기를 클릭하세요..."
@@ -582,6 +676,21 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       reset,
       loadSession,
     }),
-    [sessionId, messages, isStreaming, isLoadingSession, error, send, stop, pendingInterrupt, submitReview, submitSearchQueries, submitDeviceSelection, reset, loadSession]
+    [
+      sessionId,
+      messages,
+      isStreaming,
+      isLoadingSession,
+      error,
+      send,
+      stop,
+      pendingInterrupt,
+      submitReview,
+      submitSearchQueries,
+      submitDeviceSelection,
+      submitFeedback,
+      reset,
+      loadSession,
+    ]
   );
 }

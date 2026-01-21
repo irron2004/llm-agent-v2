@@ -184,13 +184,18 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
                     children: (
                       <div className="reference-list">
                         {message.retrievedDocs.map((doc, idx) => {
-                          // Use expanded_page_urls if available, otherwise fall back to single page
-                          const pageUrls = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
-                            ? doc.expanded_page_urls
-                            : doc.page_image_url ? [doc.page_image_url] : [];
                           const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
                             ? doc.expanded_pages
-                            : doc.page ? [doc.page] : [];
+                            : doc.page !== null && doc.page !== undefined
+                              ? [doc.page]
+                              : [];
+                          const pageUrls = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
+                            ? doc.expanded_page_urls
+                            : doc.page_image_url
+                              ? [doc.page_image_url]
+                              : doc.id && pageNumbers.length > 0
+                                ? pageNumbers.map((p) => `/api/assets/docs/${doc.id}/pages/${p}`)
+                                : [];
 
                           return (
                             <div key={doc.id || idx} className="reference-item" style={{ marginBottom: 16 }}>

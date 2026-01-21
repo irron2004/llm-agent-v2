@@ -3,6 +3,7 @@ import { env } from "../../config/env";
 import {
   AgentRequest,
   AgentResponse,
+  FeedbackRating,
   SessionListResponse,
   SessionDetailResponse,
   SaveTurnRequest,
@@ -44,6 +45,17 @@ export async function saveTurn(
   return apiClient.post<TurnResponse>(
     `/api/conversations/${sessionId}/turns`,
     turn
+  );
+}
+
+export async function saveFeedback(
+  sessionId: string,
+  turnId: number,
+  payload: { rating: FeedbackRating; reason?: string | null }
+): Promise<TurnResponse> {
+  return apiClient.post<TurnResponse>(
+    `/api/conversations/${sessionId}/turns/${turnId}/feedback`,
+    payload
   );
 }
 

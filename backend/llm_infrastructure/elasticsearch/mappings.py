@@ -338,6 +338,22 @@ def get_chat_turns_mapping() -> dict[str, Any]:
                 # Assistant's response
             },
             # ===================================================================
+            # Feedback (Satisfaction)
+            # ===================================================================
+            "feedback_rating": {
+                "type": "keyword",
+                # "up" | "down"
+            },
+            "feedback_reason": {
+                "type": "text",
+                "analyzer": "nori",
+                # Optional reason for dissatisfaction
+            },
+            "feedback_ts": {
+                "type": "date",
+                # When feedback was recorded
+            },
+            # ===================================================================
             # Document References (for "이전 1번 문서" feature)
             # ===================================================================
             "doc_refs": {
@@ -361,6 +377,9 @@ def get_chat_turns_mapping() -> dict[str, Any]:
                         # Brief content excerpt shown to user
                     },
                     "page": {
+                        "type": "integer",
+                    },
+                    "pages": {
                         "type": "integer",
                     },
                     "score": {

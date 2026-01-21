@@ -47,6 +47,7 @@ class DocRef:
     title: str
     snippet: str
     page: Optional[int] = None
+    pages: Optional[list[int]] = None
     score: Optional[float] = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -56,6 +57,7 @@ class DocRef:
             "title": self.title,
             "snippet": self.snippet,
             "page": self.page,
+            "pages": self.pages,
             "score": self.score,
         }
 
@@ -67,6 +69,7 @@ class DocRef:
             title=data.get("title", ""),
             snippet=data.get("snippet", ""),
             page=data.get("page"),
+            pages=data.get("pages"),
             score=data.get("score"),
         )
 
@@ -81,6 +84,9 @@ class ChatTurn:
     doc_refs: list[DocRef] = field(default_factory=list)
     title: Optional[str] = None  # Session title (set on first turn)
     summary: Optional[str] = None  # Turn summary for history selection
+    feedback_rating: Optional[str] = None  # "up" | "down"
+    feedback_reason: Optional[str] = None
+    feedback_ts: Optional[datetime] = None
     ts: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -95,6 +101,9 @@ class ChatTurn:
             "doc_refs": [ref.to_dict() for ref in self.doc_refs],
             "title": self.title,
             "summary": self.summary,
+            "feedback_rating": self.feedback_rating,
+            "feedback_reason": self.feedback_reason,
+            "feedback_ts": self.feedback_ts.isoformat() if self.feedback_ts else None,
             "ts": (self.ts or datetime.utcnow()).isoformat(),
             "schema_version": CHAT_TURNS_SCHEMA_VERSION,
             "created_at": self.created_at.isoformat() if self.created_at else now,
@@ -112,6 +121,9 @@ class ChatTurn:
             doc_refs=doc_refs,
             title=data.get("title"),
             summary=data.get("summary"),
+            feedback_rating=data.get("feedback_rating"),
+            feedback_reason=data.get("feedback_reason"),
+            feedback_ts=datetime.fromisoformat(data["feedback_ts"]) if data.get("feedback_ts") else None,
             ts=datetime.fromisoformat(data["ts"]) if data.get("ts") else None,
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None,
@@ -276,6 +288,35 @@ class ChatHistoryService:
             return ChatTurn.from_dict(result["_source"])
         except NotFoundError:
             return None
+
+    def update_turn_feedback(
+        self,
+        session_id: str,
+        turn_id: int,
+        *,
+        rating: str,
+        reason: Optional[str] = None,
+    ) -> ChatTurn | None:
+        """Update feedback for a specific turn."""
+        doc_id = f"{session_id}:{turn_id}"
+        now = datetime.utcnow()
+        payload = {
+            "feedback_rating": rating,
+            "feedback_reason": reason,
+            "feedback_ts": now.isoformat(),
+            "updated_at": now.isoformat(),
+        }
+        try:
+            self.es.update(
+                index=self.index,
+                id=doc_id,
+                routing=session_id,
+                body={"doc": payload},
+                refresh=True,
+            )
+        except NotFoundError:
+            return None
+        return self.get_turn(session_id, turn_id)
 
     def list_sessions(self, limit: int = 50, offset: int = 0, include_hidden: bool = False) -> list[SessionSummary]:
         """List recent chat sessions.

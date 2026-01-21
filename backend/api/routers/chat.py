@@ -48,6 +48,8 @@ class RetrievedDoc(BaseModel):
     score_percent: int
     page: int | None = None
     page_image_url: str | None = None
+    expanded_pages: List[int] | None = None
+    expanded_page_urls: List[str] | None = None
 
 
 class ChatResponse(BaseModel):
@@ -161,10 +163,37 @@ def _to_retrieved_docs(results):
         doc_id = getattr(result, "doc_id", "")
         page = None
         page_image_url = None
+        expanded_pages: List[int] | None = None
+        expanded_page_urls: List[str] | None = None
         if metadata:
             page = metadata.get("page_start") or metadata.get("page")
             if isinstance(page, int) and doc_id:
                 page_image_url = f"/api/assets/docs/{doc_id}/pages/{page}"
+            exp_pages = metadata.get("expanded_pages")
+            if exp_pages and isinstance(exp_pages, list):
+                collected: List[int] = []
+                for p in exp_pages:
+                    try:
+                        page_num = int(p)
+                    except (TypeError, ValueError):
+                        continue
+                    if page_num < 0:
+                        continue
+                    collected.append(page_num)
+                if collected:
+                    expanded_pages = sorted(set(collected))
+
+        if expanded_pages is None and isinstance(page, int):
+            expanded_pages = [page]
+
+        if expanded_pages and doc_id:
+            expanded_page_urls = [
+                f"/api/assets/docs/{doc_id}/pages/{p}" for p in expanded_pages
+            ]
+            if page is None:
+                page = expanded_pages[0]
+            if not page_image_url:
+                page_image_url = expanded_page_urls[0]
 
         docs.append(
             RetrievedDoc(
@@ -175,6 +204,8 @@ def _to_retrieved_docs(results):
                 score_percent=score_percent,
                 page=page,
                 page_image_url=page_image_url,
+                expanded_pages=expanded_pages,
+                expanded_page_urls=expanded_page_urls,
             )
         )
     return docs

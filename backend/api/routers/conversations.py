@@ -44,6 +44,7 @@ class DocRefModel(BaseModel):
     title: str = Field(..., description="Document title")
     snippet: str = Field(..., description="Content snippet")
     page: Optional[int] = Field(None, description="Page number")
+    pages: Optional[List[int]] = Field(None, description="Expanded pages")
     score: Optional[float] = Field(None, description="Relevance score")
 
 
@@ -64,6 +65,15 @@ class TurnResponse(BaseModel):
     doc_refs: List[DocRefModel]
     title: Optional[str]
     ts: str
+    feedback_rating: Optional[str] = None
+    feedback_reason: Optional[str] = None
+    feedback_ts: Optional[str] = None
+
+
+class FeedbackRequest(BaseModel):
+    """Request to save satisfaction feedback."""
+    rating: str = Field(..., description="Satisfaction rating: up/down")
+    reason: Optional[str] = Field(None, description="Reason for dissatisfaction")
 
 
 class SessionListItem(BaseModel):
@@ -154,12 +164,16 @@ async def get_session(
                         title=ref.title,
                         snippet=ref.snippet,
                         page=ref.page,
+                        pages=ref.pages,
                         score=ref.score,
                     )
                     for ref in t.doc_refs
                 ],
                 title=t.title,
                 ts=t.ts.isoformat() if t.ts else "",
+                feedback_rating=t.feedback_rating,
+                feedback_reason=t.feedback_reason,
+                feedback_ts=t.feedback_ts.isoformat() if t.feedback_ts else None,
             )
             for t in turns
         ],
@@ -188,6 +202,7 @@ async def save_turn(
             title=ref.title,
             snippet=ref.snippet,
             page=ref.page,
+            pages=ref.pages,
             score=ref.score,
         )
         for ref in req.doc_refs
@@ -212,6 +227,60 @@ async def save_turn(
         doc_refs=req.doc_refs,
         title=req.title,
         ts=turn.ts.isoformat() if turn.ts else "",
+        feedback_rating=turn.feedback_rating,
+        feedback_reason=turn.feedback_reason,
+        feedback_ts=turn.feedback_ts.isoformat() if turn.feedback_ts else None,
+    )
+
+
+@router.post("/{session_id}/turns/{turn_id}/feedback", response_model=TurnResponse)
+async def save_feedback(
+    session_id: str,
+    turn_id: int,
+    req: FeedbackRequest,
+    service: ChatHistoryService = Depends(get_chat_history_service),
+):
+    """Save satisfaction feedback for a specific turn."""
+    rating = req.rating.strip().lower()
+    if rating not in {"up", "down"}:
+        raise HTTPException(status_code=400, detail="rating must be 'up' or 'down'")
+    reason = req.reason.strip() if isinstance(req.reason, str) else None
+    if rating == "down" and not reason:
+        raise HTTPException(status_code=400, detail="reason is required for down rating")
+    if rating == "up":
+        reason = None
+
+    updated = service.update_turn_feedback(
+        session_id,
+        turn_id,
+        rating=rating,
+        reason=reason,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Session or turn not found")
+
+    return TurnResponse(
+        session_id=updated.session_id,
+        turn_id=updated.turn_id,
+        user_text=updated.user_text,
+        assistant_text=updated.assistant_text,
+        doc_refs=[
+            DocRefModel(
+                slot=ref.slot,
+                doc_id=ref.doc_id,
+                title=ref.title,
+                snippet=ref.snippet,
+                page=ref.page,
+                pages=ref.pages,
+                score=ref.score,
+            )
+            for ref in updated.doc_refs
+        ],
+        title=updated.title,
+        ts=updated.ts.isoformat() if updated.ts else "",
+        feedback_rating=updated.feedback_rating,
+        feedback_reason=updated.feedback_reason,
+        feedback_ts=updated.feedback_ts.isoformat() if updated.feedback_ts else None,
     )
 
 

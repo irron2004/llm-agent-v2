@@ -95,6 +95,7 @@ export type DocRefResponse = {
   title: string;
   snippet: string;
   page?: number | null;
+  pages?: number[] | null;
   score?: number | null;
 };
 
