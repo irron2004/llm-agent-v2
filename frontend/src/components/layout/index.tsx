@@ -443,6 +443,15 @@ function preprocessSnippet(snippet: string): string {
 
   let processed = snippet;
 
+  // Escape markdown emphasis characters to prevent unintended formatting
+  // This handles: _italic_, __bold__, *italic*, **bold**, ~~strikethrough~~
+  // Escape underscores that are part of words (e.g., file_name, __init__)
+  processed = processed.replace(/(\w)_(\w)/g, "$1\\_$2");
+  // Escape tildes for strikethrough (~~text~~)
+  processed = processed.replace(/~~/g, "\\~\\~");
+  // Escape asterisks that might trigger bold/italic (but preserve list items)
+  processed = processed.replace(/(\w)\*(\w)/g, "$1\\*$2");
+
   // Remove page_X or page_\d+ prefixes at the start
   processed = processed.replace(/^page_[X\d]+\s*/gi, "");
 
