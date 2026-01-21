@@ -238,7 +238,15 @@ class DocumentIngestService:
         # Step 6: Normalize text (for indexing, after chapter extraction)
         normalizer = get_normalizer(level="L3")
         for section in sections:
-            section.text = normalizer(section.text)
+            cleaned = self._strip_noisy_lines(section.text)
+            cleaned = normalizer(cleaned)
+            if self._is_noisy_chunk(cleaned):
+                logger.debug("Dropping noisy chunk page=%s", section.page_start)
+                section.text = ""
+                continue
+            section.text = cleaned
+
+        sections = [section for section in sections if section.text]
 
         return {
             "sections": [section.to_dict() for section in sections],
@@ -397,6 +405,65 @@ class DocumentIngestService:
         text = (value or "").replace("\r\n", "\n").replace("\r", "\n")
         text = re.sub(r"\s+", " ", text)
         return text.strip()
+
+    @staticmethod
+    def _strip_noisy_lines(text: str) -> str:
+        if not text:
+            return ""
+        lines = text.splitlines()
+        kept: List[str] = []
+        for line in lines:
+            if not line.strip():
+                continue
+            if DocumentIngestService._is_noisy_line(line):
+                continue
+            kept.append(line)
+        return "\n".join(kept).strip()
+
+    @staticmethod
+    def _is_noisy_line(line: str) -> bool:
+        stripped = line.strip()
+        if not stripped:
+            return True
+        line_len = len(stripped)
+        if line_len <= 6:
+            return False
+        alnum = sum(1 for ch in stripped if ch.isalnum())
+        alnum_ratio = alnum / max(line_len, 1)
+        pipe_count = stripped.count("|")
+        symbol_run = re.search(r"([|=_-])\1{12,}", stripped)
+        pipe_run = re.search(r"(?:\|\s*){12,}", stripped)
+
+        if pipe_run and alnum_ratio < 0.15:
+            return True
+        if symbol_run and alnum_ratio < 0.2:
+            return True
+        if pipe_count >= 10 and line_len >= 40 and alnum_ratio < 0.15:
+            return True
+        if stripped.startswith("|") and stripped.endswith("|") and alnum_ratio < 0.1:
+            return True
+        return False
+
+    @staticmethod
+    def _is_noisy_chunk(text: str) -> bool:
+        stripped = (text or "").strip()
+        if not stripped:
+            return True
+        if len(stripped) < 20:
+            return False
+        alnum = sum(1 for ch in stripped if ch.isalnum())
+        alnum_ratio = alnum / max(len(stripped), 1)
+        symbol_ratio = sum(
+            1 for ch in stripped if not ch.isalnum() and not ch.isspace()
+        ) / max(len(stripped), 1)
+
+        if symbol_ratio > 0.6 and alnum_ratio < 0.1:
+            return True
+        if re.search(r"(?:\|\s*){40,}", stripped) and alnum_ratio < 0.15:
+            return True
+        if re.search(r"([|=_-])\1{30,}", stripped) and alnum_ratio < 0.2:
+            return True
+        return False
 
     def _section_pattern(self, doc_type: str) -> re.Pattern[str]:
         token = (doc_type or "").lower()
