@@ -93,8 +93,8 @@ class TestRemainingDocsPreserved:
         # When
         result = expand_related_docs_node(state, page_fetcher=page_fetcher)
 
-        # Then: 결과에 7개 문서 모두 포함
-        assert len(result["answer_ref_json"]) == 7
+        # Then: answer_ref_json은 상위 5개만 포함
+        assert len(result["answer_ref_json"]) == min(EXPAND_TOP_K, len(docs))
 
     def test_remaining_docs_have_original_content(self):
         """6번째 이후 문서는 원본 content 유지"""
@@ -108,7 +108,7 @@ class TestRemainingDocsPreserved:
         # When
         result = expand_related_docs_node(state, page_fetcher=page_fetcher)
 
-        # Then: 모든 문서의 content 확인
+        # Then: 상위 5개 문서만 확인
         ref_json = result["answer_ref_json"]
         for i, ref in enumerate(ref_json):
             # raw_text가 있으면 raw_text, 없으면 content 사용
@@ -284,6 +284,22 @@ class TestExpansionResultFormat:
         assert "doc_id" in ref
         assert "content" in ref
 
+    def test_display_docs_merge_same_doc_id_for_myservice(self):
+        """myservice 동일 doc_id는 display_docs에서 병합"""
+        docs = [
+            _make_doc("same_doc", page=0, doc_type="myservice"),
+            _make_doc("same_doc", page=1, doc_type="myservice"),
+        ]
+        state = {"docs": docs}
+
+        doc_fetcher = MagicMock(return_value=[])
+
+        result = expand_related_docs_node(state, doc_fetcher=doc_fetcher)
+
+        display_docs = result.get("display_docs", [])
+        assert len(display_docs) == 1
+        assert display_docs[0].doc_id == "same_doc"
+
 
 class TestExpandedPagesMetadata:
     """확장된 페이지 정보가 metadata에 저장되는지 테스트"""
@@ -350,7 +366,7 @@ class TestExpandedPagesMetadata:
         assert expanded_doc.metadata["expanded_pages"] == [1, 2, 3, 5]  # sorted
 
     def test_no_expansion_no_expanded_pages(self):
-        """확장되지 않은 문서에는 expanded_pages 없음"""
+        """확장 시도 문서에는 expanded_pages가 저장됨"""
         docs = [_make_doc("doc1", page=1, doc_type="manual")]
         state = {"docs": docs}
 
@@ -362,8 +378,7 @@ class TestExpandedPagesMetadata:
 
         # Then
         doc = result["docs"][0]
-        # Original doc preserved, no expanded_pages
-        assert doc.metadata.get("expanded_pages") is None
+        assert doc.metadata.get("expanded_pages") == [1, 2, 3]
 
     def test_myservice_page_zero_expansion(self):
         """myservice 문서의 page 0도 정상적으로 확장됨"""
