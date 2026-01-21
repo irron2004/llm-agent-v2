@@ -30,63 +30,61 @@ export function DeviceSelectionPanel({
   instruction,
 }: DeviceSelectionPanelProps) {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
-  const [deviceMode, setDeviceMode] = useState<"none" | "all" | "custom">("none");
   const [selectedDocTypes, setSelectedDocTypes] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const allDevicesSelected = deviceMode === "all";
-  const customDevicesSelected = deviceMode === "custom";
-  const allDocTypesSelected = selectedDocTypes.length === 0;
+  const allDevicesSelected = devices.length > 0 && selectedDevices.length === devices.length;
+  const allDocTypesSelected = docTypes.length > 0 && selectedDocTypes.length === docTypes.length;
 
   // Filter devices by search query
   const filteredDevices = devices.filter((device) =>
     device.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+  const allFilteredSelected = filteredDevices.length > 0 && filteredDevices.every((device) =>
+    selectedDevices.includes(device.name)
+  );
 
   const handleToggleDevice = (deviceName: string) => {
-    const base = customDevicesSelected ? selectedDevices : [];
-    const next = base.includes(deviceName)
-      ? base.filter((d) => d !== deviceName)
-      : [...base, deviceName];
-    setSelectedDevices(next);
-    setDeviceMode(next.length > 0 ? "custom" : "none");
+    setSelectedDevices((prev) =>
+      prev.includes(deviceName)
+        ? prev.filter((d) => d !== deviceName)
+        : [...prev, deviceName]
+    );
   };
 
   const handleSelectAll = () => {
-    if (customDevicesSelected && selectedDevices.length === filteredDevices.length) {
-      setSelectedDevices([]);
-      setDeviceMode("none");
+    const filteredNames = filteredDevices.map((d) => d.name);
+    if (allFilteredSelected) {
+      setSelectedDevices((prev) => prev.filter((name) => !filteredNames.includes(name)));
     } else {
-      setSelectedDevices(filteredDevices.map((d) => d.name));
-      setDeviceMode("custom");
+      setSelectedDevices((prev) => Array.from(new Set([...prev, ...filteredNames])));
     }
   };
 
+  const hasSelection = (
+    (devices.length === 0 || selectedDevices.length > 0)
+    && (docTypes.length === 0 || selectedDocTypes.length > 0)
+  );
+
   const handleSubmit = () => {
-    if (deviceMode === "none" && devices.length > 0) {
+    if (!hasSelection) {
       return;
     }
-    const submitDevices = deviceMode === "all" ? [] : selectedDevices;
-    onSelect(submitDevices, selectedDocTypes);
+    onSelect(selectedDevices, selectedDocTypes);
   };
 
   // Format doc count with comma separators
   const formatDocCount = (count: number) => count.toLocaleString();
 
   // Calculate total doc count for selected devices
-  const selectedDocCount = devices
-    .filter((d) => selectedDevices.includes(d.name))
-    .reduce((sum, d) => sum + d.doc_count, 0);
   const selectedDocTypeCount = docTypes
     .filter((d) => selectedDocTypes.includes(d.name))
     .reduce((sum, d) => sum + d.doc_count, 0);
-  const totalDocTypeCount = docTypes.reduce((sum, d) => sum + d.doc_count, 0);
 
-  const hasSelection = devices.length === 0 || deviceMode !== "none";
   const selectionLabelParts: string[] = [];
   if (devices.length > 0) {
     if (allDevicesSelected) selectionLabelParts.push("전체 기기");
-    else if (selectedDevices.length > 0) selectionLabelParts.push(`기기 ${selectedDevices.length}개`);
+    else if (selectedDevices.length > 0) selectionLabelParts.push("기기 선택됨");
   }
   if (docTypes.length > 0) {
     if (allDocTypesSelected) selectionLabelParts.push("전체 문서");
@@ -120,7 +118,7 @@ export function DeviceSelectionPanel({
             기기/문서 종류 선택
           </Title>
           <Text type="secondary" style={{ fontSize: 13 }}>
-            {instruction || "검색할 기기/문서 종류를 선택하세요. 전체 선택 시 필터 없이 검색합니다."}
+            {instruction || "검색할 기기/문서 종류를 선택하세요. 기기/문서 각각 1개 이상 선택해야 합니다."}
           </Text>
         </div>
 
@@ -147,7 +145,7 @@ export function DeviceSelectionPanel({
                 문서 종류 {docTypes.length}종
                 {allDocTypesSelected ? (
                   <span style={{ color: "var(--color-accent-primary)", marginLeft: 8 }}>
-                    전체 문서 ({formatDocCount(totalDocTypeCount)} 문서)
+                    전체 문서 선택
                   </span>
                 ) : selectedDocTypes.length > 0 ? (
                   <span style={{ color: "var(--color-accent-primary)", marginLeft: 8 }}>
@@ -156,31 +154,18 @@ export function DeviceSelectionPanel({
                 ) : null}
               </Text>
             </div>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              <div
-                onClick={() => setSelectedDocTypes([])}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "6px 10px",
-                  borderRadius: 999,
-                  border: allDocTypesSelected
-                    ? "1px solid var(--color-accent-primary)"
-                    : "1px solid var(--color-border)",
-                  backgroundColor: allDocTypesSelected
-                    ? "var(--color-accent-primary-light)"
-                    : "var(--color-bg-primary)",
-                  cursor: "pointer",
-                  userSelect: "none",
+            <div style={{ marginBottom: 8 }}>
+              <Button
+                size="small"
+                type={allDocTypesSelected ? "primary" : "default"}
+                onClick={() => {
+                  setSelectedDocTypes(allDocTypesSelected ? [] : docTypes.map((d) => d.name));
                 }}
               >
-                <Checkbox checked={allDocTypesSelected} />
-                <span style={{ fontSize: 12, fontWeight: 500 }}>전체 문서</span>
-                <Text type="secondary" style={{ fontSize: 11 }}>
-                  {formatDocCount(totalDocTypeCount)}
-                </Text>
-              </div>
+                전체 문서
+              </Button>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {docTypes.map((docType) => {
                 const isSelected = selectedDocTypes.includes(docType.name);
                 return (
@@ -230,15 +215,14 @@ export function DeviceSelectionPanel({
         {/* Device count and select all */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            총 {devices.length}개 기기
-            {searchQuery && ` (${filteredDevices.length}개 일치)`}
+            기기 선택
             {allDevicesSelected ? (
               <span style={{ color: "var(--color-accent-primary)", marginLeft: 8 }}>
-                전체 기기 검색
+                전체 기기 선택
               </span>
             ) : selectedDevices.length > 0 ? (
               <span style={{ color: "var(--color-accent-primary)", marginLeft: 8 }}>
-                {selectedDevices.length}개 선택 ({formatDocCount(selectedDocCount)} 문서)
+                선택됨
               </span>
             ) : null}
           </Text>
@@ -248,8 +232,7 @@ export function DeviceSelectionPanel({
               size="small"
               icon={<GlobalOutlined />}
               onClick={() => {
-                setSelectedDevices([]);
-                setDeviceMode("all");
+                setSelectedDevices(allDevicesSelected ? [] : devices.map((d) => d.name));
               }}
             >
               전체 기기
@@ -260,7 +243,7 @@ export function DeviceSelectionPanel({
               onClick={handleSelectAll}
               style={{ padding: 0 }}
             >
-              {selectedDevices.length === filteredDevices.length ? "목록 전체 해제" : "목록 전체 선택"}
+              {allFilteredSelected ? "목록 전체 해제" : "목록 전체 선택"}
             </Button>
           </Space>
         </div>
