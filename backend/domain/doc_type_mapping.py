@@ -18,6 +18,7 @@ DOC_TYPE_GROUPS: dict[str, list[str]] = {
         "SOP/Manual/Guide",
         "SOP Appendix",
         "SOP/Set‑up Manual",
+        "generic",
     ],
     "ts": [
         "문제 해결 가이드",
@@ -35,7 +36,6 @@ DOC_TYPE_GROUPS: dict[str, list[str]] = {
     ],
     "gcb": [
         "gcb",
-        "generic",
         "maintenance",
     ],
 }
