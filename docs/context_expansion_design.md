@@ -14,7 +14,7 @@
 검색된 문서의 doc_type에 따라 컨텍스트 확장 방식을 분기한다.
 - gcb / myservice: 같은 doc_id의 모든 섹션(청크) 조회
 - 그 외 doc_type: 선택 문서의 앞뒤 ±2 페이지 청크 조회
-- 확장된 컨텍스트로 답변을 생성하고, 답변 아래 문서 목록에도 확장 결과를 표시한다
+- 확장된 컨텍스트(상위 5개)로 답변을 생성하고, 답변 아래 문서 목록에는 확장 결과 전체 페이지를 표시한다
 
 ### 1.4 현재 반영 상태
 **반영됨**
@@ -23,7 +23,8 @@
 - expand_related 노드 추가 및 answer/judge에 확장 refs 사용
 - ES helper (`fetch_doc_pages`, `fetch_doc_chunks`) 추가
 - 확장 요약 로그를 백엔드/SSE로 기록
-- 답변 이후 표시 문서 목록에 확장 결과 반영
+- 답변 이후 표시 문서 목록에 확장 대상(상위 5개) + 확장 페이지 이미지 모두 반영
+- 대화 히스토리에 확장 페이지 목록 저장 (재로드 시 동일 출력)
 
 **제거/보류**
 - context_expansion_node (rerank 기반 확장, expansion_stats, fetch_surrounding_chunks) 제거: 요구사항과 불일치
@@ -102,6 +103,7 @@ ask_user_after_retrieve_node
 expand_related_docs_node
     │
     ├── docs: List[RetrievalResult] (확장된 문서로 교체)
+    ├── display_docs: List[RetrievalResult] (UI 표시용: 확장 대상 상위 5개)
     ├── answer_ref_json: List[Dict] (답변/판정용 확장 참조)
     │
     ▼
@@ -132,6 +134,7 @@ class AgentState(TypedDict, total=False):
     selected_devices: List[str]
     device_selection_skipped: bool
     docs: List[RetrievalResult]
+    display_docs: List[RetrievalResult]
     ref_json: List[Dict[str, Any]]
     answer: str
     judge: Dict[str, Any]
@@ -193,14 +196,23 @@ def expand_related_docs_node(
         combined = combine_related_text(related)
         expanded_docs.append(as_answer_ref(doc, combined))
 
-    return {"answer_ref_json": results_to_ref_json(expanded_docs, prefer_raw_text=True)}
+    display_docs = expanded_docs[:5]
+    display_docs = merge_same_doc_id(display_docs, doc_type in {"gcb", "myservice"})
+    return {
+        "docs": expanded_docs,
+        "display_docs": display_docs,
+        "answer_ref_json": results_to_ref_json(display_docs, prefer_raw_text=True),
+    }
 ```
 
 핵심 포인트:
 - doc_type은 소문자 정규화 후 비교
 - gcb/myservice는 같은 doc_id의 전체 섹션을 결합
 - 나머지는 page 기준 ±2
-- 확장 결과는 `answer_ref_json`으로만 저장 (UI용 ref_json은 유지)
+- 확장 결과는 `answer_ref_json`(답변/판정, 상위 5개)과 `display_docs`(UI 표시, 페이지 전체)로 분리 저장
+- UI는 `expanded_pages` 기반으로 페이지 이미지를 모두 표시
+- gcb/myservice는 같은 doc_id를 병합해 1건으로 표시
+- 대화 히스토리 저장 시 doc_refs에 `pages`(expanded_pages)를 함께 저장
 
 ### 4.4 ask_user_after_retrieve_node 수정
 
