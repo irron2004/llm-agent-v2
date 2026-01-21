@@ -31,6 +31,7 @@ import numpy as np
 
 from backend.llm_infrastructure.retrieval.base import BaseRetriever, RetrievalResult
 from backend.llm_infrastructure.retrieval.registry import register_retriever
+from backend.llm_infrastructure.text_quality import is_noisy_chunk, strip_noisy_lines
 
 if TYPE_CHECKING:
     from backend.llm_infrastructure.embedding.base import BaseEmbedder
@@ -44,6 +45,23 @@ def _l2_normalize(vec: np.ndarray, eps: float = 1e-12) -> np.ndarray:
     norm = np.linalg.norm(vec)
     norm = max(norm, eps)
     return vec / norm
+
+
+def _filter_noisy_results(results: list[RetrievalResult]) -> list[RetrievalResult]:
+    if not results:
+        return results
+    filtered: list[RetrievalResult] = []
+    dropped = 0
+    for result in results:
+        text = result.raw_text or result.content or ""
+        cleaned = strip_noisy_lines(text)
+        if not cleaned or is_noisy_chunk(cleaned):
+            dropped += 1
+            continue
+        filtered.append(result)
+    if dropped:
+        logger.debug("Filtered %d noisy ES chunks", dropped)
+    return filtered
 
 
 @register_retriever("es_hybrid", version="v1")
@@ -164,7 +182,8 @@ class EsHybridRetriever(BaseRetriever):
         )
 
         # Convert to RetrievalResult
-        return [hit.to_retrieval_result() for hit in hits]
+        results = [hit.to_retrieval_result() for hit in hits]
+        return _filter_noisy_results(results)
 
     def _embed_query(self, query: str) -> list[float]:
         """Embed query text to vector."""
@@ -259,7 +278,8 @@ class EsDenseRetriever(BaseRetriever):
             filters=filters,
         )
 
-        return [hit.to_retrieval_result() for hit in hits]
+        results = [hit.to_retrieval_result() for hit in hits]
+        return _filter_noisy_results(results)
 
     def _embed_query(self, query: str) -> list[float]:
         """Embed query text to vector."""

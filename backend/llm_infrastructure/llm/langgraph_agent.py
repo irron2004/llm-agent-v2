@@ -627,18 +627,18 @@ def retrieve_node(
     *,
     retriever: Retriever,
     reranker: Any = None,
-    retrieval_top_k: int = 30,
+    retrieval_top_k: int = 20,
     final_top_k: int = 10,
 ) -> Dict[str, Any]:
     """Retrieve documents with dual search strategy and rerank.
 
     If devices are selected:
-      - Search 1: 30 docs filtered by selected devices (OR filter)
-      - Search 2: 30 docs without filter (general search)
+      - Search 1: 20 docs filtered by selected devices (OR filter)
+      - Search 2: 20 docs without filter (general search)
       - Combine and rerank to get final 10 docs
 
     If no devices selected:
-      - Search 60 docs without filter
+      - Search 20 docs without filter
       - Rerank to get final 10 docs
     """
     queries = state.get("search_queries", [state["query"]])
@@ -653,6 +653,8 @@ def retrieve_node(
     selected_doc_type_set = {
         _normalize_doc_type(dt) for dt in selected_doc_type_filters if _normalize_doc_type(dt)
     }
+
+    candidate_k = max(retrieval_top_k, final_top_k * 2, 20)
 
     all_docs: List[RetrievalResult] = []
     seen: set = set()
@@ -691,7 +693,7 @@ def retrieve_node(
         for q in queries:
             device_docs = retriever.retrieve(
                 q,
-                top_k=retrieval_top_k,
+                top_k=candidate_k,
                 device_names=selected_devices,
                 doc_types=selected_doc_type_filters,
             )
@@ -700,11 +702,11 @@ def retrieve_node(
         device_filtered_count = len(all_docs)
         logger.info("retrieve_node: device-filtered search found %d docs", device_filtered_count)
 
-        # Search 2: General search without device filter (30 docs)
+        # Search 2: General search without device filter (20 docs)
         for q in queries:
             general_docs = retriever.retrieve(
                 q,
-                top_k=retrieval_top_k,
+                top_k=candidate_k,
                 doc_types=selected_doc_type_filters,
             )
             _add_docs(general_docs, filter_devices=False)
@@ -717,12 +719,14 @@ def retrieve_node(
         for q in queries:
             docs = retriever.retrieve(
                 q,
-                top_k=retrieval_top_k * 2,
+                top_k=candidate_k,
                 doc_types=selected_doc_type_filters,
             )
             _add_docs(docs, filter_devices=False)
 
     logger.info("retrieve_node: collected %d unique docs before rerank", len(all_docs))
+    if len(all_docs) > candidate_k:
+        all_docs = sorted(all_docs, key=lambda d: d.score, reverse=True)[:candidate_k]
 
     # Rerank if reranker is available
     if reranker is not None and all_docs:
