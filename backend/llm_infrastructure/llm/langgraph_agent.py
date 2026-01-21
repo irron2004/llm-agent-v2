@@ -241,48 +241,111 @@ def _parse_gate(text: str) -> Gate:
 def _parse_queries(text: str) -> List[str]:
     """Robust parser: JSON object/list or one-per-line strings."""
     t = text.strip()
+    if not t:
+        return []
 
-    try:
-        obj = json.loads(t)
-        if isinstance(obj, dict) and isinstance(obj.get("queries"), list):
-            qs = [str(x).strip() for x in obj["queries"] if str(x).strip()]
-            return qs[:5]
+    # Strip common code-fence wrappers.
+    t = re.sub(r"```[a-zA-Z]*", "", t).strip()
+
+    def _extract_queries(obj: Any) -> List[str]:
+        if isinstance(obj, dict):
+            for key in ("queries", "search_queries"):
+                if isinstance(obj.get(key), list):
+                    return [str(x).strip() for x in obj[key] if str(x).strip()]
         if isinstance(obj, list):
-            qs = [str(x).strip() for x in obj if str(x).strip()]
-            return qs[:5]
-    except Exception:
-        pass
+            return [str(x).strip() for x in obj if str(x).strip()]
+        return []
+
+    # Try to parse JSON directly or from an embedded snippet.
+    candidates = [t]
+    obj_match = re.search(r"\{.*\}", t, flags=re.S)
+    list_match = re.search(r"\[.*\]", t, flags=re.S)
+    if obj_match:
+        candidates.append(obj_match.group(0))
+    if list_match:
+        candidates.append(list_match.group(0))
+    for candidate in candidates:
+        try:
+            obj = json.loads(candidate)
+        except Exception:
+            continue
+        qs = _extract_queries(obj)
+        if qs:
+            return _dedupe_queries(qs)
 
     if t.startswith("[") and t.endswith("]"):
         items = re.findall(r'"([^"]+)"', t)
         qs = [i.strip() for i in items if i.strip()]
         if qs:
-            return qs[:5]
+            return _dedupe_queries(qs)
 
-    if '"queries"' in t:
+    if '"queries"' in t or '"search_queries"' in t:
         items = re.findall(r'"([^"]+)"', t)
-        qs = [i.strip() for i in items if i.strip() and i.strip().lower() != "queries"]
+        qs = [
+            i.strip()
+            for i in items
+            if i.strip() and i.strip().lower() not in {"queries", "search_queries"}
+        ]
         if qs:
-            return qs[:5]
+            return _dedupe_queries(qs)
 
-    # Filter out meta-explanation lines (English prompt patterns)
-    lines = [ln.strip() for ln in t.splitlines() if ln.strip()]
-    filtered = []
-    for line in lines:
+    def _is_meta_line(line: str) -> bool:
         lower = line.lower()
-        # Skip lines that look like prompt/explanation patterns
         if any(pattern in lower for pattern in [
             "given original", "they want", "from mq:", "we need", "could be:",
             "example output", "example input", "output only", "no explanations",
-            "# ", "q1:", "q2:", "q3:", "query generation", "output format"
+            "query generation", "output format",
         ]):
-            continue
-        # Skip numbered lines like "1.", "2.", "3."
-        if re.match(r'^\d+[\.\)]\s', line):
-            continue
-        filtered.append(line)
+            return True
+        if lower.startswith(("output:", "example:", "format:", "input:")):
+            return True
+        return False
 
-    return filtered[:5]
+    def _strip_prefix(line: str) -> str:
+        cleaned = line.strip()
+        cleaned = re.sub(r"^[-*•]\s+", "", cleaned)
+        cleaned = re.sub(r"^(?:q\d+|\d+)\s*[:\.\)\-]\s*", "", cleaned, flags=re.I)
+        cleaned = cleaned.strip().strip("\"'`").strip()
+        cleaned = re.sub(r"[;,，]\s*$", "", cleaned).strip()
+        return cleaned
+
+    # Filter out meta-explanation lines and clean numbered/bulleted outputs.
+    lines = [ln.strip() for ln in t.splitlines() if ln.strip()]
+    filtered: List[str] = []
+    for line in lines:
+        if _is_meta_line(line):
+            continue
+        if line.startswith(("{", "[")):
+            continue
+        cleaned = _strip_prefix(line)
+        if cleaned:
+            filtered.append(cleaned)
+
+    if len(filtered) == 1:
+        single = filtered[0]
+        for delim in (" / ", " | ", ";", "；"):
+            if delim in single:
+                split_items = [part.strip() for part in single.split(delim) if part.strip()]
+                if len(split_items) > 1:
+                    filtered = split_items
+                break
+
+    return _dedupe_queries(filtered)
+
+
+def _dedupe_queries(queries: List[str]) -> List[str]:
+    seen: set[str] = set()
+    deduped: List[str] = []
+    for q in queries:
+        normalized = q.strip()
+        if not normalized:
+            continue
+        key = normalized.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(normalized)
+    return deduped[:5]
 
 
 # -----------------------------
@@ -362,6 +425,76 @@ def _extract_page_value(metadata: Dict[str, Any] | None) -> int | None:
         return None
     # Allow page 0 (valid for myservice docs)
     return page_num if page_num >= 0 else None
+
+
+def _extract_expanded_pages(metadata: Dict[str, Any] | None) -> list[int]:
+    if not isinstance(metadata, dict):
+        return []
+    raw_pages = metadata.get("expanded_pages")
+    if not isinstance(raw_pages, list):
+        return []
+    pages: list[int] = []
+    for page in raw_pages:
+        try:
+            page_num = int(page)
+        except (TypeError, ValueError):
+            continue
+        if page_num < 0:
+            continue
+        pages.append(page_num)
+    return sorted(set(pages))
+
+
+def _merge_display_docs(docs: List[RetrievalResult]) -> List[RetrievalResult]:
+    merged: List[RetrievalResult] = []
+    index_by_doc_id: Dict[str, int] = {}
+
+    for doc in docs:
+        meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+        doc_type = _normalize_doc_type(meta.get("doc_type"))
+        if doc_type not in DOC_TYPES_SAME_DOC:
+            merged.append(doc)
+            continue
+
+        doc_id = doc.doc_id
+        if doc_id not in index_by_doc_id:
+            index_by_doc_id[doc_id] = len(merged)
+            merged.append(doc)
+            continue
+
+        idx = index_by_doc_id[doc_id]
+        base = merged[idx]
+        base_meta = base.metadata if isinstance(base.metadata, dict) else {}
+        doc_meta = meta if isinstance(meta, dict) else {}
+        pages = _extract_expanded_pages(base_meta) + _extract_expanded_pages(doc_meta)
+        merged_pages = sorted(set(pages)) if pages else []
+
+        merged_meta = dict(base_meta)
+        for key, value in doc_meta.items():
+            if key not in merged_meta:
+                merged_meta[key] = value
+        if merged_pages:
+            merged_meta["expanded_pages"] = merged_pages
+
+        base_raw = base.raw_text or base.content or ""
+        doc_raw = doc.raw_text or doc.content or ""
+        raw_text = doc_raw if len(doc_raw) > len(base_raw) else base_raw
+
+        base_content = base.content or ""
+        doc_content = doc.content or ""
+        content = doc_content if len(doc_content) > len(base_content) else base_content
+
+        score = max(base.score, doc.score)
+
+        merged[idx] = RetrievalResult(
+            doc_id=base.doc_id,
+            content=content,
+            score=score,
+            metadata=merged_meta,
+            raw_text=raw_text,
+        )
+
+    return merged
 
 
 def _combine_related_text(docs: List[RetrievalResult]) -> str:
@@ -635,7 +768,20 @@ def expand_related_docs_node(
                 )
                 continue
 
-        expanded_docs.append(doc)
+        if expanded_pages:
+            updated_meta = dict(meta) if meta else {}
+            updated_meta["expanded_pages"] = expanded_pages
+            expanded_docs.append(
+                RetrievalResult(
+                    doc_id=doc.doc_id,
+                    content=doc.content,
+                    score=doc.score,
+                    metadata=updated_meta,
+                    raw_text=doc.raw_text,
+                )
+            )
+        else:
+            expanded_docs.append(doc)
 
     summary = (
         "expand_related: total_docs=%d expand_top_k=%d same_doc_targets=%d "
@@ -652,12 +798,12 @@ def expand_related_docs_node(
     )
     logger.info(summary)
 
-    display_docs = expanded_docs[:min(total_docs, max_expand)]
+    display_docs = _merge_display_docs(expanded_docs[:min(total_docs, max_expand)])
     return {
         "docs": expanded_docs,
         "display_docs": display_docs,
         "answer_ref_json": results_to_ref_json(
-            expanded_docs,
+            display_docs,
             max_chars=max_ref_chars,
             prefer_raw_text=True,
         ),
