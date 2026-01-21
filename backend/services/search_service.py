@@ -220,6 +220,7 @@ class SearchService:
         rerank_top_k: Optional[int] = None,
         device_name: Optional[str] = None,
         device_names: Optional[list[str]] = None,
+        doc_types: Optional[list[str]] = None,
     ) -> list[RetrievalResult]:
         """Search for relevant documents with optional multi-query expansion and reranking.
 
@@ -286,6 +287,16 @@ class SearchService:
             rerank_k = rerank_top_k or self.rerank_top_k or final_top_k
             logger.debug(f"Reranking {len(results)} results to top_k={rerank_k}")
             results = self.reranker.rerank(query, results, top_k=rerank_k)
+
+        if doc_types:
+            normalized = {str(dt).strip().lower() for dt in doc_types if str(dt).strip()}
+
+            def _matches_doc_type(doc: RetrievalResult) -> bool:
+                meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+                doc_type = str(meta.get("doc_type", "")).strip().lower()
+                return bool(doc_type) and doc_type in normalized
+
+            results = [doc for doc in results if _matches_doc_type(doc)]
 
         # Limit to final top_k
         return results[:final_top_k]

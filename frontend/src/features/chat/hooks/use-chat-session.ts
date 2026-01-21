@@ -31,6 +31,11 @@ type DeviceInfo = {
   doc_count: number;
 };
 
+type DocTypeInfo = {
+  name: string;
+  doc_count: number;
+};
+
 type FeedbackPayload = {
   messageId: string;
   sessionId?: string;
@@ -45,6 +50,7 @@ type PendingInterrupt = {
   instruction: string;
   docs: ReviewDoc[];
   devices?: DeviceInfo[];
+  docTypes?: DocTypeInfo[];
   kind: InterruptKind;
   payload?: Record<string, unknown> | null;
 };
@@ -209,12 +215,18 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           metadata: doc.metadata ?? null,
         }));
 
-        // Extract devices for device_selection interrupt
+        // Extract devices/doc types for device_selection interrupt
         const devices: DeviceInfo[] = Array.isArray(payload?.devices)
           ? payload.devices.map((d: any) => ({
               name: typeof d?.name === "string" ? d.name : "",
               doc_count: typeof d?.doc_count === "number" ? d.doc_count : 0,
             })).filter((d: DeviceInfo) => d.name)
+          : [];
+        const docTypes: DocTypeInfo[] = Array.isArray(payload?.doc_types)
+          ? payload.doc_types.map((d: any) => ({
+              name: typeof d?.name === "string" ? d.name : "",
+              doc_count: typeof d?.doc_count === "number" ? d.doc_count : 0,
+            })).filter((d: DocTypeInfo) => d.name)
           : [];
 
         if (threadId) {
@@ -224,6 +236,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
             instruction,
             docs,
             devices: kind === "device_selection" ? devices : undefined,
+            docTypes: kind === "device_selection" ? docTypes : undefined,
             kind,
             payload,
           });
@@ -498,27 +511,35 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   );
 
   const submitDeviceSelection = useCallback(
-    (selectedDevices: string[]) => {
+    (selectedDevices: string[], selectedDocTypes: string[]) => {
       if (!pendingInterrupt || pendingInterrupt.kind !== "device_selection") return;
 
       setPendingInterrupt(null);
 
-      if (selectedDevices.length === 0) {
-        // Skip device selection - search all documents
+      const hasDevices = selectedDevices.length > 0;
+      const hasDocTypes = selectedDocTypes.length > 0;
+
+      if (!hasDevices && !hasDocTypes) {
+        // Skip selections - search all documents
         send({
           text: "전체 문서에서 검색",
           decisionOverride: "skip",
         });
-      } else {
-        // Send selected devices as array
-        send({
-          text: `기기 선택: ${selectedDevices.join(", ")}`,
-          decisionOverride: {
-            type: "device_selection",
-            selected_devices: selectedDevices,
-          },
-        });
+        return;
       }
+
+      const summaryParts: string[] = [];
+      if (hasDevices) summaryParts.push(`기기: ${selectedDevices.join(", ")}`);
+      if (hasDocTypes) summaryParts.push(`문서: ${selectedDocTypes.join(", ")}`);
+
+      send({
+        text: summaryParts.length > 0 ? `선택: ${summaryParts.join(" / ")}` : "선택 조건 검색",
+        decisionOverride: {
+          type: "device_selection",
+          selected_devices: selectedDevices,
+          selected_doc_types: selectedDocTypes,
+        },
+      });
     },
     [pendingInterrupt, send]
   );

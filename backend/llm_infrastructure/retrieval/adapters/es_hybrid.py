@@ -100,6 +100,7 @@ class EsHybridRetriever(BaseRetriever):
         tenant_id: str | None = None,
         project_id: str | None = None,
         doc_type: str | None = None,
+        doc_types: list[str] | None = None,
         lang: str | None = None,
         device_name: str | None = None,
         device_names: list[str] | None = None,
@@ -143,6 +144,7 @@ class EsHybridRetriever(BaseRetriever):
             tenant_id=tenant_id,
             project_id=project_id,
             doc_type=doc_type,
+            doc_types=doc_types,
             lang=lang,
             device_names=device_names,
         )
@@ -221,6 +223,7 @@ class EsDenseRetriever(BaseRetriever):
         tenant_id: str | None = None,
         project_id: str | None = None,
         doc_type: str | None = None,
+        doc_types: list[str] | None = None,
         lang: str | None = None,
         **kwargs: Any,
     ) -> list[RetrievalResult]:
@@ -245,6 +248,7 @@ class EsDenseRetriever(BaseRetriever):
             tenant_id=tenant_id,
             project_id=project_id,
             doc_type=doc_type,
+            doc_types=doc_types,
             lang=lang,
         )
 

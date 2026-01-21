@@ -9,20 +9,28 @@ type DeviceInfo = {
   doc_count: number;
 };
 
+type DocTypeInfo = {
+  name: string;
+  doc_count: number;
+};
+
 type DeviceSelectionPanelProps = {
   question: string;
   devices: DeviceInfo[];
-  onSelect: (devices: string[]) => void;  // Changed to array
+  docTypes?: DocTypeInfo[];
+  onSelect: (devices: string[], docTypes: string[]) => void;
   instruction?: string;
 };
 
 export function DeviceSelectionPanel({
   question,
   devices,
+  docTypes = [],
   onSelect,
   instruction,
 }: DeviceSelectionPanelProps) {
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
+  const [selectedDocTypes, setSelectedDocTypes] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Filter devices by search query
@@ -47,11 +55,11 @@ export function DeviceSelectionPanel({
   };
 
   const handleSubmit = () => {
-    onSelect(selectedDevices);
+    onSelect(selectedDevices, selectedDocTypes);
   };
 
   const handleSkip = () => {
-    onSelect([]);  // Empty array means search all
+    onSelect([], selectedDocTypes);
   };
 
   // Format doc count with comma separators
@@ -61,6 +69,25 @@ export function DeviceSelectionPanel({
   const selectedDocCount = devices
     .filter((d) => selectedDevices.includes(d.name))
     .reduce((sum, d) => sum + d.doc_count, 0);
+  const selectedDocTypeCount = docTypes
+    .filter((d) => selectedDocTypes.includes(d.name))
+    .reduce((sum, d) => sum + d.doc_count, 0);
+
+  const hasSelection = selectedDevices.length > 0 || selectedDocTypes.length > 0;
+  const selectionLabelParts: string[] = [];
+  if (selectedDevices.length > 0) selectionLabelParts.push(`기기 ${selectedDevices.length}개`);
+  if (selectedDocTypes.length > 0) selectionLabelParts.push(`문서 ${selectedDocTypes.length}종`);
+  const selectionLabel = selectionLabelParts.length > 0
+    ? ` (${selectionLabelParts.join(", ")})`
+    : "";
+
+  const handleToggleDocType = (docTypeName: string) => {
+    setSelectedDocTypes((prev) =>
+      prev.includes(docTypeName)
+        ? prev.filter((d) => d !== docTypeName)
+        : [...prev, docTypeName]
+    );
+  };
 
   return (
     <Card
@@ -75,10 +102,10 @@ export function DeviceSelectionPanel({
         <div>
           <Title level={5} style={{ margin: 0, marginBottom: 4 }}>
             <LaptopOutlined style={{ marginRight: 8 }} />
-            기기 선택
+            기기/문서 종류 선택
           </Title>
           <Text type="secondary" style={{ fontSize: 13 }}>
-            {instruction || "검색할 기기를 선택하세요. 선택한 기기 문서 10개 + 전체 문서 10개를 검색합니다."}
+            {instruction || "검색할 기기/문서 종류를 선택하세요. 선택한 기기 문서 10개 + 전체 문서 10개를 검색합니다."}
           </Text>
         </div>
 
@@ -90,6 +117,60 @@ export function DeviceSelectionPanel({
         }}>
           <Text strong>질문:</Text> {question}
         </div>
+
+        {docTypes.length > 0 && (
+          <div
+            style={{
+              backgroundColor: "var(--color-bg-tertiary)",
+              padding: "10px 12px",
+              borderRadius: 8,
+              border: "1px solid var(--color-border)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                문서 종류 {docTypes.length}종
+                {selectedDocTypes.length > 0 && (
+                  <span style={{ color: "var(--color-accent-primary)", marginLeft: 8 }}>
+                    {selectedDocTypes.length}종 선택 ({formatDocCount(selectedDocTypeCount)} 문서)
+                  </span>
+                )}
+              </Text>
+            </div>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {docTypes.map((docType) => {
+                const isSelected = selectedDocTypes.includes(docType.name);
+                return (
+                  <div
+                    key={docType.name}
+                    onClick={() => handleToggleDocType(docType.name)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 6,
+                      padding: "6px 10px",
+                      borderRadius: 999,
+                      border: isSelected
+                        ? "1px solid var(--color-accent-primary)"
+                        : "1px solid var(--color-border)",
+                      backgroundColor: isSelected
+                        ? "var(--color-accent-primary-light)"
+                        : "var(--color-bg-primary)",
+                      cursor: "pointer",
+                      userSelect: "none",
+                    }}
+                  >
+                    <Checkbox checked={isSelected} />
+                    <span style={{ fontSize: 12, fontWeight: 500 }}>{docType.name}</span>
+                    <Text type="secondary" style={{ fontSize: 11 }}>
+                      {formatDocCount(docType.doc_count)}
+                    </Text>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Search input - shown when there are many devices */}
         {devices.length > 10 && (
@@ -175,14 +256,14 @@ export function DeviceSelectionPanel({
             icon={<GlobalOutlined />}
             onClick={handleSkip}
           >
-            전체 기기 검색
+            기기 선택 건너뛰기
           </Button>
           <Button
             type="primary"
             onClick={handleSubmit}
-            disabled={selectedDevices.length === 0}
+            disabled={!hasSelection}
           >
-            선택한 기기로 검색 ({selectedDevices.length}개)
+            선택한 조건으로 검색{selectionLabel}
           </Button>
         </div>
       </Space>
