@@ -7,11 +7,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from backend.api.dependencies import (
     get_chat_service,
-    get_rag_service,
+    get_default_llm,
+    get_prompt_spec_cached,
+    get_search_service,
     get_simple_chat_prompt,
 )
+from backend.services.agents.langgraph_rag_agent import LangGraphRAGAgent
 from backend.services.chat_service import ChatService
-from backend.services.rag_service import RAGService
+from backend.services.search_service import SearchService
 
 router = APIRouter(prefix="/chat", tags=["Chat Service"])
 
@@ -37,7 +40,7 @@ class ChatRequest(BaseModel):
 
     message: str = Field(..., description="사용자 질문")
     history: List[HistoryMessage] = Field(default_factory=list, description="대화 히스토리")
-    top_k: int = Field(default=3, ge=1, description="검색할 문서 수")
+    top_k: int = Field(default=10, ge=1, description="검색할 문서 수")
 
 
 class RetrievedDoc(BaseModel):
@@ -103,36 +106,43 @@ async def simple_chat(
 @router.post("/retrieval", response_model=ChatResponse)
 async def retrieval_chat(
     req: ChatRequest,
-    rag_service: RAGService = Depends(get_rag_service),
+    search_service: SearchService = Depends(get_search_service),
+    llm=Depends(get_default_llm),
+    prompt_spec=Depends(get_prompt_spec_cached),
 ):
-    """RAG 기반 질문 응답 API (검색 + 답변)."""
+    """LangGraph 기반 질문 응답 API (검색 + 답변, HIL 없음)."""
+    if not hasattr(search_service, "search"):
+        raise HTTPException(status_code=503, detail="Search service not configured")
+
     try:
-        history_payload = [msg.model_dump() for msg in req.history]
-        rag_response = rag_service.query(
-            req.message,
+        agent = LangGraphRAGAgent(
+            llm=llm,
+            search_service=search_service,
+            prompt_spec=prompt_spec,
             top_k=req.top_k,
-            history=history_payload,
+            mode="base",
+            ask_user_after_retrieve=False,
+            ask_device_selection=False,
+            checkpointer=None,
         )
+        result = agent.run(req.message, attempts=0, max_attempts=0, thread_id=None)
 
-        retrieved_docs = _to_retrieved_docs(rag_response.context)
+        display_docs = result.get("display_docs") or result.get("docs") or []
+        retrieved_docs = _to_retrieved_docs(display_docs)
         follow_ups = _generate_follow_ups(req.message)
-
-        clean_query = (
-            rag_response.metadata.get("preprocessed_query", req.message)
-            if rag_response.metadata
-            else req.message
-        )
 
         return ChatResponse(
             query=req.message,
-            clean_query=clean_query,
-            answer=rag_response.answer,
+            clean_query=req.message,
+            answer=result.get("answer", ""),
             retrieved_docs=retrieved_docs,
             follow_ups=follow_ups,
             metadata={
                 "num_results": len(retrieved_docs),
                 "top_k": req.top_k,
-                "history_len": len(history_payload),
+                "route": result.get("route"),
+                "st_gate": result.get("st_gate"),
+                "search_queries": result.get("search_queries", []),
             },
         )
 

@@ -53,7 +53,7 @@ def _create_device_fetcher(search_service):
                 "devices": {
                     "terms": {
                         "field": "device_name",
-                        "size": 10,  # Top 10 devices only
+                        "size": 200,
                         "order": {"_count": "desc"},
                     }
                 },
@@ -89,13 +89,13 @@ def _get_hil_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent:
     """HIL용 싱글톤 에이전트. 동일한 graph 인스턴스로 interrupt/resume 보장."""
     global _hil_agent
     if _hil_agent is None:
-        from backend.config.settings import rag_settings
-        logger.info("Creating HIL agent singleton with top_k=%d", rag_settings.retrieval_top_k)
+        logger.info("Creating HIL agent singleton with top_k=20 retrieval_top_k=50")
         _hil_agent = LangGraphRAGAgent(
             llm=llm,
             search_service=search_service,
             prompt_spec=prompt_spec,
-            top_k=rag_settings.retrieval_top_k,
+            top_k=20,
+            retrieval_top_k=50,
             mode="verified",
             ask_user_after_retrieve=True,
             ask_device_selection=True,

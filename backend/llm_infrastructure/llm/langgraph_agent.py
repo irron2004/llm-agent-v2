@@ -566,16 +566,19 @@ def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, A
     if route == "setup":
         user = _format_prompt(spec.setup_mq.user, {"sys.query": q})
         raw = _invoke_llm(llm, spec.setup_mq.system, user, **mq_kwargs)
+        logger.info("mq_node(setup): raw output=%s", raw)
         setup_mq_list = _parse_queries(raw)
         logger.info("mq_node(setup): generated %d queries: %s", len(setup_mq_list), setup_mq_list)
     elif route == "ts":
         user = _format_prompt(spec.ts_mq.user, {"sys.query": q})
         raw = _invoke_llm(llm, spec.ts_mq.system, user, **mq_kwargs)
+        logger.info("mq_node(ts): raw output=%s", raw)
         ts_mq_list = _parse_queries(raw)
         logger.info("mq_node(ts): generated %d queries: %s", len(ts_mq_list), ts_mq_list)
     else:
         user = _format_prompt(spec.general_mq.user, {"sys.query": q})
         raw = _invoke_llm(llm, spec.general_mq.system, user, **mq_kwargs)
+        logger.info("mq_node(general): raw output=%s", raw)
         general_mq_list = _parse_queries(raw)
         logger.info("mq_node(general): generated %d queries: %s", len(general_mq_list), general_mq_list)
 
@@ -614,6 +617,7 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     }
     user = _format_prompt(spec.st_mq.user, mapping)
     raw = _invoke_llm(llm, spec.st_mq.system, user)
+    logger.info("st_mq_node: raw output=%s", raw)
     queries = _parse_queries(raw)
 
     q0 = state["query"].strip()
@@ -633,13 +637,13 @@ def retrieve_node(
     """Retrieve documents with dual search strategy and rerank.
 
     If devices are selected:
-      - Search 1: 20 docs filtered by selected devices (OR filter)
-      - Search 2: 20 docs without filter (general search)
-      - Combine and rerank to get final 10 docs
+      - Search 1: retrieval_top_k docs filtered by selected devices (OR filter)
+      - Search 2: retrieval_top_k docs without filter (general search)
+      - Combine and rerank to get final_top_k docs
 
     If no devices selected:
-      - Search 20 docs without filter
-      - Rerank to get final 10 docs
+      - Search retrieval_top_k docs without filter
+      - Rerank to get final_top_k docs
     """
     queries = state.get("search_queries", [state["query"]])
     selected_devices = state.get("selected_devices", [])
@@ -1184,9 +1188,9 @@ def device_selection_node(
         "doc_type_count": len(available_doc_types),
         "instruction": (
             "검색할 기기/문서 종류를 선택하세요 (다중 선택 가능).\n"
-            "- 전체 기기: 기기 필터 없이 전체에서 검색\n"
-            "- 문서 종류 선택: 선택한 문서 종류로 검색 범위 제한\n"
-            "- 전체 문서: 문서 종류 필터 없이 검색"
+            "- 기기/문서 각각 최소 1개 선택 필요\n"
+            "- 전체 기기: 모든 기기 선택\n"
+            "- 전체 문서: 모든 문서 종류 선택"
         ),
     }
 
