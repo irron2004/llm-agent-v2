@@ -83,7 +83,7 @@ def expand_doc_type_selection(selected: Iterable[str]) -> list[str]:
     return _dedupe(expanded)
 
 
-def group_doc_type_buckets(buckets: Iterable[dict]) -> list[dict]:
+def group_doc_type_buckets(buckets: Iterable[dict], use_unique_docs: bool = False) -> list[dict]:
     counts = {name: 0 for name in _GROUP_ORDER}
     for bucket in buckets or []:
         key = bucket.get("key")
@@ -92,7 +92,12 @@ def group_doc_type_buckets(buckets: Iterable[dict]) -> list[dict]:
         normalized = normalize_doc_type(str(key))
         for group_name, variants in _GROUP_VARIANTS_NORMALIZED.items():
             if normalized in variants:
-                counts[group_name] += int(bucket.get("doc_count", 0))
+                # Use unique doc count if available and requested
+                if use_unique_docs:
+                    count = bucket.get("unique_docs", {}).get("value", bucket.get("doc_count", 0))
+                else:
+                    count = bucket.get("doc_count", 0)
+                counts[group_name] += int(count)
                 break
     return [{"name": name, "doc_count": counts[name]} for name in _GROUP_ORDER]
 

@@ -59,7 +59,7 @@ async def list_devices(
     es = search_service.es_engine.es
     index = search_service.es_engine.index_name
 
-    # Terms aggregation on device_name field
+    # Terms aggregation on device_name field with cardinality sub-aggregation for unique doc_id count
     agg_query = {
         "size": 0,
         "aggs": {
@@ -68,6 +68,13 @@ async def list_devices(
                     "field": "device_name",
                     "size": limit,
                     "order": {"_count": "desc"},
+                },
+                "aggs": {
+                    "unique_docs": {
+                        "cardinality": {
+                            "field": "doc_id"
+                        }
+                    }
                 }
             }
         }
@@ -78,7 +85,10 @@ async def list_devices(
         buckets = result.get("aggregations", {}).get("devices", {}).get("buckets", [])
 
         devices = [
-            DeviceInfo(name=bucket["key"], doc_count=bucket["doc_count"])
+            DeviceInfo(
+                name=bucket["key"],
+                doc_count=bucket.get("unique_docs", {}).get("value", bucket["doc_count"])
+            )
             for bucket in buckets
             if bucket["key"]  # Filter out empty device names
         ]
