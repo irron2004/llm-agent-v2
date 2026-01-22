@@ -225,14 +225,23 @@ function ReviewPanelContent({
   // 모든 문서를 미리보기 배열로 생성 (이미지 또는 텍스트)
   // content는 항상 포함 (이미지 로드 실패 시 대체용)
   const previewImages: ImagePreviewItem[] = useMemo(() => {
-    return pendingReview.docs.map((doc) => ({
-      url: hasValidImageUrl(doc.page_image_url) ? doc.page_image_url : undefined,
-      content: doc.content || undefined,
-      title: doc.title || undefined,
-      page: doc.page || undefined,
-      docId: doc.docId,
-      rank: doc.rank,
-    }));
+    return pendingReview.docs.map((doc) => {
+      // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
+      const docType = (doc.metadata as Record<string, unknown>)?.doc_type as string | undefined;
+      const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
+      const displayTitle = isSpecialDocType
+        ? `${docType}_${doc.docId}`
+        : (doc.title || undefined);
+
+      return {
+        url: hasValidImageUrl(doc.page_image_url) ? doc.page_image_url : undefined,
+        content: doc.content || undefined,
+        title: displayTitle,
+        page: doc.page || undefined,
+        docId: doc.docId,
+        rank: doc.rank,
+      };
+    });
   }, [pendingReview.docs]);
 
   const handleDocClick = (docIndex: number) => {
@@ -361,7 +370,15 @@ function ReviewPanelContent({
             </span>
           </div>
           <div className="review-docs">
-            {pendingReview.docs.map((doc, idx) => (
+            {pendingReview.docs.map((doc, idx) => {
+              // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
+              const docType = (doc.metadata as Record<string, unknown>)?.doc_type as string | undefined;
+              const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
+              const displayTitle = isSpecialDocType
+                ? `${docType}_${doc.docId}`
+                : (doc.title || `문서 ${doc.rank ?? idx + 1}`);
+
+              return (
               <label key={`${doc.rank}-${doc.docId}`} className="review-doc">
                 <input
                   type="checkbox"
@@ -370,7 +387,7 @@ function ReviewPanelContent({
                 />
                 <div className="review-doc-body">
                   <div className="review-doc-title">
-                    {doc.title || `문서 ${doc.rank ?? idx + 1}`}
+                    {displayTitle}
                     {doc.page && <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, color: "var(--color-text-secondary)" }}>p.{doc.page}</span>}
                   </div>
                   <div className="review-doc-content-wrapper" style={{ position: "relative" }}>
@@ -441,7 +458,7 @@ function ReviewPanelContent({
                   </div>
                 </div>
               </label>
-            ))}
+            );})}
           </div>
         </>
       )}
@@ -605,6 +622,13 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
   const previewImages: ImagePreviewItem[] = useMemo(() => {
     const images: ImagePreviewItem[] = [];
     docs.forEach((doc) => {
+      // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
+      const docType = doc.metadata?.doc_type as string | undefined;
+      const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
+      const displayTitle = isSpecialDocType
+        ? `${docType}_${doc.id}`
+        : (doc.title || undefined);
+
       // expanded_page_urls가 있으면 사용
       if (doc.expanded_page_urls && doc.expanded_page_urls.length > 0) {
         const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
@@ -614,7 +638,7 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
           if (hasValidImageUrl(url)) {
             images.push({
               url,
-              title: doc.title || undefined,
+              title: displayTitle,
               page: pageNumbers[idx] || undefined,
               docId: doc.id,
             });
@@ -625,7 +649,7 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
       else if (hasValidImageUrl(doc.page_image_url)) {
         images.push({
           url: doc.page_image_url,
-          title: doc.title || undefined,
+          title: displayTitle,
           page: doc.page || undefined,
           docId: doc.id,
         });
@@ -672,12 +696,21 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
             ? [doc.page_image_url]
             : [];
 
+        const hasImageUrls = pageUrls.length > 0;
+
+        // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
+        const docType = doc.metadata?.doc_type as string | undefined;
+        const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
+        const displayTitle = isSpecialDocType
+          ? `${docType}_${doc.id}`
+          : doc.title;
+
         return (
           <div key={doc.id || index} className="retrieved-doc-item">
             <div className="retrieved-doc-header">
               <span className="retrieved-doc-rank">#{index + 1}</span>
-              {doc.title && (
-                <span className="retrieved-doc-title">{doc.title}</span>
+              {displayTitle && (
+                <span className="retrieved-doc-title">{displayTitle}</span>
               )}
               {pageNumbers.length > 0 && (
                 <span className="retrieved-doc-page">
@@ -694,29 +727,41 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
                 </span>
               )}
             </div>
-            {pageUrls.length > 0 ? (
-              <div className="retrieved-doc-image-wrapper">
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {pageUrls.map((url, pageIdx) => (
-                    <img
-                      key={`${url}-${pageIdx}`}
-                      src={url}
-                      alt={`${doc.title || "Document"} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
-                      className="retrieved-doc-image"
-                      style={{ cursor: "pointer" }}
-                      onClick={() => handleImageClick(index, pageIdx)}
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  ))}
+            {/* 이미지와 텍스트 래퍼 */}
+            <div className="retrieved-doc-content-wrapper" style={{ position: "relative" }}>
+              {/* 이미지가 있으면 표시 */}
+              {hasImageUrls && (
+                <div className="retrieved-doc-image-wrapper">
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {pageUrls.map((url, pageIdx) => (
+                      <img
+                        key={`${url}-${pageIdx}`}
+                        src={url}
+                        alt={`${displayTitle || "Document"} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
+                        className="retrieved-doc-image"
+                        style={{ cursor: "pointer" }}
+                        onClick={() => handleImageClick(index, pageIdx)}
+                        onLoad={(e) => {
+                          // 이미지 로드 성공 시 텍스트 숨기기
+                          const wrapper = e.currentTarget.closest(".retrieved-doc-content-wrapper");
+                          const textContent = wrapper?.querySelector(".retrieved-doc-snippet") as HTMLElement;
+                          if (textContent) textContent.style.display = "none";
+                        }}
+                        onError={(e) => {
+                          e.currentTarget.style.display = "none";
+                        }}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ) : doc.snippet ? (
-              <div className="retrieved-doc-snippet">
-                <MarkdownContent content={preprocessSnippet(doc.snippet)} />
-              </div>
-            ) : null}
+              )}
+              {/* 텍스트 콘텐츠 (항상 렌더링, 이미지 로드 성공 시 숨김) */}
+              {doc.snippet && (
+                <div className="retrieved-doc-snippet">
+                  <MarkdownContent content={preprocessSnippet(doc.snippet)} />
+                </div>
+              )}
+            </div>
           </div>
         );
       })}

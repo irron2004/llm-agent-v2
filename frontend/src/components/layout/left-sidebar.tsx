@@ -10,7 +10,6 @@ import {
   InboxOutlined,
 } from "@ant-design/icons";
 import { useState, useMemo } from "react";
-import { ThemeToggle } from "../theme-toggle";
 import { useChatHistoryContext } from "../../features/chat/context/chat-history-context";
 import { EmptyState } from "../empty-state";
 import "./left-sidebar.css";
@@ -109,10 +108,13 @@ export default function LeftSidebar({
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-    if (diffDays === 0) return "Today";
-    if (diffDays === 1) return "Yesterday";
-    if (diffDays < 7) return `${diffDays} days ago`;
-    return date.toLocaleDateString();
+    // Format time as HH:MM
+    const timeStr = date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+
+    if (diffDays === 0) return `오늘 ${timeStr}`;
+    if (diffDays === 1) return `어제 ${timeStr}`;
+    if (diffDays < 7) return `${diffDays}일 전`;
+    return date.toLocaleDateString("ko-KR");
   };
 
   return (
@@ -123,8 +125,8 @@ export default function LeftSidebar({
       <div className="sidebar-header">
         <div className="sidebar-top-row">
           <div className="sidebar-logo">
-            <div className="logo-icon">PE</div>
-            <span className="logo-text">PE Agent</span>
+            <div className="logo-icon">RTM</div>
+            <span className="logo-text">RTM Agent</span>
           </div>
           {onToggleCollapse && (
             <button
@@ -220,10 +222,6 @@ export default function LeftSidebar({
         </div>
       </div>
 
-      {/* Footer: Theme Toggle */}
-      <div className="sidebar-footer">
-        <ThemeToggle />
-      </div>
     </aside>
   );
 }
