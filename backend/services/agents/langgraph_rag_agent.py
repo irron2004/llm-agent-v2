@@ -22,6 +22,7 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     SearchServiceRetriever,
     answer_node,
     ask_user_after_retrieve_node,
+    auto_parse_node,
     device_selection_node,
     expand_related_docs_node,
     human_review_node,
@@ -37,6 +38,7 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     st_mq_node,
 )
 from backend.services.search_service import SearchService
+from backend.services.device_cache import ensure_device_cache_initialized
 
 
 logger = logging.getLogger(__name__)
@@ -63,6 +65,7 @@ class LangGraphRAGAgent:
         checkpointer: Optional[MemorySaver] = None,
         ask_user_after_retrieve: bool = False,
         ask_device_selection: bool = False,
+        auto_parse_enabled: bool = False,  # Auto-parse device/doc_type from query
         device_fetcher: Callable[[], Dict[str, Any] | list[Dict[str, Any]]] | None = None,
         event_sink: Callable[[Dict[str, Any]], None] | None = None,
     ) -> None:
@@ -79,9 +82,24 @@ class LangGraphRAGAgent:
         self.mode = mode
         self.ask_user_after_retrieve = ask_user_after_retrieve
         self.ask_device_selection = ask_device_selection
+        self.auto_parse_enabled = auto_parse_enabled
         self.device_fetcher = device_fetcher
         self.checkpointer = checkpointer or MemorySaver()
         self._event_sink = event_sink
+
+        # Initialize device cache for auto_parse mode
+        self._device_names: list[str] = []
+        self._doc_type_names: list[str] = []
+        if auto_parse_enabled:
+            cache = ensure_device_cache_initialized(search_service)
+            self._device_names = cache.device_names
+            self._doc_type_names = cache.doc_type_names
+            logger.info(
+                "Auto-parse enabled with %d devices, %d doc types",
+                len(self._device_names),
+                len(self._doc_type_names),
+            )
+
         self._graph = self._build_graph(mode)
 
     def _emit_event(self, event: Dict[str, Any]) -> None:
@@ -200,8 +218,25 @@ class LangGraphRAGAgent:
 
         builder.add_edge(START, "route")
 
-        # Device selection node (optional HIL)
-        if self.ask_device_selection:
+        # Auto-parse mode: extract device/doc_type from query using LLM
+        if self.auto_parse_enabled:
+            builder.add_node(
+                "auto_parse",
+                self._wrap_node(
+                    "auto_parse",
+                    functools.partial(
+                        auto_parse_node,
+                        llm=self.llm,
+                        spec=self.spec,
+                        device_names=self._device_names,
+                        doc_type_names=self._doc_type_names,
+                    ),
+                ),
+            )
+            builder.add_edge("route", "auto_parse")
+            builder.add_edge("auto_parse", "mq")
+        # Device selection node (optional HIL) - legacy mode
+        elif self.ask_device_selection:
             builder.add_node(
                 "device_selection",
                 self._wrap_node(

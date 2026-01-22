@@ -42,6 +42,11 @@ class AgentState(TypedDict, total=False):
     st_gate: Gate
     search_queries: List[str]
 
+    # Auto-parsed filters (from LLM)
+    auto_parsed_device: Optional[str]  # Device parsed from query
+    auto_parsed_doc_type: Optional[str]  # Doc type parsed from query
+    auto_parse_message: Optional[str]  # Message to display (e.g., "SUPRA N장비로 검색합니다")
+
     # Device selection (HIL)
     available_devices: List[Dict[str, Any]]
     selected_devices: List[str]  # Multiple devices can be selected
@@ -88,6 +93,7 @@ class PromptSpec:
     judge_setup_sys: str
     judge_ts_sys: str
     judge_general_sys: str
+    auto_parse: Optional[PromptTemplate] = None  # Auto-parse device/doc_type
 
 
 DEFAULT_JUDGE_SETUP = """
@@ -131,6 +137,13 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
     ts_ans = load_prompt_template("ts_ans", version)
     general_ans = load_prompt_template("general_ans", version)
 
+    # Try to load auto_parse prompt (optional)
+    auto_parse = None
+    try:
+        auto_parse = load_prompt_template("auto_parse", version)
+    except FileNotFoundError:
+        pass
+
     return PromptSpec(
         router=router,
         setup_mq=setup_mq,
@@ -144,6 +157,7 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
         judge_setup_sys=DEFAULT_JUDGE_SETUP,
         judge_ts_sys=DEFAULT_JUDGE_TS,
         judge_general_sys=DEFAULT_JUDGE_GENERAL,
+        auto_parse=auto_parse,
     )
 
 
@@ -1107,6 +1121,118 @@ def refine_queries_node(state: AgentState, *, llm: BaseLLM) -> Dict[str, Any]:
     return {"search_queries": merged[:5]}
 
 
+def _parse_auto_parse_result(text: str) -> Dict[str, Optional[str]]:
+    """Parse LLM output for auto-parsed device and doc_type."""
+    result = {"device": None, "doc_type": None}
+    t = text.strip()
+    if not t:
+        return result
+
+    # Strip code fences
+    t = re.sub(r"```[a-zA-Z]*", "", t).strip()
+
+    # Try to parse JSON
+    try:
+        obj_match = re.search(r"\{.*\}", t, flags=re.S)
+        if obj_match:
+            obj = json.loads(obj_match.group(0))
+            if isinstance(obj, dict):
+                device = obj.get("device")
+                doc_type = obj.get("doc_type")
+                if device and device != "null" and device.lower() != "null":
+                    result["device"] = str(device).strip()
+                if doc_type and doc_type != "null" and doc_type.lower() != "null":
+                    result["doc_type"] = str(doc_type).strip()
+    except Exception:
+        pass
+
+    return result
+
+
+def auto_parse_node(
+    state: AgentState,
+    *,
+    llm: BaseLLM,
+    spec: PromptSpec,
+    device_names: List[str],
+    doc_type_names: List[str],
+) -> Dict[str, Any]:
+    """Auto-parse device and doc_type from user query using LLM.
+
+    Args:
+        state: Agent state with query.
+        llm: LLM instance for generation.
+        spec: Prompt specification (must have auto_parse template).
+        device_names: List of available device names.
+        doc_type_names: List of available doc type names.
+
+    Returns:
+        State update with auto_parsed_device, auto_parsed_doc_type, and auto_parse_message.
+    """
+    if spec.auto_parse is None:
+        logger.warning("auto_parse_node: no auto_parse prompt, skipping")
+        return {}
+
+    query = state["query"]
+
+    # Format device and doc_type lists for prompt
+    devices_str = ", ".join(device_names[:50]) if device_names else "없음"
+    doc_types_str = ", ".join(doc_type_names) if doc_type_names else "없음"
+
+    system = _format_prompt(spec.auto_parse.system, {
+        "sys.query": query,
+        "sys.devices": devices_str,
+        "sys.doc_types": doc_types_str,
+    })
+    user = _format_prompt(spec.auto_parse.user, {
+        "sys.query": query,
+        "sys.devices": devices_str,
+        "sys.doc_types": doc_types_str,
+    })
+
+    raw = _invoke_llm(llm, system, user)
+    logger.info("auto_parse_node: raw output=%s", raw)
+
+    parsed = _parse_auto_parse_result(raw)
+    device = parsed["device"]
+    doc_type = parsed["doc_type"]
+
+    logger.info("auto_parse_node: device=%s, doc_type=%s", device, doc_type)
+
+    # Build display message
+    message_parts = []
+    if device:
+        message_parts.append(f"{device} 장비")
+    if doc_type:
+        message_parts.append(f"{doc_type} 문서")
+
+    auto_parse_message = None
+    if message_parts:
+        auto_parse_message = f"{', '.join(message_parts)}로 검색합니다"
+
+    # Set selected_devices and selected_doc_types for downstream nodes
+    selected_devices = [device] if device else []
+    selected_doc_types = [doc_type] if doc_type else []
+
+    return {
+        "auto_parsed_device": device,
+        "auto_parsed_doc_type": doc_type,
+        "auto_parse_message": auto_parse_message,
+        "selected_devices": selected_devices,
+        "selected_doc_types": selected_doc_types,
+        "device_selection_skipped": not bool(device),
+        "doc_type_selection_skipped": not bool(doc_type),
+        "_events": [
+            {
+                "type": "auto_parse",
+                "device": device,
+                "doc_type": doc_type,
+                "message": auto_parse_message,
+            }
+        ] if auto_parse_message else [],
+    }
+
+
 def human_review_node(state: AgentState) -> Command[Literal["done", "retry"]]:
     payload = {
         "type": "human_review",
@@ -1289,4 +1415,5 @@ __all__ = [
     "refine_queries_node",
     "human_review_node",
     "device_selection_node",
+    "auto_parse_node",
 ]

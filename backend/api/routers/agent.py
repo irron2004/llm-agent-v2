@@ -29,11 +29,12 @@ router = APIRouter(prefix="/agent", tags=["LangGraph Agent"])
 logger = logging.getLogger(__name__)
 
 # =============================================================================
-# 전역 상태: HIL(Human-in-the-Loop) 지원
+# 전역 상태: HIL(Human-in-the-Loop) 지원 및 Auto-Parse 모드
 # =============================================================================
 # 핵심: interrupt/resume가 동작하려면 동일한 graph 인스턴스와 checkpointer 필요
 _checkpointer: MemorySaver = MemorySaver()
 _hil_agent: Optional[LangGraphRAGAgent] = None
+_auto_parse_agent: Optional[LangGraphRAGAgent] = None
 
 
 def _create_device_fetcher(search_service):
@@ -55,6 +56,13 @@ def _create_device_fetcher(search_service):
                         "field": "device_name",
                         "size": 200,
                         "order": {"_count": "desc"},
+                    },
+                    "aggs": {
+                        "unique_docs": {
+                            "cardinality": {
+                                "field": "doc_id"
+                            }
+                        }
                     }
                 },
                 "doc_types": {
@@ -62,6 +70,13 @@ def _create_device_fetcher(search_service):
                         "field": "doc_type",
                         "size": 12,
                         "order": {"_count": "desc"},
+                    },
+                    "aggs": {
+                        "unique_docs": {
+                            "cardinality": {
+                                "field": "doc_id"
+                            }
+                        }
                     }
                 },
             }
@@ -72,11 +87,11 @@ def _create_device_fetcher(search_service):
             device_buckets = result.get("aggregations", {}).get("devices", {}).get("buckets", [])
             doc_type_buckets = result.get("aggregations", {}).get("doc_types", {}).get("buckets", [])
             devices = [
-                {"name": bucket["key"], "doc_count": bucket["doc_count"]}
+                {"name": bucket["key"], "doc_count": bucket.get("unique_docs", {}).get("value", bucket["doc_count"])}
                 for bucket in device_buckets
                 if bucket.get("key")
             ]
-            doc_types = group_doc_type_buckets(doc_type_buckets)
+            doc_types = group_doc_type_buckets(doc_type_buckets, use_unique_docs=True)
             return {"devices": devices, "doc_types": doc_types}
         except Exception as e:
             logger.error(f"Failed to fetch device list: {e}")
@@ -105,6 +120,26 @@ def _get_hil_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent:
     return _hil_agent
 
 
+def _get_auto_parse_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent:
+    """Auto-parse용 싱글톤 에이전트. 장비/문서종류를 자동으로 파싱."""
+    global _auto_parse_agent
+    if _auto_parse_agent is None:
+        logger.info("Creating Auto-parse agent singleton with top_k=20 retrieval_top_k=50")
+        _auto_parse_agent = LangGraphRAGAgent(
+            llm=llm,
+            search_service=search_service,
+            prompt_spec=prompt_spec,
+            top_k=20,
+            retrieval_top_k=50,
+            mode="verified",
+            ask_user_after_retrieve=False,  # 문서 선택 UI 비활성화
+            ask_device_selection=False,      # 기기 선택 UI 비활성화
+            auto_parse_enabled=True,         # 자동 파싱 활성화
+            checkpointer=_checkpointer,
+        )
+    return _auto_parse_agent
+
+
 # =============================================================================
 # Request/Response Models
 # =============================================================================
@@ -116,6 +151,10 @@ class AgentRequest(BaseModel):
     thread_id: Optional[str] = Field(None, description="LangGraph thread_id")
     ask_user_after_retrieve: bool = Field(False, description="검색 후 사용자 확인")
     resume_decision: Optional[Any] = Field(None, description="interrupt 재개 응답")
+    auto_parse: bool = Field(True, description="자동 장비/문서종류 파싱 (기본값: True)")
+    # 재생성 시 사용할 필터 오버라이드
+    filter_devices: Optional[List[str]] = Field(None, description="장비 필터 오버라이드")
+    filter_doc_types: Optional[List[str]] = Field(None, description="문서종류 필터 오버라이드")
 
 
 class RetrievedDoc(BaseModel):
@@ -139,6 +178,13 @@ class ExpandedDoc(BaseModel):
     content_length: int  # 내용 길이
 
 
+class AutoParseResult(BaseModel):
+    """자동 파싱 결과"""
+    device: Optional[str] = Field(None, description="파싱된 장비명")
+    doc_type: Optional[str] = Field(None, description="파싱된 문서종류")
+    message: Optional[str] = Field(None, description="사용자에게 표시할 메시지")
+
+
 class AgentResponse(BaseModel):
     query: str
     answer: str
@@ -149,6 +195,12 @@ class AgentResponse(BaseModel):
     interrupted: bool = Field(False)
     interrupt_payload: Optional[Dict[str, Any]] = Field(None)
     thread_id: Optional[str] = Field(None)
+    # Auto-parse results
+    auto_parse: Optional[AutoParseResult] = Field(None, description="자동 파싱 결과")
+    # Filter info for regeneration
+    selected_devices: Optional[List[str]] = Field(None, description="사용된 장비 필터")
+    selected_doc_types: Optional[List[str]] = Field(None, description="사용된 문서종류 필터")
+    search_queries: Optional[List[str]] = Field(None, description="사용된 검색 쿼리 (MQ)")
 
 
 def _to_expanded_docs(answer_ref_json: List[Dict[str, Any]] | None) -> List[ExpandedDoc] | None:
@@ -261,8 +313,12 @@ async def run_agent(
     is_resume = req.resume_decision is not None and req.thread_id is not None
 
     try:
+        # Auto-parse 모드 (기본값: True)
+        if req.auto_parse and not is_resume and not req.ask_user_after_retrieve:
+            agent = _get_auto_parse_agent(llm, search_service, prompt_spec)
+            result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid)
         # HIL 모드 (ask_user 또는 resume)
-        if req.ask_user_after_retrieve or is_resume:
+        elif req.ask_user_after_retrieve or is_resume:
             agent = _get_hil_agent(llm, search_service, prompt_spec)
             config = {"configurable": {"thread_id": tid}}
 
@@ -296,6 +352,15 @@ async def run_agent(
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    # Extract auto_parse results
+    auto_parse_result = None
+    if result.get("auto_parsed_device") or result.get("auto_parsed_doc_type") or result.get("auto_parse_message"):
+        auto_parse_result = AutoParseResult(
+            device=result.get("auto_parsed_device"),
+            doc_type=result.get("auto_parsed_doc_type"),
+            message=result.get("auto_parse_message"),
+        )
+
     # Interrupt 체크
     interrupt_info = result.get("__interrupt__")
     if interrupt_info:
@@ -318,6 +383,10 @@ async def run_agent(
             interrupted=True,
             interrupt_payload=payload,
             thread_id=tid,
+            auto_parse=auto_parse_result,
+            selected_devices=result.get("selected_devices"),
+            selected_doc_types=result.get("selected_doc_types"),
+            search_queries=result.get("search_queries"),
         )
 
     # 정상 완료
@@ -335,6 +404,10 @@ async def run_agent(
         },
         interrupted=False,
         thread_id=tid,
+        auto_parse=auto_parse_result,
+        selected_devices=result.get("selected_devices"),
+        selected_doc_types=result.get("selected_doc_types"),
+        search_queries=result.get("search_queries"),
     )
 
 
@@ -371,7 +444,12 @@ async def run_agent_stream(
 
     def _worker() -> None:
         try:
-            if req.ask_user_after_retrieve or is_resume:
+            # Auto-parse 모드 (기본값: True)
+            if req.auto_parse and not is_resume and not req.ask_user_after_retrieve:
+                agent = _get_auto_parse_agent(llm, search_service, prompt_spec)
+                agent._event_sink = _enqueue  # type: ignore[attr-defined]
+                result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid)
+            elif req.ask_user_after_retrieve or is_resume:
                 # NOTE: HIL resume requires shared graph/checkpointer; reuse singleton.
                 agent = _get_hil_agent(llm, search_service, prompt_spec)
                 # Attach per-request sink (best-effort; concurrent streams may interleave).
@@ -403,6 +481,15 @@ async def run_agent_stream(
                 )
                 result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid)
 
+            # Extract auto_parse results
+            auto_parse_result = None
+            if result.get("auto_parsed_device") or result.get("auto_parsed_doc_type") or result.get("auto_parse_message"):
+                auto_parse_result = AutoParseResult(
+                    device=result.get("auto_parsed_device"),
+                    doc_type=result.get("auto_parsed_doc_type"),
+                    message=result.get("auto_parse_message"),
+                )
+
             interrupt_info = result.get("__interrupt__")
             logger.info(f"[agent stream] result keys: {list(result.keys())}")
             logger.info(f"[agent stream] interrupt_info: {interrupt_info}")
@@ -426,6 +513,10 @@ async def run_agent_stream(
                     interrupted=True,
                     interrupt_payload=payload,
                     thread_id=tid,
+                    auto_parse=auto_parse_result,
+                    selected_devices=result.get("selected_devices"),
+                    selected_doc_types=result.get("selected_doc_types"),
+                    search_queries=result.get("search_queries"),
                 )
             else:
                 resp = AgentResponse(
@@ -442,6 +533,10 @@ async def run_agent_stream(
                     },
                     interrupted=False,
                     thread_id=tid,
+                    auto_parse=auto_parse_result,
+                    selected_devices=result.get("selected_devices"),
+                    selected_doc_types=result.get("selected_doc_types"),
+                    search_queries=result.get("search_queries"),
                 )
 
             _enqueue({"type": "final", "result": resp.model_dump()})
