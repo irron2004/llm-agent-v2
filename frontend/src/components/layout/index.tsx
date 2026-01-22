@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { Outlet, useLocation } from "react-router-dom";
-import { MenuOutlined, MenuUnfoldOutlined, FileTextOutlined } from "@ant-design/icons";
+import { MenuOutlined, MenuUnfoldOutlined, FileTextOutlined, ZoomInOutlined } from "@ant-design/icons";
 import LeftSidebar from "./left-sidebar";
 import MainContent from "./main-content";
 import RightSidebar from "./right-sidebar";
@@ -9,6 +9,7 @@ import { GlobalSearch } from "../global-search";
 import { MarkdownContent } from "../../features/chat/components/markdown-content";
 import { useChatLogs } from "../../features/chat/context/chat-logs-context";
 import { useChatReview } from "../../features/chat/context/chat-review-context";
+import { ImagePreviewModal, ImagePreviewItem } from "../image-preview-modal";
 import "./layout.css";
 
 export default function Layout() {
@@ -43,8 +44,6 @@ export default function Layout() {
     (completedRetrievedDocs !== null && completedRetrievedDocs.length > 0)
   );
 
-  // Debug logging
-  console.log("[Layout] pendingReview:", pendingReview, "shouldShowRightSidebar:", shouldShowRightSidebar);
 
   const handleOpenSidebar = useCallback(() => {
     setIsSidebarOpen(true);
@@ -147,10 +146,7 @@ export default function Layout() {
               submitSearchQueries={submitSearchQueries}
             />
           ) : completedRetrievedDocs && completedRetrievedDocs.length > 0 ? (
-            <>
-              {console.log("[RightSidebar] completedRetrievedDocs:", completedRetrievedDocs)}
-              <RetrievedDocsContent docs={completedRetrievedDocs} />
-            </>
+            <RetrievedDocsContent docs={completedRetrievedDocs} />
           ) : (
             <ChatLogsContent logs={logs} />
           )}
@@ -214,6 +210,36 @@ function ReviewPanelContent({
   submitReview: (selection: { docIds: string[]; ranks: number[] }) => void;
   submitSearchQueries: (queries: string[]) => void;
 }) {
+  // 이미지 미리보기 모달 상태
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
+
+  // 이미지 URL이 유효한지 확인하는 헬퍼 함수
+  const hasValidImageUrl = (url: string | null | undefined): url is string => {
+    if (typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (trimmed.length === 0 || trimmed === 'null' || trimmed === 'undefined') return false;
+    return true;
+  };
+
+  // 모든 문서를 미리보기 배열로 생성 (이미지 또는 텍스트)
+  // content는 항상 포함 (이미지 로드 실패 시 대체용)
+  const previewImages: ImagePreviewItem[] = useMemo(() => {
+    return pendingReview.docs.map((doc) => ({
+      url: hasValidImageUrl(doc.page_image_url) ? doc.page_image_url : undefined,
+      content: doc.content || undefined,
+      title: doc.title || undefined,
+      page: doc.page || undefined,
+      docId: doc.docId,
+      rank: doc.rank,
+    }));
+  }, [pendingReview.docs]);
+
+  const handleDocClick = (docIndex: number) => {
+    setPreviewIndex(docIndex);
+    setPreviewVisible(true);
+  };
+
   const allSelected =
     pendingReview.docs.length > 0 &&
     selectedRanks.length === pendingReview.docs.length;
@@ -263,10 +289,6 @@ function ReviewPanelContent({
   const toggleEditMode = () => {
     setIsEditingQueries((prev: boolean) => !prev);
   };
-
-  console.log("[ReviewPanel] isEditingQueries:", isEditingQueries, "docs:", pendingReview.docs.length, "selectedRanks:", selectedRanks.length);
-  console.log("[ReviewPanel] First doc:", pendingReview.docs[0]);
-  console.log("[ReviewPanel] First doc page_image_url:", pendingReview.docs[0]?.page_image_url);
 
   return (
     <div className="review-panel-sidebar">
@@ -351,32 +373,72 @@ function ReviewPanelContent({
                     {doc.title || `문서 ${doc.rank ?? idx + 1}`}
                     {doc.page && <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, color: "var(--color-text-secondary)" }}>p.{doc.page}</span>}
                   </div>
-                  {doc.page_image_url ? (
-                    <div className="review-doc-image-wrapper" style={{ marginBottom: 8 }}>
+                  <div className="review-doc-content-wrapper" style={{ position: "relative" }}>
+                    {/* 이미지가 있으면 표시 (로드 실패 시 숨김) */}
+                    {hasValidImageUrl(doc.page_image_url) && (
                       <img
                         src={doc.page_image_url}
                         alt={`${doc.title || "Document"} page ${doc.page || ""}`}
+                        className="review-doc-image"
                         style={{
                           maxWidth: "100%",
                           maxHeight: 300,
                           borderRadius: 4,
                           border: "1px solid var(--color-border)",
+                          marginBottom: 8,
+                        }}
+                        onLoad={(e) => {
+                          const img = e.currentTarget;
+                          // 이미지가 실제로 유효한지 확인 (naturalWidth > 0)
+                          if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+                            const wrapper = img.parentElement;
+                            const textContent = wrapper?.querySelector(".review-doc-content") as HTMLElement;
+                            if (textContent) textContent.style.display = "none";
+                          } else {
+                            // 유효하지 않은 이미지는 숨김
+                            img.style.display = "none";
+                          }
                         }}
                         onError={(e) => {
+                          // 이미지 로드 실패 시 이미지 숨김
                           e.currentTarget.style.display = "none";
-                          const fallback = e.currentTarget.nextElementSibling as HTMLElement;
-                          if (fallback) fallback.style.display = "block";
                         }}
                       />
-                      <div className="review-doc-content" style={{ display: "none" }}>
-                        <MarkdownContent content={preprocessSnippet(doc.content)} />
-                      </div>
-                    </div>
-                  ) : (
+                    )}
+                    {/* 텍스트 콘텐츠 (항상 렌더링, 이미지 로드 성공 시 숨김) */}
                     <div className="review-doc-content">
                       <MarkdownContent content={preprocessSnippet(doc.content)} />
                     </div>
-                  )}
+                    {/* 확대 버튼 */}
+                    <button
+                      className="review-doc-zoom"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDocClick(idx);
+                      }}
+                      title="확대"
+                      style={{
+                        position: "absolute",
+                        top: 4,
+                        right: 4,
+                        width: 28,
+                        height: 28,
+                        borderRadius: 4,
+                        border: "1px solid var(--color-border)",
+                        background: "var(--color-bg-secondary, #f5f5f5)",
+                        color: "var(--color-text-secondary)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: 14,
+                        zIndex: 10,
+                      }}
+                    >
+                      <ZoomInOutlined />
+                    </button>
+                  </div>
                 </div>
               </label>
             ))}
@@ -414,6 +476,17 @@ function ReviewPanelContent({
           </>
         )}
       </div>
+
+      {/* 이미지 미리보기 모달 */}
+      <ImagePreviewModal
+        visible={previewVisible}
+        images={previewImages}
+        currentIndex={previewIndex}
+        selectedRanks={selectedRanks}
+        onIndexChange={setPreviewIndex}
+        onClose={() => setPreviewVisible(false)}
+        onToggleSelect={toggleDoc}
+      />
     </div>
   );
 }
@@ -520,6 +593,70 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
   expanded_pages?: number[] | null;
   expanded_page_urls?: string[] | null;
 }> }) {
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
+
+  // 이미지 URL이 유효한지 확인
+  const hasValidImageUrl = (url: string | null | undefined): url is string => {
+    return typeof url === 'string' && url.trim().length > 0;
+  };
+
+  // 이미지 미리보기용 배열 생성 (실제 이미지 URL이 있는 문서만)
+  const previewImages: ImagePreviewItem[] = useMemo(() => {
+    const images: ImagePreviewItem[] = [];
+    docs.forEach((doc) => {
+      // expanded_page_urls가 있으면 사용
+      if (doc.expanded_page_urls && doc.expanded_page_urls.length > 0) {
+        const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
+          ? doc.expanded_pages
+          : [];
+        doc.expanded_page_urls.forEach((url, idx) => {
+          if (hasValidImageUrl(url)) {
+            images.push({
+              url,
+              title: doc.title || undefined,
+              page: pageNumbers[idx] || undefined,
+              docId: doc.id,
+            });
+          }
+        });
+      }
+      // page_image_url만 있으면 사용
+      else if (hasValidImageUrl(doc.page_image_url)) {
+        images.push({
+          url: doc.page_image_url,
+          title: doc.title || undefined,
+          page: doc.page || undefined,
+          docId: doc.id,
+        });
+      }
+      // 실제 이미지 URL이 없으면 추가하지 않음
+    });
+    return images;
+  }, [docs]);
+
+  // 문서 인덱스와 페이지 인덱스에서 전체 미리보기 인덱스로 매핑
+  const getPreviewIndex = (docIndex: number, pageIndex: number): number => {
+    let totalIdx = 0;
+    for (let i = 0; i < docIndex; i++) {
+      const doc = docs[i];
+      // 실제 이미지 URL이 있는 경우만 카운트
+      const pageCount = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
+        ? doc.expanded_page_urls.filter(url => hasValidImageUrl(url)).length
+        : hasValidImageUrl(doc.page_image_url)
+          ? 1
+          : 0;
+      totalIdx += pageCount;
+    }
+    return totalIdx + pageIndex;
+  };
+
+  const handleImageClick = (docIndex: number, pageIndex: number) => {
+    const previewIdx = getPreviewIndex(docIndex, pageIndex);
+    setPreviewIndex(previewIdx);
+    setPreviewVisible(true);
+  };
+
   return (
     <div className="retrieved-docs-container">
       {docs.map((doc, index) => {
@@ -528,13 +665,12 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
           : doc.page !== null && doc.page !== undefined
             ? [doc.page]
             : [];
+        // 실제 이미지 URL만 사용 (동적 URL 생성 안 함)
         const pageUrls = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
-          ? doc.expanded_page_urls
-          : doc.page_image_url
+          ? doc.expanded_page_urls.filter(url => hasValidImageUrl(url))
+          : hasValidImageUrl(doc.page_image_url)
             ? [doc.page_image_url]
-            : doc.id && pageNumbers.length > 0
-              ? pageNumbers.map((p) => `/api/assets/docs/${doc.id}/pages/${p}`)
-              : [];
+            : [];
 
         return (
           <div key={doc.id || index} className="retrieved-doc-item">
@@ -559,36 +695,42 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
               )}
             </div>
             {pageUrls.length > 0 ? (
-              <>
-                <div className="retrieved-doc-image-wrapper">
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                    {pageUrls.map((url, pageIdx) => (
-                      <img
-                        key={`${url}-${pageIdx}`}
-                        src={url}
-                        alt={`${doc.title || "Document"} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
-                        className="retrieved-doc-image"
-                        onError={(e) => {
-                          e.currentTarget.style.display = "none";
-                        }}
-                      />
-                    ))}
-                  </div>
+              <div className="retrieved-doc-image-wrapper">
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {pageUrls.map((url, pageIdx) => (
+                    <img
+                      key={`${url}-${pageIdx}`}
+                      src={url}
+                      alt={`${doc.title || "Document"} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
+                      className="retrieved-doc-image"
+                      style={{ cursor: "pointer" }}
+                      onClick={() => handleImageClick(index, pageIdx)}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  ))}
                 </div>
-                {doc.snippet && (
-                  <div className="retrieved-doc-snippet" style={{ marginTop: 8 }}>
-                    <MarkdownContent content={preprocessSnippet(doc.snippet)} />
-                  </div>
-                )}
-              </>
-            ) : (
+              </div>
+            ) : doc.snippet ? (
               <div className="retrieved-doc-snippet">
                 <MarkdownContent content={preprocessSnippet(doc.snippet)} />
               </div>
-            )}
+            ) : null}
           </div>
         );
       })}
+
+      {/* 이미지 미리보기 모달 (조회 전용) */}
+      {previewImages.length > 0 && (
+        <ImagePreviewModal
+          visible={previewVisible}
+          images={previewImages}
+          currentIndex={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewVisible(false)}
+        />
+      )}
     </div>
   );
 }

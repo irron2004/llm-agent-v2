@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { CopyOutlined, LikeOutlined, DislikeOutlined, CheckOutlined } from "@ant-design/icons";
 import { Message, FeedbackRating } from "../types";
 import { MarkdownContent } from "./markdown-content";
 import { Collapse } from "antd";
+import { ImagePreviewModal, ImagePreviewItem } from "../../../components/image-preview-modal";
 
 // Preprocess snippet for better markdown rendering
 function preprocessSnippet(snippet: string): string {
@@ -93,11 +94,81 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
   const [showReasonInput, setShowReasonInput] = useState(false);
   const [reasonText, setReasonText] = useState("");
   const [reasonError, setReasonError] = useState<string | null>(null);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(0);
 
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
   const rating = message.feedback?.rating ?? null;
   const canFeedback = Boolean(message.sessionId && message.turnId);
+
+  // 이미지 URL이 유효한지 확인
+  const hasValidImageUrl = (url: string | null | undefined): url is string => {
+    if (typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    // 빈 문자열, "null", "undefined" 등 무효한 값 필터링
+    if (trimmed.length === 0 || trimmed === 'null' || trimmed === 'undefined') return false;
+    return true;
+  };
+
+  // 이미지 미리보기용 배열 생성 (실제 이미지 URL이 있는 문서만)
+  const previewImages: ImagePreviewItem[] = useMemo(() => {
+    if (!message.retrievedDocs) return [];
+
+    const images: ImagePreviewItem[] = [];
+    message.retrievedDocs.forEach((doc) => {
+      // expanded_page_urls가 있으면 사용
+      if (doc.expanded_page_urls && doc.expanded_page_urls.length > 0) {
+        const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
+          ? doc.expanded_pages
+          : [];
+        doc.expanded_page_urls.forEach((url, idx) => {
+          if (hasValidImageUrl(url)) {
+            images.push({
+              url,
+              title: doc.title || undefined,
+              page: pageNumbers[idx] || undefined,
+              docId: doc.id,
+            });
+          }
+        });
+      }
+      // page_image_url만 있으면 사용
+      else if (hasValidImageUrl(doc.page_image_url)) {
+        images.push({
+          url: doc.page_image_url,
+          title: doc.title || undefined,
+          page: doc.page || undefined,
+          docId: doc.id,
+        });
+      }
+      // 실제 이미지 URL이 없으면 추가하지 않음 (동적 URL 생성 안 함)
+    });
+    return images;
+  }, [message.retrievedDocs]);
+
+  // 문서 인덱스와 페이지 인덱스에서 전체 미리보기 인덱스로 매핑
+  const getPreviewIndex = (docIndex: number, pageIndex: number): number => {
+    if (!message.retrievedDocs) return 0;
+    let totalIdx = 0;
+    for (let i = 0; i < docIndex; i++) {
+      const doc = message.retrievedDocs[i];
+      // 실제 이미지 URL이 있는 경우만 카운트
+      const pageCount = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
+        ? doc.expanded_page_urls.filter(url => hasValidImageUrl(url)).length
+        : hasValidImageUrl(doc.page_image_url)
+          ? 1
+          : 0;
+      totalIdx += pageCount;
+    }
+    return totalIdx + pageIndex;
+  };
+
+  const handleImageClick = (docIndex: number, pageIndex: number) => {
+    const previewIdx = getPreviewIndex(docIndex, pageIndex);
+    setPreviewIndex(previewIdx);
+    setPreviewVisible(true);
+  };
 
   const handleCopy = async () => {
     try {
@@ -198,13 +269,14 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
                             : doc.page !== null && doc.page !== undefined
                               ? [doc.page]
                               : [];
+                          // 실제 이미지 URL만 사용 (동적 URL 생성 안 함)
                           const pageUrls = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
-                            ? doc.expanded_page_urls
-                            : doc.page_image_url
+                            ? doc.expanded_page_urls.filter(url => hasValidImageUrl(url))
+                            : hasValidImageUrl(doc.page_image_url)
                               ? [doc.page_image_url]
-                              : doc.id && pageNumbers.length > 0
-                                ? pageNumbers.map((p) => `/api/assets/docs/${doc.id}/pages/${p}`)
-                                : [];
+                              : [];
+
+                          const hasActualImage = pageUrls.length > 0;
 
                           return (
                             <div key={doc.id || idx} className="reference-item" style={{ marginBottom: 16 }}>
@@ -231,28 +303,35 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
                                 >
                                   {pageUrls.map((url, pageIdx) => (
                                     <div key={pageIdx} className="reference-image-wrapper">
-                                      <img
-                                        src={url}
-                                        alt={`${doc.title || "Document"} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
-                                        style={{
-                                          maxWidth: pageUrls.length > 1 ? 150 : "100%",
-                                          maxHeight: pageUrls.length > 1 ? 200 : 300,
-                                          borderRadius: 4,
-                                          border: "1px solid var(--color-border)",
-                                          cursor: "pointer",
-                                        }}
-                                        title={`페이지 ${pageNumbers[pageIdx] || pageIdx + 1}`}
-                                        onError={(e) => {
-                                          e.currentTarget.style.display = "none";
-                                        }}
-                                      />
+                                      <div style={{ position: "relative", display: "inline-block" }}>
+                                        <img
+                                          src={url}
+                                          alt={`${doc.title || "Document"} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
+                                          style={{
+                                            maxWidth: pageUrls.length > 1 ? 150 : "100%",
+                                            maxHeight: pageUrls.length > 1 ? 200 : 300,
+                                            borderRadius: 4,
+                                            border: "1px solid var(--color-border)",
+                                            cursor: "pointer",
+                                          }}
+                                          title={`클릭하여 확대`}
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleImageClick(idx, pageIdx);
+                                          }}
+                                          onError={(e) => {
+                                            e.currentTarget.style.display = "none";
+                                          }}
+                                        />
+                                      </div>
                                     </div>
                                   ))}
                                 </div>
                               )}
-                              {/* Always show snippet text */}
-                              {doc.snippet && (
-                                <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: pageUrls.length > 0 ? 8 : 0 }}>
+                              {/* Show snippet only when no actual image URL is available */}
+                              {!hasActualImage && doc.snippet && (
+                                <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
                                   <MarkdownContent content={preprocessSnippet(doc.snippet)} />
                                 </div>
                               )}
@@ -365,6 +444,17 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
           )}
         </div>
       </div>
+
+      {/* 이미지 미리보기 모달 (조회 전용) */}
+      {previewImages.length > 0 && (
+        <ImagePreviewModal
+          visible={previewVisible}
+          images={previewImages}
+          currentIndex={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewVisible(false)}
+        />
+      )}
     </div>
   );
 }
