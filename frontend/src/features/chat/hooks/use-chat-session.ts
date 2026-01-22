@@ -75,7 +75,7 @@ const resolveInterruptKind = (payload?: Record<string, unknown> | null): Interru
 
 const buildInterruptPrompt = (kind: InterruptKind, instruction?: string) => {
   if (kind === "device_selection") {
-    return "검색에 사용할 기기를 선택하세요. 선택하지 않으면 전체 문서에서 검색합니다.";
+    return "검색에 사용할 기기와 문서 종류를 각각 1개 이상 선택하세요.";
   }
   if (kind === "retrieval_review") {
     return "검색 결과가 준비되었습니다. 아래에서 문서를 선택하거나 추가 키워드를 입력해 주세요.";
@@ -274,6 +274,11 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         rawAnswer: JSON.stringify(res, null, 2),
         currentNode: null,
         sessionId,
+        // Store auto_parse and filter info for regeneration
+        autoParse: res.auto_parse ?? null,
+        selectedDevices: res.selected_devices ?? null,
+        selectedDocTypes: res.selected_doc_types ?? null,
+        searchQueries: res.search_queries ?? null,
       }));
 
       // Save turn to backend
@@ -363,11 +368,14 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         const decision = isResume ? (decisionOverride ?? resolveDecision(text)) : undefined;
         const payload = {
           message: requestMessage,
-          ask_user_after_retrieve: true,
+          auto_parse: true,  // 자동 파싱 모드 활성화 (기본값)
+          ask_user_after_retrieve: false,  // 문서 선택 UI 비활성화
           ...(isResume && pending
             ? {
                 thread_id: pending.threadId,
                 resume_decision: decision,
+                auto_parse: false,  // resume 시에는 auto_parse 비활성화
+                ask_user_after_retrieve: true,  // resume은 HIL 모드
               }
             : {}),
         };
@@ -399,12 +407,12 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
               if (evt?.type === "log") {
                 const logMessage = typeof evt?.message === "string" ? evt.message : "";
                 const logNode = typeof evt?.node === "string" ? evt.node : null;
-                
+
                 // Add log to context (for right sidebar display)
                 if (logMessage) {
                   addLog(assistantId, logMessage, logNode);
                 }
-                
+
                 // Update only currentNode for message (logs are shown in right sidebar only)
                 updateMessage(assistantId, (m) => {
                   let currentNode = m.currentNode ?? null;
@@ -420,6 +428,23 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
                     currentNode,
                   };
                 });
+                return;
+              }
+
+              // Handle auto_parse event (display parsing result)
+              if (evt?.type === "auto_parse") {
+                const parseMessage = typeof evt?.message === "string" ? evt.message : null;
+                const parsedDevice = typeof evt?.device === "string" ? evt.device : null;
+                const parsedDocType = typeof evt?.doc_type === "string" ? evt.doc_type : null;
+
+                if (parseMessage) {
+                  addLog(assistantId, `🔍 ${parseMessage}`, "auto_parse");
+                }
+
+                updateMessage(assistantId, (m) => ({
+                  ...m,
+                  content: parseMessage ? `🔍 ${parseMessage}\n\n처리 중...` : m.content,
+                }));
                 return;
               }
 
@@ -514,14 +539,37 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     (selectedDevices: string[], selectedDocTypes: string[]) => {
       if (!pendingInterrupt || pendingInterrupt.kind !== "device_selection") return;
 
-      setPendingInterrupt(null);
-
       const hasDevices = selectedDevices.length > 0;
       const hasDocTypes = selectedDocTypes.length > 0;
 
+      if (!hasDevices || !hasDocTypes) {
+        setError("기기와 문서 종류를 각각 1개 이상 선택해야 합니다.");
+        return;
+      }
+
+      const allDevicesSelected = pendingInterrupt.devices
+        ? selectedDevices.length === pendingInterrupt.devices.length
+        : false;
+      const allDocTypesSelected = pendingInterrupt.docTypes
+        ? selectedDocTypes.length === pendingInterrupt.docTypes.length
+        : false;
+
       const summaryParts: string[] = [];
-      summaryParts.push(hasDevices ? `기기: ${selectedDevices.join(", ")}` : "전체 기기");
-      summaryParts.push(hasDocTypes ? `문서: ${selectedDocTypes.join(", ")}` : "전체 문서");
+      if (allDevicesSelected) {
+        summaryParts.push("기기: 전체");
+      } else if (selectedDevices.length > 10) {
+        summaryParts.push("기기: 다수 선택");
+      } else {
+        summaryParts.push(`기기: ${selectedDevices.join(", ")}`);
+      }
+
+      summaryParts.push(
+        allDocTypesSelected
+          ? "문서: 전체"
+          : `문서: ${selectedDocTypes.join(", ")}`
+      );
+
+      setPendingInterrupt(null);
 
       send({
         text: summaryParts.length > 0 ? `선택: ${summaryParts.join(" / ")}` : "선택 조건 검색",

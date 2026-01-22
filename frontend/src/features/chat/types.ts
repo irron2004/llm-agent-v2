@@ -21,6 +21,11 @@ export type Message = {
   sessionId?: string;
   turnId?: number;
   feedback?: MessageFeedback | null;
+  // Auto-parse and filter info for regeneration
+  autoParse?: AutoParseResult | null;
+  selectedDevices?: string[] | null;
+  selectedDocTypes?: string[] | null;
+  searchQueries?: string[] | null;
 };
 
 export type ReferenceChunk = {
@@ -60,6 +65,12 @@ export type ReviewDoc = {
   metadata?: Record<string, unknown> | null;
 };
 
+export type AutoParseResult = {
+  device?: string | null;
+  doc_type?: string | null;
+  message?: string | null;
+};
+
 export type AgentResponse = {
   query: string;
   answer: string;
@@ -69,6 +80,11 @@ export type AgentResponse = {
   interrupted?: boolean;
   interrupt_payload?: Record<string, unknown> | null;
   thread_id?: string | null;
+  // Auto-parse results
+  auto_parse?: AutoParseResult | null;
+  selected_devices?: string[] | null;
+  selected_doc_types?: string[] | null;
+  search_queries?: string[] | null;
 };
 
 export type AgentRequest = {
@@ -79,6 +95,9 @@ export type AgentRequest = {
   thread_id?: string | null;
   ask_user_after_retrieve?: boolean;
   resume_decision?: unknown;
+  auto_parse?: boolean;
+  filter_devices?: string[] | null;
+  filter_doc_types?: string[] | null;
 };
 
 export type Conversation = {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useChatSession } from "../hooks/use-chat-session";
 import { useChatHistoryContext } from "../context/chat-history-context";
@@ -11,6 +11,7 @@ import {
   ChatInput,
   DeviceSelectionPanel,
 } from "../components";
+import type { RegeneratePayload } from "../components/message-item";
 import { Alert, Spin } from "antd";
 
 export default function ChatPage() {
@@ -109,6 +110,28 @@ export default function ChatPage() {
     await send({ text });
   };
 
+  // Handle regeneration request
+  const handleRegenerate = useCallback((payload: RegeneratePayload) => {
+    console.log("[ChatPage] Regenerate requested:", payload);
+    // Re-send the original query with filter overrides
+    // For now, just re-send the query (full filter override support will come later)
+    send({ text: payload.originalQuery });
+  }, [send]);
+
+  // Get the original user query for the last assistant message
+  const getOriginalQuery = useMemo(() => {
+    const queryMap = new Map<string, string>();
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].role === "user") {
+        // The next assistant message gets this user's query
+        if (i + 1 < messages.length && messages[i + 1].role === "assistant") {
+          queryMap.set(messages[i + 1].id, messages[i].content);
+        }
+      }
+    }
+    return (assistantId: string) => queryMap.get(assistantId) || "";
+  }, [messages]);
+
   return (
     <div className="chat-layout">
       {/* Main Chat Area */}
@@ -173,6 +196,8 @@ export default function ChatPage() {
                     message={msg}
                     isStreaming={isStreaming && idx === messages.length - 1 && msg.role === "assistant"}
                     onFeedback={submitFeedback}
+                    onRegenerate={msg.role === "assistant" && !isStreaming ? handleRegenerate : undefined}
+                    originalQuery={msg.role === "assistant" ? getOriginalQuery(msg.id) : undefined}
                   />
                 ))
               )}

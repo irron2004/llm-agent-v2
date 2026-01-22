@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
-import { CopyOutlined, LikeOutlined, DislikeOutlined, CheckOutlined } from "@ant-design/icons";
+import { CopyOutlined, LikeOutlined, DislikeOutlined, CheckOutlined, ReloadOutlined, FilterOutlined } from "@ant-design/icons";
 import { Message, FeedbackRating } from "../types";
 import { MarkdownContent } from "./markdown-content";
-import { Collapse } from "antd";
+import { Collapse, Tag } from "antd";
 import { ImagePreviewModal, ImagePreviewItem } from "../../../components/image-preview-modal";
 
 // Preprocess snippet for better markdown rendering
@@ -77,6 +77,14 @@ function preprocessSnippet(snippet: string): string {
   return processed;
 }
 
+export type RegeneratePayload = {
+  messageId: string;
+  originalQuery: string;
+  selectedDevices?: string[] | null;
+  selectedDocTypes?: string[] | null;
+  searchQueries?: string[] | null;
+};
+
 type MessageItemProps = {
   message: Message;
   isStreaming?: boolean;
@@ -87,20 +95,42 @@ type MessageItemProps = {
     rating: FeedbackRating;
     reason?: string | null;
   }) => void;
+  onRegenerate?: (payload: RegeneratePayload) => void;
+  originalQuery?: string;  // Original user query for regeneration
 };
 
-export function MessageItem({ message, isStreaming, onFeedback }: MessageItemProps) {
+export function MessageItem({ message, isStreaming, onFeedback, onRegenerate, originalQuery }: MessageItemProps) {
   const [copied, setCopied] = useState(false);
   const [showReasonInput, setShowReasonInput] = useState(false);
   const [reasonText, setReasonText] = useState("");
   const [reasonError, setReasonError] = useState<string | null>(null);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
+  const [showFilterInfo, setShowFilterInfo] = useState(false);
 
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
   const rating = message.feedback?.rating ?? null;
   const canFeedback = Boolean(message.sessionId && message.turnId);
+
+  // Check if regeneration info is available
+  const hasFilterInfo = Boolean(
+    message.selectedDevices?.length ||
+    message.selectedDocTypes?.length ||
+    message.searchQueries?.length ||
+    message.autoParse
+  );
+
+  const handleRegenerate = () => {
+    if (!onRegenerate || !originalQuery) return;
+    onRegenerate({
+      messageId: message.id,
+      originalQuery,
+      selectedDevices: message.selectedDevices,
+      selectedDocTypes: message.selectedDocTypes,
+      searchQueries: message.searchQueries,
+    });
+  };
 
   // 이미지 URL이 유효한지 확인
   const hasValidImageUrl = (url: string | null | undefined): url is string => {
@@ -117,6 +147,13 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
 
     const images: ImagePreviewItem[] = [];
     message.retrievedDocs.forEach((doc) => {
+      // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
+      const docType = (doc.metadata as Record<string, unknown>)?.doc_type as string | undefined;
+      const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
+      const displayTitle = isSpecialDocType
+        ? `${docType}_${doc.id}`
+        : (doc.title || undefined);
+
       // expanded_page_urls가 있으면 사용
       if (doc.expanded_page_urls && doc.expanded_page_urls.length > 0) {
         const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
@@ -126,7 +163,7 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
           if (hasValidImageUrl(url)) {
             images.push({
               url,
-              title: doc.title || undefined,
+              title: displayTitle,
               page: pageNumbers[idx] || undefined,
               docId: doc.id,
             });
@@ -137,7 +174,7 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
       else if (hasValidImageUrl(doc.page_image_url)) {
         images.push({
           url: doc.page_image_url,
-          title: doc.title || undefined,
+          title: displayTitle,
           page: doc.page || undefined,
           docId: doc.id,
         });
@@ -227,7 +264,7 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
     <div className="message-item">
       <div className={`message-content ${isUser ? "user" : ""}`}>
         <div className={`message-avatar ${isUser ? "user" : "assistant"}`}>
-          {isUser ? "U" : "A"}
+          {isUser ? "U" : "RTM"}
         </div>
         <div className="message-body">
           <div className={`message-bubble ${isUser ? "user" : "assistant"}`}>
@@ -276,12 +313,19 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
                               ? [doc.page_image_url]
                               : [];
 
-                          const hasActualImage = pageUrls.length > 0;
+                          const hasImageUrls = pageUrls.length > 0;
+
+                          // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
+                          const docType = (doc.metadata as Record<string, unknown>)?.doc_type as string | undefined;
+                          const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
+                          const displayTitle = isSpecialDocType
+                            ? `${docType}_${doc.id}`
+                            : (doc.title || `Document ${idx + 1}`);
 
                           return (
                             <div key={doc.id || idx} className="reference-item" style={{ marginBottom: 16 }}>
                               <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                                {doc.title || `Document ${idx + 1}`}
+                                {displayTitle}
                                 {pageNumbers.length > 0 && (
                                   <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, color: "var(--color-text-secondary)" }}>
                                     {pageNumbers.length === 1
@@ -290,51 +334,64 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
                                   </span>
                                 )}
                               </div>
-                              {/* Show page images if available */}
-                              {pageUrls.length > 0 && (
-                                <div
-                                  className="reference-images-container"
-                                  style={{
-                                    display: "flex",
-                                    flexWrap: "wrap",
-                                    gap: 8,
-                                    marginBottom: 8,
-                                  }}
-                                >
-                                  {pageUrls.map((url, pageIdx) => (
-                                    <div key={pageIdx} className="reference-image-wrapper">
-                                      <div style={{ position: "relative", display: "inline-block" }}>
-                                        <img
-                                          src={url}
-                                          alt={`${doc.title || "Document"} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
-                                          style={{
-                                            maxWidth: pageUrls.length > 1 ? 150 : "100%",
-                                            maxHeight: pageUrls.length > 1 ? 200 : 300,
-                                            borderRadius: 4,
-                                            border: "1px solid var(--color-border)",
-                                            cursor: "pointer",
-                                          }}
-                                          title={`클릭하여 확대`}
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            handleImageClick(idx, pageIdx);
-                                          }}
-                                          onError={(e) => {
-                                            e.currentTarget.style.display = "none";
-                                          }}
-                                        />
+                              {/* 이미지와 텍스트 래퍼 */}
+                              <div className="reference-content-wrapper" style={{ position: "relative" }}>
+                                {/* 이미지가 있으면 표시 */}
+                                {hasImageUrls && (
+                                  <div
+                                    className="reference-images-container"
+                                    style={{
+                                      display: "flex",
+                                      flexWrap: "wrap",
+                                      gap: 8,
+                                      marginBottom: 8,
+                                    }}
+                                  >
+                                    {pageUrls.map((url, pageIdx) => (
+                                      <div key={pageIdx} className="reference-image-wrapper">
+                                        <div style={{ position: "relative", display: "inline-block" }}>
+                                          <img
+                                            src={url}
+                                            alt={`${displayTitle} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
+                                            style={{
+                                              maxWidth: pageUrls.length > 1 ? 150 : "100%",
+                                              maxHeight: pageUrls.length > 1 ? 200 : 300,
+                                              borderRadius: 4,
+                                              border: "1px solid var(--color-border)",
+                                              cursor: "pointer",
+                                            }}
+                                            title={`클릭하여 확대`}
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              handleImageClick(idx, pageIdx);
+                                            }}
+                                            onLoad={(e) => {
+                                              // 이미지 로드 성공 시 텍스트 숨기기
+                                              const wrapper = e.currentTarget.closest(".reference-content-wrapper");
+                                              const textContent = wrapper?.querySelector(".reference-text-content") as HTMLElement;
+                                              if (textContent) textContent.style.display = "none";
+                                            }}
+                                            onError={(e) => {
+                                              // 이미지 로드 실패 시 이미지 숨기기
+                                              e.currentTarget.style.display = "none";
+                                            }}
+                                          />
+                                        </div>
                                       </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                              {/* Show snippet only when no actual image URL is available */}
-                              {!hasActualImage && doc.snippet && (
-                                <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-                                  <MarkdownContent content={preprocessSnippet(doc.snippet)} />
-                                </div>
-                              )}
+                                    ))}
+                                  </div>
+                                )}
+                                {/* 텍스트 콘텐츠 (항상 렌더링, 이미지 로드 성공 시 숨김) */}
+                                {doc.snippet && (
+                                  <div
+                                    className="reference-text-content"
+                                    style={{ fontSize: 12, color: "var(--color-text-secondary)" }}
+                                  >
+                                    <MarkdownContent content={preprocessSnippet(doc.snippet)} />
+                                  </div>
+                                )}
+                              </div>
                               {(doc.score !== null && doc.score !== undefined) && (
                                 <div style={{ fontSize: 12, opacity: 0.6 }}>
                                   score: {doc.score.toFixed(3)} {doc.score_percent ? `(${doc.score_percent}%)` : ""}
@@ -379,6 +436,63 @@ export function MessageItem({ message, isStreaming, onFeedback }: MessageItemPro
               >
                 <DislikeOutlined />
               </button>
+              {hasFilterInfo && (
+                <button
+                  className={`action-button ${showFilterInfo ? "active" : ""}`}
+                  onClick={() => setShowFilterInfo(!showFilterInfo)}
+                  title="검색 필터 정보"
+                >
+                  <FilterOutlined />
+                </button>
+              )}
+              {onRegenerate && originalQuery && (
+                <button
+                  className="action-button regenerate-button"
+                  onClick={handleRegenerate}
+                  title="답변 재생성"
+                >
+                  <ReloadOutlined />
+                  <span style={{ marginLeft: 4, fontSize: 12 }}>재생성</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Filter info display */}
+          {isAssistant && !isStreaming && showFilterInfo && hasFilterInfo && (
+            <div className="filter-info" style={{ marginTop: 8, padding: "8px 12px", background: "var(--color-bg-secondary)", borderRadius: 6, fontSize: 12 }}>
+              {message.autoParse?.message && (
+                <div style={{ marginBottom: 4, color: "var(--color-accent-primary)" }}>
+                  🔍 {message.autoParse.message}
+                </div>
+              )}
+              {message.selectedDevices && message.selectedDevices.length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <span style={{ color: "var(--color-text-secondary)" }}>장비: </span>
+                  {message.selectedDevices.map((d, i) => (
+                    <Tag key={i} style={{ marginRight: 4 }}>{d}</Tag>
+                  ))}
+                </div>
+              )}
+              {message.selectedDocTypes && message.selectedDocTypes.length > 0 && (
+                <div style={{ marginBottom: 4 }}>
+                  <span style={{ color: "var(--color-text-secondary)" }}>문서 종류: </span>
+                  {message.selectedDocTypes.map((d, i) => (
+                    <Tag key={i} style={{ marginRight: 4 }}>{d}</Tag>
+                  ))}
+                </div>
+              )}
+              {message.searchQueries && message.searchQueries.length > 0 && (
+                <div>
+                  <span style={{ color: "var(--color-text-secondary)" }}>검색 쿼리: </span>
+                  {message.searchQueries.slice(0, 3).map((q, i) => (
+                    <div key={i} style={{ marginLeft: 8, color: "var(--color-text-secondary)" }}>• {q}</div>
+                  ))}
+                  {message.searchQueries.length > 3 && (
+                    <div style={{ marginLeft: 8, color: "var(--color-text-secondary)" }}>...외 {message.searchQueries.length - 3}개</div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
