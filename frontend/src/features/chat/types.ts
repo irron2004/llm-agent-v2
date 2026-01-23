@@ -13,9 +13,11 @@ export type Message = {
   role: MessageRole;
   content: string;
   createdAt?: string;
+  originalQuery?: string;
   reference?: Reference;
   rawAnswer?: string;
   retrievedDocs?: RetrievedDoc[];
+  allRetrievedDocs?: RetrievedDoc[];  // 전체 검색 문서 (재생성용, 20개)
   logs?: string[];
   currentNode?: string | null;
   sessionId?: string;
@@ -26,6 +28,22 @@ export type Message = {
   selectedDevices?: string[] | null;
   selectedDocTypes?: string[] | null;
   searchQueries?: string[] | null;
+};
+
+export type DeviceInfo = {
+  name: string;
+  doc_count: number;
+};
+
+export type DocTypeInfo = {
+  name: string;
+  doc_count: number;
+};
+
+export type DeviceCatalogResponse = {
+  devices: DeviceInfo[];
+  doc_types: DocTypeInfo[];
+  vis?: string[];
 };
 
 export type ReferenceChunk = {
@@ -68,6 +86,8 @@ export type ReviewDoc = {
 export type AutoParseResult = {
   device?: string | null;
   doc_type?: string | null;
+  devices?: string[] | null;
+  doc_types?: string[] | null;
   message?: string | null;
 };
 
@@ -76,6 +96,7 @@ export type AgentResponse = {
   answer: string;
   judge?: Record<string, unknown>;
   retrieved_docs?: RetrievedDoc[];
+  all_retrieved_docs?: RetrievedDoc[];  // 전체 검색 문서 (재생성용, 20개)
   metadata?: Record<string, unknown>;
   interrupted?: boolean;
   interrupt_payload?: Record<string, unknown> | null;
@@ -98,6 +119,8 @@ export type AgentRequest = {
   auto_parse?: boolean;
   filter_devices?: string[] | null;
   filter_doc_types?: string[] | null;
+  search_queries?: string[] | null;
+  selected_doc_ids?: string[] | null;
 };
 
 export type Conversation = {

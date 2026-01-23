@@ -192,6 +192,7 @@
   flex-direction: column;
   height: 100%;
   gap: var(--spacing-md);
+  overflow: hidden;  /* 내부 스크롤이 작동하도록 설정 */
 }
 
 .review-panel-sidebar .review-queries {

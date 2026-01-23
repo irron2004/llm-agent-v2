@@ -22,6 +22,13 @@ export type SessionChangeCallback = (info: { sessionId: string; title: string; i
 type SendOptions = {
   text: string;
   decisionOverride?: unknown;
+  overrides?: {
+    filterDevices?: string[];
+    filterDocTypes?: string[];
+    searchQueries?: string[];
+    selectedDocIds?: string[];
+    autoParse?: boolean;
+  };
 };
 
 type InterruptKind = "device_selection" | "retrieval_review" | "human_review" | "unknown";
@@ -259,10 +266,17 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       clearLogs();
 
       // Set completed retrieved docs in context if available
-      if (res.retrieved_docs && res.retrieved_docs.length > 0) {
-        console.log("[useChatSession] Setting completedRetrievedDocs:", res.retrieved_docs);
-        console.log("[useChatSession] First doc page_image_url:", res.retrieved_docs[0]?.page_image_url);
-        setCompletedRetrievedDocs(res.retrieved_docs);
+      // Fallback to all_retrieved_docs if retrieved_docs is empty (e.g., regeneration with no matching docs)
+      const docsToShow = (res.retrieved_docs && res.retrieved_docs.length > 0)
+        ? res.retrieved_docs
+        : (res.all_retrieved_docs && res.all_retrieved_docs.length > 0)
+          ? res.all_retrieved_docs
+          : null;
+
+      if (docsToShow) {
+        console.log("[useChatSession] Setting completedRetrievedDocs:", docsToShow);
+        console.log("[useChatSession] First doc page_image_url:", docsToShow[0]?.page_image_url);
+        setCompletedRetrievedDocs(docsToShow);
       } else {
         setCompletedRetrievedDocs(null);
       }
@@ -271,6 +285,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         ...m,
         content: res.answer || "",
         retrievedDocs: res.retrieved_docs || [],
+        allRetrievedDocs: res.all_retrieved_docs || [],  // 재생성용 전체 문서 (20개)
         rawAnswer: JSON.stringify(res, null, 2),
         currentNode: null,
         sessionId,
@@ -316,7 +331,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   );
 
   const send = useCallback(
-    async ({ text, decisionOverride }: SendOptions) => {
+    async ({ text, decisionOverride, overrides }: SendOptions) => {
       stop();
       setError(null);
       const pending = pendingInterrupt;
@@ -345,6 +360,9 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       const userId = nanoid();
       const assistantId = nanoid();
 
+      const requestMessage = isResume && pending ? pending.question : text;
+      const decision = isResume ? (decisionOverride ?? resolveDecision(text)) : undefined;
+
       appendMessage({
         id: userId,
         role: "user",
@@ -360,16 +378,22 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         content: "처리 중...",
         currentNode: null,
         sessionId,
+        originalQuery: requestMessage,
       });
       setIsStreaming(true);
 
       try {
-        const requestMessage = isResume && pending ? pending.question : text;
-        const decision = isResume ? (decisionOverride ?? resolveDecision(text)) : undefined;
+        const autoParseEnabled = overrides?.autoParse ?? !Boolean(overrides);
         const payload = {
           message: requestMessage,
-          auto_parse: true,  // 자동 파싱 모드 활성화 (기본값)
+          auto_parse: autoParseEnabled,  // 자동 파싱 모드 활성화 (기본값)
           ask_user_after_retrieve: false,  // 문서 선택 UI 비활성화
+          ...(overrides ? {
+            filter_devices: overrides.filterDevices,
+            filter_doc_types: overrides.filterDocTypes,
+            search_queries: overrides.searchQueries,
+            selected_doc_ids: overrides.selectedDocIds,
+          } : {}),
           ...(isResume && pending
             ? {
                 thread_id: pending.threadId,
@@ -436,14 +460,36 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
                 const parseMessage = typeof evt?.message === "string" ? evt.message : null;
                 const parsedDevice = typeof evt?.device === "string" ? evt.device : null;
                 const parsedDocType = typeof evt?.doc_type === "string" ? evt.doc_type : null;
+                const parsedDevices = Array.isArray(evt?.devices)
+                  ? evt.devices.map((d: any) => String(d)).filter((d: string) => d.trim())
+                  : (parsedDevice ? [parsedDevice] : []);
+                const parsedDocTypes = Array.isArray(evt?.doc_types)
+                  ? evt.doc_types.map((d: any) => String(d)).filter((d: string) => d.trim())
+                  : (parsedDocType ? [parsedDocType] : []);
 
-                if (parseMessage) {
-                  addLog(assistantId, `🔍 ${parseMessage}`, "auto_parse");
+                if (!parseMessage && parsedDevices.length === 0 && parsedDocTypes.length === 0) {
+                  return;
                 }
+
+                const messageText = parseMessage ?? `파싱 결과 - ${[
+                  parsedDevices.length > 0 ? `장비: ${parsedDevices.join(", ")}` : null,
+                  parsedDocTypes.length > 0 ? `문서: ${parsedDocTypes.join(", ")}` : null,
+                ].filter(Boolean).join(", ")}`;
+
+                addLog(assistantId, `🔍 ${messageText}`, "auto_parse");
 
                 updateMessage(assistantId, (m) => ({
                   ...m,
-                  content: parseMessage ? `🔍 ${parseMessage}\n\n처리 중...` : m.content,
+                  content: `🔍 ${messageText}\n\n처리 중...`,
+                  autoParse: {
+                    device: parsedDevice,
+                    doc_type: parsedDocType,
+                    devices: parsedDevices,
+                    doc_types: parsedDocTypes,
+                    message: messageText,
+                  },
+                  selectedDevices: parsedDevices.length > 0 ? parsedDevices : m.selectedDevices ?? null,
+                  selectedDocTypes: parsedDocTypes.length > 0 ? parsedDocTypes : m.selectedDocTypes ?? null,
                 }));
                 return;
               }

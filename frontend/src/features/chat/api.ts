@@ -4,6 +4,7 @@ import {
   AgentRequest,
   AgentResponse,
   FeedbackRating,
+  DeviceCatalogResponse,
   SessionListResponse,
   SessionDetailResponse,
   SaveTurnRequest,
@@ -17,6 +18,10 @@ export async function sendChatMessage(
 ): Promise<AgentResponse> {
   // Agent endpoint returns JSON (non-SSE)
   return apiClient.post<AgentResponse>(env.chatPath || "/api/agent/run", payload);
+}
+
+export async function fetchDeviceCatalog(): Promise<DeviceCatalogResponse> {
+  return apiClient.get<DeviceCatalogResponse>("/api/device-catalog");
 }
 
 // ─── Conversations API ───

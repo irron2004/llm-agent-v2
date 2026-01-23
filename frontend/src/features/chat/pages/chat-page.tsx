@@ -23,6 +23,8 @@ export default function ChatPage() {
     setPendingReview,
     setIsStreaming,
     registerSubmitHandlers,
+    setPendingRegeneration,
+    registerRegenerationHandlers,
   } = useChatReview();
 
   // Callback when a turn is saved
@@ -64,6 +66,30 @@ export default function ChatPage() {
     registerSubmitHandlers({ submitReview, submitSearchQueries });
   }, [submitReview, submitSearchQueries, registerSubmitHandlers]);
 
+  const submitRegeneration = useCallback((payload: {
+    originalQuery: string;
+    searchQueries: string[];
+    selectedDevices: string[];
+    selectedDocTypes: string[];
+    selectedDocIds: string[];
+  }) => {
+    setPendingRegeneration(null);
+    send({
+      text: payload.originalQuery,
+      overrides: {
+        filterDevices: payload.selectedDevices,
+        filterDocTypes: payload.selectedDocTypes,
+        searchQueries: payload.searchQueries,
+        selectedDocIds: payload.selectedDocIds,
+        autoParse: false,
+      },
+    });
+  }, [send, setPendingRegeneration]);
+
+  useEffect(() => {
+    registerRegenerationHandlers({ submitRegeneration });
+  }, [submitRegeneration, registerRegenerationHandlers]);
+
   // Sync streaming state with context
   useEffect(() => {
     setIsStreaming(isStreaming);
@@ -99,12 +125,13 @@ export default function ChatPage() {
   useEffect(() => {
     const handleNewChat = () => {
       reset();
+      setPendingRegeneration(null);
     };
     window.addEventListener("pe-agent:new-chat", handleNewChat);
     return () => {
       window.removeEventListener("pe-agent:new-chat", handleNewChat);
     };
-  }, [reset]);
+  }, [reset, setPendingRegeneration]);
 
   const handleSend = async (text: string) => {
     await send({ text });
@@ -112,11 +139,18 @@ export default function ChatPage() {
 
   // Handle regeneration request
   const handleRegenerate = useCallback((payload: RegeneratePayload) => {
-    console.log("[ChatPage] Regenerate requested:", payload);
-    // Re-send the original query with filter overrides
-    // For now, just re-send the query (full filter override support will come later)
-    send({ text: payload.originalQuery });
-  }, [send]);
+    const fallbackQueries = payload.originalQuery ? [payload.originalQuery] : [];
+    setPendingRegeneration({
+      messageId: payload.messageId,
+      originalQuery: payload.originalQuery,
+      docs: payload.retrievedDocs ?? [],
+      searchQueries: payload.searchQueries && payload.searchQueries.length > 0
+        ? payload.searchQueries
+        : fallbackQueries,
+      selectedDevices: payload.selectedDevices ?? [],
+      selectedDocTypes: payload.selectedDocTypes ?? [],
+    });
+  }, [setPendingRegeneration]);
 
   // Get the original user query for the last assistant message
   const getOriginalQuery = useMemo(() => {
@@ -196,7 +230,7 @@ export default function ChatPage() {
                     message={msg}
                     isStreaming={isStreaming && idx === messages.length - 1 && msg.role === "assistant"}
                     onFeedback={submitFeedback}
-                    onRegenerate={msg.role === "assistant" && !isStreaming ? handleRegenerate : undefined}
+                    onRegenerate={msg.role === "assistant" ? handleRegenerate : undefined}
                     originalQuery={msg.role === "assistant" ? getOriginalQuery(msg.id) : undefined}
                   />
                 ))

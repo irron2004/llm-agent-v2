@@ -1,6 +1,6 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { CopyOutlined, LikeOutlined, DislikeOutlined, CheckOutlined, ReloadOutlined, FilterOutlined } from "@ant-design/icons";
-import { Message, FeedbackRating } from "../types";
+import { Message, FeedbackRating, RetrievedDoc } from "../types";
 import { MarkdownContent } from "./markdown-content";
 import { Collapse, Tag } from "antd";
 import { ImagePreviewModal, ImagePreviewItem } from "../../../components/image-preview-modal";
@@ -77,9 +77,118 @@ function preprocessSnippet(snippet: string): string {
   return processed;
 }
 
+// 이미지 URL이 유효한지 확인하는 헬퍼
+function hasValidImageUrl(url: string | null | undefined): url is string {
+  if (typeof url !== 'string') return false;
+  const trimmed = url.trim();
+  if (trimmed.length === 0 || trimmed === 'null' || trimmed === 'undefined') return false;
+  return true;
+}
+
+// 개별 참고 문서 아이템 - 이미지 로드 상태를 자체 관리
+type ReferenceItemProps = {
+  doc: RetrievedDoc;
+  idx: number;
+  onImageClick: (docIndex: number, pageIndex: number) => void;
+};
+
+function ReferenceItem({ doc, idx, onImageClick }: ReferenceItemProps) {
+  const [imageLoadSuccess, setImageLoadSuccess] = useState(false);
+  const [imageLoadError, setImageLoadError] = useState(false);
+
+  const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
+    ? doc.expanded_pages
+    : doc.page !== null && doc.page !== undefined
+      ? [doc.page]
+      : [];
+
+  const pageUrls = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
+    ? doc.expanded_page_urls.filter(url => hasValidImageUrl(url))
+    : hasValidImageUrl(doc.page_image_url)
+      ? [doc.page_image_url]
+      : [];
+
+  const hasImageUrls = pageUrls.length > 0;
+
+  // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
+  const docType = (doc.metadata as Record<string, unknown>)?.doc_type as string | undefined;
+  const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
+  const displayTitle = isSpecialDocType
+    ? `${docType}_${doc.id}`
+    : (doc.title || `Document ${idx + 1}`);
+
+  // 이미지가 있고 로드에 성공했으면 텍스트 숨김
+  const showText = !hasImageUrls || imageLoadError || !imageLoadSuccess;
+
+  return (
+    <div className="reference-item" style={{ marginBottom: 16 }}>
+      <div style={{ fontWeight: 600, marginBottom: 4 }}>
+        {displayTitle}
+        {pageNumbers.length > 0 && (
+          <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, color: "var(--color-text-secondary)" }}>
+            {pageNumbers.length === 1
+              ? `p.${pageNumbers[0]}`
+              : `p.${pageNumbers[0]}-${pageNumbers[pageNumbers.length - 1]}`}
+          </span>
+        )}
+      </div>
+      {/* 이미지가 있으면 표시 */}
+      {hasImageUrls && !imageLoadError && (
+        <div
+          className="reference-images-container"
+          style={{
+            display: "flex",
+            flexWrap: "wrap",
+            gap: 8,
+            marginBottom: showText ? 8 : 0,
+          }}
+        >
+          {pageUrls.map((url, pageIdx) => (
+            <div key={pageIdx} className="reference-image-wrapper">
+              <div style={{ position: "relative", display: "inline-block" }}>
+                <img
+                  src={url}
+                  alt={`${displayTitle} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
+                  style={{
+                    maxWidth: pageUrls.length > 1 ? 150 : "100%",
+                    maxHeight: pageUrls.length > 1 ? 200 : 300,
+                    borderRadius: 4,
+                    border: "1px solid var(--color-border)",
+                    cursor: "pointer",
+                  }}
+                  title={`클릭하여 확대`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onImageClick(idx, pageIdx);
+                  }}
+                  onLoad={() => setImageLoadSuccess(true)}
+                  onError={() => setImageLoadError(true)}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {/* 텍스트: 이미지가 없거나 로드 실패 시에만 표시 */}
+      {showText && doc.snippet && (
+        <div style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+          <MarkdownContent content={preprocessSnippet(doc.snippet)} />
+        </div>
+      )}
+      {(doc.score !== null && doc.score !== undefined) && (
+        <div style={{ fontSize: 12, opacity: 0.6 }}>
+          score: {doc.score.toFixed(3)} {doc.score_percent ? `(${doc.score_percent}%)` : ""}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export type RegeneratePayload = {
   messageId: string;
   originalQuery: string;
+  retrievedDocs: RetrievedDoc[];
   selectedDevices?: string[] | null;
   selectedDocTypes?: string[] | null;
   searchQueries?: string[] | null;
@@ -112,6 +221,7 @@ export function MessageItem({ message, isStreaming, onFeedback, onRegenerate, or
   const isAssistant = message.role === "assistant";
   const rating = message.feedback?.rating ?? null;
   const canFeedback = Boolean(message.sessionId && message.turnId);
+  const regenerateQuery = (originalQuery || message.originalQuery || "").trim();
 
   // Check if regeneration info is available
   const hasFilterInfo = Boolean(
@@ -122,10 +232,12 @@ export function MessageItem({ message, isStreaming, onFeedback, onRegenerate, or
   );
 
   const handleRegenerate = () => {
-    if (!onRegenerate || !originalQuery) return;
+    if (!onRegenerate || !regenerateQuery) return;
+    // 재생성용으로 allRetrievedDocs (20개) 사용, 없으면 retrievedDocs fallback
     onRegenerate({
       messageId: message.id,
-      originalQuery,
+      originalQuery: regenerateQuery,
+      retrievedDocs: message.allRetrievedDocs ?? message.retrievedDocs ?? [],
       selectedDevices: message.selectedDevices,
       selectedDocTypes: message.selectedDocTypes,
       searchQueries: message.searchQueries,
@@ -405,6 +517,19 @@ export function MessageItem({ message, isStreaming, onFeedback, onRegenerate, or
                   },
                 ]}
               />
+              {onRegenerate && regenerateQuery && (
+                <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    className="action-button regenerate-button"
+                    onClick={handleRegenerate}
+                    title="답변 재생성"
+                    disabled={isStreaming}
+                  >
+                    <ReloadOutlined />
+                    <span style={{ marginLeft: 4, fontSize: 12 }}>재생성</span>
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -443,16 +568,6 @@ export function MessageItem({ message, isStreaming, onFeedback, onRegenerate, or
                   title="검색 필터 정보"
                 >
                   <FilterOutlined />
-                </button>
-              )}
-              {onRegenerate && originalQuery && (
-                <button
-                  className="action-button regenerate-button"
-                  onClick={handleRegenerate}
-                  title="답변 재생성"
-                >
-                  <ReloadOutlined />
-                  <span style={{ marginLeft: 4, fontSize: 12 }}>재생성</span>
                 </button>
               )}
             </div>
