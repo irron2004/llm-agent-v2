@@ -69,11 +69,12 @@ up-vllm:
 	$(DOCKER_COMPOSE) --profile with-vllm up -d
 
 build-up:
-	$(DOCKER_COMPOSE) build $(DOCKER_SERVICES)
-	$(DOCKER_COMPOSE) up -d $(DOCKER_SERVICES)
+	$(DOCKER_COMPOSE) build
+	$(DOCKER_COMPOSE) down
+	$(DOCKER_COMPOSE) up -d
 	@echo ""
 	@echo "=========================================="
-	@echo " Rebuilt and started: $(DOCKER_SERVICES)"
+	@echo " Rebuilt and started all services"
 	@echo "=========================================="
 
 logs:

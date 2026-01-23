@@ -1,40 +1,140 @@
-# llm-agent-v2
+# LLM-Agent-V2
 
-프로세스 엔지니어링(PE) 트러블슈팅을 위한 RAG 기반 에이전트 스켈레톤입니다. 전처리/임베딩/검색 레지스트리와 실험 러너를 중심으로, 도메인 특화 정규화(L0~L5)를 지원합니다.
+프로세스 엔지니어링(PE) 트러블슈팅을 위한 **RAG(Retrieval-Augmented Generation) 기반 에이전트 시스템**입니다.
 
-## 현재 상태
-- FastAPI API/서비스 레이어는 스켈레톤이며, 실제 엔드포인트·파이프라인 연결은 직접 채워야 합니다.
-- Docker/Makefile/Compose는 포함되어 있지 않습니다. 로컬 파이썬 환경 기준입니다.
-- 핵심 빌딩 블록: 전처리(normalize_engine), 임베딩/검색 레지스트리, 실험 러너(파이프라인 구현은 TODO).
+## 목차
+- [주요 기능](#주요-기능)
+- [기술 스택](#기술-스택)
+- [프로젝트 구조](#프로젝트-구조)
+- [빠른 시작](#빠른-시작)
+- [설정 가이드](#설정-env-기준)
+- [API 엔드포인트](#api-엔드포인트)
+- [핵심 아키텍처](#핵심-아키텍처)
+- [관련 문서](#문서)
 
-## 주요 특징
-- 레지스트리 패턴: 전처리·임베딩·검색을 이름/버전으로 선택·교체
-- 전처리 엔진: L0~L5 정규화(도메인 특화, 변형어/알람/모듈 토큰화 포함)
-- 설정 기반: Pydantic Settings(.env)로 RAG/VLLM/TEI/API 설정 주입
-- 실험 러너 스켈레톤: config/dataset을 받아 파이프라인을 실행하도록 확장 가능
+---
+
+## 주요 기능
+- **RAG 파이프라인**: 문서 수집 → 전처리 → 임베딩 → 검색 → 재순위 → LLM 생성
+- **도메인 특화 정규화**: PE 분야에 최적화된 L0~L5 정규화 엔진
+- **하이브리드 검색**: Dense(벡터) + Sparse(BM25) + RRF 융합
+- **레지스트리 패턴**: 전처리·임베딩·검색을 이름/버전으로 선택·교체 가능
+- **설정 기반**: Pydantic Settings(.env) + YAML 프리셋으로 모든 설정 관리
+- **실험 프레임워크**: 파이프라인 실험 및 평가 자동화
+
+---
+
+## 기술 스택
+
+### 백엔드
+| 분류 | 기술 |
+|------|------|
+| 언어/프레임워크 | Python 3.12+, FastAPI 0.110+, Uvicorn |
+| 검색 엔진 | Elasticsearch 8.0, Rank-BM25 |
+| 임베딩 | Sentence-Transformers, BGE, TEI |
+| LLM | vLLM, OpenAI SDK, LangChain, LangGraph |
+| 저장소 | MinIO (S3 호환), DiskCache |
+
+### 프론트엔드
+| 분류 | 기술 |
+|------|------|
+| 프레임워크 | React 18+, TypeScript, Vite |
+| UI | Ant Design |
+| 데이터 페칭 | TanStack React Query |
+
+### DevOps
+| 분류 | 기술 |
+|------|------|
+| 컨테이너 | Docker, Docker Compose |
+| 패키지 관리 | UV (Python), pnpm (Node) |
+| 코드 품질 | Ruff, MyPy, Pytest |
+
+---
 
 ## 프로젝트 구조
 ```
 llm-agent-v2/
-├── backend/
-│   ├── api/                          # FastAPI 라우터 스켈레톤
-│   ├── config/                       # 설정(BaseSettings) + retrieval 프리셋 YAML
-│   ├── domain/pe_core/               # 도메인 로직 스켈레톤
-│   ├── llm_infrastructure/
-│   │   ├── preprocessing/
+├── backend/                          # 백엔드 (Python)
+│   ├── api/                          # FastAPI API 레이어
+│   │   ├── main.py                   # 앱 진입점
+│   │   ├── dependencies.py           # 의존성 주입
+│   │   └── routers/                  # API 라우터 (11개)
+│   ├── config/                       # 설정 관리
+│   │   ├── settings.py               # 메인 설정 (Pydantic)
+│   │   ├── preset_loader.py          # YAML 프리셋 로더
+│   │   └── presets/                  # 검색 프리셋 YAML
+│   ├── llm_infrastructure/           # 핵심 LLM 인프라
+│   │   ├── preprocessing/            # 전처리 모듈
 │   │   │   ├── normalize_engine/     # L0~L5 정규화 엔진
-│   │   │   ├── adapters/             # 레지스트리 어댑터(standard, domain_specific)
-│   │   │   ├── base.py, registry.py  # 공통 베이스/레지스트리
-│   │   │   └── README.md             # 전처리 아키텍처 가이드
-│   │   ├── embedding/                # 임베더 베이스/레지스트리/샘플(BGE, TEI)
-│   │   └── retrieval/                # 리트리버 베이스/레지스트리/프리셋
-│   ├── services/ingest/              # 인제스트용 노멀라이저 팩토리
+│   │   │   ├── adapters/             # 전처리 어댑터
+│   │   │   ├── parsers/              # 문서 파서 (PDF, 텍스트)
+│   │   │   └── chunking/             # 청킹 알고리즘
+│   │   ├── embedding/                # 임베딩 (BGE, TEI 어댑터)
+│   │   ├── retrieval/                # 검색 (Dense, BM25, Hybrid)
+│   │   ├── llm/                      # LLM (vLLM, 프롬프트)
+│   │   ├── reranking/                # 재순위
+│   │   ├── query_expansion/          # 질의 확장
+│   │   ├── summarization/            # 요약
+│   │   ├── vlm/                      # 비전 LLM
+│   │   └── elasticsearch/            # ES 관리
+│   ├── services/                     # 서비스 레이어
+│   │   ├── chat_service.py           # 챗 오케스트레이션
+│   │   ├── search_service.py         # 검색 서비스
+│   │   ├── es_search_service.py      # ES 검색
+│   │   ├── embedding_service.py      # 임베딩 서비스
+│   │   ├── agents/                   # 에이전트 구현
+│   │   └── ingest/                   # 수집 파이프라인
+│   ├── domain/pe_core/               # PE 도메인 로직
+│   ├── tests/                        # 테스트 코드
 │   └── pyproject.toml                # 백엔드 의존성
-├── experiments/                      # 실험 러너/설정/가이드
-├── frontend/                         # React 소스/빌드 산출물
-├── data/                             # 데이터 폴더(샘플 비포함)
-└── docs/                             # 현재 비어 있음(선택적 문서용)
+│
+├── frontend/                         # 프론트엔드 (React)
+│   ├── src/
+│   │   ├── components/               # React 컴포넌트
+│   │   ├── features/                 # 기능 모듈
+│   │   └── lib/                      # 유틸리티
+│   ├── package.json                  # Node 의존성
+│   └── vite.config.ts                # Vite 설정
+│
+├── experiments/                      # 실험 프레임워크
+│   ├── run.py                        # 실험 러너
+│   ├── configs/                      # 실험 설정 YAML
+│   └── runs/                         # 실험 결과
+│
+├── scripts/                          # 유틸리티 스크립트
+│   ├── batch_ingest_*.py             # 배치 수집
+│   ├── es_migrate_v2.py              # ES 마이그레이션
+│   └── evaluation/                   # 평가 스크립트
+│
+├── data/                             # 데이터 디렉토리
+│   ├── ingestions/                   # 수집된 문서
+│   ├── elasticsearch/                # ES 인덱스 데이터
+│   ├── golden_set/                   # 평가용 골드셋
+│   ├── hf_cache/                     # HuggingFace 캐시
+│   └── vector_store/                 # 벡터 스토어
+│
+├── docs/                             # 문서
+│   └── work_list/                    # 작업 목록
+│
+├── docker-compose.yml                # Docker Compose
+├── Makefile                          # 개발 명령어
+├── pyproject.toml                    # 프로젝트 메타데이터
+└── .env                              # 환경변수
 ```
+
+### 디렉토리별 빠른 참조
+| 찾고 싶은 것 | 위치 |
+|-------------|------|
+| API 라우터 | `backend/api/routers/` |
+| 설정 파일 | `backend/config/settings.py` |
+| 전처리 엔진 | `backend/llm_infrastructure/preprocessing/normalize_engine/` |
+| 임베딩 어댑터 | `backend/llm_infrastructure/embedding/adapters/` |
+| 검색 방식 | `backend/llm_infrastructure/retrieval/methods/` |
+| LLM 프롬프트 | `backend/llm_infrastructure/llm/prompts/` |
+| 서비스 로직 | `backend/services/` |
+| 프론트엔드 컴포넌트 | `frontend/src/components/` |
+| 실험 설정 | `experiments/configs/` |
+| 배치 스크립트 | `scripts/` |
 
 ## 빠른 시작
 ### 1) 파이썬 환경 설치
