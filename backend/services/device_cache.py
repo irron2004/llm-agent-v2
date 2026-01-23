@@ -7,10 +7,87 @@ and can be refreshed manually.
 
 from __future__ import annotations
 
+import json
 import logging
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+_CATALOG_PATH = _REPO_ROOT / "data" / "device_catalog.json"
+
+
+def _unique_doc_count_agg(field: str = "doc_id") -> Dict[str, Any]:
+    """Cardinality aggregation for unique document count.
+
+    Falls back to base doc id when doc_id includes chunk suffixes.
+    """
+    return {
+        "cardinality": {
+            "script": {
+                "lang": "painless",
+                "source": (
+                    "def v = doc.containsKey(params.f) && !doc[params.f].empty ? doc[params.f].value : null;"
+                    "if (v == null) return null;"
+                    "int idx = v.indexOf('#');"
+                    "if (idx == -1) idx = v.indexOf(':');"
+                    "return idx > 0 ? v.substring(0, idx) : v;"
+                ),
+                "params": {"f": field},
+            }
+        }
+    }
+
+
+def _compute_visible_devices(devices: List[Dict[str, Any]], limit: int = 10) -> List[str]:
+    """Compute visible device list based on document counts (top N)."""
+    ranked = []
+    for item in devices or []:
+        name = str(item.get("name", "")).strip()
+        if not name:
+            continue
+        try:
+            count = int(item.get("doc_count", 0))
+        except Exception:
+            count = 0
+        ranked.append((name, count))
+    ranked.sort(key=lambda x: x[1], reverse=True)
+    return [name for name, _ in ranked[: max(0, int(limit))]]
+
+
+def _load_catalog_from_file(path: Path) -> Optional[Dict[str, Any]]:
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            return None
+        devices = data.get("devices") or []
+        doc_types = data.get("doc_types") or []
+        vis = data.get("vis") or data.get("visible_devices") or []
+        if not isinstance(devices, list) or not isinstance(doc_types, list) or not isinstance(vis, list):
+            return None
+        return {"devices": devices, "doc_types": doc_types, "vis": vis}
+    except Exception:
+        logger.exception("Failed to load device catalog file: %s", path)
+        return None
+
+
+def _save_catalog_to_file(path: Path, devices: List[Dict[str, Any]], doc_types: List[Dict[str, Any]]) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        visible_devices = _compute_visible_devices(devices)
+        payload = {
+            "devices": devices,
+            "doc_types": doc_types,
+            "vis": visible_devices,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        logger.exception("Failed to save device catalog file: %s", path)
 
 
 class DeviceCache:
@@ -23,6 +100,7 @@ class DeviceCache:
             cls._instance = super().__new__(cls)
             cls._instance._devices: List[Dict[str, Any]] = []
             cls._instance._doc_types: List[Dict[str, Any]] = []
+            cls._instance._visible_devices: List[str] = []
             cls._instance._initialized = False
         return cls._instance
 
@@ -35,6 +113,11 @@ class DeviceCache:
     def doc_types(self) -> List[Dict[str, Any]]:
         """Get cached doc type list."""
         return self._doc_types
+
+    @property
+    def visible_devices(self) -> List[str]:
+        """Get list of visible devices (top by doc count)."""
+        return self._visible_devices
 
     @property
     def device_names(self) -> List[str]:
@@ -60,6 +143,22 @@ class DeviceCache:
         Returns:
             True if initialization successful, False otherwise.
         """
+        # 1) Try local catalog first
+        local_catalog = _load_catalog_from_file(_CATALOG_PATH)
+        if local_catalog is not None:
+            self._devices = local_catalog.get("devices", [])
+            self._doc_types = local_catalog.get("doc_types", [])
+            self._visible_devices = local_catalog.get("vis", []) or _compute_visible_devices(self._devices)
+            self._initialized = True
+            logger.info(
+                "Device catalog loaded from file: %s (devices=%d, doc_types=%d)",
+                _CATALOG_PATH,
+                len(self._devices),
+                len(self._doc_types),
+            )
+            return True
+
+        # 2) Fallback to ES on first creation only
         if not hasattr(search_service, 'es_engine') or search_service.es_engine is None:
             logger.warning("ES engine not available for device cache initialization")
             return False
@@ -78,11 +177,7 @@ class DeviceCache:
                             "order": {"_count": "desc"},
                         },
                         "aggs": {
-                            "unique_docs": {
-                                "cardinality": {
-                                    "field": "doc_id"
-                                }
-                            }
+                            "unique_docs": _unique_doc_count_agg("doc_id")
                         }
                     },
                     "doc_types": {
@@ -92,11 +187,7 @@ class DeviceCache:
                             "order": {"_count": "desc"},
                         },
                         "aggs": {
-                            "unique_docs": {
-                                "cardinality": {
-                                    "field": "doc_id"
-                                }
-                            }
+                            "unique_docs": _unique_doc_count_agg("doc_id")
                         }
                     },
                 }
@@ -125,7 +216,9 @@ class DeviceCache:
                 if bucket.get("key")
             ]
 
+            self._visible_devices = _compute_visible_devices(self._devices)
             self._initialized = True
+            _save_catalog_to_file(_CATALOG_PATH, self._devices, self._doc_types)
             logger.info(
                 f"Device cache initialized: {len(self._devices)} devices, "
                 f"{len(self._doc_types)} doc types"
@@ -157,6 +250,7 @@ class DeviceCache:
         return {
             "devices": self._devices,
             "doc_types": self._doc_types,
+            "vis": self._visible_devices,
         }
 
 

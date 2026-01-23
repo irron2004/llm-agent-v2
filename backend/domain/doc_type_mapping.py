@@ -19,12 +19,19 @@ DOC_TYPE_GROUPS: dict[str, list[str]] = {
         "SOP Appendix",
         "SOP/Set‑up Manual",
         "generic",
+        "에스오피",
+        "sop"
     ],
     "ts": [
         "문제 해결 가이드",
         "Trouble Shooting Guide",
+        "trouble shooting",
+        "trouble shooting guide",
+        "trouble shooting guilde",
+        "troubleshooting",
         "Guide",
         "ts",
+        "t/s",
         "Troubleshooting Guide",
     ],
     "setup": [
