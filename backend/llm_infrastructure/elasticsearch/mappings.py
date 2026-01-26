@@ -438,11 +438,113 @@ def get_chat_turns_mapping() -> dict[str, Any]:
 CHAT_TURNS_MAPPING = get_chat_turns_mapping()
 
 
+def get_feedback_mapping() -> dict[str, Any]:
+    """Get feedback index mapping for detailed feedback storage.
+
+    Index naming convention:
+        - Index: feedback_{env}_v{version}  (e.g., feedback_dev_v1)
+        - Alias: feedback_{env}_current     (e.g., feedback_dev_current)
+
+    Each document represents feedback for a single turn with detailed scores.
+    Designed for LLM fine-tuning data collection.
+    """
+    return {
+        "properties": {
+            # ===================================================================
+            # Reference Keys (FK to chat_turns)
+            # ===================================================================
+            "session_id": {
+                "type": "keyword",
+                "doc_values": True,
+            },
+            "turn_id": {
+                "type": "integer",
+            },
+            # ===================================================================
+            # Conversation Content (copied for join-free retrieval)
+            # ===================================================================
+            "user_text": {
+                "type": "text",
+                "analyzer": "nori",
+            },
+            "assistant_text": {
+                "type": "text",
+                "analyzer": "nori",
+            },
+            # ===================================================================
+            # Detailed Feedback Scores (1-5)
+            # ===================================================================
+            "accuracy": {
+                "type": "integer",
+                # 답변이 사실적으로 정확한가 (1-5)
+            },
+            "completeness": {
+                "type": "integer",
+                # 답변이 질문에 충분히 답했는가 (1-5)
+            },
+            "relevance": {
+                "type": "integer",
+                # 답변이 질문과 관련이 있는가 (1-5)
+            },
+            "avg_score": {
+                "type": "float",
+                # 평균 점수 (집계용)
+            },
+            "rating": {
+                "type": "keyword",
+                # "up" | "down" (하위 호환, avg >= 3 이면 up)
+            },
+            # ===================================================================
+            # Free-form Feedback
+            # ===================================================================
+            "comment": {
+                "type": "text",
+                "analyzer": "nori",
+                # 자유 의견 (선택사항)
+            },
+            # ===================================================================
+            # Reviewer Info
+            # ===================================================================
+            "reviewer_name": {
+                "type": "keyword",
+                # 피드백 제출자 이름 (선택, 집계용)
+            },
+            # ===================================================================
+            # Execution Logs (at feedback time)
+            # ===================================================================
+            "logs": {
+                "type": "text",
+                "index": False,
+                # 피드백 시점의 실행 로그 (저장만, 검색 불필요)
+            },
+            # ===================================================================
+            # Timestamps
+            # ===================================================================
+            "ts": {
+                "type": "date",
+                # 피드백 제출 시간
+            },
+            "created_at": {
+                "type": "date",
+            },
+            "updated_at": {
+                "type": "date",
+            },
+        },
+    }
+
+
+# Default feedback mapping
+FEEDBACK_MAPPING = get_feedback_mapping()
+
+
 __all__ = [
     "get_rag_chunks_mapping",
     "get_index_settings",
     "get_index_meta",
     "get_chat_turns_mapping",
+    "get_feedback_mapping",
     "RAG_CHUNKS_MAPPING",
     "CHAT_TURNS_MAPPING",
+    "FEEDBACK_MAPPING",
 ]

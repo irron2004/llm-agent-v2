@@ -159,12 +159,13 @@ def _to_retrieved_docs(results):
         metadata = getattr(result, "metadata", None)
         title = ""
         if metadata:
-            title = metadata.get("title", "")
+            # Try title first, then doc_description (used by myservice/gcb)
+            title = metadata.get("title", "") or metadata.get("doc_description", "")
         if not title:
-            title = (result.raw_text or result.content or "").split("\n")[0][:50]
+            title = (result.raw_text or result.content or "").split("\n")[0][:80]
 
-        snippet_source = result.raw_text or result.content or ""
-        snippet = snippet_source[:200] + ("..." if len(snippet_source) > 200 else "")
+        # Use full expanded content (raw_text) or original content without truncation
+        snippet = result.raw_text or result.content or ""
 
         score = getattr(result, "score", 0.0) or 0.0
         score_percent = int(score * 100) if score <= 1 else int(min(score, 100))
