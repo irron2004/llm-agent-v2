@@ -49,6 +49,7 @@ export default function ChatPage() {
     submitSearchQueries,
     submitDeviceSelection,
     submitFeedback,
+    submitDetailedFeedback,
   } = useChatSession({ onTurnSaved: handleTurnSaved });
 
   // Load session from URL parameter
@@ -230,6 +231,7 @@ export default function ChatPage() {
                     message={msg}
                     isStreaming={isStreaming && idx === messages.length - 1 && msg.role === "assistant"}
                     onFeedback={submitFeedback}
+                    onDetailedFeedback={submitDetailedFeedback}
                     onRegenerate={msg.role === "assistant" ? handleRegenerate : undefined}
                     originalQuery={msg.role === "assistant" ? getOriginalQuery(msg.id) : undefined}
                   />

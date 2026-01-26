@@ -560,7 +560,8 @@ function RegeneratePanelContent({
   onClose: () => void;
 }) {
   const [editableQueries, setEditableQueries] = useState<string[]>([]);
-  const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
+  // Use index-based selection to handle duplicate docIds correctly
+  const [selectedIndices, setSelectedIndices] = useState<number[]>([]);
   const [selectedDevices, setSelectedDevices] = useState<string[]>([]);
   const [selectedDocTypes, setSelectedDocTypes] = useState<string[]>([]);
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
@@ -615,10 +616,9 @@ function RegeneratePanelContent({
       ? pendingRegeneration.searchQueries
       : (pendingRegeneration.originalQuery ? [pendingRegeneration.originalQuery] : []);
     setEditableQueries(baseQueries);
-    const docIds = Array.from(new Set(
-      pendingRegeneration.docs.map((d) => d.id).filter((id) => typeof id === "string" && id.trim())
-    ));
-    setSelectedDocIds(docIds);
+    // Select all documents by index initially
+    const allIndices = pendingRegeneration.docs.map((_, idx) => idx);
+    setSelectedIndices(allIndices);
     setSelectedDevices(pendingRegeneration.selectedDevices ?? []);
     const allowedSet = new Set(allowedDocTypes.map((d) => d.toLowerCase()));
     const initialDocTypes = (pendingRegeneration.selectedDocTypes ?? [])
@@ -646,29 +646,22 @@ function RegeneratePanelContent({
     };
   }, [pendingRegeneration]);
 
-  const docIdList = useMemo(() => {
-    return Array.from(new Set(
-      pendingRegeneration.docs
-        .map((d) => d.id)
-        .filter((id) => typeof id === "string" && id.trim())
-    ));
-  }, [pendingRegeneration.docs]);
-
+  // Use index-based selection to handle duplicate docIds
   const allDocsSelected =
-    docIdList.length > 0 && selectedDocIds.length === docIdList.length;
+    pendingRegeneration.docs.length > 0 && selectedIndices.length === pendingRegeneration.docs.length;
 
-  const toggleDoc = (docId: string) => {
-    setSelectedDocIds((prev) =>
-      prev.includes(docId) ? prev.filter((id) => id !== docId) : [...prev, docId]
+  const toggleDocByIndex = (index: number) => {
+    setSelectedIndices((prev) =>
+      prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
     );
   };
 
   const toggleAllDocs = () => {
     if (allDocsSelected) {
-      setSelectedDocIds([]);
+      setSelectedIndices([]);
       return;
     }
-    setSelectedDocIds(docIdList);
+    setSelectedIndices(pendingRegeneration.docs.map((_, idx) => idx));
   };
 
   const handleQueryChange = (index: number, value: string) => {
@@ -761,10 +754,14 @@ function RegeneratePanelContent({
 
   const handleSubmit = () => {
     const queries = editableQueries.map((q) => q.trim()).filter((q) => q.length > 0);
-    if (selectedDocIds.length === 0) {
+    if (selectedIndices.length === 0) {
       setError("재검색할 문서를 1개 이상 선택해 주세요.");
       return;
     }
+    // Convert selected indices to doc IDs
+    const selectedDocIds = selectedIndices
+      .map((idx) => pendingRegeneration.docs[idx]?.id)
+      .filter((id): id is string => typeof id === "string" && id.trim().length > 0);
     // 전체 선택 시 빈 배열로 전달 (필터 없이 검색)
     const deviceFilter = allDevicesSelected ? [] : selectedDevices;
     const docTypeFilter = allDocTypesSelected ? [] : selectedDocTypes;
@@ -937,7 +934,7 @@ function RegeneratePanelContent({
           이전 문서 전체 선택
         </label>
         <span className="review-count">
-          {selectedDocIds.length}/{pendingRegeneration.docs.length} 선택
+          {selectedIndices.length}/{pendingRegeneration.docs.length} 선택
         </span>
       </div>
 
@@ -950,12 +947,11 @@ function RegeneratePanelContent({
             ? `${docType}_${docId}`
             : (doc.title || `문서 ${idx + 1}`);
           return (
-            <label key={`${docId}-${idx}`} className="review-doc">
+            <label key={`doc-${idx}`} className="review-doc">
               <input
                 type="checkbox"
-                checked={docId ? selectedDocIds.includes(docId) : false}
-                onChange={() => docId && toggleDoc(docId)}
-                disabled={!docId}
+                checked={selectedIndices.includes(idx)}
+                onChange={() => toggleDocByIndex(idx)}
               />
               <div className="review-doc-body">
                 <div className="review-doc-title">
@@ -1057,15 +1053,11 @@ function RegeneratePanelContent({
         visible={previewVisible}
         images={previewImages}
         currentIndex={previewIndex}
-        selectedRanks={selectedDocIds.map((id) => {
-          const idx = pendingRegeneration.docs.findIndex((d) => d.id === id);
-          return idx >= 0 ? idx + 1 : -1;
-        }).filter((r) => r > 0)}
+        selectedRanks={selectedIndices.map((idx) => idx + 1)}
         onIndexChange={setPreviewIndex}
         onClose={() => setPreviewVisible(false)}
         onToggleSelect={(rank) => {
-          const doc = pendingRegeneration.docs[rank - 1];
-          if (doc?.id) toggleDoc(doc.id);
+          toggleDocByIndex(rank - 1);
         }}
       />
     </div>
