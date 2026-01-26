@@ -464,7 +464,7 @@ async def run_agent(
             answer=result.get("answer", "") or "",
             judge=result.get("judge", {}) or {},
             retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
-            all_retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+            all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
             expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
             metadata={
                 "route": result.get("route"),
@@ -488,7 +488,7 @@ async def run_agent(
         answer=result.get("answer", ""),
         judge=result.get("judge", {}),
         retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
-        all_retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+        all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
         expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
         metadata={
             "route": result.get("route"),
@@ -624,6 +624,8 @@ async def run_agent_stream(
 
             interrupt_info = result.get("__interrupt__")
             logger.info(f"[agent stream] result keys: {list(result.keys())}")
+            logger.info(f"[agent stream] search_queries: {result.get('search_queries')}")
+            logger.info(f"[agent stream] all_docs count: {len(result.get('all_docs', []))}")
             logger.info(f"[agent stream] interrupt_info: {interrupt_info}")
             if interrupt_info:
                 payload = None
@@ -636,7 +638,7 @@ async def run_agent_stream(
                     reasoning=result.get("reasoning"),
                     judge=result.get("judge", {}) or {},
                     retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
-                    all_retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+                    all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
                     expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
                     metadata={
                         "route": result.get("route"),
@@ -660,7 +662,7 @@ async def run_agent_stream(
                     reasoning=result.get("reasoning"),
                     judge=result.get("judge", {}),
                     retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
-                    all_retrieved_docs=_to_retrieved_docs(result.get("docs", [])),
+                    all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
                     expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
                     metadata={
                         "route": result.get("route"),

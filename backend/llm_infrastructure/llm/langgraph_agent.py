@@ -73,6 +73,7 @@ class AgentState(TypedDict, total=False):
 
     # Retrieval outputs
     docs: List[RetrievalResult]
+    all_docs: List[RetrievalResult]  # 재생성용 전체 문서 (rerank 전, 최대 20개)
     display_docs: List[RetrievalResult]
     ref_json: List[Dict[str, Any]]
     answer_ref_json: List[Dict[str, Any]]
@@ -958,6 +959,10 @@ def retrieve_node(
     if len(all_docs) > candidate_k:
         all_docs = sorted(all_docs, key=lambda d: d.score, reverse=True)[:candidate_k]
 
+    # Store all_docs before reranking for regeneration (up to retrieval_top_k)
+    # Sort by score and take top retrieval_top_k for regeneration options
+    all_docs_for_regen = sorted(all_docs, key=lambda d: d.score, reverse=True)[:retrieval_top_k]
+
     # Rerank if reranker is available
     # Use English query for reranking - cross-encoder models often work better with English
     rerank_query = query_en if query_en else original_query
@@ -968,8 +973,12 @@ def retrieve_node(
         # No reranker: just take top final_top_k by score
         docs = sorted(all_docs, key=lambda d: d.score, reverse=True)[:final_top_k]
 
-    logger.info("retrieve_node: returning %d docs", len(docs))
-    return {"docs": docs, "ref_json": results_to_ref_json(docs)}
+    logger.info("retrieve_node: returning %d docs (all_docs_for_regen: %d)", len(docs), len(all_docs_for_regen))
+    return {
+        "docs": docs,
+        "ref_json": results_to_ref_json(docs),
+        "all_docs": all_docs_for_regen,  # 재생성용 전체 문서 (최대 retrieval_top_k개)
+    }
 
 
 def expand_related_docs_node(
