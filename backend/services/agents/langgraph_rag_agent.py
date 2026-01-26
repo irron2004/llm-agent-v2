@@ -117,6 +117,16 @@ class LangGraphRAGAgent:
         """Wrap a node to emit a single log event with timing and result info."""
 
         def _wrapped(state: AgentState, *args: Any, **kwargs: Any):
+            # Log input state (key fields only)
+            input_info = {
+                "query": state.get("query", "")[:50] if state.get("query") else None,
+                "query_en": state.get("query_en", "")[:50] if state.get("query_en") else None,
+                "query_ko": state.get("query_ko", "")[:50] if state.get("query_ko") else None,
+                "detected_language": state.get("detected_language"),
+                "route": state.get("route"),
+            }
+            logger.info("[langgraph] >>> %s INPUT: %s", name, input_info)
+
             t0 = time.perf_counter()
             result = fn(state, *args, **kwargs)
             elapsed = (time.perf_counter() - t0) * 1000
@@ -124,6 +134,20 @@ class LangGraphRAGAgent:
             extra_events = None
             if isinstance(result, dict):
                 extra_events = result.pop("_events", None)
+
+            # Log output result
+            if result:
+                output_info = {}
+                for k, v in result.items():
+                    if k.startswith("_"):
+                        continue
+                    if isinstance(v, str) and len(v) > 100:
+                        output_info[k] = v[:100] + "..."
+                    elif isinstance(v, list) and len(v) > 0:
+                        output_info[k] = f"[{len(v)} items] {str(v)[:100]}..."
+                    else:
+                        output_info[k] = v
+                logger.info("[langgraph] <<< %s OUTPUT: %s", name, output_info)
 
             # Build node-specific details for display
             details = self._build_node_details(name, state, result)
@@ -292,9 +316,8 @@ class LangGraphRAGAgent:
         builder.add_node("answer", self._wrap_node("answer", functools.partial(answer_node, llm=self.llm, spec=self.spec)))
         builder.add_node("judge", self._wrap_node("judge", functools.partial(judge_node, llm=self.llm, spec=self.spec)))
 
-        builder.add_edge(START, "route")
-
-        # Auto-parse mode: extract device/doc_type from query using LLM
+        # Auto-parse mode: auto_parse → translate → route → mq
+        # This ensures route receives translated query (query_en)
         if self.auto_parse_enabled:
             builder.add_node(
                 "auto_parse",
@@ -321,9 +344,11 @@ class LangGraphRAGAgent:
                     ),
                 ),
             )
-            builder.add_edge("route", "auto_parse")
+            # Flow: START → auto_parse → translate → route → mq
+            builder.add_edge(START, "auto_parse")
             builder.add_edge("auto_parse", "translate")
-            builder.add_edge("translate", "mq")
+            builder.add_edge("translate", "route")
+            builder.add_edge("route", "mq")
         # Device selection node (optional HIL) - legacy mode
         elif self.ask_device_selection:
             builder.add_node(
@@ -333,9 +358,12 @@ class LangGraphRAGAgent:
                     functools.partial(device_selection_node, device_fetcher=self.device_fetcher),
                 ),
             )
+            builder.add_edge(START, "route")
             builder.add_edge("route", "device_selection")
             # device_selection_node returns Command(goto="mq"), so no explicit edge needed
         else:
+            # Default flow: START → route → mq
+            builder.add_edge(START, "route")
             builder.add_edge("route", "mq")
 
         builder.add_edge("mq", "st_gate")
@@ -368,7 +396,7 @@ class LangGraphRAGAgent:
 
         # verified: add retry/human
         builder.add_node("retry_bump", self._wrap_node("retry_bump", retry_bump_node))
-        builder.add_node("refine_queries", self._wrap_node("refine_queries", functools.partial(refine_queries_node, llm=self.llm)))
+        builder.add_node("refine_queries", self._wrap_node("refine_queries", functools.partial(refine_queries_node, llm=self.llm, spec=self.spec)))
         builder.add_node("human_review", self._wrap_node("human_review", human_review_node))
         # 호환성을 위해 'retry' 별칭을 두고 바로 retry_bump로 연결
         builder.add_node("retry", self._wrap_node("retry", lambda s: {}))
@@ -418,7 +446,12 @@ class LangGraphRAGAgent:
             state.update(state_overrides)
         config = kwargs.pop("config", {})
         # thread_id is required for checkpointer
-        config = {**config, "configurable": {**config.get("configurable", {}), "thread_id": tid}}
+        # recursion_limit: max_attempts=3일 때 재시도 루프를 위해 충분한 값 설정
+        config = {
+            **config,
+            "configurable": {**config.get("configurable", {}), "thread_id": tid},
+            "recursion_limit": 100,
+        }
 
         return self._graph.invoke(state, config=config)
 

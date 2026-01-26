@@ -192,7 +192,7 @@ def _get_auto_parse_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent
 class AgentRequest(BaseModel):
     message: str = Field(..., description="사용자 질문")
     top_k: int = Field(10, ge=1, le=50, description="검색 상위 문서 수")
-    max_attempts: int = Field(0, ge=0, le=3, description="judge 실패 시 재시도 횟수")
+    max_attempts: int = Field(3, ge=0, le=3, description="judge 실패 시 재시도 횟수")
     mode: str = Field("verified", description="base 또는 verified")
     thread_id: Optional[str] = Field(None, description="LangGraph thread_id")
     ask_user_after_retrieve: bool = Field(False, description="검색 후 사용자 확인")

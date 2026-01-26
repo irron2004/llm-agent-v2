@@ -38,6 +38,9 @@ class AgentState(TypedDict, total=False):
     setup_mq_list: List[str]
     ts_mq_list: List[str]
     general_mq_list: List[str]
+    setup_mq_ko_list: List[str]
+    ts_mq_ko_list: List[str]
+    general_mq_ko_list: List[str]
 
     st_gate: Gate
     search_queries: List[str]
@@ -623,15 +626,22 @@ def _combine_related_text(docs: List[RetrievalResult]) -> str:
 # 6) Graph node helpers
 # -----------------------------
 def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
-    user = _format_prompt(spec.router.user, {"sys.query": state["query"]})
+    # Use English query for routing (after translation)
+    query = state.get("query_en") or state["query"]
+    user = _format_prompt(spec.router.user, {"sys.query": query})
     route = _parse_route(_invoke_llm(llm, spec.router.system, user))
+    logger.info("route_node: query=%s..., route=%s", query[:50] if query else None, route)
     return {"route": route}
 
 
 def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     route = state["route"]
-    # Use English query for MQ generation (better prompt consistency)
-    q = state.get("query_en") or state["query"]
+    # Generate MQ in both English and Korean for bilingual retrieval
+    query_en = state.get("query_en") or state["query"]
+    query_ko = state.get("query_ko") or state["query"]
+    logger.info("mq_node: bilingual - EN=%s..., KO=%s...",
+                query_en[:40] if query_en else None,
+                query_ko[:40] if query_ko else None)
 
     if state.get("skip_mq") and state.get("search_queries"):
         logger.info("mq_node: search_queries override provided, skipping MQ generation")
@@ -641,30 +651,53 @@ def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, A
     ts_mq_list: List[str] = []
     general_mq_list: List[str] = []
 
-    # MQ generation needs more tokens than classification (3 queries ~300 tokens)
-    # Reasoning models need extra tokens for thinking process (~1000) + output (~200)
+    # MQ generation needs more tokens than classification
     mq_kwargs = {"max_tokens": 4096}
 
-    if route == "setup":
-        user = _format_prompt(spec.setup_mq.user, {"sys.query": q})
-        raw = _invoke_llm(llm, spec.setup_mq.system, user, **mq_kwargs)
-        logger.info("mq_node(setup): raw output=%s", raw)
-        setup_mq_list = _parse_queries(raw)
-        logger.info("mq_node(setup): generated %d queries: %s", len(setup_mq_list), setup_mq_list)
-    elif route == "ts":
-        user = _format_prompt(spec.ts_mq.user, {"sys.query": q})
-        raw = _invoke_llm(llm, spec.ts_mq.system, user, **mq_kwargs)
-        logger.info("mq_node(ts): raw output=%s", raw)
-        ts_mq_list = _parse_queries(raw)
-        logger.info("mq_node(ts): generated %d queries: %s", len(ts_mq_list), ts_mq_list)
-    else:
-        user = _format_prompt(spec.general_mq.user, {"sys.query": q})
-        raw = _invoke_llm(llm, spec.general_mq.system, user, **mq_kwargs)
-        logger.info("mq_node(general): raw output=%s", raw)
-        general_mq_list = _parse_queries(raw)
-        logger.info("mq_node(general): generated %d queries: %s", len(general_mq_list), general_mq_list)
+    def _generate_mq_bilingual(spec_template) -> tuple[List[str], List[str]]:
+        """Generate MQ in both English and Korean."""
+        # English MQ - add explicit language instruction
+        system_en = spec_template.system + "\n\n**IMPORTANT: Generate all queries in English.**"
+        user_en = _format_prompt(spec_template.user, {"sys.query": query_en})
+        raw_en = _invoke_llm(llm, system_en, user_en, **mq_kwargs)
+        mq_en = _parse_queries(raw_en)
+        logger.info("mq_node(%s/en): %d queries: %s", route, len(mq_en), mq_en)
 
-    return {"setup_mq_list": setup_mq_list, "ts_mq_list": ts_mq_list, "general_mq_list": general_mq_list}
+        # Korean MQ - add explicit Korean language instruction
+        system_ko = spec_template.system + "\n\n**중요: 모든 검색어를 반드시 한국어로 생성하세요. Generate all queries in Korean.**"
+        user_ko = _format_prompt(spec_template.user, {"sys.query": query_ko})
+        raw_ko = _invoke_llm(llm, system_ko, user_ko, **mq_kwargs)
+        mq_ko = _parse_queries(raw_ko)
+        logger.info("mq_node(%s/ko): %d queries: %s", route, len(mq_ko), mq_ko)
+
+        return mq_en, mq_ko
+
+    setup_mq_ko_list: List[str] = []
+    ts_mq_ko_list: List[str] = []
+    general_mq_ko_list: List[str] = []
+
+    if route == "setup":
+        setup_mq_list, setup_mq_ko_list = _generate_mq_bilingual(spec.setup_mq)
+    elif route == "ts":
+        ts_mq_list, ts_mq_ko_list = _generate_mq_bilingual(spec.ts_mq)
+    else:
+        general_mq_list, general_mq_ko_list = _generate_mq_bilingual(spec.general_mq)
+
+    logger.info(
+        "mq_node: total - setup(en=%d,ko=%d), ts(en=%d,ko=%d), general(en=%d,ko=%d)",
+        len(setup_mq_list), len(setup_mq_ko_list),
+        len(ts_mq_list), len(ts_mq_ko_list),
+        len(general_mq_list), len(general_mq_ko_list),
+    )
+
+    return {
+        "setup_mq_list": setup_mq_list,
+        "ts_mq_list": ts_mq_list,
+        "general_mq_list": general_mq_list,
+        "setup_mq_ko_list": setup_mq_ko_list,
+        "ts_mq_ko_list": ts_mq_ko_list,
+        "general_mq_ko_list": general_mq_ko_list,
+    }
 
 
 def st_gate_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
@@ -706,6 +739,20 @@ def _is_garbage_query(q: str) -> bool:
     return False
 
 
+def _contains_korean(text: str) -> bool:
+    return bool(re.search(r"[가-힣]", text or ""))
+
+
+def _fill_to_n(base: List[str], candidates: List[str], n: int) -> List[str]:
+    for q in candidates:
+        q = str(q).strip()
+        if q and q not in base:
+            base.append(q)
+        if len(base) >= n:
+            break
+    return base
+
+
 def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     # Get MQ lists from previous node
     setup_mq_list = state.get("setup_mq_list", [])
@@ -716,6 +763,16 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     q_en = state.get("query_en") or state["query"]
     # Get Korean query for bilingual search
     q_ko = state.get("query_ko")
+    route = state.get("route", "general")
+    if route == "setup":
+        mq_en_list = setup_mq_list
+        mq_ko_list = state.get("setup_mq_ko_list", [])
+    elif route == "ts":
+        mq_en_list = ts_mq_list
+        mq_ko_list = state.get("ts_mq_ko_list", [])
+    else:
+        mq_en_list = general_mq_list
+        mq_ko_list = state.get("general_mq_ko_list", [])
 
     if state.get("skip_mq") and state.get("search_queries"):
         provided = [str(q).strip() for q in state.get("search_queries", []) if str(q).strip()]
@@ -738,14 +795,45 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     # Filter out garbage queries (prompt label leaks, too short, etc.)
     queries = [q for q in queries if not _is_garbage_query(q)]
 
-    # Include both English and Korean queries for bilingual search
-    # This ensures Korean documents are also found effectively
-    merged = [q_en] + [q for q in queries if q and q != q_en]
-    # Add Korean query for bilingual coverage if different from English
-    if q_ko and q_ko != q_en and q_ko not in merged:
-        merged.append(q_ko)
-    logger.info("st_mq_node: final search_queries (bilingual)=%s", merged[:6])
-    return {"search_queries": merged[:6]}
+    # Build English queries (prefer st_mq output, then q_en, then MQ list)
+    english_queries: List[str] = []
+    _fill_to_n(english_queries, queries, 3)
+    if q_en:
+        _fill_to_n(english_queries, [q_en], 3)
+    _fill_to_n(english_queries, mq_en_list, 3)
+
+    # Build Korean queries (prefer KO MQ list, then q_ko, then translate EN if needed)
+    ko_candidates = [q for q in mq_ko_list if _contains_korean(q)]
+    if q_ko and _contains_korean(q_ko):
+        ko_candidates = [q_ko] + ko_candidates
+    korean_queries = _dedupe_queries(ko_candidates)
+
+    if len(korean_queries) < 3 and spec.translate is not None:
+        def _translate(text: str, target_lang: str) -> str:
+            target_name = {"en": "English", "ko": "Korean"}.get(target_lang, target_lang)
+            user = _format_prompt(spec.translate.user, {
+                "query": text,
+                "target_language": target_name,
+            })
+            result = _invoke_llm(llm, spec.translate.system, user)
+            result = result.strip().strip('"').strip("'").strip()
+            return result if result else text
+
+        for q in english_queries:
+            if len(korean_queries) >= 3:
+                break
+            if _contains_korean(q):
+                continue
+            translated = _translate(q, "ko")
+            if translated and translated not in korean_queries:
+                korean_queries.append(translated)
+
+    korean_queries = korean_queries[:3]
+    english_queries = english_queries[:3]
+
+    merged = english_queries + korean_queries
+    logger.info("st_mq_node: final search_queries (bilingual)=%s", merged)
+    return {"search_queries": merged}
 
 
 def retrieve_node(
@@ -774,16 +862,9 @@ def retrieve_node(
     selected_doc_type_filters = expand_doc_type_selection(selected_doc_types)
     original_query = state["query"]
 
-    # Add bilingual queries for better retrieval coverage
+    # search_queries from st_mq_node already contains EN+KO queries
+    # No need to add bilingual queries here
     query_en = state.get("query_en")
-    query_ko = state.get("query_ko")
-    bilingual_queries: List[str] = []
-    if query_en and query_en not in queries:
-        bilingual_queries.append(query_en)
-    if query_ko and query_ko not in queries:
-        bilingual_queries.append(query_ko)
-    if bilingual_queries:
-        logger.info("retrieve_node: adding bilingual queries: %s", bilingual_queries)
 
     selected_device_set = {
         _normalize_device_name(d) for d in selected_devices if _normalize_device_name(d)
@@ -823,8 +904,8 @@ def retrieve_node(
                 seen.add(key)
                 all_docs.append(d)
 
-    # Combine queries with bilingual queries for comprehensive search
-    all_queries = queries + bilingual_queries
+    # Use search_queries directly (already contains EN+KO from st_mq_node)
+    all_queries = queries
 
     if selected_devices:
         # Dual search strategy: device-filtered + general
@@ -1214,25 +1295,35 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     query_for_prompt = state.get("query_en") or state["query"]
     mapping = {"sys.query": query_for_prompt, "ref_text": ref_text}
 
-    # Always use default (English) template for consistency
-    default_templates = {
-        "setup": spec.setup_ans,
-        "ts": spec.ts_ans,
-        "general": spec.general_ans,
-    }
-    tmpl = default_templates.get(route, spec.general_ans)
+    # Select language-specific template
+    # Korean (ko): use default template
+    # English (en): use *_en template if available
+    # Japanese (ja): use *_ja template if available
+    if detected_language == "en":
+        templates = {
+            "setup": spec.setup_ans_en or spec.setup_ans,
+            "ts": spec.ts_ans_en or spec.ts_ans,
+            "general": spec.general_ans_en or spec.general_ans,
+        }
+    elif detected_language == "ja":
+        templates = {
+            "setup": spec.setup_ans_ja or spec.setup_ans,
+            "ts": spec.ts_ans_ja or spec.ts_ans,
+            "general": spec.general_ans_ja or spec.general_ans,
+        }
+    else:  # ko or default
+        templates = {
+            "setup": spec.setup_ans,
+            "ts": spec.ts_ans,
+            "general": spec.general_ans,
+        }
 
-    # Add language instruction to system prompt
-    lang_names = {"ko": "Korean", "en": "English", "ja": "Japanese"}
-    output_lang = lang_names.get(detected_language, "Korean")
-    language_instruction = f"\n\n**IMPORTANT: You MUST answer in {output_lang}.**"
-
-    system_with_lang = tmpl.system + language_instruction
-    logger.info("answer_node: using English template for route=%s, output in %s", route, output_lang)
+    tmpl = templates.get(route, spec.general_ans)
+    logger.info("answer_node: using %s template for route=%s", detected_language, route)
 
     user = _format_prompt(tmpl.user, mapping)
-    logger.info("answer_node: user_prompt_chars=%d, system_prompt_chars=%d", len(user), len(system_with_lang))
-    answer, reasoning = _invoke_llm_with_reasoning(llm, system_with_lang, user, max_tokens=MAX_TOKENS_ANSWER)
+    logger.info("answer_node: user_prompt_chars=%d, system_prompt_chars=%d", len(user), len(tmpl.system))
+    answer, reasoning = _invoke_llm_with_reasoning(llm, tmpl.system, user, max_tokens=MAX_TOKENS_ANSWER)
     logger.info("answer_node: answer_chars=%d, reasoning_chars=%d, answer_preview=%s", len(answer), len(reasoning) if reasoning else 0, answer[:500] if answer else "(empty)")
     return {"answer": answer, "reasoning": reasoning}
 
@@ -1287,23 +1378,73 @@ def retry_bump_node(state: AgentState) -> Dict[str, Any]:
     return {"attempts": int(state.get("attempts", 0)) + 1}
 
 
-def refine_queries_node(state: AgentState, *, llm: BaseLLM) -> Dict[str, Any]:
+def refine_queries_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     hint = state.get("judge", {}).get("hint", "")
     prev = state.get("search_queries", [])
-    sys = (
-        "역할: 검색 질의 리파이너\n"
-        "입력(원 질문, 기존 질의, judge hint)을 보고 더 좋은 검색 질의 3~5개를 JSON으로 만든다.\n"
-        "출력: {\"queries\":[...]} 한 줄만."
+    # Use English query for refining (for consistent LLM processing)
+    query_en = state.get("query_en") or state["query"]
+    query_ko = state.get("query_ko") or state["query"]
+    route = state.get("route", "general")
+
+    # Get previous MQ lists for Korean queries
+    if route == "setup":
+        mq_ko_list = state.get("setup_mq_ko_list", [])
+    elif route == "ts":
+        mq_ko_list = state.get("ts_mq_ko_list", [])
+    else:
+        mq_ko_list = state.get("general_mq_ko_list", [])
+
+    # Generate refined English queries
+    sys_en = (
+        "Role: Search Query Refiner\n"
+        "Given the original question, existing queries, and judge hint, generate 3 improved search queries.\n"
+        "**IMPORTANT: Generate all queries in English.**\n"
+        "Output: {\"queries\":[...]} in one line only."
     )
-    user = (
-        f"원 질문: {state['query']}\n"
-        f"기존 질의: {json.dumps(prev, ensure_ascii=False)}\n"
-        f"judge hint: {hint}\n"
+    user_en = (
+        f"Original question: {query_en}\n"
+        f"Previous queries: {json.dumps(prev, ensure_ascii=False)}\n"
+        f"Judge hint: {hint}\n"
     )
-    raw = _invoke_llm(llm, sys, user)
-    queries = _parse_queries(raw)
-    merged = [state["query"]] + [q for q in queries if q and q != state["query"]]
-    return {"search_queries": merged[:5]}
+    raw_en = _invoke_llm(llm, sys_en, user_en)
+    queries_en = _parse_queries(raw_en)
+
+    # Build English queries (3)
+    english_queries: List[str] = []
+    _fill_to_n(english_queries, queries_en, 3)
+    if query_en:
+        _fill_to_n(english_queries, [query_en], 3)
+    english_queries = english_queries[:3]
+
+    # Build Korean queries (3) - prefer existing KO MQ list
+    ko_candidates = [q for q in mq_ko_list if _contains_korean(q)]
+    if query_ko and _contains_korean(query_ko):
+        ko_candidates = [query_ko] + ko_candidates
+    korean_queries = _dedupe_queries(ko_candidates)[:3]
+
+    # If not enough Korean queries, translate from English
+    if len(korean_queries) < 3 and spec.translate is not None:
+        def _translate(text: str) -> str:
+            user = _format_prompt(spec.translate.user, {
+                "query": text,
+                "target_language": "Korean",
+            })
+            result = _invoke_llm(llm, spec.translate.system, user)
+            return result.strip().strip('"').strip("'").strip() or text
+
+        for q in english_queries:
+            if len(korean_queries) >= 3:
+                break
+            if _contains_korean(q):
+                continue
+            translated = _translate(q)
+            if translated and translated not in korean_queries:
+                korean_queries.append(translated)
+        korean_queries = korean_queries[:3]
+
+    merged = english_queries + korean_queries
+    logger.info("refine_queries_node: bilingual queries EN=%d, KO=%d", len(english_queries), len(korean_queries))
+    return {"search_queries": merged}
 
 
 def _parse_auto_parse_result(text: str) -> Dict[str, Any]:
