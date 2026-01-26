@@ -1,9 +1,10 @@
 import { useState, useMemo, useCallback } from "react";
-import { CopyOutlined, LikeOutlined, DislikeOutlined, CheckOutlined, ReloadOutlined, FilterOutlined } from "@ant-design/icons";
-import { Message, FeedbackRating, RetrievedDoc } from "../types";
+import { CopyOutlined, CheckOutlined, ReloadOutlined, FilterOutlined, LikeOutlined, LikeFilled, DislikeOutlined, DislikeFilled, EditOutlined } from "@ant-design/icons";
+import { Message, FeedbackRating, RetrievedDoc, MessageFeedback } from "../types";
 import { MarkdownContent } from "./markdown-content";
 import { Collapse, Tag } from "antd";
 import { ImagePreviewModal, ImagePreviewItem } from "../../../components/image-preview-modal";
+import { FeedbackForm } from "./feedback-form";
 
 // Preprocess snippet for better markdown rendering
 function preprocessSnippet(snippet: string): string {
@@ -194,6 +195,18 @@ export type RegeneratePayload = {
   searchQueries?: string[] | null;
 };
 
+type DetailedFeedbackPayload = {
+  messageId: string;
+  sessionId?: string;
+  turnId?: number;
+  accuracy: number;
+  completeness: number;
+  relevance: number;
+  comment?: string;
+  reviewerName?: string;
+  logs?: string[];
+};
+
 type MessageItemProps = {
   message: Message;
   isStreaming?: boolean;
@@ -204,22 +217,22 @@ type MessageItemProps = {
     rating: FeedbackRating;
     reason?: string | null;
   }) => void;
+  onDetailedFeedback?: (payload: DetailedFeedbackPayload) => void;
   onRegenerate?: (payload: RegeneratePayload) => void;
   originalQuery?: string;  // Original user query for regeneration
 };
 
-export function MessageItem({ message, isStreaming, onFeedback, onRegenerate, originalQuery }: MessageItemProps) {
+export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedback, onRegenerate, originalQuery }: MessageItemProps) {
   const [copied, setCopied] = useState(false);
-  const [showReasonInput, setShowReasonInput] = useState(false);
-  const [reasonText, setReasonText] = useState("");
-  const [reasonError, setReasonError] = useState<string | null>(null);
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [showFilterInfo, setShowFilterInfo] = useState(false);
 
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
-  const rating = message.feedback?.rating ?? null;
+  const hasFeedback = Boolean(message.feedback?.accuracy || message.feedback?.rating);
   const canFeedback = Boolean(message.sessionId && message.turnId);
   const regenerateQuery = (originalQuery || message.originalQuery || "").trim();
 
@@ -329,48 +342,48 @@ export function MessageItem({ message, isStreaming, onFeedback, onRegenerate, or
     }
   };
 
-  const handleLike = () => {
+  const handleFeedbackClick = () => {
     if (!canFeedback) return;
-    setShowReasonInput(false);
-    setReasonError(null);
-    onFeedback?.({
-      messageId: message.id,
-      sessionId: message.sessionId,
-      turnId: message.turnId,
-      rating: "up",
-    });
+    setShowFeedbackForm(true);
   };
 
-  const handleDislike = () => {
-    if (!canFeedback) return;
-    const existingReason = message.feedback?.rating === "down" ? message.feedback.reason ?? "" : "";
-    setReasonText(existingReason);
-    setReasonError(null);
-    setShowReasonInput(true);
-  };
+  const handleFeedbackSubmit = async (data: {
+    accuracy: number;
+    completeness: number;
+    relevance: number;
+    comment?: string;
+    reviewerName?: string;
+  }) => {
+    if (!canFeedback || !onDetailedFeedback) return;
 
-  const handleReasonSubmit = () => {
-    if (!canFeedback) return;
-    const reason = reasonText.trim();
-    if (!reason) {
-      setReasonError("불만족 사유를 입력해 주세요.");
-      return;
+    setIsSubmittingFeedback(true);
+    try {
+      await onDetailedFeedback({
+        messageId: message.id,
+        sessionId: message.sessionId,
+        turnId: message.turnId,
+        accuracy: data.accuracy,
+        completeness: data.completeness,
+        relevance: data.relevance,
+        comment: data.comment,
+        reviewerName: data.reviewerName,
+        logs: message.logs,
+      });
+      setShowFeedbackForm(false);
+    } finally {
+      setIsSubmittingFeedback(false);
     }
-    onFeedback?.({
-      messageId: message.id,
-      sessionId: message.sessionId,
-      turnId: message.turnId,
-      rating: "down",
-      reason,
-    });
-    setShowReasonInput(false);
-    setReasonError(null);
   };
 
-  const handleReasonCancel = () => {
-    setShowReasonInput(false);
-    setReasonError(null);
+  const handleFeedbackCancel = () => {
+    setShowFeedbackForm(false);
   };
+
+  // Calculate average score for display
+  const feedbackAvgScore = message.feedback?.avgScore ??
+    (message.feedback?.accuracy && message.feedback?.completeness && message.feedback?.relevance
+      ? (message.feedback.accuracy + message.feedback.completeness + message.feedback.relevance) / 3
+      : null);
 
   return (
     <div className="message-item">
@@ -545,22 +558,17 @@ export function MessageItem({ message, isStreaming, onFeedback, onRegenerate, or
               >
                 {copied ? <CheckOutlined /> : <CopyOutlined />}
               </button>
-              <button
-                className={`action-button ${rating === "up" ? "active" : ""}`}
-                onClick={handleLike}
-                title="만족"
-                disabled={!canFeedback}
-              >
-                <LikeOutlined />
-              </button>
-              <button
-                className={`action-button ${rating === "down" ? "active" : ""}`}
-                onClick={handleDislike}
-                title="불만족"
-                disabled={!canFeedback}
-              >
-                <DislikeOutlined />
-              </button>
+              {/* 피드백 버튼: 피드백이 없을 때만 표시 */}
+              {!hasFeedback && (
+                <button
+                  className="action-button"
+                  onClick={handleFeedbackClick}
+                  title="답변 평가"
+                  disabled={!canFeedback}
+                >
+                  <LikeOutlined />
+                </button>
+              )}
               {hasFilterInfo && (
                 <button
                   className={`action-button ${showFilterInfo ? "active" : ""}`}
@@ -611,54 +619,66 @@ export function MessageItem({ message, isStreaming, onFeedback, onRegenerate, or
             </div>
           )}
 
-          {isAssistant && showReasonInput && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 12, marginBottom: 6, color: "var(--color-text-secondary)" }}>
-                불만족 사유
-              </div>
-              <textarea
-                value={reasonText}
-                onChange={(e) => {
-                  setReasonText(e.target.value);
-                  if (reasonError) setReasonError(null);
-                }}
-                rows={3}
-                placeholder="어떤 점이 불만족이었는지 입력해 주세요."
-                style={{
-                  width: "100%",
-                  borderRadius: 6,
-                  border: "1px solid var(--color-border)",
-                  padding: "8px 10px",
-                  fontSize: 12,
-                  resize: "vertical",
-                  background: "var(--color-bg-secondary)",
-                  color: "var(--color-text-primary)",
-                }}
-              />
-              {reasonError && (
-                <div style={{ marginTop: 6, fontSize: 12, color: "var(--color-danger, #c0392b)" }}>
-                  {reasonError}
-                </div>
-              )}
-              <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
-                <button className="action-button" onClick={handleReasonSubmit} disabled={!canFeedback}>
-                  저장
-                </button>
-                <button className="action-button" onClick={handleReasonCancel}>
-                  취소
-                </button>
-              </div>
-            </div>
+          {/* Feedback Form - only show when no existing feedback */}
+          {isAssistant && showFeedbackForm && !hasFeedback && (
+            <FeedbackForm
+              onSubmit={handleFeedbackSubmit}
+              onCancel={handleFeedbackCancel}
+              isSubmitting={isSubmittingFeedback}
+              initialValues={{
+                accuracy: message.feedback?.accuracy ?? undefined,
+                completeness: message.feedback?.completeness ?? undefined,
+                relevance: message.feedback?.relevance ?? undefined,
+                comment: message.feedback?.comment ?? undefined,
+              }}
+            />
           )}
 
-          {isAssistant && message.feedback?.rating && (
-            <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 6 }}>
-              만족도: {message.feedback.rating === "up" ? "만족" : "불만족"}
-            </div>
-          )}
-          {isAssistant && message.feedback?.rating === "down" && message.feedback?.reason && (
-            <div style={{ fontSize: 12, color: "var(--color-text-secondary)", marginTop: 4 }}>
-              불만족 사유: {message.feedback.reason}
+          {/* Feedback Summary (read-only) */}
+          {isAssistant && hasFeedback && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: "8px 12px",
+                background: "var(--color-bg-secondary)",
+                borderRadius: 6,
+                fontSize: 12,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                {message.feedback?.accuracy && (
+                  <span>
+                    정확성: <strong>{message.feedback.accuracy}</strong>
+                  </span>
+                )}
+                {message.feedback?.completeness && (
+                  <span>
+                    완성도: <strong>{message.feedback.completeness}</strong>
+                  </span>
+                )}
+                {message.feedback?.relevance && (
+                  <span>
+                    관련성: <strong>{message.feedback.relevance}</strong>
+                  </span>
+                )}
+                {feedbackAvgScore !== null && (
+                  <span style={{
+                    marginLeft: "auto",
+                    color: feedbackAvgScore >= 3 ? "var(--color-success, #52c41a)" : "var(--color-danger, #ff4d4f)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                  }}>
+                    {feedbackAvgScore >= 3 ? <LikeFilled /> : <DislikeFilled />}
+                    <strong>{feedbackAvgScore.toFixed(1)}</strong>/5
+                  </span>
+                )}
+              </div>
+              {message.feedback?.comment && (
+                <div style={{ marginTop: 4, color: "var(--color-text-secondary)" }}>
+                  의견: {message.feedback.comment}
+                </div>
+              )}
             </div>
           )}
 

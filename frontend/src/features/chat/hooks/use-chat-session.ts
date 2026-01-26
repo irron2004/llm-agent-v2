@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { nanoid } from "nanoid";
-import { sendChatMessage, saveTurn, fetchSession, saveFeedback } from "../api";
+import { sendChatMessage, saveTurn, fetchSession, saveFeedback, saveDetailedFeedback, getDetailedFeedback } from "../api";
 import {
   AgentResponse,
   Message,
@@ -49,6 +49,18 @@ type FeedbackPayload = {
   turnId?: number;
   rating: FeedbackRating;
   reason?: string | null;
+};
+
+type DetailedFeedbackPayload = {
+  messageId: string;
+  sessionId?: string;
+  turnId?: number;
+  accuracy: number;
+  completeness: number;
+  relevance: number;
+  comment?: string;
+  reviewerName?: string;
+  logs?: string[];
 };
 
 type PendingInterrupt = {
@@ -680,6 +692,89 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     [sessionId, updateMessage]
   );
 
+  const submitDetailedFeedback = useCallback(
+    async ({
+      messageId,
+      sessionId: msgSessionId,
+      turnId,
+      accuracy,
+      completeness,
+      relevance,
+      comment,
+      reviewerName,
+      logs,
+    }: DetailedFeedbackPayload) => {
+      const targetSessionId = msgSessionId || sessionId;
+      if (!targetSessionId || !turnId) {
+        setError("피드백을 저장하려면 turn 정보가 필요합니다.");
+        return;
+      }
+
+      // Find message to get user_text and assistant_text
+      const msg = messages.find((m) => m.id === messageId);
+      const userMsg = messages.find(
+        (m) => m.role === "user" && messages.indexOf(m) === messages.indexOf(msg!) - 1
+      );
+
+      // Calculate avg score and rating
+      const avgScore = (accuracy + completeness + relevance) / 3;
+      const rating: FeedbackRating = avgScore >= 3 ? "up" : "down";
+
+      // Optimistic update
+      const feedback: MessageFeedback = {
+        rating,
+        accuracy,
+        completeness,
+        relevance,
+        avgScore,
+        comment: comment ?? null,
+        ts: new Date().toISOString(),
+      };
+      updateMessage(messageId, (m) => ({
+        ...m,
+        feedback,
+      }));
+
+      try {
+        // Save to feedback index
+        const saved = await saveDetailedFeedback(targetSessionId, turnId, {
+          accuracy,
+          completeness,
+          relevance,
+          comment,
+          reviewer_name: reviewerName,
+          logs,
+          user_text: userMsg?.content ?? "",
+          assistant_text: msg?.content ?? "",
+        });
+
+        // Update with server response
+        updateMessage(messageId, (m) => ({
+          ...m,
+          feedback: {
+            rating: saved.rating as FeedbackRating,
+            accuracy: saved.accuracy,
+            completeness: saved.completeness,
+            relevance: saved.relevance,
+            avgScore: saved.avg_score,
+            comment: saved.comment ?? null,
+            ts: saved.ts,
+          },
+        }));
+
+        // Also update the legacy feedback in chat_turns for backwards compatibility
+        await saveFeedback(targetSessionId, turnId, {
+          rating,
+          reason: comment,
+        });
+      } catch (err) {
+        console.error("Failed to save detailed feedback:", err);
+        setError(err instanceof Error ? err.message : "피드백 저장에 실패했습니다.");
+      }
+    },
+    [sessionId, messages, updateMessage]
+  );
+
   // Load an existing session from the backend
   const loadSession = useCallback(
     async (targetSessionId: string) => {
@@ -772,6 +867,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       submitSearchQueries,
       submitDeviceSelection,
       submitFeedback,
+      submitDetailedFeedback,
       inputPlaceholder: pendingInterrupt
         ? pendingInterrupt.kind === "device_selection"
           ? "기기를 선택하거나 건너뛰기를 클릭하세요..."
@@ -795,6 +891,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       submitSearchQueries,
       submitDeviceSelection,
       submitFeedback,
+      submitDetailedFeedback,
       reset,
       loadSession,
     ]

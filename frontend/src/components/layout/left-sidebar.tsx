@@ -8,6 +8,7 @@ import {
   MenuFoldOutlined,
   DeleteOutlined,
   InboxOutlined,
+  StarOutlined,
 } from "@ant-design/icons";
 import { useState, useMemo } from "react";
 import { useChatHistoryContext } from "../../features/chat/context/chat-history-context";
@@ -58,6 +59,11 @@ export default function LeftSidebar({
       key: "/parsing",
       icon: <FileTextOutlined />,
       label: "Parsing",
+    },
+    {
+      key: "/feedback",
+      icon: <StarOutlined />,
+      label: "Feedback",
     },
   ];
 

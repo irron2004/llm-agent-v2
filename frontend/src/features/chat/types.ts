@@ -6,6 +6,12 @@ export type MessageFeedback = {
   rating: FeedbackRating;
   reason?: string | null;
   ts?: string | null;
+  // Detailed feedback scores (from separate feedback index)
+  accuracy?: number | null;      // 1-5
+  completeness?: number | null;  // 1-5
+  relevance?: number | null;     // 1-5
+  avgScore?: number | null;
+  comment?: string | null;
 };
 
 export type Message = {
@@ -180,4 +186,47 @@ export type SaveTurnRequest = {
   assistant_text: string;
   doc_refs: DocRefResponse[];
   title?: string | null;
+};
+
+// --- Detailed Feedback Types (for feedback index) ---
+
+export type DetailedFeedbackRequest = {
+  accuracy: number;      // 1-5
+  completeness: number;  // 1-5
+  relevance: number;     // 1-5
+  comment?: string | null;
+  reviewer_name?: string | null;  // 피드백 제출자 이름 (선택)
+  logs?: string[] | null;
+  user_text?: string | null;
+  assistant_text?: string | null;
+};
+
+export type FeedbackResponse = {
+  session_id: string;
+  turn_id: number;
+  user_text: string;
+  assistant_text: string;
+  accuracy: number;
+  completeness: number;
+  relevance: number;
+  avg_score: number;
+  rating: string;
+  comment?: string | null;
+  reviewer_name?: string | null;
+  logs?: string[] | null;
+  ts: string;
+};
+
+export type FeedbackListResponse = {
+  items: FeedbackResponse[];
+  total: number;
+};
+
+export type FeedbackStatisticsResponse = {
+  total_count: number;
+  avg_accuracy?: number | null;
+  avg_completeness?: number | null;
+  avg_relevance?: number | null;
+  avg_score?: number | null;
+  rating_distribution: Record<string, number>;
 };
