@@ -46,6 +46,10 @@ class AgentState(TypedDict, total=False):
     search_queries: List[str]
     skip_mq: bool
 
+    # Retry strategy configuration
+    expand_top_k: int  # Number of docs to expand (default: 5, retry: 10)
+    retry_strategy: str  # "expand_more" | "refine_queries" | "regenerate_mq"
+
     # Auto-parsed filters (from LLM)
     auto_parsed_device: Optional[str]  # First parsed device from query
     auto_parsed_doc_type: Optional[str]  # First parsed doc type from query
@@ -989,7 +993,9 @@ def expand_related_docs_node(
         return {"_events": [msg]}
 
     expanded_docs: List[RetrievalResult] = []
-    max_expand = max(0, int(EXPAND_TOP_K))
+    # Use expand_top_k from state if set, otherwise use default EXPAND_TOP_K
+    expand_top_k = state.get("expand_top_k") or EXPAND_TOP_K
+    max_expand = max(0, int(expand_top_k))
     total_docs = len(docs)
     same_doc_targets = 0
     page_targets = 0
@@ -1359,15 +1365,35 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     return {"judge": judge}
 
 
-def should_retry(state: AgentState) -> Literal["done", "retry", "human"]:
+def should_retry(state: AgentState) -> Literal["done", "retry", "retry_expand", "retry_mq", "human"]:
+    """Determine retry strategy based on attempt count.
+
+    Retry strategies:
+    - 1st unfaithful (attempt 0→1): retry_expand - use more docs (5→10)
+    - 2nd unfaithful (attempt 1→2): retry - refine queries
+    - 3rd unfaithful (attempt 2→3): retry_mq - regenerate multi-query from scratch
+    """
     if state.get("retrieval_confirmed"):
         return "done"
     judge = state.get("judge", {})
     faithful = bool(judge.get("faithful", False))
     if faithful:
         return "done"
-    if state.get("attempts", 0) < state.get("max_attempts", 0):
-        return "retry"
+
+    attempts = state.get("attempts", 0)
+    max_attempts = state.get("max_attempts", 0)
+
+    if attempts < max_attempts:
+        if attempts == 0:
+            # 1st retry: expand more docs (5→10)
+            return "retry_expand"
+        elif attempts == 1:
+            # 2nd retry: refine queries
+            return "retry"
+        else:
+            # 3rd+ retry: regenerate MQ from scratch
+            return "retry_mq"
+
     # HIL 비활성화 모드 (auto_parse 등)에서는 human_review 건너뛰기
     if state.get("_skip_human_review"):
         return "done"
@@ -1375,7 +1401,46 @@ def should_retry(state: AgentState) -> Literal["done", "retry", "human"]:
 
 
 def retry_bump_node(state: AgentState) -> Dict[str, Any]:
+    """Increment attempt counter."""
     return {"attempts": int(state.get("attempts", 0)) + 1}
+
+
+def retry_expand_node(state: AgentState) -> Dict[str, Any]:
+    """1st retry strategy: increase expand_top_k from 5 to 10.
+
+    This doesn't re-retrieve docs, just uses more of the already retrieved docs
+    for answer generation.
+    """
+    attempts = int(state.get("attempts", 0)) + 1
+    logger.info("retry_expand_node: increasing expand_top_k to 10 (attempt %d)", attempts)
+    return {
+        "attempts": attempts,
+        "expand_top_k": 10,
+        "retry_strategy": "expand_more",
+    }
+
+
+def retry_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
+    """3rd+ retry strategy: regenerate multi-query from scratch.
+
+    Clears previous MQ lists and triggers fresh MQ generation.
+    """
+    attempts = int(state.get("attempts", 0)) + 1
+    logger.info("retry_mq_node: regenerating MQ from scratch (attempt %d)", attempts)
+
+    # Clear previous MQ lists to force regeneration
+    return {
+        "attempts": attempts,
+        "retry_strategy": "regenerate_mq",
+        "setup_mq_list": [],
+        "ts_mq_list": [],
+        "general_mq_list": [],
+        "setup_mq_ko_list": [],
+        "ts_mq_ko_list": [],
+        "general_mq_ko_list": [],
+        "search_queries": [],
+        "expand_top_k": 10,  # Keep expanded doc count
+    }
 
 
 def refine_queries_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
@@ -1954,6 +2019,8 @@ __all__ = [
     "judge_node",
     "should_retry",
     "retry_bump_node",
+    "retry_expand_node",
+    "retry_mq_node",
     "refine_queries_node",
     "human_review_node",
     "device_selection_node",

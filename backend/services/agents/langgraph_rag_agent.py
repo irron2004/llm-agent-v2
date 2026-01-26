@@ -32,6 +32,8 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     refine_queries_node,
     retrieve_node,
     retry_bump_node,
+    retry_expand_node,
+    retry_mq_node,
     route_node,
     should_retry,
     st_gate_node,
@@ -271,6 +273,19 @@ class LangGraphRAGAgent:
                 if faithful is not None:
                     details_parts.append("✓ 충실" if faithful else "✗ 불충실")
 
+        elif name == "retry_expand":
+            attempts = result.get("attempts") if result else state.get("attempts")
+            expand_k = result.get("expand_top_k") if result else state.get("expand_top_k")
+            details_parts.append(f"문서 확장 5→{expand_k or 10}개")
+            if attempts:
+                details_parts.append(f"attempt {attempts}")
+
+        elif name == "retry_mq":
+            attempts = result.get("attempts") if result else state.get("attempts")
+            details_parts.append("MQ 재생성")
+            if attempts:
+                details_parts.append(f"attempt {attempts}")
+
         return " | ".join(details_parts) if details_parts else ""
 
     def _build_graph(self, mode: str):
@@ -394,23 +409,45 @@ class LangGraphRAGAgent:
             builder.add_edge("judge", END)
             return builder.compile(checkpointer=self.checkpointer if self.ask_user_after_retrieve else None)
 
-        # verified: add retry/human
+        # verified: add retry/human with different strategies
+        # retry_expand: 1st retry - use more docs (5→10)
+        builder.add_node("retry_expand", self._wrap_node("retry_expand", retry_expand_node))
+        # retry_bump + refine_queries: 2nd retry - refine queries and re-retrieve
         builder.add_node("retry_bump", self._wrap_node("retry_bump", retry_bump_node))
         builder.add_node("refine_queries", self._wrap_node("refine_queries", functools.partial(refine_queries_node, llm=self.llm, spec=self.spec)))
+        # retry_mq: 3rd+ retry - regenerate MQ from scratch
+        builder.add_node("retry_mq", self._wrap_node("retry_mq", functools.partial(retry_mq_node, llm=self.llm, spec=self.spec)))
         builder.add_node("human_review", self._wrap_node("human_review", human_review_node))
         # 호환성을 위해 'retry' 별칭을 두고 바로 retry_bump로 연결
         builder.add_node("retry", self._wrap_node("retry", lambda s: {}))
         builder.add_node("done", self._wrap_node("done", lambda s: {}))
 
+        # Conditional edges based on retry strategy
+        # - retry_expand: 1st unfaithful → expand more docs (no re-retrieval)
+        # - retry: 2nd unfaithful → refine queries and re-retrieve
+        # - retry_mq: 3rd+ unfaithful → regenerate MQ from scratch
         builder.add_conditional_edges(
             "judge",
             should_retry,
-            {"done": "done", "retry": "retry_bump", "human": "human_review"},
+            {
+                "done": "done",
+                "retry_expand": "retry_expand",
+                "retry": "retry_bump",
+                "retry_mq": "retry_mq",
+                "human": "human_review",
+            },
         )
 
+        # retry_expand: just increase expand_top_k and go back to expand_related
+        builder.add_edge("retry_expand", "expand_related")
+
+        # retry (refine_queries): refine queries and re-retrieve
         builder.add_edge("retry_bump", "refine_queries")
-        # retry 경로에서는 retrieve_retry를 사용 (ask_user 건너뛰기)
         builder.add_edge("refine_queries", "retrieve_retry")
+
+        # retry_mq: regenerate MQ from scratch → mq → st_gate → st_mq → retrieve
+        builder.add_edge("retry_mq", "mq")
+
         builder.add_edge("retry", "retry_bump")
         builder.add_edge("human_review", "retry_bump")
         builder.add_edge("human_review", "done")
