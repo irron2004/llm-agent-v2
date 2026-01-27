@@ -20,6 +20,16 @@ system: |
     - Follow-up questions about the same alarm/symptom
   - general:
     - General explanations, document overviews, company info, policies that don't clearly fit the above two categories
+    - Questions about the agent itself or capabilities (e.g., "Who are you?", "What can you do?")
+    - Casual conversation, greetings, or off-topic chat
+    - Anything that does not clearly fit setup or ts
+
+  # Examples (few-shot guidance)
+  - "How do I install the slot valve?" -> setup
+  - "Alarm E-001 keeps appearing. What should I check?" -> ts
+  - "Who are you?" -> general
+  - "너는 누구니?" -> general
+  - "Give me an overview of the PM schedule." -> general
 
   # Priority (multiple intents)
   - ts > setup > general

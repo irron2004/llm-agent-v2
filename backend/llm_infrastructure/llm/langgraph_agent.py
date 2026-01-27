@@ -785,20 +785,31 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
             return {"search_queries": _dedupe_queries(provided)}
         return {"search_queries": [q_en] if q_en else []}
 
-    mapping = {
-        "sys.query": q_en,
-        "setup_mq": "\n".join(setup_mq_list),
-        "ts_mq": "\n".join(ts_mq_list),
-        "general_mq": "\n".join(general_mq_list),
-        "st_gate": state.get("st_gate", "no_st"),
-    }
-    user = _format_prompt(spec.st_mq.user, mapping)
-    raw = _invoke_llm(llm, spec.st_mq.system, user)
-    logger.info("st_mq_node: raw output=%s", raw)
-    queries = _parse_queries(raw)
+    gate = state.get("st_gate", "no_st")
+    queries: List[str] = []
 
-    # Filter out garbage queries (prompt label leaks, too short, etc.)
-    queries = [q for q in queries if not _is_garbage_query(q)]
+    # When no structured transform is needed, skip the extra LLM call but
+    # keep the downstream bilingual merge/translation behavior.
+    if gate == "no_st":
+        logger.info("st_mq_node: st_gate=no_st, skipping st_mq LLM call")
+    else:
+        mapping = {
+            "sys.query": q_en,
+            "setup_mq": "\n".join(setup_mq_list),
+            "ts_mq": "\n".join(ts_mq_list),
+            "general_mq": "\n".join(general_mq_list),
+            "st_gate": gate,
+        }
+        user = _format_prompt(spec.st_mq.user, mapping)
+        raw = _invoke_llm(llm, spec.st_mq.system, user)
+        logger.info("st_mq_node: raw output=%s", raw)
+        queries = _parse_queries(raw)
+        # Filter out garbage queries (prompt label leaks, too short, etc.)
+        queries = [q for q in queries if not _is_garbage_query(q)]
+
+    # Also filter MQ lists for garbage labels/leaks before merging.
+    mq_en_list = [q for q in mq_en_list if not _is_garbage_query(q)]
+    mq_ko_list = [q for q in mq_ko_list if not _is_garbage_query(q)]
 
     # Build English queries (prefer st_mq output, then q_en, then MQ list)
     english_queries: List[str] = []
@@ -865,15 +876,37 @@ def retrieve_node(
     selected_doc_types = state.get("selected_doc_types", [])
     selected_doc_ids = [str(x).strip() for x in state.get("selected_doc_ids", []) if str(x).strip()]
     selected_doc_type_filters = expand_doc_type_selection(selected_doc_types)
+    route = state.get("route", "general")
     original_query = state["query"]
 
     # search_queries from st_mq_node already contains EN+KO queries
     # No need to add bilingual queries here
     query_en = state.get("query_en")
 
+    # Route-based doc_type bias (boost-like behavior): when the user did not
+    # explicitly select doc types, run an additional route-biased search and
+    # merge with a general search to avoid hard filter recall loss.
+    route_doc_type_groups: Dict[str, List[str]] = {
+        "setup": ["setup", "SOP"],
+        "ts": ["ts"],
+        "general": [],
+    }
+    route_doc_type_filters: List[str] = []
+    route_bias_enabled = False
+    if not selected_doc_types:
+        route_doc_type_filters = expand_doc_type_selection(route_doc_type_groups.get(route, []))
+        route_bias_enabled = bool(route_doc_type_filters)
+        if route_bias_enabled:
+            logger.info(
+                "retrieve_node: route bias enabled route=%s doc_types=%s",
+                route,
+                route_doc_type_filters,
+            )
+
     selected_device_set = {
         _normalize_device_name(d) for d in selected_devices if _normalize_device_name(d)
     }
+    # Only user-selected doc types act as a hard filter.
     selected_doc_type_set = {
         _normalize_doc_type(dt) for dt in selected_doc_type_filters if _normalize_doc_type(dt)
     }
@@ -917,12 +950,13 @@ def retrieve_node(
         logger.info("retrieve_node: dual search with devices=%s, queries=%d", selected_devices, len(all_queries))
 
         # Search 1: Device-filtered search with device_names as OR filter
+        device_doc_types = selected_doc_type_filters or (route_doc_type_filters if route_bias_enabled else None)
         for q in all_queries:
             device_docs = retriever.retrieve(
                 q,
                 top_k=candidate_k,
                 device_names=selected_devices,
-                doc_types=selected_doc_type_filters,
+                doc_types=device_doc_types,
             )
             _add_docs(device_docs, filter_devices=True)
 
@@ -930,26 +964,53 @@ def retrieve_node(
         logger.info("retrieve_node: device-filtered search found %d docs", device_filtered_count)
 
         # Search 2: General search without device filter
+        general_doc_types = selected_doc_type_filters or None
         for q in all_queries:
             general_docs = retriever.retrieve(
                 q,
                 top_k=candidate_k,
-                doc_types=selected_doc_type_filters,
+                doc_types=general_doc_types,
             )
             _add_docs(general_docs, filter_devices=False)
 
         logger.info("retrieve_node: after general search, total %d docs", len(all_docs))
 
     else:
-        # No device selection: search without filter
+        # No device selection: optionally run route-biased search + general search.
         logger.info("retrieve_node: general search (no device filter), queries=%d", len(all_queries))
-        for q in all_queries:
-            docs = retriever.retrieve(
-                q,
-                top_k=candidate_k,
-                doc_types=selected_doc_type_filters,
-            )
-            _add_docs(docs, filter_devices=False)
+        if selected_doc_type_filters:
+            # User-selected doc types: honor as hard filter.
+            for q in all_queries:
+                docs = retriever.retrieve(
+                    q,
+                    top_k=candidate_k,
+                    doc_types=selected_doc_type_filters,
+                )
+                _add_docs(docs, filter_devices=False)
+        elif route_bias_enabled:
+            # Route-biased search (doc_type filter) + general search (no filter).
+            for q in all_queries:
+                biased_docs = retriever.retrieve(
+                    q,
+                    top_k=candidate_k,
+                    doc_types=route_doc_type_filters,
+                )
+                _add_docs(biased_docs, filter_devices=False)
+            for q in all_queries:
+                general_docs = retriever.retrieve(
+                    q,
+                    top_k=candidate_k,
+                    doc_types=None,
+                )
+                _add_docs(general_docs, filter_devices=False)
+        else:
+            for q in all_queries:
+                docs = retriever.retrieve(
+                    q,
+                    top_k=candidate_k,
+                    doc_types=None,
+                )
+                _add_docs(docs, filter_devices=False)
 
     logger.info("retrieve_node: collected %d unique docs before rerank", len(all_docs))
     if selected_doc_ids:

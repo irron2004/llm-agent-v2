@@ -18,6 +18,15 @@ system: |
   # Decision Rules
   - Ambiguous/broad scope/abbreviations only/multiple modules/no validation criteria → need_st
   - Very specific (module/numeric values/buttons/steps included) → no_st
+  - Broad synthesis/summary requests across documents/logs/history → need_st
+  - Requests like "정리/요약/이력/기반/비교" without concrete constraints → need_st
+
+  # Examples (few-shot guidance)
+  - "GCB 기반으로 SUPRA Np 이슈 정리해줘" → need_st
+  - "지난달 에러 이력 정리" → need_st
+  - "APC 문제 원인 알려줘" → need_st
+  - "SUPRA N slot valve 교체 토크 3.2Nm 맞나?" → no_st
+  - "Error E-001 on SUPRA N, check PLC sensor wiring step-by-step" → no_st
 messages:
   - role: user
     content: |
@@ -28,4 +37,10 @@ messages:
       Decision rules:
       - Ambiguous/broad/abbreviations only/multiple modules/no validation criteria → need_st
       - Very specific (module/values/buttons/steps) → no_st
+      - Broad synthesis/summary across docs/logs/history → need_st
+      - "정리/요약/이력/기반/비교" without constraints → need_st
+      Examples:
+      - "GCB 기반으로 SUPRA Np 이슈 정리해줘" → need_st
+      - "지난달 에러 이력 정리" → need_st
+      - "SUPRA N slot valve 교체 토크 3.2Nm 맞나?" → no_st
       Output ONE word: need_st | no_st
