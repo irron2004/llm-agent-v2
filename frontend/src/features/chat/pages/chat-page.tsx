@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useChatSession } from "../hooks/use-chat-session";
 import { useChatHistoryContext } from "../context/chat-history-context";
@@ -11,6 +11,7 @@ import {
   ChatInput,
   DeviceSelectionPanel,
 } from "../components";
+import type { RegeneratePayload } from "../components/message-item";
 import { Alert, Spin } from "antd";
 
 export default function ChatPage() {
@@ -22,6 +23,8 @@ export default function ChatPage() {
     setPendingReview,
     setIsStreaming,
     registerSubmitHandlers,
+    setPendingRegeneration,
+    registerRegenerationHandlers,
   } = useChatReview();
 
   // Callback when a turn is saved
@@ -46,6 +49,7 @@ export default function ChatPage() {
     submitSearchQueries,
     submitDeviceSelection,
     submitFeedback,
+    submitDetailedFeedback,
   } = useChatSession({ onTurnSaved: handleTurnSaved });
 
   // Load session from URL parameter
@@ -62,6 +66,30 @@ export default function ChatPage() {
   useEffect(() => {
     registerSubmitHandlers({ submitReview, submitSearchQueries });
   }, [submitReview, submitSearchQueries, registerSubmitHandlers]);
+
+  const submitRegeneration = useCallback((payload: {
+    originalQuery: string;
+    searchQueries: string[];
+    selectedDevices: string[];
+    selectedDocTypes: string[];
+    selectedDocIds: string[];
+  }) => {
+    setPendingRegeneration(null);
+    send({
+      text: payload.originalQuery,
+      overrides: {
+        filterDevices: payload.selectedDevices,
+        filterDocTypes: payload.selectedDocTypes,
+        searchQueries: payload.searchQueries,
+        selectedDocIds: payload.selectedDocIds,
+        autoParse: false,
+      },
+    });
+  }, [send, setPendingRegeneration]);
+
+  useEffect(() => {
+    registerRegenerationHandlers({ submitRegeneration });
+  }, [submitRegeneration, registerRegenerationHandlers]);
 
   // Sync streaming state with context
   useEffect(() => {
@@ -98,16 +126,46 @@ export default function ChatPage() {
   useEffect(() => {
     const handleNewChat = () => {
       reset();
+      setPendingRegeneration(null);
     };
     window.addEventListener("pe-agent:new-chat", handleNewChat);
     return () => {
       window.removeEventListener("pe-agent:new-chat", handleNewChat);
     };
-  }, [reset]);
+  }, [reset, setPendingRegeneration]);
 
   const handleSend = async (text: string) => {
     await send({ text });
   };
+
+  // Handle regeneration request
+  const handleRegenerate = useCallback((payload: RegeneratePayload) => {
+    const fallbackQueries = payload.originalQuery ? [payload.originalQuery] : [];
+    setPendingRegeneration({
+      messageId: payload.messageId,
+      originalQuery: payload.originalQuery,
+      docs: payload.retrievedDocs ?? [],
+      searchQueries: payload.searchQueries && payload.searchQueries.length > 0
+        ? payload.searchQueries
+        : fallbackQueries,
+      selectedDevices: payload.selectedDevices ?? [],
+      selectedDocTypes: payload.selectedDocTypes ?? [],
+    });
+  }, [setPendingRegeneration]);
+
+  // Get the original user query for the last assistant message
+  const getOriginalQuery = useMemo(() => {
+    const queryMap = new Map<string, string>();
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].role === "user") {
+        // The next assistant message gets this user's query
+        if (i + 1 < messages.length && messages[i + 1].role === "assistant") {
+          queryMap.set(messages[i + 1].id, messages[i].content);
+        }
+      }
+    }
+    return (assistantId: string) => queryMap.get(assistantId) || "";
+  }, [messages]);
 
   return (
     <div className="chat-layout">
@@ -173,6 +231,9 @@ export default function ChatPage() {
                     message={msg}
                     isStreaming={isStreaming && idx === messages.length - 1 && msg.role === "assistant"}
                     onFeedback={submitFeedback}
+                    onDetailedFeedback={submitDetailedFeedback}
+                    onRegenerate={msg.role === "assistant" ? handleRegenerate : undefined}
+                    originalQuery={msg.role === "assistant" ? getOriginalQuery(msg.id) : undefined}
                   />
                 ))
               )}

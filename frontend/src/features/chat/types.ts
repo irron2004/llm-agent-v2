@@ -6,6 +6,12 @@ export type MessageFeedback = {
   rating: FeedbackRating;
   reason?: string | null;
   ts?: string | null;
+  // Detailed feedback scores (from separate feedback index)
+  accuracy?: number | null;      // 1-5
+  completeness?: number | null;  // 1-5
+  relevance?: number | null;     // 1-5
+  avgScore?: number | null;
+  comment?: string | null;
 };
 
 export type Message = {
@@ -13,14 +19,37 @@ export type Message = {
   role: MessageRole;
   content: string;
   createdAt?: string;
+  originalQuery?: string;
   reference?: Reference;
   rawAnswer?: string;
   retrievedDocs?: RetrievedDoc[];
+  allRetrievedDocs?: RetrievedDoc[];  // 전체 검색 문서 (재생성용, 20개)
   logs?: string[];
   currentNode?: string | null;
   sessionId?: string;
   turnId?: number;
   feedback?: MessageFeedback | null;
+  // Auto-parse and filter info for regeneration
+  autoParse?: AutoParseResult | null;
+  selectedDevices?: string[] | null;
+  selectedDocTypes?: string[] | null;
+  searchQueries?: string[] | null;
+};
+
+export type DeviceInfo = {
+  name: string;
+  doc_count: number;
+};
+
+export type DocTypeInfo = {
+  name: string;
+  doc_count: number;
+};
+
+export type DeviceCatalogResponse = {
+  devices: DeviceInfo[];
+  doc_types: DocTypeInfo[];
+  vis?: string[];
 };
 
 export type ReferenceChunk = {
@@ -60,15 +89,29 @@ export type ReviewDoc = {
   metadata?: Record<string, unknown> | null;
 };
 
+export type AutoParseResult = {
+  device?: string | null;
+  doc_type?: string | null;
+  devices?: string[] | null;
+  doc_types?: string[] | null;
+  message?: string | null;
+};
+
 export type AgentResponse = {
   query: string;
   answer: string;
   judge?: Record<string, unknown>;
   retrieved_docs?: RetrievedDoc[];
+  all_retrieved_docs?: RetrievedDoc[];  // 전체 검색 문서 (재생성용, 20개)
   metadata?: Record<string, unknown>;
   interrupted?: boolean;
   interrupt_payload?: Record<string, unknown> | null;
   thread_id?: string | null;
+  // Auto-parse results
+  auto_parse?: AutoParseResult | null;
+  selected_devices?: string[] | null;
+  selected_doc_types?: string[] | null;
+  search_queries?: string[] | null;
 };
 
 export type AgentRequest = {
@@ -79,6 +122,11 @@ export type AgentRequest = {
   thread_id?: string | null;
   ask_user_after_retrieve?: boolean;
   resume_decision?: unknown;
+  auto_parse?: boolean;
+  filter_devices?: string[] | null;
+  filter_doc_types?: string[] | null;
+  search_queries?: string[] | null;
+  selected_doc_ids?: string[] | null;
 };
 
 export type Conversation = {
@@ -138,4 +186,47 @@ export type SaveTurnRequest = {
   assistant_text: string;
   doc_refs: DocRefResponse[];
   title?: string | null;
+};
+
+// --- Detailed Feedback Types (for feedback index) ---
+
+export type DetailedFeedbackRequest = {
+  accuracy: number;      // 1-5
+  completeness: number;  // 1-5
+  relevance: number;     // 1-5
+  comment?: string | null;
+  reviewer_name?: string | null;  // 피드백 제출자 이름 (선택)
+  logs?: string[] | null;
+  user_text?: string | null;
+  assistant_text?: string | null;
+};
+
+export type FeedbackResponse = {
+  session_id: string;
+  turn_id: number;
+  user_text: string;
+  assistant_text: string;
+  accuracy: number;
+  completeness: number;
+  relevance: number;
+  avg_score: number;
+  rating: string;
+  comment?: string | null;
+  reviewer_name?: string | null;
+  logs?: string[] | null;
+  ts: string;
+};
+
+export type FeedbackListResponse = {
+  items: FeedbackResponse[];
+  total: number;
+};
+
+export type FeedbackStatisticsResponse = {
+  total_count: number;
+  avg_accuracy?: number | null;
+  avg_completeness?: number | null;
+  avg_relevance?: number | null;
+  avg_score?: number | null;
+  rating_distribution: Record<string, number>;
 };

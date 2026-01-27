@@ -17,6 +17,7 @@ class LLMResponse:
 
     text: str
     raw: dict[str, Any] | None = None
+    reasoning: str | None = None  # Reasoning content from reasoning models
 
 
 class BaseLLM(ABC):

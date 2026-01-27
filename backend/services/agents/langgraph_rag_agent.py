@@ -22,6 +22,7 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     SearchServiceRetriever,
     answer_node,
     ask_user_after_retrieve_node,
+    auto_parse_node,
     device_selection_node,
     expand_related_docs_node,
     human_review_node,
@@ -31,12 +32,16 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     refine_queries_node,
     retrieve_node,
     retry_bump_node,
+    retry_expand_node,
+    retry_mq_node,
     route_node,
     should_retry,
     st_gate_node,
     st_mq_node,
+    translate_node,
 )
 from backend.services.search_service import SearchService
+from backend.services.device_cache import ensure_device_cache_initialized
 
 
 logger = logging.getLogger(__name__)
@@ -63,6 +68,7 @@ class LangGraphRAGAgent:
         checkpointer: Optional[MemorySaver] = None,
         ask_user_after_retrieve: bool = False,
         ask_device_selection: bool = False,
+        auto_parse_enabled: bool = False,  # Auto-parse device/doc_type from query
         device_fetcher: Callable[[], Dict[str, Any] | list[Dict[str, Any]]] | None = None,
         event_sink: Callable[[Dict[str, Any]], None] | None = None,
     ) -> None:
@@ -79,9 +85,25 @@ class LangGraphRAGAgent:
         self.mode = mode
         self.ask_user_after_retrieve = ask_user_after_retrieve
         self.ask_device_selection = ask_device_selection
+        self.auto_parse_enabled = auto_parse_enabled
         self.device_fetcher = device_fetcher
         self.checkpointer = checkpointer or MemorySaver()
         self._event_sink = event_sink
+
+        # Initialize device cache for auto_parse mode
+        # Use full device_names list for better LLM parsing accuracy
+        self._device_names: list[str] = []
+        self._doc_type_names: list[str] = []
+        if auto_parse_enabled:
+            cache = ensure_device_cache_initialized(search_service)
+            self._device_names = cache.device_names  # 전체 장비 목록 사용 (LLM 파싱용)
+            self._doc_type_names = cache.doc_type_names
+            logger.info(
+                "Auto-parse enabled with %d devices, %d doc types",
+                len(self._device_names),
+                len(self._doc_type_names),
+            )
+
         self._graph = self._build_graph(mode)
 
     def _emit_event(self, event: Dict[str, Any]) -> None:
@@ -94,43 +116,62 @@ class LangGraphRAGAgent:
             logger.exception("event_sink failed")
 
     def _wrap_node(self, name: str, fn):
-        """Wrap a node to log start/end without leaking user content."""
+        """Wrap a node to emit a single log event with timing and result info."""
 
         def _wrapped(state: AgentState, *args: Any, **kwargs: Any):
-            meta = {
+            # Log input state (key fields only)
+            input_info = {
+                "query": state.get("query", "")[:50] if state.get("query") else None,
+                "query_en": state.get("query_en", "")[:50] if state.get("query_en") else None,
+                "query_ko": state.get("query_ko", "")[:50] if state.get("query_ko") else None,
+                "detected_language": state.get("detected_language"),
                 "route": state.get("route"),
-                "st_gate": state.get("st_gate"),
-                "attempts": state.get("attempts"),
-                "max_attempts": state.get("max_attempts"),
-                "thread_id": state.get("thread_id"),
             }
-            logger.info("[langgraph] node start: %s %s", name, meta)
-            self._emit_event({
-                "type": "log",
-                "level": "info",
-                "node": name,
-                "phase": "start",
-                "meta": meta,
-                "ts": time.time(),
-                "message": f"[langgraph] node start: {name} {meta}",
-            })
+            logger.info("[langgraph] >>> %s INPUT: %s", name, input_info)
+
             t0 = time.perf_counter()
             result = fn(state, *args, **kwargs)
+            elapsed = (time.perf_counter() - t0) * 1000
+
             extra_events = None
             if isinstance(result, dict):
                 extra_events = result.pop("_events", None)
-            elapsed = (time.perf_counter() - t0) * 1000
-            logger.info("[langgraph] node done: %s (%.1f ms)", name, elapsed)
+
+            # Log output result
+            if result:
+                output_info = {}
+                for k, v in result.items():
+                    if k.startswith("_"):
+                        continue
+                    if isinstance(v, str) and len(v) > 100:
+                        output_info[k] = v[:100] + "..."
+                    elif isinstance(v, list) and len(v) > 0:
+                        output_info[k] = f"[{len(v)} items] {str(v)[:100]}..."
+                    else:
+                        output_info[k] = v
+                logger.info("[langgraph] <<< %s OUTPUT: %s", name, output_info)
+
+            # Build node-specific details for display
+            details = self._build_node_details(name, state, result)
+
+            # Format elapsed time
+            if elapsed >= 1000:
+                elapsed_str = f"{elapsed / 1000:.1f}s"
+            else:
+                elapsed_str = f"{elapsed:.0f}ms"
+
+            logger.info("[langgraph] %s (%s) %s", name, elapsed_str, details)
+
             self._emit_event({
                 "type": "log",
                 "level": "info",
                 "node": name,
-                "phase": "done",
-                "meta": meta,
                 "ts": time.time(),
                 "elapsed_ms": round(elapsed, 1),
-                "message": f"[langgraph] node done: {name} ({elapsed:.1f} ms)",
+                "details": details,
+                "message": f"{name} ({elapsed_str})" + (f" - {details}" if details else ""),
             })
+
             if extra_events:
                 for evt in extra_events:
                     payload: Dict[str, Any]
@@ -154,6 +195,98 @@ class LangGraphRAGAgent:
             return result
 
         return _wrapped
+
+    def _build_node_details(self, name: str, state: AgentState, result: Dict[str, Any] | None) -> str:
+        """Build human-readable details for each node type."""
+        details_parts = []
+
+        if name == "route":
+            route = result.get("route") if result else state.get("route")
+            if route:
+                details_parts.append(f"→ {route}")
+
+        elif name == "auto_parse":
+            if result:
+                device = result.get("auto_parsed_device")
+                doc_type = result.get("auto_parsed_doc_type")
+                if device:
+                    details_parts.append(f"장비: {device}")
+                if doc_type:
+                    details_parts.append(f"문서: {doc_type}")
+                if not device and not doc_type:
+                    details_parts.append("파싱 결과 없음")
+
+        elif name == "translate":
+            if result:
+                lang = state.get("detected_language") or result.get("detected_language")
+                query_en = result.get("query_en")
+                query_ko = result.get("query_ko")
+                if lang:
+                    details_parts.append(f"언어: {lang}")
+                if query_en:
+                    preview = query_en[:50] + "..." if len(query_en) > 50 else query_en
+                    details_parts.append(f"EN: {preview}")
+                if query_ko:
+                    preview = query_ko[:50] + "..." if len(query_ko) > 50 else query_ko
+                    details_parts.append(f"KO: {preview}")
+
+        elif name == "mq":
+            if result:
+                route = state.get("route", "")
+                key = f"{route}_mq_list"
+                mq_list = result.get(key, [])
+                if mq_list:
+                    details_parts.append(f"{len(mq_list)}개 쿼리 생성")
+
+        elif name == "st_gate":
+            gate = result.get("st_gate") if result else None
+            if gate:
+                details_parts.append(f"→ {gate}")
+
+        elif name == "st_mq":
+            if result:
+                queries = result.get("search_queries", [])
+                details_parts.append(f"{len(queries)}개 검색 쿼리")
+
+        elif name == "retrieve" or name == "retrieve_retry":
+            if result:
+                docs = result.get("docs", [])
+                details_parts.append(f"{len(docs)}개 문서 검색")
+
+        elif name == "expand_related":
+            if result:
+                ref_json = result.get("answer_ref_json", [])
+                details_parts.append(f"{len(ref_json)}개 문서 확장")
+
+        elif name == "answer":
+            if result:
+                answer = result.get("answer", "")
+                reasoning = result.get("reasoning")
+                details_parts.append(f"{len(answer)}자")
+                if reasoning:
+                    details_parts.append(f"reasoning: {len(reasoning)}자")
+
+        elif name == "judge":
+            if result:
+                judge = result.get("judge", {})
+                faithful = judge.get("faithful")
+                if faithful is not None:
+                    details_parts.append("✓ 충실" if faithful else "✗ 불충실")
+
+        elif name == "retry_expand":
+            attempts = result.get("attempts") if result else state.get("attempts")
+            expand_k = result.get("expand_top_k") if result else state.get("expand_top_k")
+            details_parts.append(f"문서 확장 5→{expand_k or 10}개")
+            if attempts:
+                details_parts.append(f"attempt {attempts}")
+
+        elif name == "retry_mq":
+            attempts = result.get("attempts") if result else state.get("attempts")
+            details_parts.append("MQ 재생성")
+            if attempts:
+                details_parts.append(f"attempt {attempts}")
+
+        return " | ".join(details_parts) if details_parts else ""
 
     def _build_graph(self, mode: str):
         builder = StateGraph(AgentState)
@@ -198,10 +331,41 @@ class LangGraphRAGAgent:
         builder.add_node("answer", self._wrap_node("answer", functools.partial(answer_node, llm=self.llm, spec=self.spec)))
         builder.add_node("judge", self._wrap_node("judge", functools.partial(judge_node, llm=self.llm, spec=self.spec)))
 
-        builder.add_edge(START, "route")
-
-        # Device selection node (optional HIL)
-        if self.ask_device_selection:
+        # Auto-parse mode: auto_parse → translate → route → mq
+        # This ensures route receives translated query (query_en)
+        if self.auto_parse_enabled:
+            builder.add_node(
+                "auto_parse",
+                self._wrap_node(
+                    "auto_parse",
+                    functools.partial(
+                        auto_parse_node,
+                        llm=self.llm,
+                        spec=self.spec,
+                        device_names=self._device_names,
+                        doc_type_names=self._doc_type_names,
+                    ),
+                ),
+            )
+            # Translate node: translate query to EN and KO for better retrieval
+            builder.add_node(
+                "translate",
+                self._wrap_node(
+                    "translate",
+                    functools.partial(
+                        translate_node,
+                        llm=self.llm,
+                        spec=self.spec,
+                    ),
+                ),
+            )
+            # Flow: START → auto_parse → translate → route → mq
+            builder.add_edge(START, "auto_parse")
+            builder.add_edge("auto_parse", "translate")
+            builder.add_edge("translate", "route")
+            builder.add_edge("route", "mq")
+        # Device selection node (optional HIL) - legacy mode
+        elif self.ask_device_selection:
             builder.add_node(
                 "device_selection",
                 self._wrap_node(
@@ -209,9 +373,12 @@ class LangGraphRAGAgent:
                     functools.partial(device_selection_node, device_fetcher=self.device_fetcher),
                 ),
             )
+            builder.add_edge(START, "route")
             builder.add_edge("route", "device_selection")
             # device_selection_node returns Command(goto="mq"), so no explicit edge needed
         else:
+            # Default flow: START → route → mq
+            builder.add_edge(START, "route")
             builder.add_edge("route", "mq")
 
         builder.add_edge("mq", "st_gate")
@@ -242,23 +409,45 @@ class LangGraphRAGAgent:
             builder.add_edge("judge", END)
             return builder.compile(checkpointer=self.checkpointer if self.ask_user_after_retrieve else None)
 
-        # verified: add retry/human
+        # verified: add retry/human with different strategies
+        # retry_expand: 1st retry - use more docs (5→10)
+        builder.add_node("retry_expand", self._wrap_node("retry_expand", retry_expand_node))
+        # retry_bump + refine_queries: 2nd retry - refine queries and re-retrieve
         builder.add_node("retry_bump", self._wrap_node("retry_bump", retry_bump_node))
-        builder.add_node("refine_queries", self._wrap_node("refine_queries", functools.partial(refine_queries_node, llm=self.llm)))
+        builder.add_node("refine_queries", self._wrap_node("refine_queries", functools.partial(refine_queries_node, llm=self.llm, spec=self.spec)))
+        # retry_mq: 3rd+ retry - regenerate MQ from scratch
+        builder.add_node("retry_mq", self._wrap_node("retry_mq", functools.partial(retry_mq_node, llm=self.llm, spec=self.spec)))
         builder.add_node("human_review", self._wrap_node("human_review", human_review_node))
         # 호환성을 위해 'retry' 별칭을 두고 바로 retry_bump로 연결
         builder.add_node("retry", self._wrap_node("retry", lambda s: {}))
         builder.add_node("done", self._wrap_node("done", lambda s: {}))
 
+        # Conditional edges based on retry strategy
+        # - retry_expand: 1st unfaithful → expand more docs (no re-retrieval)
+        # - retry: 2nd unfaithful → refine queries and re-retrieve
+        # - retry_mq: 3rd+ unfaithful → regenerate MQ from scratch
         builder.add_conditional_edges(
             "judge",
             should_retry,
-            {"done": "done", "retry": "retry_bump", "human": "human_review"},
+            {
+                "done": "done",
+                "retry_expand": "retry_expand",
+                "retry": "retry_bump",
+                "retry_mq": "retry_mq",
+                "human": "human_review",
+            },
         )
 
+        # retry_expand: just increase expand_top_k and go back to expand_related
+        builder.add_edge("retry_expand", "expand_related")
+
+        # retry (refine_queries): refine queries and re-retrieve
         builder.add_edge("retry_bump", "refine_queries")
-        # retry 경로에서는 retrieve_retry를 사용 (ask_user 건너뛰기)
         builder.add_edge("refine_queries", "retrieve_retry")
+
+        # retry_mq: regenerate MQ from scratch → mq → st_gate → st_mq → retrieve
+        builder.add_edge("retry_mq", "mq")
+
         builder.add_edge("retry", "retry_bump")
         builder.add_edge("human_review", "retry_bump")
         builder.add_edge("human_review", "done")
@@ -273,6 +462,7 @@ class LangGraphRAGAgent:
         attempts: int = 0,
         max_attempts: int = 1,
         thread_id: str | None = None,
+        state_overrides: Dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """그래프 실행. kwargs는 LangGraph invoke config로 전달 가능."""
@@ -280,15 +470,25 @@ class LangGraphRAGAgent:
         import uuid
 
         tid = thread_id or str(uuid.uuid4())
+        # HIL 비활성화 모드에서는 human_review 건너뛰기
+        skip_human = not self.ask_user_after_retrieve and not self.ask_device_selection
         state: AgentState = {
             "query": query,
             "attempts": attempts,
             "max_attempts": max_attempts,
             "thread_id": tid,
+            "_skip_human_review": skip_human,
         }
+        if state_overrides:
+            state.update(state_overrides)
         config = kwargs.pop("config", {})
         # thread_id is required for checkpointer
-        config = {**config, "configurable": {**config.get("configurable", {}), "thread_id": tid}}
+        # recursion_limit: max_attempts=3일 때 재시도 루프를 위해 충분한 값 설정
+        config = {
+            **config,
+            "configurable": {**config.get("configurable", {}), "thread_id": tid},
+            "recursion_limit": 100,
+        }
 
         return self._graph.invoke(state, config=config)
 

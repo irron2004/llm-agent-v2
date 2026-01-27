@@ -2,10 +2,10 @@
    PE Agent - Global Styles (web-overrides port)
    ============================================ */
 
-/* CSS Custom Properties - Light Theme */
+/* CSS Custom Properties - Light Theme (RTM AI inspired) */
 :root {
-  /* Typography */
-  --font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
+  /* Typography - Pretendard */
+  --font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, sans-serif;
   --font-family-mono: "Fira Code", "SF Mono", "Consolas", "Monaco", monospace;
   --font-size-xs: 12px;
   --font-size-sm: 14px;
@@ -31,42 +31,44 @@
   --color-bg-card: #ffffff;
   --color-bg-elevated: #ffffff;
   --color-bg-secondary: #f5f5f5;
+  --color-bg-tertiary: #fafafa;
 
-  --color-text-primary: #161618;
-  --color-text-secondary: #75787a;
-  --color-text-disabled: #b2b5b7;
-  --color-text-title: #161618;
-  --color-text-subtitle: #979aab;
+  --color-text-primary: #1a1a1a;
+  --color-text-secondary: #6b6b6b;
+  --color-text-disabled: #aaadb0;
+  --color-text-title: #1a1a1a;
+  --color-text-subtitle: #888888;
 
-  /* Accent Colors */
-  --color-accent-primary: rgb(0, 190, 180);
-  --color-accent-primary-hover: rgb(0, 170, 160);
+  /* Accent Colors - RTM Orange */
+  --color-accent-primary: #f76707;
+  --color-accent-primary-hover: #e85d00;
+  --color-accent-primary-light: rgba(247, 103, 7, 0.1);
   --color-accent-blue: #1677ff;
   --color-accent-orange: #f76707;
 
   /* State Colors */
-  --color-success: #1677ff;
-  --color-error: #ff4d4f;
-  --color-warning: #faad14;
+  --color-success: #22c55e;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
 
   /* Message Colors */
-  --color-msg-user-bg: rgba(0, 190, 180, 0.1);
-  --color-msg-user-border: rgba(0, 190, 180, 0.2);
+  --color-msg-user-bg: rgba(247, 103, 7, 0.08);
+  --color-msg-user-border: rgba(247, 103, 7, 0.15);
   --color-msg-assistant-bg: transparent;
   --color-msg-assistant-border: transparent;
 
   /* Action Button */
-  --color-action-bg: #f4f6fb;
-  --color-action-bg-hover: #e6ecfb;
-  --color-action-text: #111827;
+  --color-action-bg: #f4f4f5;
+  --color-action-bg-hover: #e4e4e7;
+  --color-action-text: #1a1a1a;
 
   /* Code Block */
-  --color-code-bg: #0f172a;
-  --color-code-text: #e2e8f0;
+  --color-code-bg: #0a0a0a;
+  --color-code-text: #ededed;
 
   /* Borders */
-  --color-border: #e5e7eb;
-  --color-border-light: #f3f4f6;
+  --color-border: #e5e5e5;
+  --color-border-light: #f0f0f0;
 
   /* Shadows */
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
@@ -94,31 +96,45 @@
   --theme-transition-timing: ease;
 }
 
-/* Dark Theme */
+/* Dark Theme - RTM AI Style */
 .dark {
-  --color-bg-base: #161618;
-  --color-bg-canvas: #000000;
-  --color-bg-card: #1f1f23;
-  --color-bg-elevated: #27272a;
-  --color-bg-secondary: #2d2d30;
+  --color-bg-base: #0a0a0a;
+  --color-bg-canvas: #0a0a0a;
+  --color-bg-card: #1a1a1a;
+  --color-bg-elevated: #1a1a1a;
+  --color-bg-secondary: #262626;
+  --color-bg-tertiary: #1f1f1f;
 
-  --color-text-primary: #f6f6f7;
-  --color-text-secondary: #b2b5b7;
-  --color-text-disabled: #75787a;
+  --color-text-primary: #ededed;
+  --color-text-secondary: #aaadb0;
+  --color-text-disabled: #666666;
   --color-text-title: #ffffff;
-  --color-text-subtitle: #5b5d6a;
+  --color-text-subtitle: #888888;
 
-  --color-msg-user-bg: rgba(255, 255, 255, 0.08);
-  --color-msg-user-border: rgba(255, 255, 255, 0.12);
+  /* Accent Colors - RTM Orange */
+  --color-accent-primary: #f76707;
+  --color-accent-primary-hover: #ff7b1a;
+  --color-accent-primary-light: rgba(247, 103, 7, 0.15);
+
+  /* Message Colors */
+  --color-msg-user-bg: rgba(247, 103, 7, 0.1);
+  --color-msg-user-border: rgba(247, 103, 7, 0.2);
   --color-msg-assistant-bg: transparent;
   --color-msg-assistant-border: transparent;
 
-  --color-action-bg: rgba(255, 255, 255, 0.1);
-  --color-action-bg-hover: rgba(255, 255, 255, 0.16);
-  --color-action-text: #f8fafc;
+  /* Action Button */
+  --color-action-bg: rgba(255, 255, 255, 0.08);
+  --color-action-bg-hover: rgba(255, 255, 255, 0.12);
+  --color-action-text: #ededed;
 
-  --color-border: #2d2d30;
-  --color-border-light: #3f3f46;
+  /* Borders */
+  --color-border: #2a2a2a;
+  --color-border-light: #333333;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
 }
 
 /* ============================================
@@ -566,6 +582,40 @@ a:hover {
 .action-button.active {
   background-color: var(--color-accent-primary);
   color: white;
+}
+
+.action-button.regenerate-button {
+  background-color: var(--color-accent-primary);
+  color: white;
+  padding: var(--spacing-xs) var(--spacing-md);
+}
+
+.action-button.regenerate-button:hover {
+  background-color: var(--color-accent-hover);
+  filter: brightness(1.1);
+}
+
+/* Filter info display */
+.filter-info {
+  animation: fadeIn 0.2s ease;
+}
+
+.filter-info .ant-tag {
+  font-size: 11px;
+  padding: 0 6px;
+  line-height: 18px;
+  height: auto;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ============================================

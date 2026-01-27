@@ -90,20 +90,22 @@ class VLLMClient:
         choice = data["choices"][0]
         message = choice.get("message", {})
         text = message.get("content")
+
+        # Extract reasoning content from reasoning models
+        reasoning = message.get("reasoning_content") or message.get("reasoning")
+
         if text is None:
             # Reasoning models may return reasoning_content instead of content
-            text = (
-                message.get("reasoning_content")
-                or message.get("reasoning")
-                or choice.get("text", "")
-                or ""
-            )
+            text = reasoning or choice.get("text", "") or ""
+            # If we used reasoning as text, clear it to avoid duplication
+            if text == reasoning:
+                reasoning = None
 
         # Parse to Pydantic model if requested
         if response_model is not None:
             return response_model.model_validate_json(text)
 
-        return LLMResponse(text=text, raw=data)
+        return LLMResponse(text=text, raw=data, reasoning=reasoning)
 
 
 __all__ = ["VLLMClient"]
