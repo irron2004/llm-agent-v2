@@ -49,7 +49,8 @@ class StubLLM(BaseLLM):
 
         # Router prompt
         if "routing agent" in system.lower():
-            return LLMResponse(text="general")
+            # Intentionally misroute to verify chat guardrail override.
+            return LLMResponse(text="ts")
 
         return LLMResponse(text="general")
 
@@ -99,6 +100,7 @@ def test_route_node_general_chat_query() -> None:
     result = route_node(state, llm=llm, spec=spec)
 
     assert result["route"] == "general"
+    assert result["is_chat_query"] is True
 
 
 def test_st_mq_no_st_skips_llm_but_builds_bilingual_queries() -> None:
@@ -152,4 +154,3 @@ def test_retrieve_node_route_bias_merges_biased_and_general_results() -> None:
         for d in result["docs"]
     ]
     assert "other" in doc_types
-

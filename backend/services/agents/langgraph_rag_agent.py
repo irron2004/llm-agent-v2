@@ -23,6 +23,7 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     answer_node,
     ask_user_after_retrieve_node,
     auto_parse_node,
+    chat_answer_node,
     device_selection_node,
     expand_related_docs_node,
     human_review_node,
@@ -204,6 +205,8 @@ class LangGraphRAGAgent:
             route = result.get("route") if result else state.get("route")
             if route:
                 details_parts.append(f"→ {route}")
+            if (result or {}).get("is_chat_query") or state.get("is_chat_query"):
+                details_parts.append("chat")
 
         elif name == "auto_parse":
             if result:
@@ -265,6 +268,11 @@ class LangGraphRAGAgent:
                 details_parts.append(f"{len(answer)}자")
                 if reasoning:
                     details_parts.append(f"reasoning: {len(reasoning)}자")
+
+        elif name == "chat_answer":
+            if result:
+                answer = result.get("answer", "")
+                details_parts.append(f"chat {len(answer)}자")
 
         elif name == "judge":
             if result:
@@ -329,6 +337,7 @@ class LangGraphRAGAgent:
             ),
         )
         builder.add_node("answer", self._wrap_node("answer", functools.partial(answer_node, llm=self.llm, spec=self.spec)))
+        builder.add_node("chat_answer", self._wrap_node("chat_answer", chat_answer_node))
         builder.add_node("judge", self._wrap_node("judge", functools.partial(judge_node, llm=self.llm, spec=self.spec)))
 
         # Auto-parse mode: auto_parse → translate → route → mq
@@ -363,7 +372,13 @@ class LangGraphRAGAgent:
             builder.add_edge(START, "auto_parse")
             builder.add_edge("auto_parse", "translate")
             builder.add_edge("translate", "route")
-            builder.add_edge("route", "mq")
+            def _route_decision(state: AgentState) -> str:
+                return "chat" if state.get("is_chat_query") else "default"
+            builder.add_conditional_edges(
+                "route",
+                _route_decision,
+                {"chat": "chat_answer", "default": "mq"},
+            )
         # Device selection node (optional HIL) - legacy mode
         elif self.ask_device_selection:
             builder.add_node(
@@ -374,12 +389,24 @@ class LangGraphRAGAgent:
                 ),
             )
             builder.add_edge(START, "route")
-            builder.add_edge("route", "device_selection")
+            def _route_decision(state: AgentState) -> str:
+                return "chat" if state.get("is_chat_query") else "default"
+            builder.add_conditional_edges(
+                "route",
+                _route_decision,
+                {"chat": "chat_answer", "default": "device_selection"},
+            )
             # device_selection_node returns Command(goto="mq"), so no explicit edge needed
         else:
             # Default flow: START → route → mq
             builder.add_edge(START, "route")
-            builder.add_edge("route", "mq")
+            def _route_decision(state: AgentState) -> str:
+                return "chat" if state.get("is_chat_query") else "default"
+            builder.add_conditional_edges(
+                "route",
+                _route_decision,
+                {"chat": "chat_answer", "default": "mq"},
+            )
 
         builder.add_edge("mq", "st_gate")
         builder.add_edge("st_gate", "st_mq")
@@ -404,6 +431,7 @@ class LangGraphRAGAgent:
         builder.add_edge("expand_related", "answer")
 
         builder.add_edge("answer", "judge")
+        builder.add_edge("chat_answer", END)
 
         if mode == "base":
             builder.add_edge("judge", END)

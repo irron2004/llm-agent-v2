@@ -33,6 +33,7 @@ Gate = Literal["need_st", "no_st"]
 class AgentState(TypedDict, total=False):
     query: str
     route: Route
+    is_chat_query: bool
 
     # Multi-query outputs (parsed lists)
     setup_mq_list: List[str]
@@ -149,6 +150,16 @@ faithful이 false면 조치/근거 누락, 불일치 등을 issues에 적는다.
 DEFAULT_JUDGE_GENERAL = """
 # 역할
 일반 답변이 질문 의도와 검색 증거를 충실히 반영했는지 판정한다.
+
+# 예외 (항상 faithful=true)
+다음 유형의 질문은 REFS 없이 답변해도 faithful로 판정한다:
+- 에이전트 정체성 질문 ("너는 누구니?", "뭘 할 수 있어?", "Who are you?")
+- 인사/일상 대화 ("안녕", "고마워", "잘가")
+- 에이전트 사용법 질문
+
+# 일반 규칙
+위 예외에 해당하지 않는 경우, 답변이 REFS 증거에 기반했는지 판정한다.
+
 출력: {"faithful": bool, "issues": [..], "hint": "..."}
 """.strip()
 
@@ -321,6 +332,32 @@ def _parse_gate(text: str) -> Gate:
     if "need" in t:
         return "need_st"
     return "no_st"
+
+
+def _is_general_chat_query(query: str) -> bool:
+    """Heuristic guardrail for agent-identity/small-talk queries."""
+    q = (query or "").strip().lower()
+    if not q:
+        return False
+
+    patterns = [
+        r"\bwho are you\b",
+        r"\bwhat can you do\b",
+        r"\bwhat are you\b",
+        r"\bhello\b",
+        r"\bhi\b",
+        r"\bhey\b",
+        r"\bthanks?\b",
+        r"\bthank you\b",
+        r"^안녕",
+        r"^ㅎㅇ",
+        r"너는 누구",
+        r"당신은 누구",
+        r"뭐(야|임)\??$",
+        r"고마워",
+        r"감사",
+    ]
+    return any(re.search(pat, q) for pat in patterns)
 
 
 def _parse_queries(text: str) -> List[str]:
@@ -635,8 +672,16 @@ def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     query = state.get("query_en") or state["query"]
     user = _format_prompt(spec.router.user, {"sys.query": query})
     route = _parse_route(_invoke_llm(llm, spec.router.system, user))
-    logger.info("route_node: query=%s..., route=%s", query[:50] if query else None, route)
-    return {"route": route}
+    chat_query = _is_general_chat_query(state.get("query") or query)
+    if chat_query:
+        route = "general"
+    logger.info(
+        "route_node: query=%s..., route=%s, is_chat_query=%s",
+        query[:50] if query else None,
+        route,
+        chat_query,
+    )
+    return {"route": route, "is_chat_query": chat_query}
 
 
 def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
@@ -1404,7 +1449,43 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     return {"answer": answer, "reasoning": reasoning}
 
 
+def chat_answer_node(state: AgentState) -> Dict[str, Any]:
+    """Answer small-talk / agent identity questions without retrieval."""
+    lang = state.get("detected_language", "ko")
+    if lang == "en":
+        answer = (
+            "I am a document-grounded RAG assistant for semiconductor equipment. "
+            "Ask me about alarms, troubleshooting steps, setup/installation procedures, "
+            "or device-specific documentation, and I will cite sources when available."
+        )
+    elif lang == "ja":
+        answer = (
+            "私は半導体装置向けの文書根拠型RAGアシスタントです。"
+            "アラーム、トラブルシューティング手順、セットアップ/設置手順、"
+            "装置別ドキュメントについて質問してください。根拠があれば出典も示します。"
+        )
+    else:
+        answer = (
+            "저는 반도체 장비 문서 기반 RAG 어시스턴트입니다. "
+            "알람/에러 원인, 트러블슈팅 절차, 설치/셋업 방법, 장비별 문서 내용을 물어보시면 "
+            "가능한 경우 근거와 함께 답변하겠습니다."
+        )
+
+    # Provide a faithful judge result to avoid retry loops.
+    judge = {"faithful": True, "issues": [], "hint": "chat_query"}
+    return {
+        "answer": answer,
+        "judge": judge,
+        "docs": [],
+        "display_docs": [],
+        "ref_json": [],
+        "answer_ref_json": [],
+    }
+
+
 def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
+    if state.get("is_chat_query"):
+        return {"judge": {"faithful": True, "issues": [], "hint": "chat_query"}}
     route = state["route"]
     ref_items = state.get("answer_ref_json") or state.get("ref_json", [])
     ref_text = ref_json_to_text(ref_items)
@@ -2086,6 +2167,7 @@ __all__ = [
     "expand_related_docs_node",
     "ask_user_after_retrieve_node",
     "answer_node",
+    "chat_answer_node",
     "judge_node",
     "should_retry",
     "retry_bump_node",
