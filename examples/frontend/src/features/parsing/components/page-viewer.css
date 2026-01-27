@@ -1,0 +1,110 @@
+.page-viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-bg-secondary, #f5f5f5);
+}
+
+.page-viewer--loading,
+.page-viewer--empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-text-secondary, #666);
+}
+
+.page-viewer__spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--color-border, #ddd);
+  border-top-color: var(--color-accent-primary, #1890ff);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.page-viewer__content {
+  display: flex;
+  flex: 1;
+  gap: 16px;
+  padding: 16px;
+  overflow: hidden;
+}
+
+.page-viewer__panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-primary, #fff);
+  border: 1px solid var(--color-border, #e0e0e0);
+  border-radius: 8px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.page-viewer__panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: var(--color-bg-tertiary, #fafafa);
+  border-bottom: 1px solid var(--color-border, #e0e0e0);
+}
+
+.page-viewer__panel-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.page-viewer__page-number,
+.page-viewer__char-count {
+  font-size: 12px;
+  color: #444;
+  background: #e8e8e8;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.page-viewer__panel-body {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.page-viewer__image {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.page-viewer__vlm-text {
+  margin: 0;
+  font-family: "Pretendard", "Noto Sans KR", -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  color: #1a1a1a;
+}
+
+/* 반응형: 좁은 화면에서는 세로 배치 */
+@media (max-width: 900px) {
+  .page-viewer__content {
+    flex-direction: column;
+  }
+
+  .page-viewer__panel {
+    min-height: 300px;
+  }
+}

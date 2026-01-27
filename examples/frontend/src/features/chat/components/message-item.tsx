@@ -1,0 +1,197 @@
+import { useState } from "react";
+import { CopyOutlined, LikeOutlined, DislikeOutlined, CheckOutlined, EditOutlined, SendOutlined, CloseOutlined } from "@ant-design/icons";
+import { Message } from "../types";
+import { MarkdownContent } from "./markdown-content";
+
+type MessageItemProps = {
+  message: Message;
+  isStreaming?: boolean;
+  onLike?: (id: string) => void;
+  onDislike?: (id: string) => void;
+  onEdit?: (id: string, newContent: string) => void;
+};
+
+export function MessageItem({ message, isStreaming, onLike, onDislike, onEdit }: MessageItemProps) {
+  const [copied, setCopied] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [disliked, setDisliked] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editContent, setEditContent] = useState(message.content);
+
+  const isUser = message.role === "user";
+  const isAssistant = message.role === "assistant";
+
+  const handleEditClick = () => {
+    setEditContent(message.content);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditContent(message.content);
+  };
+
+  const handleSubmitEdit = () => {
+    if (editContent.trim() && editContent !== message.content) {
+      onEdit?.(message.id, editContent.trim());
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmitEdit();
+    }
+    if (e.key === "Escape") {
+      handleCancelEdit();
+    }
+  };
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
+    }
+  };
+
+  const handleLike = () => {
+    setLiked(!liked);
+    setDisliked(false);
+    onLike?.(message.id);
+  };
+
+  const handleDislike = () => {
+    setDisliked(!disliked);
+    setLiked(false);
+    onDislike?.(message.id);
+  };
+
+  return (
+    <div className="message-item">
+      <div className={`message-content ${isUser ? "user" : ""}`}>
+        <div className={`message-avatar ${isUser ? "user" : "assistant"}`}>
+          {isUser ? "U" : "A"}
+        </div>
+        <div className="message-body">
+          <div className={`message-bubble ${isUser ? "user" : "assistant"}`}>
+            {isAssistant ? (
+              <MarkdownContent content={message.content} />
+            ) : isEditing ? (
+              <div className="edit-mode">
+                <textarea
+                  className="edit-textarea"
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  autoFocus
+                  rows={3}
+                />
+                <div className="edit-actions">
+                  <button
+                    className="edit-button submit"
+                    onClick={handleSubmitEdit}
+                    disabled={!editContent.trim()}
+                    title="전송 (Enter)"
+                  >
+                    <SendOutlined /> 전송
+                  </button>
+                  <button
+                    className="edit-button cancel"
+                    onClick={handleCancelEdit}
+                    title="취소 (Esc)"
+                  >
+                    <CloseOutlined /> 취소
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="message-text">{message.content}</div>
+            )}
+            {isStreaming && (
+              <span className="typing-indicator">
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+                <span className="typing-dot" />
+              </span>
+            )}
+          </div>
+
+          {/* Reference section */}
+          {message.reference && message.reference.chunks.length > 0 && (
+            <div className="reference-section">
+              <div className="reference-title">
+                <span>References ({message.reference.chunks.length})</span>
+              </div>
+              <div className="reference-list">
+                {message.reference.chunks.map((chunk, idx) => (
+                  <div key={chunk.id || idx} className="reference-item">
+                    <span>{chunk.documentName || `Document ${idx + 1}`}</span>
+                    {chunk.similarity !== undefined && (
+                      <span style={{ opacity: 0.6 }}>
+                        {(chunk.similarity * 100).toFixed(0)}%
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Edit button - only for user messages */}
+          {isUser && !isEditing && (
+            <div className="message-actions">
+              <button
+                className="action-button"
+                onClick={handleEditClick}
+                title="Edit"
+              >
+                <EditOutlined />
+              </button>
+            </div>
+          )}
+
+          {/* Action buttons - only for assistant messages */}
+          {isAssistant && !isStreaming && (
+            <div className="message-actions">
+              <button
+                className={`action-button ${copied ? "active" : ""}`}
+                onClick={handleCopy}
+                title="Copy"
+              >
+                {copied ? <CheckOutlined /> : <CopyOutlined />}
+              </button>
+              <button
+                className={`action-button ${liked ? "active" : ""}`}
+                onClick={handleLike}
+                title="Like"
+              >
+                <LikeOutlined />
+              </button>
+              <button
+                className={`action-button ${disliked ? "active" : ""}`}
+                onClick={handleDislike}
+                title="Dislike"
+              >
+                <DislikeOutlined />
+              </button>
+            </div>
+          )}
+
+          {/* Raw answer block (optional) */}
+          {message.rawAnswer && (
+            <details style={{ marginTop: 12 }}>
+              <summary style={{ cursor: "pointer", fontSize: 12, color: "var(--color-text-secondary)" }}>
+                Show raw response
+              </summary>
+              <div className="raw-block">{message.rawAnswer}</div>
+            </details>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
