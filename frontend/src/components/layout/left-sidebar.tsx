@@ -9,6 +9,7 @@ import {
   DeleteOutlined,
   InboxOutlined,
   StarOutlined,
+  BranchesOutlined,
 } from "@ant-design/icons";
 import { useState, useMemo } from "react";
 import { useChatHistoryContext } from "../../features/chat/context/chat-history-context";
@@ -210,7 +211,14 @@ export default function LeftSidebar({
               >
                 <MessageOutlined className="history-item-icon" />
                 <div className="history-item-content">
-                  <div className="history-item-title">{item.title}</div>
+                  <div className="history-item-title">
+                    {item.title}
+                    {item.isBranch && (
+                      <span className="history-item-badge">
+                        <BranchesOutlined /> 브랜치
+                      </span>
+                    )}
+                  </div>
                   <div className="history-item-date">{formatDate(item.updatedAt)}</div>
                 </div>
                 <div className="history-item-actions">

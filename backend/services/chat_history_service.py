@@ -25,6 +25,7 @@ from datetime import datetime
 from typing import Any, Optional
 
 from elasticsearch import Elasticsearch, NotFoundError
+from elasticsearch.helpers import bulk
 
 from backend.config.settings import search_settings
 from backend.llm_infrastructure.elasticsearch.mappings import (
@@ -81,6 +82,10 @@ class ChatTurn:
     turn_id: int
     user_text: str
     assistant_text: str
+    edited: Optional[bool] = None
+    parent_session_id: Optional[str] = None
+    branched_from_turn_id: Optional[int] = None
+    is_branch: Optional[bool] = None
     doc_refs: list[DocRef] = field(default_factory=list)
     title: Optional[str] = None  # Session title (set on first turn)
     summary: Optional[str] = None  # Turn summary for history selection
@@ -98,6 +103,10 @@ class ChatTurn:
             "turn_id": self.turn_id,
             "user_text": self.user_text,
             "assistant_text": self.assistant_text,
+            "edited": self.edited,
+            "parent_session_id": self.parent_session_id,
+            "branched_from_turn_id": self.branched_from_turn_id,
+            "is_branch": self.is_branch,
             "doc_refs": [ref.to_dict() for ref in self.doc_refs],
             "title": self.title,
             "summary": self.summary,
@@ -118,6 +127,10 @@ class ChatTurn:
             turn_id=data.get("turn_id", 0),
             user_text=data.get("user_text", ""),
             assistant_text=data.get("assistant_text", ""),
+            edited=data.get("edited"),
+            parent_session_id=data.get("parent_session_id"),
+            branched_from_turn_id=data.get("branched_from_turn_id"),
+            is_branch=data.get("is_branch"),
             doc_refs=doc_refs,
             title=data.get("title"),
             summary=data.get("summary"),
@@ -139,6 +152,9 @@ class SessionSummary:
     turn_count: int
     created_at: datetime
     updated_at: datetime
+    is_branch: bool = False
+    parent_session_id: Optional[str] = None
+    branched_from_turn_id: Optional[int] = None
 
 
 class ChatHistoryService:
@@ -361,7 +377,14 @@ class ChatHistoryService:
                             "top_hits": {
                                 "size": 1,
                                 "sort": [{"turn_id": "asc"}],
-                                "_source": ["title", "user_text", "created_at"],
+                                "_source": [
+                                    "title",
+                                    "user_text",
+                                    "created_at",
+                                    "parent_session_id",
+                                    "branched_from_turn_id",
+                                    "is_branch",
+                                ],
                             }
                         },
                     },
@@ -387,6 +410,9 @@ class ChatHistoryService:
                 first_hit = bucket["first_turn"]["hits"]["hits"][0]["_source"] if bucket["first_turn"]["hits"]["hits"] else {}
                 title = first_hit.get("title") or first_hit.get("user_text", "")[:50]
                 preview = first_hit.get("user_text", "")[:100]
+                is_branch = bool(first_hit.get("is_branch")) or bool(first_hit.get("parent_session_id"))
+                parent_session_id = first_hit.get("parent_session_id")
+                branched_from_turn_id = first_hit.get("branched_from_turn_id")
 
                 sessions.append(SessionSummary(
                     session_id=session_id,
@@ -395,6 +421,9 @@ class ChatHistoryService:
                     turn_count=turn_count,
                     created_at=datetime.fromisoformat(earliest_ts.replace("Z", "+00:00")) if earliest_ts else datetime.utcnow(),
                     updated_at=datetime.fromisoformat(latest_ts.replace("Z", "+00:00")) if latest_ts else datetime.utcnow(),
+                    is_branch=is_branch,
+                    parent_session_id=parent_session_id,
+                    branched_from_turn_id=branched_from_turn_id,
                 ))
 
             return sessions
@@ -421,6 +450,126 @@ class ChatHistoryService:
         )
         deleted = result.get("deleted", 0)
         logger.info(f"Deleted {deleted} turns for session {session_id}")
+        return deleted
+
+    def _session_has_turns(self, session_id: str) -> bool:
+        query = {
+            "query": {"term": {"session_id": session_id}},
+            "size": 1,
+            "_source": False,
+        }
+        try:
+            result = self.es.search(
+                index=self.index,
+                body=query,
+                routing=session_id,
+            )
+        except NotFoundError:
+            return False
+        hits = result.get("hits", {}).get("hits", [])
+        return bool(hits)
+
+    def _next_branch_session_id(self, session_id: str) -> str:
+        base = f"{session_id}_branch"
+        if not self._session_has_turns(base):
+            return base
+        suffix = 2
+        while self._session_has_turns(f"{base}_{suffix}"):
+            suffix += 1
+        return f"{base}_{suffix}"
+
+    def branch_session(self, session_id: str, from_turn_id: int) -> tuple[str, int]:
+        """Create a branched session by cloning turns before from_turn_id.
+
+        Args:
+            session_id: Original session ID.
+            from_turn_id: Turn ID to replace (clone turns with turn_id < from_turn_id).
+
+        Returns:
+            (new_session_id, copied_count)
+        """
+        new_session_id = self._next_branch_session_id(session_id)
+        query = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"session_id": session_id}},
+                        {"range": {"turn_id": {"lt": from_turn_id}}},
+                    ]
+                }
+            },
+            "sort": [{"turn_id": "asc"}],
+            "size": 1000,
+        }
+        try:
+            result = self.es.search(
+                index=self.index,
+                body=query,
+                routing=session_id,
+            )
+        except NotFoundError:
+            return new_session_id, 0
+
+        hits = result.get("hits", {}).get("hits", [])
+        if not hits:
+            return new_session_id, 0
+
+        actions = []
+        for hit in hits:
+            turn = ChatTurn.from_dict(hit["_source"])
+            turn.session_id = new_session_id
+            turn.parent_session_id = session_id
+            turn.branched_from_turn_id = from_turn_id
+            turn.is_branch = True
+            doc_id = f"{new_session_id}:{turn.turn_id}"
+            actions.append(
+                {
+                    "_op_type": "index",
+                    "_index": self.index,
+                    "_id": doc_id,
+                    "_routing": new_session_id,
+                    "_source": turn.to_dict(),
+                }
+            )
+
+        if actions:
+            bulk(self.es, actions, refresh=True)
+
+        return new_session_id, len(actions)
+
+    def delete_turns_from(self, session_id: str, turn_id: int) -> int:
+        """Delete turns from a specific turn_id onward (inclusive).
+
+        Args:
+            session_id: Session ID to delete turns from.
+            turn_id: Delete turns with turn_id >= this value.
+
+        Returns:
+            Number of documents deleted.
+        """
+        query = {
+            "query": {
+                "bool": {
+                    "must": [
+                        {"term": {"session_id": session_id}},
+                        {"range": {"turn_id": {"gte": turn_id}}},
+                    ]
+                }
+            }
+        }
+        result = self.es.delete_by_query(
+            index=self.index,
+            body=query,
+            routing=session_id,
+            refresh=True,
+        )
+        deleted = result.get("deleted", 0)
+        logger.info(
+            "Deleted %s turns for session %s from turn_id %s",
+            deleted,
+            session_id,
+            turn_id,
+        )
         return deleted
 
     def hide_session(self, session_id: str) -> int:

@@ -69,6 +69,26 @@ export async function saveFeedback(
   );
 }
 
+export async function truncateSessionTurns(
+  sessionId: string,
+  fromTurnId: number
+): Promise<{ deleted: number; session_id: string; from_turn_id: number }> {
+  return apiClient.post(
+    `/api/conversations/${sessionId}/turns/${fromTurnId}/truncate`,
+    {}
+  );
+}
+
+export async function branchSessionTurns(
+  sessionId: string,
+  fromTurnId: number
+): Promise<{ session_id: string; copied: number; from_turn_id: number }> {
+  return apiClient.post(
+    `/api/conversations/${sessionId}/turns/${fromTurnId}/branch`,
+    {}
+  );
+}
+
 export async function deleteSession(sessionId: string): Promise<void> {
   await apiClient.delete(`/api/conversations/${sessionId}`);
 }

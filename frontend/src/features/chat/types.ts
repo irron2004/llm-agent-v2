@@ -19,6 +19,7 @@ export type Message = {
   role: MessageRole;
   content: string;
   createdAt?: string;
+  edited?: boolean;
   originalQuery?: string;
   reference?: Reference;
   rawAnswer?: string;
@@ -121,6 +122,7 @@ export type AgentRequest = {
   mode?: string;
   thread_id?: string | null;
   ask_user_after_retrieve?: boolean;
+  ask_device_selection?: boolean;
   resume_decision?: unknown;
   auto_parse?: boolean;
   filter_devices?: string[] | null;
@@ -155,6 +157,10 @@ export type TurnResponse = {
   doc_refs: DocRefResponse[];
   title?: string | null;
   ts: string;
+  edited?: boolean | null;
+  parent_session_id?: string | null;
+  branched_from_turn_id?: number | null;
+  is_branch?: boolean | null;
   feedback_rating?: FeedbackRating | null;
   feedback_reason?: string | null;
   feedback_ts?: string | null;
@@ -167,6 +173,9 @@ export type SessionListItem = {
   turnCount: number;
   createdAt: string;
   updatedAt: string;
+  isBranch?: boolean;
+  parentSessionId?: string | null;
+  branchedFromTurnId?: number | null;
 };
 
 export type SessionListResponse = {
@@ -179,6 +188,9 @@ export type SessionDetailResponse = {
   title: string;
   turns: TurnResponse[];
   turn_count: number;
+  is_branch?: boolean;
+  parent_session_id?: string | null;
+  branched_from_turn_id?: number | null;
 };
 
 export type SaveTurnRequest = {
@@ -186,6 +198,10 @@ export type SaveTurnRequest = {
   assistant_text: string;
   doc_refs: DocRefResponse[];
   title?: string | null;
+  edited?: boolean | null;
+  parent_session_id?: string | null;
+  branched_from_turn_id?: number | null;
+  is_branch?: boolean | null;
 };
 
 // --- Detailed Feedback Types (for feedback index) ---

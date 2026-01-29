@@ -579,6 +579,62 @@ a:hover {
   background-color: var(--color-action-bg-hover);
 }
 
+.message-edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  animation: fadeIn 0.2s ease;
+}
+
+.message-edit-textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  resize: vertical;
+  background-color: var(--color-bg-base);
+  color: var(--color-text-primary);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.message-edit-textarea:focus {
+  outline: none;
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 3px var(--color-accent-primary-light);
+}
+
+.message-edit-textarea:hover:not(:focus) {
+  border-color: var(--color-text-secondary);
+}
+
+.message-edit-actions {
+  display: flex;
+  gap: var(--spacing-xs);
+  justify-content: flex-end;
+}
+
+.edited-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background-color: var(--color-bg-secondary);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+.edited-indicator::before {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background-color: var(--color-text-disabled);
+}
+
 .action-button.active {
   background-color: var(--color-accent-primary);
   color: white;
@@ -1048,4 +1104,23 @@ a:hover {
   -webkit-line-clamp: 3;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ============================================
+   Responsive Breakpoints
+   ============================================ */
+
+@media (max-width: 768px) {
+  .message-edit-textarea {
+    font-size: var(--font-size-base);
+  }
+
+  .message-actions {
+    opacity: 1;
+  }
+
+  .action-button {
+    min-width: 36px;
+    height: 32px;
+  }
 }

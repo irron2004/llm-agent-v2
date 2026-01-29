@@ -9,6 +9,9 @@ export interface ChatHistoryItem {
   createdAt: string;
   updatedAt: string;
   messageCount: number;
+  isBranch?: boolean;
+  parentSessionId?: string | null;
+  branchedFromTurnId?: number | null;
 }
 
 export function useChatHistory() {
@@ -32,6 +35,9 @@ export function useChatHistory() {
           createdAt: session.createdAt,
           updatedAt: session.updatedAt,
           messageCount: session.turnCount,
+          isBranch: session.isBranch ?? false,
+          parentSessionId: session.parentSessionId ?? null,
+          branchedFromTurnId: session.branchedFromTurnId ?? null,
         })
       );
       setHistory(items);

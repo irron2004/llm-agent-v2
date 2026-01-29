@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { CopyOutlined, CheckOutlined, ReloadOutlined, FilterOutlined, LikeOutlined, LikeFilled, DislikeOutlined, DislikeFilled, EditOutlined } from "@ant-design/icons";
 import { Message, FeedbackRating, RetrievedDoc, MessageFeedback } from "../types";
 import { MarkdownContent } from "./markdown-content";
@@ -219,22 +219,31 @@ type MessageItemProps = {
   }) => void;
   onDetailedFeedback?: (payload: DetailedFeedbackPayload) => void;
   onRegenerate?: (payload: RegeneratePayload) => void;
+  onEditAndResend?: (payload: { messageId: string; content: string }) => void;
   originalQuery?: string;  // Original user query for regeneration
 };
 
-export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedback, onRegenerate, originalQuery }: MessageItemProps) {
+export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedback, onRegenerate, onEditAndResend, originalQuery }: MessageItemProps) {
   const [copied, setCopied] = useState(false);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [showFilterInfo, setShowFilterInfo] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(message.content);
 
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
   const hasFeedback = Boolean(message.feedback?.accuracy || message.feedback?.rating);
   const canFeedback = Boolean(message.sessionId && message.turnId);
   const regenerateQuery = (originalQuery || message.originalQuery || "").trim();
+
+  useEffect(() => {
+    if (!isEditing) {
+      setEditValue(message.content);
+    }
+  }, [message.content, isEditing]);
 
   // Check if regeneration info is available
   const hasFilterInfo = Boolean(
@@ -255,6 +264,38 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
       selectedDocTypes: message.selectedDocTypes,
       searchQueries: message.searchQueries,
     });
+  };
+
+  const handleEditClick = () => {
+    if (!isUser || isStreaming) return;
+    setIsEditing(true);
+  };
+
+  const handleEditCancel = () => {
+    setIsEditing(false);
+    setEditValue(message.content);
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      handleEditCancel();
+      return;
+    }
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      if (editValue.trim() && !isStreaming) {
+        handleEditResend();
+      }
+    }
+  };
+
+  const handleEditResend = () => {
+    if (!onEditAndResend) return;
+    const trimmed = editValue.trim();
+    if (!trimmed) return;
+    setIsEditing(false);
+    onEditAndResend({ messageId: message.id, content: trimmed });
   };
 
   // 이미지 URL이 유효한지 확인
@@ -396,7 +437,38 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
             {isAssistant ? (
               <MarkdownContent content={message.content} />
             ) : (
-              <div className="message-text">{message.content}</div>
+              isEditing ? (
+                <div className="message-edit">
+                  <textarea
+                    className="message-edit-textarea"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={handleEditKeyDown}
+                    rows={3}
+                    disabled={isStreaming}
+                    aria-label="메시지 편집"
+                    placeholder="메시지를 수정하세요. Ctrl+Enter로 재전송, Escape로 취소"
+                  />
+                  <div className="message-edit-actions">
+                    <button
+                      className="action-button"
+                      onClick={handleEditCancel}
+                      disabled={isStreaming}
+                    >
+                      취소
+                    </button>
+                    <button
+                      className="action-button"
+                      onClick={handleEditResend}
+                      disabled={isStreaming || !editValue.trim()}
+                    >
+                      재전송
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="message-text">{message.content}</div>
+              )
             )}
             {isStreaming && (
               <span className="typing-indicator">
@@ -406,6 +478,10 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
               </span>
             )}
           </div>
+
+          {isUser && message.edited && !isEditing && (
+            <div className="edited-indicator">수정됨</div>
+          )}
 
           {isAssistant && isStreaming && message.currentNode && (
             <div className="node-indicator">
@@ -549,33 +625,47 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
           {/* Execution logs moved to right sidebar */}
 
           {/* Action buttons - only for assistant messages */}
-          {isAssistant && !isStreaming && (
+          {(isAssistant || isUser) && !isStreaming && (
             <div className="message-actions">
-              <button
-                className={`action-button ${copied ? "active" : ""}`}
-                onClick={handleCopy}
-                title="Copy"
-              >
-                {copied ? <CheckOutlined /> : <CopyOutlined />}
-              </button>
-              {/* 피드백 버튼: 피드백이 없을 때만 표시 */}
-              {!hasFeedback && (
+              {isAssistant && (
+                <>
+                  <button
+                    className={`action-button ${copied ? "active" : ""}`}
+                    onClick={handleCopy}
+                    title="Copy"
+                  >
+                    {copied ? <CheckOutlined /> : <CopyOutlined />}
+                  </button>
+                  {/* 피드백 버튼: 피드백이 없을 때만 표시 */}
+                  {!hasFeedback && (
+                    <button
+                      className="action-button"
+                      onClick={handleFeedbackClick}
+                      title="답변 평가"
+                      disabled={!canFeedback}
+                    >
+                      <LikeOutlined />
+                    </button>
+                  )}
+                  {hasFilterInfo && (
+                    <button
+                      className={`action-button ${showFilterInfo ? "active" : ""}`}
+                      onClick={() => setShowFilterInfo(!showFilterInfo)}
+                      title="검색 필터 정보"
+                    >
+                      <FilterOutlined />
+                    </button>
+                  )}
+                </>
+              )}
+              {isUser && onEditAndResend && (
                 <button
                   className="action-button"
-                  onClick={handleFeedbackClick}
-                  title="답변 평가"
-                  disabled={!canFeedback}
+                  onClick={handleEditClick}
+                  title="메시지 수정"
+                  disabled={isStreaming}
                 >
-                  <LikeOutlined />
-                </button>
-              )}
-              {hasFilterInfo && (
-                <button
-                  className={`action-button ${showFilterInfo ? "active" : ""}`}
-                  onClick={() => setShowFilterInfo(!showFilterInfo)}
-                  title="검색 필터 정보"
-                >
-                  <FilterOutlined />
+                  <EditOutlined />
                 </button>
               )}
             </div>

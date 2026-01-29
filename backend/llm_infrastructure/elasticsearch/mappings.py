@@ -337,6 +337,22 @@ def get_chat_turns_mapping() -> dict[str, Any]:
                 "analyzer": "nori",
                 # Assistant's response
             },
+            "edited": {
+                "type": "boolean",
+                # True if this turn was created from an edited user message
+            },
+            "parent_session_id": {
+                "type": "keyword",
+                # Parent session ID if this session is branched
+            },
+            "branched_from_turn_id": {
+                "type": "integer",
+                # Turn ID where the branch was created
+            },
+            "is_branch": {
+                "type": "boolean",
+                # True if this session is a branch
+            },
             # ===================================================================
             # Feedback (Satisfaction)
             # ===================================================================

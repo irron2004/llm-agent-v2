@@ -1,6 +1,6 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState, useEffect } from "react";
 import { nanoid } from "nanoid";
-import { sendChatMessage, saveTurn, fetchSession, saveFeedback, saveDetailedFeedback, getDetailedFeedback } from "../api";
+import { sendChatMessage, saveTurn, fetchSession, saveFeedback, saveDetailedFeedback, getDetailedFeedback, truncateSessionTurns, branchSessionTurns } from "../api";
 import {
   AgentResponse,
   Message,
@@ -22,6 +22,7 @@ export type SessionChangeCallback = (info: { sessionId: string; title: string; i
 type SendOptions = {
   text: string;
   decisionOverride?: unknown;
+  askDeviceSelection?: boolean;
   overrides?: {
     filterDevices?: string[];
     filterDocTypes?: string[];
@@ -169,6 +170,7 @@ export type UseChatSessionOptions = {
 export function useChatSession(options: UseChatSessionOptions = {}) {
   const { onSessionChange, onTurnSaved } = options;
   const [sessionId, setSessionId] = useState<string>(() => nanoid());
+  const sessionIdRef = useRef(sessionId);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -179,10 +181,21 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   const currentUserTextRef = useRef<string>("");
   const sessionTitleRef = useRef<string | null>(null);
   const turnCountRef = useRef(0);
+  const pendingEditedRef = useRef(false);
+  const currentTurnEditedRef = useRef(false);
+  const branchMetaRef = useRef<{
+    parentSessionId: string;
+    branchedFromTurnId: number;
+    isBranch: boolean;
+  } | null>(null);
   const onSessionChangeRef = useRef(onSessionChange);
   const onTurnSavedRef = useRef(onTurnSaved);
   onSessionChangeRef.current = onSessionChange;
   onTurnSavedRef.current = onTurnSaved;
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   // Get chat logs context (Provider is always available in AppProviders)
   const { addLog, clearLogs } = useChatLogs();
@@ -198,6 +211,110 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     setMessages((prev) => prev.map((m) => (m.id === id ? updater(m) : m)));
   }, []);
 
+  const truncateMessagesFrom = useCallback((id: string) => {
+    setMessages((prev) => {
+      const index = prev.findIndex((m) => m.id === id);
+      if (index < 0) return prev;
+      return prev.slice(0, index);
+    });
+    setPendingInterrupt(null);
+    setCompletedRetrievedDocs(null);
+    clearLogs();
+  }, [clearLogs, setCompletedRetrievedDocs]);
+
+  const markNextTurnEdited = useCallback(() => {
+    pendingEditedRef.current = true;
+  }, []);
+
+  const resolveTurnIdFromMessageId = useCallback((id: string): number | null => {
+    const index = messages.findIndex((m) => m.id === id);
+    if (index < 0) return null;
+    for (let i = index + 1; i < messages.length; i += 1) {
+      const candidate = messages[i];
+      if (candidate.role === "assistant" && typeof candidate.turnId === "number") {
+        return candidate.turnId;
+      }
+    }
+    const priorTurns = messages.slice(0, index).filter(
+      (m) => m.role === "assistant" && typeof m.turnId === "number"
+    ).length;
+    return priorTurns + 1;
+  }, [messages]);
+
+  const truncateSessionFromMessageId = useCallback(async (id: string) => {
+    const fromTurnId = resolveTurnIdFromMessageId(id);
+    const index = messages.findIndex((m) => m.id === id);
+    const remainingMessages = index >= 0 ? messages.slice(0, index) : messages;
+    const remainingTurns = remainingMessages.filter(
+      (m) => m.role === "assistant" && typeof m.turnId === "number"
+    ).length;
+
+    if (fromTurnId && sessionId) {
+      try {
+        await truncateSessionTurns(sessionId, fromTurnId);
+      } catch (err) {
+        console.error("Failed to truncate session turns:", err);
+      }
+    }
+
+    truncateMessagesFrom(id);
+    turnCountRef.current = remainingTurns;
+    isFirstMessageRef.current = remainingTurns === 0;
+    if (remainingTurns === 0) {
+      sessionTitleRef.current = null;
+    }
+  }, [messages, resolveTurnIdFromMessageId, sessionId, truncateMessagesFrom]);
+
+  const branchSessionFromMessageId = useCallback(async (id: string): Promise<string | null> => {
+    const index = messages.findIndex((m) => m.id === id);
+    const baseMessages = index >= 0 ? messages.slice(0, index) : messages;
+    const remainingTurns = baseMessages.filter(
+      (m) => m.role === "assistant" && typeof m.turnId === "number"
+    ).length;
+    const fromTurnId = resolveTurnIdFromMessageId(id);
+
+    let newSessionId = sessionId;
+    if (fromTurnId && sessionId) {
+      try {
+        const res = await branchSessionTurns(sessionId, fromTurnId);
+        newSessionId = res.session_id;
+      } catch (err) {
+        console.error("Failed to branch session:", err);
+        setError("브랜치 세션 생성에 실패했습니다.");
+        return null;
+      }
+    }
+
+    const updatedMessages = baseMessages.map((m) => ({
+      ...m,
+      sessionId: newSessionId,
+    }));
+
+    setMessages(updatedMessages);
+    setSessionId(newSessionId);
+    sessionIdRef.current = newSessionId;
+    if (fromTurnId && sessionId) {
+      branchMetaRef.current = {
+        parentSessionId: sessionId,
+        branchedFromTurnId: fromTurnId,
+        isBranch: true,
+      };
+    } else {
+      branchMetaRef.current = null;
+    }
+    setPendingInterrupt(null);
+    setCompletedRetrievedDocs(null);
+    clearLogs();
+
+    turnCountRef.current = remainingTurns;
+    isFirstMessageRef.current = remainingTurns === 0;
+    if (remainingTurns === 0) {
+      sessionTitleRef.current = null;
+    }
+
+    return newSessionId;
+  }, [messages, resolveTurnIdFromMessageId, sessionId, clearLogs, setCompletedRetrievedDocs, setError]);
+
   const stop = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -206,6 +323,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
   const handleAgentResponse = useCallback(
     (res: AgentResponse, assistantId: string, fallbackQuestion: string) => {
+      const activeSessionId = sessionIdRef.current;
       if (res.interrupted) {
         const threadId = res.thread_id ?? "";
         if (!threadId) {
@@ -300,7 +418,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         allRetrievedDocs: res.all_retrieved_docs || [],  // 재생성용 전체 문서 (20개)
         rawAnswer: JSON.stringify(res, null, 2),
         currentNode: null,
-        sessionId,
+        sessionId: activeSessionId,
         // Store auto_parse and filter info for regeneration
         autoParse: res.auto_parse ?? null,
         selectedDevices: res.selected_devices ?? null,
@@ -312,6 +430,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       const userText = currentUserTextRef.current;
       const assistantText = res.answer || "";
       const docRefs = toDocRefs(res.retrieved_docs || []);
+      const edited = currentTurnEditedRef.current;
+      currentTurnEditedRef.current = false;
 
       // Determine title (only for first turn)
       turnCountRef.current += 1;
@@ -322,15 +442,19 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         sessionTitleRef.current = title;
       }
 
-      saveTurn(sessionId, {
+      saveTurn(activeSessionId, {
         user_text: userText,
         assistant_text: assistantText,
         doc_refs: docRefs,
         title,
+        edited: edited || undefined,
+        parent_session_id: branchMetaRef.current?.parentSessionId ?? undefined,
+        branched_from_turn_id: branchMetaRef.current?.branchedFromTurnId ?? undefined,
+        is_branch: branchMetaRef.current?.isBranch ?? undefined,
       }).then((turn) => {
         updateMessage(assistantId, (m) => ({
           ...m,
-          sessionId,
+          sessionId: activeSessionId,
           turnId: turn.turn_id,
           feedback: extractFeedback(turn),
         }));
@@ -343,7 +467,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   );
 
   const send = useCallback(
-    async ({ text, decisionOverride, overrides }: SendOptions) => {
+    async ({ text, decisionOverride, overrides, askDeviceSelection }: SendOptions) => {
       stop();
       setError(null);
       const pending = pendingInterrupt;
@@ -362,11 +486,13 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         clearLogs();
       }
 
+      const activeSessionId = sessionIdRef.current;
+
       // Notify on first message of this session
       if (isFirstMessageRef.current && !isResume) {
         isFirstMessageRef.current = false;
         const title = text.length > 50 ? text.slice(0, 50) + "..." : text;
-        onSessionChangeRef.current?.({ sessionId, title, isNew: true });
+        onSessionChangeRef.current?.({ sessionId: activeSessionId, title, isNew: true });
       }
 
       const userId = nanoid();
@@ -374,12 +500,16 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
       const requestMessage = isResume && pending ? pending.question : text;
       const decision = isResume ? (decisionOverride ?? resolveDecision(text)) : undefined;
+      const isEdited = pendingEditedRef.current;
+      pendingEditedRef.current = false;
+      currentTurnEditedRef.current = isEdited;
 
       appendMessage({
         id: userId,
         role: "user",
         content: text,
-        sessionId,
+        edited: isEdited || undefined,
+        sessionId: activeSessionId,
       });
 
       // Assistant placeholder so the UI shows progress immediately.
@@ -389,32 +519,41 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         role: "assistant",
         content: "처리 중...",
         currentNode: null,
-        sessionId,
+        sessionId: activeSessionId,
         originalQuery: requestMessage,
       });
       setIsStreaming(true);
 
       try {
         const autoParseEnabled = overrides?.autoParse ?? !Boolean(overrides);
-        const payload = {
-          message: requestMessage,
-          auto_parse: autoParseEnabled,  // 자동 파싱 모드 활성화 (기본값)
-          ask_user_after_retrieve: false,  // 문서 선택 UI 비활성화
-          ...(overrides ? {
-            filter_devices: overrides.filterDevices,
-            filter_doc_types: overrides.filterDocTypes,
-            search_queries: overrides.searchQueries,
-            selected_doc_ids: overrides.selectedDocIds,
-          } : {}),
-          ...(isResume && pending
-            ? {
-                thread_id: pending.threadId,
-                resume_decision: decision,
-                auto_parse: false,  // resume 시에는 auto_parse 비활성화
-                ask_user_after_retrieve: true,  // resume은 HIL 모드
-              }
-            : {}),
-        };
+      const shouldAskDeviceSelection = Boolean(
+        (isResume && pending?.kind === "device_selection") || (!isResume && askDeviceSelection)
+      );
+      const shouldAskUserAfterRetrieve = Boolean(
+        (isResume && pending?.kind === "retrieval_review")
+      );
+
+      const payload = {
+        message: requestMessage,
+        auto_parse: autoParseEnabled,  // 자동 파싱 모드 활성화 (기본값)
+        ask_user_after_retrieve: shouldAskUserAfterRetrieve,
+        ask_device_selection: shouldAskDeviceSelection,
+        ...(overrides ? {
+          filter_devices: overrides.filterDevices,
+          filter_doc_types: overrides.filterDocTypes,
+          search_queries: overrides.searchQueries,
+          selected_doc_ids: overrides.selectedDocIds,
+        } : {}),
+        ...(isResume && pending
+          ? {
+              thread_id: pending.threadId,
+              resume_decision: decision,
+              auto_parse: false,  // resume 시에는 auto_parse 비활성화
+              ask_user_after_retrieve: shouldAskUserAfterRetrieve,
+              ask_device_selection: shouldAskDeviceSelection,
+            }
+          : {}),
+      };
         const canStream = env.chatPath.endsWith("/run");
         if (!canStream) {
           const res = await sendChatMessage(payload);
@@ -535,6 +674,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           }
         );
       } catch (err) {
+        currentTurnEditedRef.current = false;
         setError(err instanceof Error ? err.message : "요청 실패");
       } finally {
         setIsStreaming(false);
@@ -651,10 +791,14 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     // Generate new session ID for next chat
     const newSessionId = nanoid();
     setSessionId(newSessionId);
+    sessionIdRef.current = newSessionId;
     isFirstMessageRef.current = true;
     currentUserTextRef.current = "";
     sessionTitleRef.current = null;
     turnCountRef.current = 0;
+    pendingEditedRef.current = false;
+    currentTurnEditedRef.current = false;
+    branchMetaRef.current = null;
   }, [stop, clearLogs, setCompletedRetrievedDocs]);
 
   const submitFeedback = useCallback(
@@ -797,6 +941,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
             content: turn.user_text,
             createdAt: turn.ts,
             sessionId: session.session_id,
+            edited: turn.edited ?? undefined,
           });
           // Assistant message
           loadedMessages.push({
@@ -832,10 +977,26 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
         // Update state
         setSessionId(targetSessionId);
+        sessionIdRef.current = targetSessionId;
         setMessages(loadedMessages);
         setPendingInterrupt(null);
         clearLogs();
         setCompletedRetrievedDocs(null);
+
+        const firstTurn = session.turns[0];
+        if (firstTurn?.is_branch || firstTurn?.parent_session_id) {
+          const parentSessionId = firstTurn.parent_session_id ?? "";
+          const branchedFromTurnId = firstTurn.branched_from_turn_id ?? 1;
+          branchMetaRef.current = parentSessionId
+            ? {
+                parentSessionId,
+                branchedFromTurnId,
+                isBranch: true,
+              }
+            : null;
+        } else {
+          branchMetaRef.current = null;
+        }
 
         // Update refs
         isFirstMessageRef.current = false;
@@ -877,6 +1038,10 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         : "메시지를 입력하세요...",
       reset,
       loadSession,
+      truncateMessagesFrom,
+      truncateSessionFromMessageId,
+      branchSessionFromMessageId,
+      markNextTurnEdited,
     }),
     [
       sessionId,
@@ -894,6 +1059,10 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       submitDetailedFeedback,
       reset,
       loadSession,
+      truncateMessagesFrom,
+      truncateSessionFromMessageId,
+      branchSessionFromMessageId,
+      markNextTurnEdited,
     ]
   );
 }

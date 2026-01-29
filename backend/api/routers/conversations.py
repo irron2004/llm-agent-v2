@@ -54,6 +54,10 @@ class TurnRequest(BaseModel):
     assistant_text: str = Field(..., description="Assistant's response")
     doc_refs: List[DocRefModel] = Field(default_factory=list, description="Referenced documents")
     title: Optional[str] = Field(None, description="Session title (set on first turn)")
+    edited: Optional[bool] = Field(None, description="Whether the user message was edited")
+    parent_session_id: Optional[str] = Field(None, description="Parent session ID if branched")
+    branched_from_turn_id: Optional[int] = Field(None, description="Turn ID where this branch started")
+    is_branch: Optional[bool] = Field(None, description="Whether this session is a branch")
 
 
 class TurnResponse(BaseModel):
@@ -65,6 +69,10 @@ class TurnResponse(BaseModel):
     doc_refs: List[DocRefModel]
     title: Optional[str]
     ts: str
+    edited: Optional[bool] = None
+    parent_session_id: Optional[str] = None
+    branched_from_turn_id: Optional[int] = None
+    is_branch: Optional[bool] = None
     feedback_rating: Optional[str] = None
     feedback_reason: Optional[str] = None
     feedback_ts: Optional[str] = None
@@ -84,6 +92,9 @@ class SessionListItem(BaseModel):
     turn_count: int = Field(..., alias="turnCount")
     created_at: str = Field(..., alias="createdAt")
     updated_at: str = Field(..., alias="updatedAt")
+    is_branch: bool = Field(False, alias="isBranch")
+    parent_session_id: Optional[str] = Field(None, alias="parentSessionId")
+    branched_from_turn_id: Optional[int] = Field(None, alias="branchedFromTurnId")
 
     class Config:
         populate_by_name = True
@@ -95,6 +106,9 @@ class SessionDetail(BaseModel):
     title: str
     turns: List[TurnResponse]
     turn_count: int
+    is_branch: bool = False
+    parent_session_id: Optional[str] = None
+    branched_from_turn_id: Optional[int] = None
 
 
 class SessionListResponse(BaseModel):
@@ -126,6 +140,9 @@ async def list_sessions(
                 turnCount=s.turn_count,
                 createdAt=s.created_at.isoformat(),
                 updatedAt=s.updated_at.isoformat(),
+                isBranch=s.is_branch,
+                parentSessionId=s.parent_session_id,
+                branchedFromTurnId=s.branched_from_turn_id,
             )
             for s in sessions
         ],
@@ -151,6 +168,9 @@ async def get_session(
     return SessionDetail(
         session_id=session_id,
         title=title,
+        is_branch=bool(turns[0].is_branch) if turns else False,
+        parent_session_id=turns[0].parent_session_id if turns else None,
+        branched_from_turn_id=turns[0].branched_from_turn_id if turns else None,
         turns=[
             TurnResponse(
                 session_id=t.session_id,
@@ -171,6 +191,10 @@ async def get_session(
                 ],
                 title=t.title,
                 ts=t.ts.isoformat() if t.ts else "",
+                edited=t.edited,
+                parent_session_id=t.parent_session_id,
+                branched_from_turn_id=t.branched_from_turn_id,
+                is_branch=t.is_branch,
                 feedback_rating=t.feedback_rating,
                 feedback_reason=t.feedback_reason,
                 feedback_ts=t.feedback_ts.isoformat() if t.feedback_ts else None,
@@ -214,6 +238,10 @@ async def save_turn(
         turn_id=turn_id,
         user_text=req.user_text,
         assistant_text=req.assistant_text,
+        edited=req.edited,
+        parent_session_id=req.parent_session_id,
+        branched_from_turn_id=req.branched_from_turn_id,
+        is_branch=req.is_branch,
         doc_refs=doc_refs,
         title=req.title if turn_id == 1 else None,  # Only set title on first turn
     )
@@ -227,6 +255,10 @@ async def save_turn(
         doc_refs=req.doc_refs,
         title=req.title,
         ts=turn.ts.isoformat() if turn.ts else "",
+        edited=turn.edited,
+        parent_session_id=turn.parent_session_id,
+        branched_from_turn_id=turn.branched_from_turn_id,
+        is_branch=turn.is_branch,
         feedback_rating=turn.feedback_rating,
         feedback_reason=turn.feedback_reason,
         feedback_ts=turn.feedback_ts.isoformat() if turn.feedback_ts else None,
@@ -278,10 +310,47 @@ async def save_feedback(
         ],
         title=updated.title,
         ts=updated.ts.isoformat() if updated.ts else "",
+        edited=updated.edited,
+        parent_session_id=updated.parent_session_id,
+        branched_from_turn_id=updated.branched_from_turn_id,
+        is_branch=updated.is_branch,
         feedback_rating=updated.feedback_rating,
         feedback_reason=updated.feedback_reason,
         feedback_ts=updated.feedback_ts.isoformat() if updated.feedback_ts else None,
     )
+
+
+@router.post("/{session_id}/turns/{turn_id}/branch")
+async def branch_session(
+    session_id: str,
+    turn_id: int,
+    service: ChatHistoryService = Depends(get_chat_history_service),
+):
+    """Create a branch session by cloning turns before turn_id."""
+    if turn_id < 1:
+        raise HTTPException(status_code=400, detail="turn_id must be >= 1")
+    new_session_id, copied = service.branch_session(session_id, turn_id)
+    return {
+        "session_id": new_session_id,
+        "copied": copied,
+        "from_turn_id": turn_id,
+    }
+
+
+@router.post("/{session_id}/turns/{turn_id}/truncate")
+async def truncate_turns(
+    session_id: str,
+    turn_id: int,
+    service: ChatHistoryService = Depends(get_chat_history_service),
+):
+    """Delete turns from a specific turn_id onward (inclusive).
+
+    Useful for "edit and resend" flows where later turns should be removed.
+    """
+    if turn_id < 1:
+        raise HTTPException(status_code=400, detail="turn_id must be >= 1")
+    deleted = service.delete_turns_from(session_id, turn_id)
+    return {"deleted": deleted, "session_id": session_id, "from_turn_id": turn_id}
 
 
 @router.delete("/{session_id}")

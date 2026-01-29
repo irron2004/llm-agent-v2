@@ -42,6 +42,8 @@ export default function ChatPage() {
     error,
     reset,
     loadSession,
+    branchSessionFromMessageId,
+    markNextTurnEdited,
     inputPlaceholder,
     pendingReview,
     pendingDeviceSelection,
@@ -77,6 +79,7 @@ export default function ChatPage() {
     setPendingRegeneration(null);
     send({
       text: payload.originalQuery,
+      askDeviceSelection: true,
       overrides: {
         filterDevices: payload.selectedDevices,
         filterDocTypes: payload.selectedDocTypes,
@@ -152,6 +155,15 @@ export default function ChatPage() {
       selectedDocTypes: payload.selectedDocTypes ?? [],
     });
   }, [setPendingRegeneration]);
+
+  const handleEditAndResend = useCallback(async (payload: { messageId: string; content: string }) => {
+    const trimmed = payload.content.trim();
+    if (!trimmed) return;
+    const newSessionId = await branchSessionFromMessageId(payload.messageId);
+    if (!newSessionId) return;
+    markNextTurnEdited();
+    send({ text: trimmed });
+  }, [branchSessionFromMessageId, markNextTurnEdited, send]);
 
   // Get the original user query for the last assistant message
   const getOriginalQuery = useMemo(() => {
@@ -233,6 +245,7 @@ export default function ChatPage() {
                     onFeedback={submitFeedback}
                     onDetailedFeedback={submitDetailedFeedback}
                     onRegenerate={msg.role === "assistant" ? handleRegenerate : undefined}
+                    onEditAndResend={msg.role === "user" ? handleEditAndResend : undefined}
                     originalQuery={msg.role === "assistant" ? getOriginalQuery(msg.id) : undefined}
                   />
                 ))

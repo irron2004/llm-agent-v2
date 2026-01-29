@@ -290,6 +290,22 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.history-item-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: var(--font-weight-semibold);
+  background-color: var(--color-accent-primary-light);
+  color: var(--color-accent-primary);
+  border: 1px solid transparent;
 }
 
 .history-item-date {
