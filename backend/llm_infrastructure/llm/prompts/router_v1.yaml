@@ -22,12 +22,18 @@ system: |
   - Off-topic or non-domain questions
 
   ## doc_lookup
-  Use when the user wants to access a SPECIFIC document directly:
+  Use when the user wants to access PREVIOUSLY MENTIONED documents or continue from previous answer:
   - Explicit document ID reference: "myservice 29392", "gcb 12345", "sop-001"
   - Reference to previously mentioned documents (requires history):
     - "그 문서에서...", "아까 말한...", "더 자세히", "방금 문서"
+    - "이전 대화에서 검색된 문서", "위 문서들", "앞에서 찾은 문서"
+    - "검색된 문서 요약해줘", "위 내용 정리해줘"
     - "Tell me more about that document", "What else does it say?"
     - Follow-up questions about the same document from previous turn
+  - **Follow-up questions about previous answer content** (requires history):
+    - Questions about steps/procedures mentioned in previous answer: "다음엔 뭘 해야해?", "그 다음 단계는?"
+    - Questions referencing specific terms from previous answer: "[이전 답변에 나온 용어] 다음엔?", "[절차명] 후에는?"
+    - Asking for elaboration on previous answer: "더 자세히 설명해줘", "이전 내용 보충해줘"
   - NOTE: If history has no referenced documents, use "retrieval" instead
 
   ## retrieval
@@ -41,7 +47,12 @@ system: |
   - "너는 누구니?" -> general
   - "myservice 29392 설명해줘" -> doc_lookup
   - "gcb 12345 내용 알려줘" -> doc_lookup
-  - (with history: prev doc mentioned) "그 문서에서 더 자세히 설명해줘" -> doc_lookup
+  - (with history) "그 문서에서 더 자세히 설명해줘" -> doc_lookup
+  - (with history) "이전 대화에서 검색된 문서 요약해줘" -> doc_lookup
+  - (with history) "위 문서들 정리해줘" -> doc_lookup
+  - (with history about "시각적 점검") "시각적 점검 다음엔 뭘 해야해?" -> doc_lookup
+  - (with history about procedures) "그 다음 단계는?" -> doc_lookup
+  - (with history) "더 자세히 설명해줘" -> doc_lookup
   - (no history) "그 문서에서 더 자세히" -> retrieval
   - "SUPRA XP 센서 이상 해결 방법" -> retrieval
   - "슬롯 밸브 설치 방법" -> retrieval

@@ -168,18 +168,27 @@ DEFAULT_JUDGE_SETUP = """
 # 입력
 - 질문, 답변, REFS (검색 결과)
 
+# 판정 기준 (관대하게 적용)
+- faithful=true: 답변의 **핵심 절차**가 REFS에서 유추 가능하면 충분
+- faithful=true: REFS 내용을 요약/재구성/순서 변경해도 OK
+- faithful=true: 일반 상식 수준의 연결/추론은 허용
+- faithful=false: REFS에 전혀 없는 수치/토크값/압력을 단정적으로 언급한 경우만
+
 # 출력
 JSON 한 줄: {"faithful": bool, "issues": ["..."], "hint": "..."}
-- faithful: 근거 기반이면 true, 아니면 false
-- issues: 부족한 근거/누락된 단계/잘못된 조치 등
-- hint: 재검색/보강에 도움이 되는 한 줄
 """.strip()
 
 DEFAULT_JUDGE_TS = """
 # 역할
-TS 답변이 질문과 검색 증거에 근거했는지 판정한다.
+TS(트러블슈팅) 답변이 질문과 검색 증거에 근거했는지 판정한다.
+
+# 판정 기준 (관대하게 적용)
+- faithful=true: 답변의 **원인/조치**가 REFS에서 유추 가능하면 충분
+- faithful=true: REFS 내용을 요약/재구성해도 OK
+- faithful=true: 일반 상식 수준의 진단 연결은 허용
+- faithful=false: REFS와 **명백히 모순**되는 조치를 제시한 경우만
+
 출력: {"faithful": bool, "issues": [..], "hint": "..."}
-faithful이 false면 조치/근거 누락, 불일치 등을 issues에 적는다.
 """.strip()
 
 DEFAULT_JUDGE_GENERAL = """
@@ -193,7 +202,13 @@ DEFAULT_JUDGE_GENERAL = """
 - 에이전트 사용법 질문
 
 # 일반 규칙
-위 예외에 해당하지 않는 경우, 답변이 REFS 증거에 기반했는지 판정한다.
+위 예외에 해당하지 않는 경우, 답변이 REFS 증거에 **대체로** 기반했는지 판정한다.
+
+# 판정 기준 (관대하게 적용)
+- faithful=true: 답변의 **핵심 내용**이 REFS에서 유추 가능하면 충분
+- faithful=true: REFS 내용을 요약/재구성/번역해도 OK
+- faithful=true: 일반 상식 수준의 연결/추론은 허용
+- faithful=false: 답변이 REFS와 **명백히 모순**되거나, REFS에 전혀 없는 수치/명칭을 단정적으로 언급한 경우만
 
 출력: {"faithful": bool, "issues": [..], "hint": "..."}
 """.strip()
@@ -322,7 +337,7 @@ MAX_REF_CHARS_REVIEW = 200       # 검색 결과 리뷰용
 MAX_REF_CHARS_ANSWER = 1200      # 답변 생성용
 RELATED_PAGE_WINDOW = 2          # 인접 페이지 범위 (±N)
 DOC_TYPES_SAME_DOC = {"gcb", "myservice"}
-EXPAND_TOP_K = 10                # 확장 대상 최대 개수 (rerank 상위)
+EXPAND_TOP_K = 20                # 확장 대상 최대 개수 (rerank 상위)
 
 
 def _invoke_llm(llm: BaseLLM, system: str, user: str, **kwargs: Any) -> str:
@@ -752,9 +767,16 @@ def _combine_related_text(docs: List[RetrievalResult]) -> str:
 
 # doc_id 추출 패턴 (myservice 29392, gcb 12345, sop-001 등)
 DOC_ID_PATTERNS = [
-    r"(myservice|gcb|sop)\s+(\d+)",  # myservice 29392
-    r"(myservice|gcb|sop)[-_](\d+)",  # myservice-29392, myservice_29392
-    r"(myservice|gcb|sop)(\d+)",  # myservice29392 (붙여쓰기)
+    # myservice 패턴 (오타 허용: myserv로 시작하면 매칭)
+    r"(myserv[a-z]*)\s+(\d+)",  # myservice 29392, myservvice 29392
+    r"(myserv[a-z]*)[-_](\d+)",  # myservice-29392, myservice_29392
+    r"(myserv[a-z]*)(\d{4,})",  # myservice29392 (4자리 이상 숫자만)
+    # gcb 패턴
+    r"(gcb)\s+(\d+)",  # gcb 12345
+    r"(gcb)[-_](\d+)",  # gcb-12345
+    r"(gcb)(\d{4,})",  # gcb12345
+    # sop 패턴
+    r"(sop)\s*[-_]?\s*(\d+)",  # sop-001, sop 001
 ]
 
 
@@ -770,6 +792,9 @@ def _extract_doc_id_from_query(query: str) -> Optional[tuple[str, str]]:
         match = re.search(pattern, query_lower)
         if match:
             doc_type, doc_number = match.groups()
+            # doc_type 정규화 (오타 허용)
+            if doc_type.startswith("myserv"):
+                doc_type = "myservice"
             return (doc_type, doc_number)
     return None
 
@@ -791,6 +816,26 @@ def _format_history_for_prompt(chat_history: List[ChatHistoryEntry]) -> str:
             if refs:
                 lines.append(f"  참조 문서: {', '.join(refs[:3])}")  # 상위 3개만
     return "\n".join(lines)
+
+
+HISTORY_REFERENCE_PATTERNS = [
+    r"이전\s*(대화|문서|내용)",  # 이전 대화, 이전 문서
+    r"(위|앞)\s*(에서|의|문서|내용)",  # 위에서, 앞의 문서
+    r"(그|저)\s*(문서|내용)",  # 그 문서, 저 내용
+    r"아까\s*\w*\s*(문서|내용|결과)",  # 아까 찾은 내용, 아까 검색한 결과
+    r"(방금|조금\s*전)\s*\w*\s*(말한|검색|찾은|내용|문서)",  # 방금 말한, 조금 전 검색한
+    r"더\s*자세히",  # 더 자세히
+    r"(검색|찾은)\s*(결과|문서).*(요약|정리|설명)",  # 검색 결과 요약
+]
+
+
+def _is_history_reference(query: str) -> bool:
+    """쿼리가 이전 대화/문서를 참조하는지 Rule 기반 체크."""
+    query_lower = query.lower()
+    for pattern in HISTORY_REFERENCE_PATTERNS:
+        if re.search(pattern, query_lower):
+            return True
+    return False
 
 
 def _detect_doc_lookup_intent(
@@ -913,55 +958,79 @@ def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     - general: 일반 대화 (RAG 우회)
     - doc_lookup: 직접 문서 조회 (MQ 생략)
     - retrieval: 검색 필요 (RAG 파이프라인)
+
+    실행 순서:
+    1. Rule 기반 doc_id 체크 (LLM 호출 없음) - "myservice 12345"
+    2. Rule 기반 history 참조 체크 (LLM 호출 없음) - "이전 대화에서...", "위 문서..."
+    3. LLM 라우터 호출 (general | doc_lookup | retrieval)
+    4. doc_lookup인 경우 history에서 doc_ids 추출
     """
     original_query = state.get("query") or ""
     query = state.get("query_en") or original_query
     chat_history = state.get("chat_history", [])
 
-    # history를 프롬프트용 텍스트로 변환
-    history_text = _format_history_for_prompt(chat_history) if chat_history else "없음"
+    # === 디버깅 로그: 입력 상태 ===
+    history_doc_ids = _get_doc_ids_from_history(chat_history) if chat_history else []
+    logger.info(
+        "[route_node] INPUT: query='%s', history_count=%d, history_doc_ids=%s",
+        original_query[:80] if original_query else "",
+        len(chat_history),
+        history_doc_ids,
+    )
 
-    # Router 프롬프트 호출 (general | doc_lookup | retrieval)
+    # [1] Rule 기반: 쿼리에서 doc_id 패턴 체크 (LLM 호출 전에 빠르게 처리)
+    doc_info = _extract_doc_id_from_query(original_query)
+    if doc_info:
+        doc_type, doc_number = doc_info
+        logger.info("[route_node] DECISION: doc_lookup (rule: doc_id pattern), doc_type=%s, doc_id=%s", doc_type, doc_number)
+        return {
+            "route": "doc_lookup",
+            "lookup_doc_ids": [doc_number],
+            "lookup_source": "query",
+        }
+
+    # [2] Rule 기반: history 참조 패턴 체크 (LLM보다 신뢰성 높음)
+    is_history_ref = _is_history_reference(original_query)
+    logger.info("[route_node] CHECK: is_history_reference=%s", is_history_ref)
+
+    if chat_history and is_history_ref:
+        if history_doc_ids:
+            logger.info("[route_node] DECISION: doc_lookup (rule: history reference), doc_ids=%s", history_doc_ids)
+            return {
+                "route": "doc_lookup",
+                "lookup_doc_ids": history_doc_ids,
+                "lookup_source": "history",
+            }
+        # history 참조 패턴이지만 doc_ids 없으면 retrieval로 fallback
+        logger.info("[route_node] FALLBACK: history reference pattern but no doc_ids in history")
+
+    # [3] LLM Router 호출 (general | doc_lookup | retrieval)
+    history_text = _format_history_for_prompt(chat_history) if chat_history else "없음"
+    logger.info("[route_node] LLM INPUT: history_text='%s'", history_text[:200] if history_text else "없음")
+
     user = _format_prompt(spec.router.user, {
         "sys.query": query,
         "sys.history": history_text,
     })
     route = _parse_route(_invoke_llm(llm, spec.router.system, user))
 
-    logger.info(
-        "route_node: query=%s..., route=%s, has_history=%s",
-        query[:50] if query else None,
-        route,
-        bool(chat_history),
-    )
+    logger.info("[route_node] LLM DECISION: route=%s", route)
 
-    # doc_lookup인 경우 doc_ids 추출
+    # [4] doc_lookup인 경우 history에서 doc_ids 추출
     if route == "doc_lookup":
-        # 1. Rule 기반: 쿼리에서 doc_id 추출 시도
-        doc_info = _extract_doc_id_from_query(original_query)
-        if doc_info:
-            doc_type, doc_number = doc_info
-            logger.info("route_node: doc_lookup from query, doc_id=%s", doc_number)
+        if history_doc_ids:
+            logger.info("[route_node] FINAL: doc_lookup from LLM, doc_ids=%s", history_doc_ids)
             return {
                 "route": route,
-                "lookup_doc_ids": [doc_number],
-                "lookup_source": "query",
-            }
-
-        # 2. History에서 doc_ids 추출
-        prev_doc_ids = _get_doc_ids_from_history(chat_history)
-        if prev_doc_ids:
-            logger.info("route_node: doc_lookup from history, doc_ids=%s", prev_doc_ids)
-            return {
-                "route": route,
-                "lookup_doc_ids": prev_doc_ids,
+                "lookup_doc_ids": history_doc_ids,
                 "lookup_source": "history",
             }
 
-        # 3. doc_ids를 찾을 수 없으면 retrieval로 fallback
-        logger.info("route_node: doc_lookup but no doc_ids found, fallback to retrieval")
+        # doc_ids를 찾을 수 없으면 retrieval로 fallback
+        logger.info("[route_node] FALLBACK: LLM said doc_lookup but no doc_ids, using retrieval")
         return {"route": "retrieval"}
 
+    logger.info("[route_node] FINAL: route=%s", route)
     return {"route": route}
 
 
@@ -1838,6 +1907,21 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
             raise ValueError("judge not dict")
     except Exception:
         judge = {"faithful": False, "issues": ["parse_error"], "hint": "judge JSON parse failed"}
+
+    # 불충실 판정 시 상세 로그
+    faithful = judge.get("faithful", False)
+    if not faithful:
+        issues = judge.get("issues", [])
+        hint = judge.get("hint", "")
+        logger.warning(
+            "[judge_node] UNFAITHFUL: issues=%s, hint='%s', query='%s'",
+            issues,
+            hint,
+            (query_for_judge[:80] + "...") if len(query_for_judge) > 80 else query_for_judge,
+        )
+    else:
+        logger.info("[judge_node] FAITHFUL: query='%s'", query_for_judge[:50])
+
     return {"judge": judge}
 
 

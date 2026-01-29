@@ -8,18 +8,27 @@ export async function fetchConversations(): Promise<Conversation[]> {
 }
 
 export async function sendChatMessage(
-  payload: { conversationId?: string; message: string },
+  payload: { conversationId?: string; message: string; sessionId?: string },
   handlers: {
     onMessage: (text: string) => void;
     onDone?: () => void;
     onError?: (err: unknown) => void;
   }
 ) {
+  // BE Agent API 형식으로 변환
+  const body: Record<string, unknown> = {
+    message: payload.message,
+  };
+  // session_id가 있으면 BE에서 history 자동 로드
+  if (payload.sessionId) {
+    body.session_id = payload.sessionId;
+  }
+
   return connectSse(
     {
       path: env.chatPath,
       method: "POST",
-      body: payload,
+      body,
     },
     {
       onMessage: handlers.onMessage,

@@ -32,14 +32,14 @@ def _make_doc(
 class TestExpandTopKLimit:
     """상위 K개 확장 제한 테스트"""
 
-    def test_expand_top_k_constant_is_5(self):
-        """EXPAND_TOP_K 상수가 5인지 확인"""
-        assert EXPAND_TOP_K == 5
+    def test_expand_top_k_constant_is_20(self):
+        """EXPAND_TOP_K 상수가 20인지 확인"""
+        assert EXPAND_TOP_K == 20
 
-    def test_expand_only_top_5_docs(self):
-        """10개 문서 중 상위 5개만 확장 시도"""
-        # Given: 10개 문서
-        docs = [_make_doc(f"doc_{i}", page=i + 1) for i in range(10)]
+    def test_expand_only_top_20_docs(self):
+        """25개 문서 중 상위 20개만 확장 시도"""
+        # Given: 25개 문서
+        docs = [_make_doc(f"doc_{i}", page=i + 1) for i in range(25)]
         state = {"docs": docs}
 
         page_fetcher = MagicMock(return_value=[])
@@ -47,11 +47,11 @@ class TestExpandTopKLimit:
         # When
         expand_related_docs_node(state, page_fetcher=page_fetcher)
 
-        # Then: page_fetcher는 상위 5개에 대해서만 호출 (5회)
-        assert page_fetcher.call_count == 5
+        # Then: page_fetcher는 상위 20개에 대해서만 호출 (20회)
+        assert page_fetcher.call_count == 20
 
     def test_docs_less_than_top_k_all_expanded(self):
-        """문서가 5개 미만일 때 전부 확장 시도"""
+        """문서가 20개 미만일 때 전부 확장 시도"""
         # Given: 3개 문서
         docs = [_make_doc(f"doc_{i}", page=i + 1) for i in range(3)]
         state = {"docs": docs}
@@ -64,10 +64,10 @@ class TestExpandTopKLimit:
         # Then: 3회 호출
         assert page_fetcher.call_count == 3
 
-    def test_exactly_5_docs_all_expanded(self):
-        """정확히 5개 문서일 때 전부 확장"""
-        # Given: 5개 문서
-        docs = [_make_doc(f"doc_{i}", page=i + 1) for i in range(5)]
+    def test_exactly_20_docs_all_expanded(self):
+        """정확히 20개 문서일 때 전부 확장"""
+        # Given: 20개 문서
+        docs = [_make_doc(f"doc_{i}", page=i + 1) for i in range(20)]
         state = {"docs": docs}
 
         page_fetcher = MagicMock(return_value=[])
@@ -75,17 +75,17 @@ class TestExpandTopKLimit:
         # When
         expand_related_docs_node(state, page_fetcher=page_fetcher)
 
-        # Then: 5회 호출
-        assert page_fetcher.call_count == 5
+        # Then: 20회 호출
+        assert page_fetcher.call_count == 20
 
 
 class TestRemainingDocsPreserved:
     """나머지 문서 원본 유지 테스트"""
 
     def test_remaining_docs_included_in_result(self):
-        """6번째 이후 문서도 결과에 포함"""
-        # Given: 7개 문서
-        docs = [_make_doc(f"doc_{i}", page=i + 1) for i in range(7)]
+        """21번째 이후 문서도 결과에 포함"""
+        # Given: 22개 문서
+        docs = [_make_doc(f"doc_{i}", page=i + 1) for i in range(22)]
         state = {"docs": docs}
 
         page_fetcher = MagicMock(return_value=[])
@@ -93,13 +93,13 @@ class TestRemainingDocsPreserved:
         # When
         result = expand_related_docs_node(state, page_fetcher=page_fetcher)
 
-        # Then: answer_ref_json은 상위 5개만 포함
+        # Then: answer_ref_json은 상위 20개만 포함
         assert len(result["answer_ref_json"]) == min(EXPAND_TOP_K, len(docs))
 
     def test_remaining_docs_have_original_content(self):
-        """6번째 이후 문서는 원본 content 유지"""
-        # Given: 7개 문서, 각각 고유 content
-        docs = [_make_doc(f"doc_{i}", page=i + 1, content=f"original_content_{i}") for i in range(7)]
+        """21번째 이후 문서는 원본 content 유지"""
+        # Given: 22개 문서, 각각 고유 content
+        docs = [_make_doc(f"doc_{i}", page=i + 1, content=f"original_content_{i}") for i in range(22)]
         state = {"docs": docs}
 
         # page_fetcher가 빈 결과 반환 -> 확장 안됨
@@ -108,7 +108,7 @@ class TestRemainingDocsPreserved:
         # When
         result = expand_related_docs_node(state, page_fetcher=page_fetcher)
 
-        # Then: 상위 5개 문서만 확인
+        # Then: 상위 20개 문서만 확인
         ref_json = result["answer_ref_json"]
         for i, ref in enumerate(ref_json):
             # raw_text가 있으면 raw_text, 없으면 content 사용

@@ -4,7 +4,6 @@ import { sendChatMessage } from "../api";
 import { Message } from "../types";
 
 type SendOptions = {
-  conversationId?: string;
   text: string;
 };
 
@@ -13,6 +12,8 @@ export function useChatSession() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const controllerRef = useRef<{ close: () => void } | null>(null);
+  // 세션 ID: 대화 시작 시 생성, reset 시 갱신
+  const sessionIdRef = useRef<string>(nanoid());
 
   const appendMessage = useCallback((msg: Message) => {
     setMessages((prev) => [...prev, msg]);
@@ -43,7 +44,7 @@ export function useChatSession() {
   }, []);
 
   const send = useCallback(
-    async ({ conversationId, text }: SendOptions) => {
+    async ({ text }: SendOptions) => {
       stop();
       setError(null);
       appendMessage({
@@ -53,8 +54,9 @@ export function useChatSession() {
       });
       setIsStreaming(true);
 
+      const sessionId = sessionIdRef.current;
       controllerRef.current = await sendChatMessage(
-        { conversationId, message: text },
+        { message: text, sessionId },
         {
           onMessage: (delta) => updateLastAssistant(delta),
           onDone: () => setIsStreaming(false),
@@ -72,10 +74,12 @@ export function useChatSession() {
     stop();
     setMessages([]);
     setError(null);
+    // 새 세션 시작
+    sessionIdRef.current = nanoid();
   }, [stop]);
 
   const editAndResend = useCallback(
-    async (messageId: string, newContent: string, conversationId?: string) => {
+    async (messageId: string, newContent: string) => {
       stop();
       setError(null);
 
@@ -92,8 +96,9 @@ export function useChatSession() {
 
       // 새 대화 요청 전송
       setIsStreaming(true);
+      const sessionId = sessionIdRef.current;
       controllerRef.current = await sendChatMessage(
-        { conversationId, message: newContent },
+        { message: newContent, sessionId },
         {
           onMessage: (delta) => updateLastAssistant(delta),
           onDone: () => setIsStreaming(false),
