@@ -246,6 +246,8 @@ def _build_state_overrides(req: "AgentRequest") -> Dict[str, Any]:
         devices = [str(d).strip() for d in req.filter_devices if str(d).strip()]
         if devices:
             overrides["selected_devices"] = devices
+            # filter_devices가 명시적으로 제공되면 auto_parse 건너뛰기
+            overrides["skip_auto_parse"] = True
 
     if req.filter_doc_types is not None:
         doc_types = [str(d).strip() for d in req.filter_doc_types if str(d).strip()]
@@ -448,6 +450,12 @@ class ExpandedDoc(BaseModel):
     content_length: int  # 내용 길이
 
 
+class SuggestedDevice(BaseModel):
+    """추천 장비 (검색 결과 기반)"""
+    name: str = Field(..., description="장비명")
+    count: int = Field(..., description="검색된 문서 수")
+
+
 class AutoParseResult(BaseModel):
     """자동 파싱 결과"""
     device: Optional[str] = Field(None, description="파싱된 장비명")
@@ -482,6 +490,10 @@ class AgentResponse(BaseModel):
     summary: Optional[str] = Field(None, description="답변 요약 (다음 턴 history용, 150자)")
     refs: Optional[List[str]] = Field(None, description="참조 문서 title (rank 순)")
     ref_doc_ids: Optional[List[str]] = Field(None, description="참조 문서 ID (rank 순)")
+    # Device suggestion (장비 미지정 시 추천)
+    suggested_devices: Optional[List[SuggestedDevice]] = Field(
+        None, description="추천 장비 목록 (장비 미지정 시, count 내림차순)"
+    )
 
 
 def _to_expanded_docs(answer_ref_json: List[Dict[str, Any]] | None) -> List[ExpandedDoc] | None:
@@ -498,6 +510,17 @@ def _to_expanded_docs(answer_ref_json: List[Dict[str, Any]] | None) -> List[Expa
             content_length=len(content),
         ))
     return docs if docs else None
+
+
+def _to_suggested_devices(devices: List[Dict[str, Any]] | None) -> List[SuggestedDevice] | None:
+    """suggested_devices dict 리스트를 SuggestedDevice 리스트로 변환."""
+    if not devices:
+        return None
+    return [
+        SuggestedDevice(name=d.get("name", ""), count=d.get("count", 0))
+        for d in devices
+        if d.get("name")
+    ] or None
 
 
 def _select_display_docs(result: Dict[str, Any]) -> List[RetrievalResult]:
@@ -765,6 +788,7 @@ async def run_agent(
         summary=summary,
         refs=refs if refs else None,
         ref_doc_ids=ref_doc_ids if ref_doc_ids else None,
+        suggested_devices=_to_suggested_devices(result.get("suggested_devices")),
     )
 
 
@@ -937,6 +961,7 @@ async def run_agent_stream(
                     summary=stream_summary,
                     refs=stream_refs if stream_refs else None,
                     ref_doc_ids=stream_ref_doc_ids if stream_ref_doc_ids else None,
+                    suggested_devices=_to_suggested_devices(result.get("suggested_devices")),
                 )
             else:
                 # 정상 완료 - 턴 저장
@@ -973,6 +998,7 @@ async def run_agent_stream(
                     summary=stream_summary,
                     refs=stream_refs if stream_refs else None,
                     ref_doc_ids=stream_ref_doc_ids if stream_ref_doc_ids else None,
+                    suggested_devices=_to_suggested_devices(result.get("suggested_devices")),
                 )
 
             _enqueue({"type": "final", "result": resp.model_dump()})

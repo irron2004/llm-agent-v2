@@ -312,6 +312,11 @@ a:hover {
   opacity: 1;
 }
 
+/* User message edit button - always visible */
+.message-content.user .message-actions {
+  opacity: 1;
+}
+
 .action-button {
   display: inline-flex;
   align-items: center;
@@ -781,4 +786,68 @@ a:hover {
 
 .edit-button.cancel:hover {
   background-color: var(--color-action-bg-hover);
+}
+
+/* ============================================
+   Device Suggestions
+   ============================================ */
+.device-suggestions {
+  margin-top: 12px;
+  padding: 12px;
+  background-color: var(--color-bg-canvas);
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+
+.device-suggestions-title {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  margin: 0 0 8px 0;
+}
+
+.device-suggestions-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.device-suggestion-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background-color: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.device-suggestion-item:hover {
+  background-color: var(--color-accent-primary);
+  color: white;
+  border-color: var(--color-accent-primary);
+}
+
+.device-number {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent-primary);
+}
+
+.device-suggestion-item:hover .device-number {
+  color: white;
+}
+
+.device-name {
+  font-weight: var(--font-weight-normal);
+}
+
+.device-count {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.device-suggestion-item:hover .device-count {
+  color: rgba(255, 255, 255, 0.8);
 }

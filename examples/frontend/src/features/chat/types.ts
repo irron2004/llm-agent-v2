@@ -1,5 +1,10 @@
 export type MessageRole = "user" | "assistant" | "system";
 
+export type SuggestedDevice = {
+  name: string;
+  count: number;
+};
+
 export type Message = {
   id: string;
   role: MessageRole;
@@ -7,6 +12,7 @@ export type Message = {
   createdAt?: string;
   reference?: Reference;
   rawAnswer?: string;
+  suggestedDevices?: SuggestedDevice[];
 };
 
 export type ReferenceChunk = {

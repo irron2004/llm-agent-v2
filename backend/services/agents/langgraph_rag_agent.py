@@ -27,6 +27,7 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     device_selection_node,
     doc_lookup_node,
     expand_related_docs_node,
+    history_answer_node,
     human_review_node,
     judge_node,
     load_prompt_spec,
@@ -292,6 +293,11 @@ class LangGraphRAGAgent:
                 if chat_type:
                     details_parts.append(f"type: {chat_type}")
 
+        elif name == "history_answer":
+            if result:
+                answer = result.get("answer", "")
+                details_parts.append(f"history 기반 {len(answer)}자")
+
         elif name == "judge":
             if result:
                 judge = result.get("judge", {})
@@ -356,6 +362,7 @@ class LangGraphRAGAgent:
         )
         builder.add_node("answer", self._wrap_node("answer", functools.partial(answer_node, llm=self.llm, spec=self.spec)))
         builder.add_node("chat_answer", self._wrap_node("chat_answer", chat_answer_node))
+        builder.add_node("history_answer", self._wrap_node("history_answer", functools.partial(history_answer_node, llm=self.llm)))
         builder.add_node("judge", self._wrap_node("judge", functools.partial(judge_node, llm=self.llm, spec=self.spec)))
 
         # doc_lookup 노드: doc_id로 직접 문서 조회 (MQ 우회)
@@ -395,7 +402,7 @@ class LangGraphRAGAgent:
                     ),
                 ),
             )
-            # Flow: START → auto_parse → translate → route → (doc_lookup | mq | chat)
+            # Flow: START → auto_parse → translate → route → (doc_lookup | history_answer | mq | chat)
             builder.add_edge(START, "auto_parse")
             builder.add_edge("auto_parse", "translate")
             builder.add_edge("translate", "route")
@@ -406,12 +413,14 @@ class LangGraphRAGAgent:
                     return "general"
                 if route == "doc_lookup":
                     return "doc_lookup"
+                if route == "history_answer":
+                    return "history_answer"
                 return "retrieval"  # retrieval → mq
 
             builder.add_conditional_edges(
                 "route",
                 _route_decision,
-                {"general": "chat_answer", "doc_lookup": "doc_lookup", "retrieval": "mq"},
+                {"general": "chat_answer", "doc_lookup": "doc_lookup", "history_answer": "history_answer", "retrieval": "mq"},
             )
         # Device selection node (optional HIL) - legacy mode
         elif self.ask_device_selection:
@@ -429,15 +438,17 @@ class LangGraphRAGAgent:
                     return "general"
                 if route == "doc_lookup":
                     return "doc_lookup"
+                if route == "history_answer":
+                    return "history_answer"
                 return "retrieval"
             builder.add_conditional_edges(
                 "route",
                 _route_decision,
-                {"general": "chat_answer", "doc_lookup": "doc_lookup", "retrieval": "device_selection"},
+                {"general": "chat_answer", "doc_lookup": "doc_lookup", "history_answer": "history_answer", "retrieval": "device_selection"},
             )
             # device_selection_node returns Command(goto="mq"), so no explicit edge needed
         else:
-            # Default flow: START → route → (general | doc_lookup | retrieval)
+            # Default flow: START → route → (general | doc_lookup | history_answer | retrieval)
             builder.add_edge(START, "route")
             def _route_decision(state: AgentState) -> str:
                 route = state.get("route")
@@ -445,11 +456,13 @@ class LangGraphRAGAgent:
                     return "general"
                 if route == "doc_lookup":
                     return "doc_lookup"
+                if route == "history_answer":
+                    return "history_answer"
                 return "retrieval"
             builder.add_conditional_edges(
                 "route",
                 _route_decision,
-                {"general": "chat_answer", "doc_lookup": "doc_lookup", "retrieval": "mq"},
+                {"general": "chat_answer", "doc_lookup": "doc_lookup", "history_answer": "history_answer", "retrieval": "mq"},
             )
 
         builder.add_edge("mq", "st_gate")
@@ -489,6 +502,7 @@ class LangGraphRAGAgent:
 
         builder.add_edge("answer", "judge")
         builder.add_edge("chat_answer", END)
+        builder.add_edge("history_answer", END)
 
         if mode == "base":
             builder.add_edge("judge", END)

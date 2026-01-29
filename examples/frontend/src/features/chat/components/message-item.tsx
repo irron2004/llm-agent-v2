@@ -2,6 +2,7 @@ import { useState } from "react";
 import { CopyOutlined, LikeOutlined, DislikeOutlined, CheckOutlined, EditOutlined, SendOutlined, CloseOutlined } from "@ant-design/icons";
 import { Message } from "../types";
 import { MarkdownContent } from "./markdown-content";
+import { DeviceSuggestions } from "./device-suggestions";
 
 type MessageItemProps = {
   message: Message;
@@ -9,9 +10,10 @@ type MessageItemProps = {
   onLike?: (id: string) => void;
   onDislike?: (id: string) => void;
   onEdit?: (id: string, newContent: string) => void;
+  onDeviceSelect?: (index: number, deviceName: string) => void;
 };
 
-export function MessageItem({ message, isStreaming, onLike, onDislike, onEdit }: MessageItemProps) {
+export function MessageItem({ message, isStreaming, onLike, onDislike, onEdit, onDeviceSelect }: MessageItemProps) {
   const [copied, setCopied] = useState(false);
   const [liked, setLiked] = useState(false);
   const [disliked, setDisliked] = useState(false);
@@ -139,6 +141,14 @@ export function MessageItem({ message, isStreaming, onLike, onDislike, onEdit }:
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Device suggestions - only for assistant messages with suggestions */}
+          {isAssistant && !isStreaming && message.suggestedDevices && message.suggestedDevices.length > 0 && (
+            <DeviceSuggestions
+              devices={message.suggestedDevices}
+              onSelect={onDeviceSelect}
+            />
           )}
 
           {/* Edit button - only for user messages */}

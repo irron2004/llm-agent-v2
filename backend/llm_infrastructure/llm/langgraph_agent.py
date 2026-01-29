@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 # 1) State schema
 # -----------------------------
-Route = Literal["general", "doc_lookup", "retrieval"]
+Route = Literal["general", "doc_lookup", "history_answer", "retrieval"]
 Gate = Literal["need_st", "no_st"]
 
 
@@ -56,6 +56,11 @@ class AgentState(TypedDict, total=False):
     chat_history: List[ChatHistoryEntry]  # 대화 히스토리 (클라이언트 전달)
     lookup_doc_ids: List[str]  # doc_lookup용 doc_id 목록
     lookup_source: str  # "query" | "history" - doc_id 추출 출처
+
+    # History intent detection (history_intent_node 결과)
+    history_intent: bool  # 이전 대화 참조 의도 여부
+    history_confidence: float  # 신뢰도 (0~1)
+    history_source: str  # "rule" | "keyword_overlap" | "none"
 
     # Multi-query outputs (parsed lists)
     # Unified retrieval MQ (new structure)
@@ -379,11 +384,12 @@ def _format_prompt(template: str, mapping: Dict[str, str]) -> str:
 
 
 def _parse_route(text: str) -> Route:
-    """Parse route from LLM response: general | doc_lookup | retrieval."""
+    """Parse route from LLM response: general | doc_lookup | history_answer | retrieval."""
     t = text.strip().lower()
-    if t in ("general", "doc_lookup", "retrieval"):
+    valid_routes = ("general", "doc_lookup", "history_answer", "retrieval")
+    if t in valid_routes:
         return t  # type: ignore[return-value]
-    m = re.search(r"\b(general|doc_lookup|retrieval)\b", t)
+    m = re.search(r"\b(general|doc_lookup|history_answer|retrieval)\b", t)
     if m:
         return m.group(1)  # type: ignore[return-value]
     # fallback to retrieval (safer - will search)
@@ -838,6 +844,124 @@ def _is_history_reference(query: str) -> bool:
     return False
 
 
+def _get_last_assistant_summary(chat_history: List[ChatHistoryEntry]) -> str:
+    """history에서 가장 최근 assistant의 summary 추출."""
+    for entry in reversed(chat_history):
+        if entry.get("role") == "assistant":
+            return entry.get("summary", "") or ""
+    return ""
+
+
+def _extract_keywords(text: str) -> set:
+    """텍스트에서 키워드 추출 (한글 명사 + 영문 단어)."""
+    if not text:
+        return set()
+    # 한글 단어 (2글자 이상)
+    korean_words = set(re.findall(r"[가-힣]{2,}", text))
+    # 영문 단어 (3글자 이상)
+    english_words = set(w.lower() for w in re.findall(r"[a-zA-Z]{3,}", text))
+    return korean_words | english_words
+
+
+def _keyword_overlap_score(query: str, summary: str) -> float:
+    """질문과 summary 간 키워드 overlap 점수 (0~1)."""
+    if not query or not summary:
+        return 0.0
+    query_keywords = _extract_keywords(query)
+    summary_keywords = _extract_keywords(summary)
+    if not query_keywords or not summary_keywords:
+        return 0.0
+    overlap = query_keywords & summary_keywords
+    # Jaccard 유사도 변형: overlap / query_keywords (질문 기준)
+    return len(overlap) / len(query_keywords) if query_keywords else 0.0
+
+
+def _needs_detail(query: str) -> bool:
+    """질문이 자세한 내용/근거/수치를 요구하는지 체크."""
+    detail_patterns = [
+        r"더\s*자세히",
+        r"(근거|출처|레퍼런스)",
+        r"(정확한|구체적인)\s*(절차|방법|수치|값)",
+        r"(몇|얼마|어느\s*정도)",  # 수치 관련
+        r"(토크|압력|온도|시간)\s*(값|설정|스펙)",
+    ]
+    for pattern in detail_patterns:
+        if re.search(pattern, query.lower()):
+            return True
+    return False
+
+
+def history_intent_node(state: AgentState) -> Dict[str, Any]:
+    """이전 대화 참조 의도 판단 (route_node 이전 실행).
+
+    판단 순서:
+    1. Rule 체크: 명시적 history 참조 패턴
+    2. Keyword overlap: 질문 vs 직전 assistant summary
+
+    Returns:
+        {
+            "history_intent": bool,
+            "history_confidence": float (0~1),
+            "history_source": str ("rule" | "keyword_overlap" | "none")
+        }
+    """
+    query = state.get("query", "")
+    chat_history = state.get("chat_history", [])
+    history_doc_ids = _get_doc_ids_from_history(chat_history) if chat_history else []
+
+    # history 없으면 바로 종료
+    if not chat_history:
+        logger.info("[history_intent_node] No chat_history, skipping")
+        return {
+            "history_intent": False,
+            "history_confidence": 0.0,
+            "history_source": "none",
+            "_events": [
+                "history_intent: history_count=0 (skip)"
+            ],
+        }
+
+    # [1] Rule 체크: 명시적 패턴
+    if _is_history_reference(query):
+        logger.info("[history_intent_node] DETECTED: rule match, query='%s'", query[:50])
+        return {
+            "history_intent": True,
+            "history_confidence": 1.0,
+            "history_source": "rule",
+            "_events": [
+                f"history_intent: source=rule, confidence=1.00, history_count={len(chat_history)}, doc_ids={history_doc_ids}"
+            ],
+        }
+
+    # [2] Keyword overlap: 질문 vs 직전 assistant summary
+    last_summary = _get_last_assistant_summary(chat_history)
+    if last_summary:
+        overlap_score = _keyword_overlap_score(query, last_summary)
+        logger.info(
+            "[history_intent_node] Keyword overlap: score=%.2f, query='%s', summary='%s'",
+            overlap_score, query[:30], last_summary[:50]
+        )
+        if overlap_score >= 0.3:  # threshold
+            return {
+                "history_intent": True,
+                "history_confidence": overlap_score,
+                "history_source": "keyword_overlap",
+                "_events": [
+                    f"history_intent: source=keyword_overlap, score={overlap_score:.2f}, history_count={len(chat_history)}, doc_ids={history_doc_ids}"
+                ],
+            }
+
+    logger.info("[history_intent_node] No history intent detected")
+    return {
+        "history_intent": False,
+        "history_confidence": 0.0,
+        "history_source": "none",
+        "_events": [
+            f"history_intent: source=none, history_count={len(chat_history)}, doc_ids={history_doc_ids}"
+        ],
+    }
+
+
 def _detect_doc_lookup_intent(
     llm: BaseLLM,
     query: str,
@@ -956,55 +1080,51 @@ def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
 
     Router가 역할/행동 기반으로 분류:
     - general: 일반 대화 (RAG 우회)
-    - doc_lookup: 직접 문서 조회 (MQ 생략)
+    - doc_lookup: 이전 문서/대화 기반 답변 (MQ 생략)
     - retrieval: 검색 필요 (RAG 파이프라인)
 
     실행 순서:
     1. Rule 기반 doc_id 체크 (LLM 호출 없음) - "myservice 12345"
-    2. Rule 기반 history 참조 체크 (LLM 호출 없음) - "이전 대화에서...", "위 문서..."
-    3. LLM 라우터 호출 (general | doc_lookup | retrieval)
-    4. doc_lookup인 경우 history에서 doc_ids 추출
+    2. LLM 라우터 호출 (general | doc_lookup | retrieval)
+    3. doc_lookup인 경우 doc_ids 유무에 따라 분기
     """
     original_query = state.get("query") or ""
     query = state.get("query_en") or original_query
     chat_history = state.get("chat_history", [])
 
+    events: List[str] = []
+
     # === 디버깅 로그: 입력 상태 ===
     history_doc_ids = _get_doc_ids_from_history(chat_history) if chat_history else []
+    events.append(f"router_input: history_count={len(chat_history)}, doc_ids={history_doc_ids}")
     logger.info(
         "[route_node] INPUT: query='%s', history_count=%d, history_doc_ids=%s",
-        original_query[:80] if original_query else "",
+        original_query[:60] if original_query else "",
         len(chat_history),
         history_doc_ids,
     )
+
+    def _return(payload: Dict[str, Any], note: str | None = None) -> Dict[str, Any]:
+        if note:
+            events.append(note)
+        payload["_events"] = list(events)
+        return payload
 
     # [1] Rule 기반: 쿼리에서 doc_id 패턴 체크 (LLM 호출 전에 빠르게 처리)
     doc_info = _extract_doc_id_from_query(original_query)
     if doc_info:
         doc_type, doc_number = doc_info
         logger.info("[route_node] DECISION: doc_lookup (rule: doc_id pattern), doc_type=%s, doc_id=%s", doc_type, doc_number)
-        return {
-            "route": "doc_lookup",
-            "lookup_doc_ids": [doc_number],
-            "lookup_source": "query",
-        }
-
-    # [2] Rule 기반: history 참조 패턴 체크 (LLM보다 신뢰성 높음)
-    is_history_ref = _is_history_reference(original_query)
-    logger.info("[route_node] CHECK: is_history_reference=%s", is_history_ref)
-
-    if chat_history and is_history_ref:
-        if history_doc_ids:
-            logger.info("[route_node] DECISION: doc_lookup (rule: history reference), doc_ids=%s", history_doc_ids)
-            return {
+        return _return(
+            {
                 "route": "doc_lookup",
-                "lookup_doc_ids": history_doc_ids,
-                "lookup_source": "history",
-            }
-        # history 참조 패턴이지만 doc_ids 없으면 retrieval로 fallback
-        logger.info("[route_node] FALLBACK: history reference pattern but no doc_ids in history")
+                "lookup_doc_ids": [doc_number],
+                "lookup_source": "query",
+            },
+            f"router_decision: doc_lookup (doc_id pattern), doc_id={doc_number}",
+        )
 
-    # [3] LLM Router 호출 (general | doc_lookup | retrieval)
+    # [2] LLM Router 호출 (general | doc_lookup | retrieval)
     history_text = _format_history_for_prompt(chat_history) if chat_history else "없음"
     logger.info("[route_node] LLM INPUT: history_text='%s'", history_text[:200] if history_text else "없음")
 
@@ -1015,23 +1135,30 @@ def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     route = _parse_route(_invoke_llm(llm, spec.router.system, user))
 
     logger.info("[route_node] LLM DECISION: route=%s", route)
+    events.append(f"router_llm: route={route}, history_count={len(chat_history)}, doc_ids={history_doc_ids}")
 
-    # [4] doc_lookup인 경우 history에서 doc_ids 추출
+    # [3] doc_lookup인 경우 history에서 doc_ids 추출
     if route == "doc_lookup":
         if history_doc_ids:
-            logger.info("[route_node] FINAL: doc_lookup from LLM, doc_ids=%s", history_doc_ids)
-            return {
-                "route": route,
-                "lookup_doc_ids": history_doc_ids,
-                "lookup_source": "history",
-            }
+            logger.info("[route_node] FINAL: doc_lookup, doc_ids=%s", history_doc_ids)
+            return _return(
+                {
+                    "route": route,
+                    "lookup_doc_ids": history_doc_ids,
+                    "lookup_source": "history",
+                },
+                "router_final: doc_lookup (llm)",
+            )
 
-        # doc_ids를 찾을 수 없으면 retrieval로 fallback
-        logger.info("[route_node] FALLBACK: LLM said doc_lookup but no doc_ids, using retrieval")
-        return {"route": "retrieval"}
+        # doc_ids를 찾을 수 없으면 history_answer로 fallback (summary 기반)
+        logger.info("[route_node] FALLBACK: doc_lookup but no doc_ids -> history_answer")
+        return _return(
+            {"route": "history_answer"},
+            "router_fallback: doc_lookup→history_answer (no doc_ids)",
+        )
 
     logger.info("[route_node] FINAL: route=%s", route)
-    return {"route": route}
+    return _return({"route": route}, f"router_final: {route}")
 
 
 def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
@@ -1739,6 +1866,39 @@ def _get_answer_template(
     return default_templates.get(route, spec.general_ans)
 
 
+def _collect_suggested_devices(docs: List[Any]) -> List[Dict[str, Any]]:
+    """검색 결과에서 device_name 집계 (count 내림차순).
+
+    Args:
+        docs: RetrievalResult 또는 dict 리스트
+
+    Returns:
+        [{"name": "SUPRA XP", "count": 18}, ...] 형태의 리스트
+    """
+    from collections import Counter
+
+    EXCLUDE_NAMES = {"", "ALL", "etc", "ETC", "all", "N/A", "Unknown"}
+
+    device_counts: Counter = Counter()
+    for doc in docs:
+        # RetrievalResult 또는 dict 모두 지원
+        if hasattr(doc, "metadata"):
+            metadata = doc.metadata
+        elif isinstance(doc, dict):
+            metadata = doc.get("metadata", {})
+        else:
+            continue
+
+        device_name = metadata.get("device_name", "") if metadata else ""
+        if device_name and device_name.strip() not in EXCLUDE_NAMES:
+            device_counts[device_name.strip()] += 1
+
+    return [
+        {"name": name, "count": count}
+        for name, count in device_counts.most_common()
+    ]
+
+
 def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     """Generate answer using unified retrieval_ans prompt."""
     route = state["route"]
@@ -1771,7 +1931,25 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     logger.info("answer_node: user_prompt_chars=%d, system_prompt_chars=%d", len(user), len(tmpl.system))
     answer, reasoning = _invoke_llm_with_reasoning(llm, tmpl.system, user, max_tokens=MAX_TOKENS_ANSWER)
     logger.info("answer_node: answer_chars=%d, reasoning_chars=%d, answer_preview=%s", len(answer), len(reasoning) if reasoning else 0, answer[:500] if answer else "(empty)")
-    return {"answer": answer, "reasoning": reasoning}
+
+    # suggested_devices 집계 (장비 미지정 시에만)
+    suggested_devices = None
+    auto_parsed_device = state.get("auto_parsed_device")
+    auto_parsed_devices = state.get("auto_parsed_devices")
+    has_device_filter = bool(auto_parsed_device or auto_parsed_devices)
+
+    if not has_device_filter:
+        # all_docs (retrieve 결과) 또는 docs 사용
+        docs_for_suggestion = state.get("all_docs") or state.get("docs", [])
+        if docs_for_suggestion:
+            suggested_devices = _collect_suggested_devices(docs_for_suggestion)
+            logger.info(
+                "answer_node: suggested_devices=%d devices (top3: %s)",
+                len(suggested_devices),
+                [d["name"] for d in suggested_devices[:3]] if suggested_devices else []
+            )
+
+    return {"answer": answer, "reasoning": reasoning, "suggested_devices": suggested_devices}
 
 
 def _detect_chat_type(query: str) -> str:
@@ -1870,6 +2048,75 @@ def chat_answer_node(state: AgentState) -> Dict[str, Any]:
         "answer": answer,
         "chat_type": chat_type,
         "judge": judge,
+        "docs": [],
+        "display_docs": [],
+        "ref_json": [],
+        "answer_ref_json": [],
+    }
+
+
+def history_answer_node(state: AgentState, *, llm: BaseLLM) -> Dict[str, Any]:
+    """이전 대화 summary 기반 답변 (간단한 후속 질문용).
+
+    route_node에서 history_intent=True이고 doc_ids가 없거나 summary로 충분할 때 호출.
+    직전 assistant 응답의 summary를 기반으로 후속 질문에 답변.
+
+    Returns:
+        - answer: 생성된 답변
+        - judge: {faithful: True} (history 기반이므로 검증 불필요)
+    """
+    query = state.get("query", "")
+    chat_history = state.get("chat_history", [])
+    lang = state.get("detected_language", "ko")
+
+    # 직전 assistant summary 가져오기
+    last_summary = _get_last_assistant_summary(chat_history)
+
+    if not last_summary:
+        # summary 없으면 fallback 응답
+        fallback = {
+            "ko": "이전 대화 내용을 찾을 수 없습니다. 새로운 질문을 해주세요.",
+            "en": "I couldn't find the previous conversation. Please ask a new question.",
+            "ja": "以前の会話が見つかりませんでした。新しい質問をしてください。",
+        }
+        return {
+            "answer": fallback.get(lang, fallback["ko"]),
+            "judge": {"faithful": True, "issues": [], "hint": "history_answer:no_summary"},
+            "docs": [],
+            "display_docs": [],
+            "ref_json": [],
+            "answer_ref_json": [],
+        }
+
+    # LLM으로 history 기반 답변 생성
+    system_prompt = """당신은 이전 대화 내용을 기반으로 후속 질문에 답변하는 어시스턴트입니다.
+
+규칙:
+1. 이전 답변에서 제공된 정보만 사용하여 답변하세요
+2. 이전 답변에 없는 내용은 "이전 대화에서 해당 내용을 찾을 수 없습니다"라고 말하세요
+3. 답변은 간결하고 명확하게 작성하세요
+4. 사용자가 요청한 언어로 답변하세요"""
+
+    user_prompt = f"""이전 답변 내용:
+{last_summary}
+
+사용자 후속 질문: {query}
+
+위 이전 답변 내용을 바탕으로 사용자의 질문에 답변해주세요."""
+
+    try:
+        answer = _invoke_llm(llm, system_prompt, user_prompt)
+        logger.info(
+            "[history_answer_node] Generated answer from summary, query='%s', answer_len=%d",
+            query[:50], len(answer)
+        )
+    except Exception as e:
+        logger.error("[history_answer_node] LLM error: %s", e)
+        answer = "답변 생성 중 오류가 발생했습니다."
+
+    return {
+        "answer": answer,
+        "judge": {"faithful": True, "issues": [], "hint": "history_answer"},
         "docs": [],
         "display_docs": [],
         "ref_json": [],
@@ -2360,6 +2607,17 @@ def auto_parse_node(
         State update with auto_parsed_device, auto_parsed_doc_type, detected_language, and auto_parse_message.
     """
     query = state["query"]
+
+    # skip_auto_parse가 True이면 건너뛰기 (filter_devices 재검색 시)
+    if state.get("skip_auto_parse"):
+        selected_devices = state.get("selected_devices", [])
+        logger.info("auto_parse_node: SKIPPED (skip_auto_parse=True), using selected_devices=%s", selected_devices)
+        return {
+            "auto_parsed_device": selected_devices[0] if selected_devices else None,
+            "auto_parsed_devices": selected_devices if selected_devices else None,
+            "detected_language": _detect_language_rule_based(query),
+            "auto_parse_message": f"필터 적용: {', '.join(selected_devices)}" if selected_devices else "",
+        }
 
     # 1. 규칙 기반 파싱 (빠름)
     detected_language = _detect_language_rule_based(query)

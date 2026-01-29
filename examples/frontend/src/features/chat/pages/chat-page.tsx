@@ -10,7 +10,7 @@ import { ThemeToggle } from "../../../components/theme-toggle";
 import { Alert } from "antd";
 
 export default function ChatPage() {
-  const { messages, send, stop, isStreaming, error, reset, editAndResend } = useChatSession();
+  const { messages, send, stop, isStreaming, error, reset, editAndResend, selectDevice } = useChatSession();
 
   const handleSend = async (text: string) => {
     await send({ text });
@@ -18,6 +18,10 @@ export default function ChatPage() {
 
   const handleEdit = async (id: string, newContent: string) => {
     await editAndResend(id, newContent);
+  };
+
+  const handleDeviceSelect = async (index: number, deviceName: string) => {
+    await selectDevice(index, deviceName);
   };
 
   return (
@@ -82,6 +86,7 @@ export default function ChatPage() {
                   message={msg}
                   isStreaming={isStreaming && idx === messages.length - 1 && msg.role === "assistant"}
                   onEdit={handleEdit}
+                  onDeviceSelect={handleDeviceSelect}
                 />
               ))
             )}
