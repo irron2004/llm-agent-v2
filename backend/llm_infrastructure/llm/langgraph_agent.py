@@ -26,16 +26,42 @@ logger = logging.getLogger(__name__)
 # -----------------------------
 # 1) State schema
 # -----------------------------
-Route = Literal["setup", "ts", "general"]
+Route = Literal["general", "doc_lookup", "retrieval"]
 Gate = Literal["need_st", "no_st"]
+
+
+class ChatHistoryEntry(TypedDict, total=False):
+    """대화 히스토리 항목.
+
+    - user: content 필드 사용 (원본 질문)
+    - assistant: summary 필드 사용 (답변 요약 truncate 150자)
+    """
+
+    role: str  # "user" | "assistant"
+    # user용 필드
+    content: str  # user만 사용: 원본 질문 (그대로 유지)
+    # assistant용 필드
+    summary: str  # assistant만 사용: 답변 요약 (truncate 150자)
+    refs: List[str]  # 참조 문서 title (rank 순)
+    doc_ids: List[str]  # 참조 문서 ID (rank 순 - 첫 번째가 가장 중요)
 
 
 class AgentState(TypedDict, total=False):
     query: str
     route: Route
     is_chat_query: bool
+    chat_type: str
+
+    # Chat history for multi-turn conversation
+    chat_history: List[ChatHistoryEntry]  # 대화 히스토리 (클라이언트 전달)
+    lookup_doc_ids: List[str]  # doc_lookup용 doc_id 목록
+    lookup_source: str  # "query" | "history" - doc_id 추출 출처
 
     # Multi-query outputs (parsed lists)
+    # Unified retrieval MQ (new structure)
+    retrieval_mq_list: List[str]  # English queries
+    retrieval_mq_ko_list: List[str]  # Korean queries
+    # Legacy MQ lists (kept for compatibility during transition)
     setup_mq_list: List[str]
     ts_mq_list: List[str]
     general_mq_list: List[str]
@@ -104,11 +130,17 @@ class AgentState(TypedDict, total=False):
 @dataclass
 class PromptSpec:
     router: PromptTemplate
+    # Unified retrieval MQ (replaces setup_mq, ts_mq, general_mq)
+    retrieval_mq: PromptTemplate
+    # Legacy MQ prompts (kept for compatibility during transition)
     setup_mq: PromptTemplate
     ts_mq: PromptTemplate
     general_mq: PromptTemplate
     st_gate: PromptTemplate
     st_mq: PromptTemplate
+    # Unified retrieval answer (replaces setup_ans, ts_ans, general_ans)
+    retrieval_ans: PromptTemplate
+    # Legacy answer prompts (kept for compatibility)
     setup_ans: PromptTemplate
     ts_ans: PromptTemplate
     general_ans: PromptTemplate
@@ -117,13 +149,16 @@ class PromptSpec:
     judge_general_sys: str
     auto_parse: Optional[PromptTemplate] = None  # Auto-parse device/doc_type
     translate: Optional[PromptTemplate] = None  # Translate query to en/ko
-    # Language-specific answer prompts
+    # Language-specific answer prompts (legacy)
     setup_ans_en: Optional[PromptTemplate] = None
     setup_ans_ja: Optional[PromptTemplate] = None
     ts_ans_en: Optional[PromptTemplate] = None
     ts_ans_ja: Optional[PromptTemplate] = None
     general_ans_en: Optional[PromptTemplate] = None
     general_ans_ja: Optional[PromptTemplate] = None
+    # Unified retrieval answer - language-specific
+    retrieval_ans_en: Optional[PromptTemplate] = None
+    retrieval_ans_ja: Optional[PromptTemplate] = None
 
 
 DEFAULT_JUDGE_SETUP = """
@@ -176,11 +211,17 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
     """Load required prompts from YAML (router/MQ/gate/answer)."""
 
     router = load_prompt_template("router", version)
+    # Unified retrieval MQ
+    retrieval_mq = load_prompt_template("retrieval_mq", version)
+    # Legacy MQ prompts (kept for compatibility)
     setup_mq = load_prompt_template("setup_mq", version)
     ts_mq = load_prompt_template("ts_mq", version)
     general_mq = load_prompt_template("general_mq", version)
     st_gate = load_prompt_template("st_gate", version)
     st_mq = load_prompt_template("st_mq", version)
+    # Unified retrieval answer
+    retrieval_ans = load_prompt_template("retrieval_ans", version)
+    # Legacy answer prompts (kept for compatibility)
     setup_ans = load_prompt_template("setup_ans", version)
     ts_ans = load_prompt_template("ts_ans", version)
     general_ans = load_prompt_template("general_ans", version)
@@ -189,21 +230,26 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
     auto_parse = _try_load_prompt("auto_parse", version)
     translate = _try_load_prompt("translate", version)
 
-    # Load language-specific answer prompts (optional)
+    # Load language-specific answer prompts (optional, legacy)
     setup_ans_en = _try_load_prompt("setup_ans_en", version)
     setup_ans_ja = _try_load_prompt("setup_ans_ja", version)
     ts_ans_en = _try_load_prompt("ts_ans_en", version)
     ts_ans_ja = _try_load_prompt("ts_ans_ja", version)
     general_ans_en = _try_load_prompt("general_ans_en", version)
     general_ans_ja = _try_load_prompt("general_ans_ja", version)
+    # Unified retrieval answer - language-specific
+    retrieval_ans_en = _try_load_prompt("retrieval_ans_en", version)
+    retrieval_ans_ja = _try_load_prompt("retrieval_ans_ja", version)
 
     return PromptSpec(
         router=router,
+        retrieval_mq=retrieval_mq,
         setup_mq=setup_mq,
         ts_mq=ts_mq,
         general_mq=general_mq,
         st_gate=st_gate,
         st_mq=st_mq,
+        retrieval_ans=retrieval_ans,
         setup_ans=setup_ans,
         ts_ans=ts_ans,
         general_ans=general_ans,
@@ -218,6 +264,8 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
         ts_ans_ja=ts_ans_ja,
         general_ans_en=general_ans_en,
         general_ans_ja=general_ans_ja,
+        retrieval_ans_en=retrieval_ans_en,
+        retrieval_ans_ja=retrieval_ans_ja,
     )
 
 
@@ -274,7 +322,7 @@ MAX_REF_CHARS_REVIEW = 200       # 검색 결과 리뷰용
 MAX_REF_CHARS_ANSWER = 1200      # 답변 생성용
 RELATED_PAGE_WINDOW = 2          # 인접 페이지 범위 (±N)
 DOC_TYPES_SAME_DOC = {"gcb", "myservice"}
-EXPAND_TOP_K = 5                 # 확장 대상 최대 개수 (rerank 상위)
+EXPAND_TOP_K = 10                # 확장 대상 최대 개수 (rerank 상위)
 
 
 def _invoke_llm(llm: BaseLLM, system: str, user: str, **kwargs: Any) -> str:
@@ -316,13 +364,15 @@ def _format_prompt(template: str, mapping: Dict[str, str]) -> str:
 
 
 def _parse_route(text: str) -> Route:
+    """Parse route from LLM response: general | doc_lookup | retrieval."""
     t = text.strip().lower()
-    if t in ("setup", "ts", "general"):
+    if t in ("general", "doc_lookup", "retrieval"):
         return t  # type: ignore[return-value]
-    m = re.search(r"\b(setup|ts|general)\b", t)
+    m = re.search(r"\b(general|doc_lookup|retrieval)\b", t)
     if m:
         return m.group(1)  # type: ignore[return-value]
-    return "general"
+    # fallback to retrieval (safer - will search)
+    return "retrieval"
 
 
 def _parse_gate(text: str) -> Gate:
@@ -340,22 +390,54 @@ def _is_general_chat_query(query: str) -> bool:
     if not q:
         return False
 
-    patterns = [
+    identity_patterns = [
         r"\bwho are you\b",
-        r"\bwhat can you do\b",
         r"\bwhat are you\b",
+        r"\bwhat can you do\b",
+        r"\bwhat is your name\b",
+        r"\bwhat'?s your name\b",
+        r"너는?\s*누구",
+        r"넌\s*누구",
+        r"당신은?\s*누구",
+        r"너는?\s*뭘\s*할\s*수",
+    ]
+    if any(re.search(pat, q) for pat in identity_patterns):
+        return True
+
+    # Guardrail against technical/domain-like tokens (APC, E-001, 3.2Nm, etc.).
+    # This prevents domain questions with greetings from being misrouted to chat.
+    if re.search(r"[A-Z]{2,}|\d", query or ""):
+        return False
+
+    patterns = [
+        # English - greeting
         r"\bhello\b",
         r"\bhi\b",
         r"\bhey\b",
+        # English - thanks
         r"\bthanks?\b",
         r"\bthank you\b",
+        # English - farewell
+        r"\bbye\b",
+        r"\bgoodbye\b",
+        r"\bsee you\b",
+        # Korean - greeting
         r"^안녕",
         r"^ㅎㅇ",
-        r"너는 누구",
-        r"당신은 누구",
-        r"뭐(야|임)\??$",
+        r"^하이",
+        r"^헬로",
+        # Korean - thanks
         r"고마워",
-        r"감사",
+        r"고맙습니다",
+        r"감사합니다",
+        r"감사해",
+        r"땡큐",
+        r"ㄱㅅ",
+        # Korean - farewell
+        r"잘\s*가",
+        r"안녕히",
+        r"바이",
+        r"다음에\s*(봐|봬)",
     ]
     return any(re.search(pat, q) for pat in patterns)
 
@@ -665,27 +747,226 @@ def _combine_related_text(docs: List[RetrievalResult]) -> str:
 
 
 # -----------------------------
-# 6) Graph node helpers
+# 6) doc_lookup helpers
+# -----------------------------
+
+# doc_id 추출 패턴 (myservice 29392, gcb 12345, sop-001 등)
+DOC_ID_PATTERNS = [
+    r"(myservice|gcb|sop)\s+(\d+)",  # myservice 29392
+    r"(myservice|gcb|sop)[-_](\d+)",  # myservice-29392, myservice_29392
+    r"(myservice|gcb|sop)(\d+)",  # myservice29392 (붙여쓰기)
+]
+
+
+def _extract_doc_id_from_query(query: str) -> Optional[tuple[str, str]]:
+    """쿼리에서 doc_type과 doc_id 추출 (Rule 기반).
+
+    Returns:
+        (doc_type, doc_number) 튜플 또는 None
+        예: ("myservice", "29392")
+    """
+    query_lower = query.lower()
+    for pattern in DOC_ID_PATTERNS:
+        match = re.search(pattern, query_lower)
+        if match:
+            doc_type, doc_number = match.groups()
+            return (doc_type, doc_number)
+    return None
+
+
+def _format_history_for_prompt(chat_history: List[ChatHistoryEntry]) -> str:
+    """chat_history를 프롬프트용 텍스트로 변환.
+
+    주의: user는 content, assistant는 summary 필드 사용
+    """
+    lines = []
+    for entry in chat_history[-5:]:  # 최근 5턴만
+        role = entry.get("role", "")
+        if role == "user":
+            lines.append(f"User: {entry.get('content', '')}")  # user는 content
+        elif role == "assistant":
+            summary = entry.get("summary", "")  # assistant는 summary
+            refs = entry.get("refs", [])
+            lines.append(f"Assistant: {summary}")
+            if refs:
+                lines.append(f"  참조 문서: {', '.join(refs[:3])}")  # 상위 3개만
+    return "\n".join(lines)
+
+
+def _detect_doc_lookup_intent(
+    llm: BaseLLM,
+    query: str,
+    chat_history: List[ChatHistoryEntry],
+) -> dict:
+    """LLM으로 doc_lookup 의도 판단 (_invoke_llm 사용)."""
+
+    # history가 없으면 doc_lookup 불가
+    if not chat_history:
+        return {"is_doc_lookup": False}
+
+    # 최근 assistant 응답에 doc_ids가 없으면 불가
+    has_doc_refs = False
+    for entry in reversed(chat_history):
+        if entry.get("role") == "assistant" and entry.get("doc_ids"):
+            has_doc_refs = True
+            break
+    if not has_doc_refs:
+        return {"is_doc_lookup": False}
+
+    # history 포맷팅
+    history_text = _format_history_for_prompt(chat_history)
+
+    system = "사용자의 질문이 이전 대화에서 언급된 문서를 참조하는지 판단하세요."
+    user = f"""이전 대화:
+{history_text}
+
+현재 질문: {query}
+
+판단 기준:
+- "그 문서", "아까", "위에서 말한", "더 자세히", "방금 말한" 등의 표현
+- 이전 답변의 특정 부분을 깊이 묻는 경우
+- 새로운 장비나 주제가 아닌, 이전 맥락을 이어가는 경우
+
+이 질문이 이전 문서를 참조하면 "yes", 새로운 검색이 필요하면 "no"로만 답하세요."""
+
+    response = _invoke_llm(llm, system, user)
+    is_doc_lookup = "yes" in response.lower()
+
+    logger.info("_detect_doc_lookup_intent: query=%s, result=%s", query[:50], is_doc_lookup)
+    return {"is_doc_lookup": is_doc_lookup}
+
+
+def _get_doc_ids_from_history(chat_history: List[ChatHistoryEntry]) -> List[str]:
+    """history에서 가장 최근 assistant의 doc_ids 추출."""
+    for entry in reversed(chat_history):
+        if entry.get("role") == "assistant":
+            doc_ids = entry.get("doc_ids", [])
+            if doc_ids:
+                return doc_ids[:3]  # 최대 3개
+    return []
+
+
+def doc_lookup_node(
+    state: AgentState,
+    *,
+    doc_fetcher,  # Callable[[str], List[RetrievalResult]]
+) -> Dict[str, Any]:
+    """doc_id로 직접 문서 조회 (MQ 생략, retrieve 우회).
+
+    Args:
+        state: AgentState (lookup_doc_ids 필드 사용)
+        doc_fetcher: fetch_doc_chunks 함수 (doc_id -> chunks)
+
+    Returns:
+        - 성공: {"docs": [...], "lookup_doc_ids": [...]}
+        - 실패: {"route": "general"} (fallback)
+    """
+    doc_ids = state.get("lookup_doc_ids", [])
+    lookup_source = state.get("lookup_source", "unknown")
+
+    if not doc_ids:
+        logger.info("doc_lookup_node: no doc_ids, fallback to MQ")
+        return {"route": "general"}
+
+    # fetch_doc_chunks로 직접 조회
+    all_docs: List[RetrievalResult] = []
+    valid_doc_ids: List[str] = []
+
+    for doc_id in doc_ids[:3]:  # 최대 3개 문서
+        if doc_fetcher is None:
+            logger.warning("doc_lookup_node: doc_fetcher is None")
+            break
+        chunks = doc_fetcher(doc_id)
+        if chunks:
+            all_docs.extend(chunks)
+            valid_doc_ids.append(doc_id)
+            logger.info("doc_lookup_node: fetched %d chunks for doc_id=%s", len(chunks), doc_id)
+        else:
+            logger.warning("doc_lookup_node: doc_id=%s not found in ES", doc_id)
+
+    if not all_docs:
+        # 모든 doc_id 검증 실패 → fallback
+        logger.info("doc_lookup_node: all doc_ids invalid, fallback to MQ")
+        return {"route": "general"}
+
+    # docs 필드에 직접 설정
+    logger.info(
+        "doc_lookup_node: success, source=%s, doc_ids=%s, total_chunks=%d",
+        lookup_source,
+        valid_doc_ids,
+        len(all_docs),
+    )
+    return {
+        "docs": all_docs,
+        "all_docs": all_docs,  # 재생성용
+        "lookup_doc_ids": valid_doc_ids,
+    }
+
+
+# -----------------------------
+# 7) Graph node helpers
 # -----------------------------
 def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
-    # Use English query for routing (after translation)
-    query = state.get("query_en") or state["query"]
-    user = _format_prompt(spec.router.user, {"sys.query": query})
+    """라우팅 노드: general | doc_lookup | retrieval 분기.
+
+    Router가 역할/행동 기반으로 분류:
+    - general: 일반 대화 (RAG 우회)
+    - doc_lookup: 직접 문서 조회 (MQ 생략)
+    - retrieval: 검색 필요 (RAG 파이프라인)
+    """
+    original_query = state.get("query") or ""
+    query = state.get("query_en") or original_query
+    chat_history = state.get("chat_history", [])
+
+    # history를 프롬프트용 텍스트로 변환
+    history_text = _format_history_for_prompt(chat_history) if chat_history else "없음"
+
+    # Router 프롬프트 호출 (general | doc_lookup | retrieval)
+    user = _format_prompt(spec.router.user, {
+        "sys.query": query,
+        "sys.history": history_text,
+    })
     route = _parse_route(_invoke_llm(llm, spec.router.system, user))
-    chat_query = _is_general_chat_query(state.get("query") or query)
-    if chat_query:
-        route = "general"
+
     logger.info(
-        "route_node: query=%s..., route=%s, is_chat_query=%s",
+        "route_node: query=%s..., route=%s, has_history=%s",
         query[:50] if query else None,
         route,
-        chat_query,
+        bool(chat_history),
     )
-    return {"route": route, "is_chat_query": chat_query}
+
+    # doc_lookup인 경우 doc_ids 추출
+    if route == "doc_lookup":
+        # 1. Rule 기반: 쿼리에서 doc_id 추출 시도
+        doc_info = _extract_doc_id_from_query(original_query)
+        if doc_info:
+            doc_type, doc_number = doc_info
+            logger.info("route_node: doc_lookup from query, doc_id=%s", doc_number)
+            return {
+                "route": route,
+                "lookup_doc_ids": [doc_number],
+                "lookup_source": "query",
+            }
+
+        # 2. History에서 doc_ids 추출
+        prev_doc_ids = _get_doc_ids_from_history(chat_history)
+        if prev_doc_ids:
+            logger.info("route_node: doc_lookup from history, doc_ids=%s", prev_doc_ids)
+            return {
+                "route": route,
+                "lookup_doc_ids": prev_doc_ids,
+                "lookup_source": "history",
+            }
+
+        # 3. doc_ids를 찾을 수 없으면 retrieval로 fallback
+        logger.info("route_node: doc_lookup but no doc_ids found, fallback to retrieval")
+        return {"route": "retrieval"}
+
+    return {"route": route}
 
 
 def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
-    route = state["route"]
+    """Generate multi-queries for retrieval using unified retrieval_mq prompt."""
     # Generate MQ in both English and Korean for bilingual retrieval
     query_en = state.get("query_en") or state["query"]
     query_ko = state.get("query_ko") or state["query"]
@@ -697,10 +978,6 @@ def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, A
         logger.info("mq_node: search_queries override provided, skipping MQ generation")
         return {}
 
-    setup_mq_list: List[str] = []
-    ts_mq_list: List[str] = []
-    general_mq_list: List[str] = []
-
     # MQ generation needs more tokens than classification
     mq_kwargs = {"max_tokens": 4096}
 
@@ -711,42 +988,36 @@ def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, A
         user_en = _format_prompt(spec_template.user, {"sys.query": query_en})
         raw_en = _invoke_llm(llm, system_en, user_en, **mq_kwargs)
         mq_en = _parse_queries(raw_en)
-        logger.info("mq_node(%s/en): %d queries: %s", route, len(mq_en), mq_en)
+        logger.info("mq_node(retrieval/en): %d queries: %s", len(mq_en), mq_en)
 
         # Korean MQ - add explicit Korean language instruction
         system_ko = spec_template.system + "\n\n**중요: 모든 검색어를 반드시 한국어로 생성하세요. Generate all queries in Korean.**"
         user_ko = _format_prompt(spec_template.user, {"sys.query": query_ko})
         raw_ko = _invoke_llm(llm, system_ko, user_ko, **mq_kwargs)
         mq_ko = _parse_queries(raw_ko)
-        logger.info("mq_node(%s/ko): %d queries: %s", route, len(mq_ko), mq_ko)
+        logger.info("mq_node(retrieval/ko): %d queries: %s", len(mq_ko), mq_ko)
 
         return mq_en, mq_ko
 
-    setup_mq_ko_list: List[str] = []
-    ts_mq_ko_list: List[str] = []
-    general_mq_ko_list: List[str] = []
-
-    if route == "setup":
-        setup_mq_list, setup_mq_ko_list = _generate_mq_bilingual(spec.setup_mq)
-    elif route == "ts":
-        ts_mq_list, ts_mq_ko_list = _generate_mq_bilingual(spec.ts_mq)
-    else:
-        general_mq_list, general_mq_ko_list = _generate_mq_bilingual(spec.general_mq)
+    # Use unified retrieval_mq prompt
+    retrieval_mq_list, retrieval_mq_ko_list = _generate_mq_bilingual(spec.retrieval_mq)
 
     logger.info(
-        "mq_node: total - setup(en=%d,ko=%d), ts(en=%d,ko=%d), general(en=%d,ko=%d)",
-        len(setup_mq_list), len(setup_mq_ko_list),
-        len(ts_mq_list), len(ts_mq_ko_list),
-        len(general_mq_list), len(general_mq_ko_list),
+        "mq_node: total - retrieval(en=%d, ko=%d)",
+        len(retrieval_mq_list), len(retrieval_mq_ko_list),
     )
 
+    # Return both new unified fields and legacy fields for compatibility
     return {
-        "setup_mq_list": setup_mq_list,
-        "ts_mq_list": ts_mq_list,
-        "general_mq_list": general_mq_list,
-        "setup_mq_ko_list": setup_mq_ko_list,
-        "ts_mq_ko_list": ts_mq_ko_list,
-        "general_mq_ko_list": general_mq_ko_list,
+        "retrieval_mq_list": retrieval_mq_list,
+        "retrieval_mq_ko_list": retrieval_mq_ko_list,
+        # Legacy fields (for compatibility with st_gate_node, st_mq_node)
+        "general_mq_list": retrieval_mq_list,
+        "general_mq_ko_list": retrieval_mq_ko_list,
+        "setup_mq_list": [],
+        "ts_mq_list": [],
+        "setup_mq_ko_list": [],
+        "ts_mq_ko_list": [],
     }
 
 
@@ -1400,6 +1671,7 @@ def _get_answer_template(
 
 
 def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
+    """Generate answer using unified retrieval_ans prompt."""
     route = state["route"]
     detected_language = state.get("detected_language", "ko")
     ref_items = state.get("answer_ref_json") or state.get("ref_json", [])
@@ -1416,31 +1688,15 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     query_for_prompt = state.get("query_en") or state["query"]
     mapping = {"sys.query": query_for_prompt, "ref_text": ref_text}
 
-    # Select language-specific template
-    # Korean (ko): use default template
-    # English (en): use *_en template if available
-    # Japanese (ja): use *_ja template if available
+    # Select language-specific unified template
+    # Routes: retrieval, doc_lookup → use retrieval_ans
     if detected_language == "en":
-        templates = {
-            "setup": spec.setup_ans_en or spec.setup_ans,
-            "ts": spec.ts_ans_en or spec.ts_ans,
-            "general": spec.general_ans_en or spec.general_ans,
-        }
+        tmpl = spec.retrieval_ans_en or spec.retrieval_ans
     elif detected_language == "ja":
-        templates = {
-            "setup": spec.setup_ans_ja or spec.setup_ans,
-            "ts": spec.ts_ans_ja or spec.ts_ans,
-            "general": spec.general_ans_ja or spec.general_ans,
-        }
+        tmpl = spec.retrieval_ans_ja or spec.retrieval_ans
     else:  # ko or default
-        templates = {
-            "setup": spec.setup_ans,
-            "ts": spec.ts_ans,
-            "general": spec.general_ans,
-        }
-
-    tmpl = templates.get(route, spec.general_ans)
-    logger.info("answer_node: using %s template for route=%s", detected_language, route)
+        tmpl = spec.retrieval_ans
+    logger.info("answer_node: using retrieval_ans template (lang=%s) for route=%s", detected_language, route)
 
     user = _format_prompt(tmpl.user, mapping)
     logger.info("answer_node: user_prompt_chars=%d, system_prompt_chars=%d", len(user), len(tmpl.system))
@@ -1449,32 +1705,101 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     return {"answer": answer, "reasoning": reasoning}
 
 
+def _detect_chat_type(query: str) -> str:
+    """Detect the type of chat query for appropriate response."""
+    q = (query or "").strip().lower()
+
+    # Identity patterns
+    identity_patterns = [
+        r"\bwho are you\b", r"\bwhat are you\b", r"\bwhat can you do\b",
+        r"\bwhat is your name\b", r"\bwhat'?s your name\b",
+        r"너는?\s*누구", r"넌\s*누구", r"당신은?\s*누구",
+        r"너는?\s*뭘\s*할\s*수",
+    ]
+    if any(re.search(pat, q) for pat in identity_patterns):
+        return "identity"
+
+    # Greeting patterns
+    greeting_patterns = [
+        r"\bhello\b", r"\bhi\b", r"\bhey\b",
+        r"^안녕", r"^ㅎㅇ", r"^하이", r"^헬로",
+    ]
+    if any(re.search(pat, q) for pat in greeting_patterns):
+        return "greeting"
+
+    # Thanks patterns
+    thanks_patterns = [
+        r"\bthanks?\b", r"\bthank you\b",
+        r"고마워", r"고맙습니다", r"감사합니다", r"감사해", r"땡큐", r"ㄱㅅ",
+    ]
+    if any(re.search(pat, q) for pat in thanks_patterns):
+        return "thanks"
+
+    # Farewell patterns
+    farewell_patterns = [
+        r"\bbye\b", r"\bgoodbye\b", r"\bsee you\b",
+        r"잘\s*가", r"안녕히", r"바이", r"다음에\s*(봐|봬)",
+    ]
+    if any(re.search(pat, q) for pat in farewell_patterns):
+        return "farewell"
+
+    return "general"
+
+
 def chat_answer_node(state: AgentState) -> Dict[str, Any]:
     """Answer small-talk / agent identity questions without retrieval."""
     lang = state.get("detected_language", "ko")
-    if lang == "en":
-        answer = (
-            "I am a document-grounded RAG assistant for semiconductor equipment. "
-            "Ask me about alarms, troubleshooting steps, setup/installation procedures, "
-            "or device-specific documentation, and I will cite sources when available."
-        )
-    elif lang == "ja":
-        answer = (
-            "私は半導体装置向けの文書根拠型RAGアシスタントです。"
-            "アラーム、トラブルシューティング手順、セットアップ/設置手順、"
-            "装置別ドキュメントについて質問してください。根拠があれば出典も示します。"
-        )
-    else:
-        answer = (
-            "저는 반도체 장비 문서 기반 RAG 어시스턴트입니다. "
-            "알람/에러 원인, 트러블슈팅 절차, 설치/셋업 방법, 장비별 문서 내용을 물어보시면 "
-            "가능한 경우 근거와 함께 답변하겠습니다."
-        )
+    query = state.get("query", "")
+    chat_type = _detect_chat_type(query)
+
+    # Language-specific responses by chat type
+    responses = {
+        "identity": {
+            "ko": (
+                "저는 반도체 장비 문서 기반 RAG 어시스턴트입니다. "
+                "알람/에러 원인, 트러블슈팅 절차, 설치/셋업 방법, 장비별 문서 내용을 물어보시면 "
+                "가능한 경우 근거와 함께 답변하겠습니다."
+            ),
+            "en": (
+                "I am a document-grounded RAG assistant for semiconductor equipment. "
+                "Ask me about alarms, troubleshooting steps, setup/installation procedures, "
+                "or device-specific documentation, and I will cite sources when available."
+            ),
+            "ja": (
+                "私は半導体装置向けの文書根拠型RAGアシスタントです。"
+                "アラーム、トラブルシューティング手順、セットアップ/設置手順、"
+                "装置別ドキュメントについて質問してください。根拠があれば出典も示します。"
+            ),
+        },
+        "greeting": {
+            "ko": "안녕하세요! 무엇을 도와드릴까요?",
+            "en": "Hello! How can I help you today?",
+            "ja": "こんにちは！何かお手伝いできることはありますか？",
+        },
+        "thanks": {
+            "ko": "도움이 되어 기쁩니다. 다른 질문이 있으시면 말씀해주세요!",
+            "en": "You're welcome! Let me know if you have any other questions.",
+            "ja": "お役に立てて嬉しいです。他にご質問があればお知らせください！",
+        },
+        "farewell": {
+            "ko": "다음에 또 질문해주세요. 좋은 하루 되세요!",
+            "en": "Feel free to ask anytime. Have a great day!",
+            "ja": "またいつでもご質問ください。良い一日を！",
+        },
+        "general": {
+            "ko": "네, 무엇을 도와드릴까요?",
+            "en": "Yes, how can I help you?",
+            "ja": "はい、何かお手伝いできますか？",
+        },
+    }
+
+    answer = responses.get(chat_type, responses["general"]).get(lang, responses[chat_type]["ko"])
 
     # Provide a faithful judge result to avoid retry loops.
-    judge = {"faithful": True, "issues": [], "hint": "chat_query"}
+    judge = {"faithful": True, "issues": [], "hint": f"chat_query:{chat_type}"}
     return {
         "answer": answer,
+        "chat_type": chat_type,
         "judge": judge,
         "docs": [],
         "display_docs": [],
@@ -1557,16 +1882,15 @@ def retry_bump_node(state: AgentState) -> Dict[str, Any]:
 
 
 def retry_expand_node(state: AgentState) -> Dict[str, Any]:
-    """1st retry strategy: increase expand_top_k from 5 to 10.
+    """1st retry strategy: increase expand_top_k and re-retrieve.
 
-    This doesn't re-retrieve docs, just uses more of the already retrieved docs
-    for answer generation.
+    Re-retrieves documents with expanded top_k for better coverage.
     """
     attempts = int(state.get("attempts", 0)) + 1
-    logger.info("retry_expand_node: increasing expand_top_k to 10 (attempt %d)", attempts)
+    logger.info("retry_expand_node: re-retrieving with expand_top_k=20 (attempt %d)", attempts)
     return {
         "attempts": attempts,
-        "expand_top_k": 10,
+        "expand_top_k": 20,
         "retry_strategy": "expand_more",
     }
 
@@ -1730,7 +2054,39 @@ def _parse_auto_parse_result(text: str) -> Dict[str, Any]:
 def _compact_text(value: str) -> str:
     if value is None:
         return ""
-    return re.sub(r"[\s\-_./]+", "", str(value).lower())
+    return re.sub(r"[^0-9a-zA-Z가-힣]+", "", str(value).lower())
+
+
+def _strip_parenthetical(value: str) -> str:
+    if value is None:
+        return ""
+    return re.sub(r"[\(\[\{].*?[\)\]\}]", "", str(value))
+
+
+def _device_aliases_from_name(device_name: str) -> list[str]:
+    """Generate normalized aliases for device name matching.
+
+    Examples:
+    - 'SUPRA XP' -> ['supraxp']
+    - 'SUPRA-XP' -> ['supraxp']
+    - 'SUPRA XP SEM' -> ['supraxpsem', 'supraxp'] (prefix alias)
+    """
+    cleaned = _strip_parenthetical(device_name or "")
+    tokens = [t for t in re.split(r"[\s\-_./]+", cleaned) if t]
+    aliases: set[str] = set()
+
+    def _add_alias(text: str) -> None:
+        normalized = _compact_text(text)
+        if len(normalized) >= 4:
+            aliases.add(normalized)
+
+    _add_alias(cleaned)
+    if len(tokens) >= 2:
+        _add_alias("".join(tokens[:2]))
+    if len(tokens) >= 3:
+        _add_alias("".join(tokens[:3]))
+
+    return sorted(aliases)
 
 
 def _filter_devices_by_query(
@@ -1748,8 +2104,8 @@ def _filter_devices_by_query(
         canonical = device_map.get(key)
         if not canonical:
             continue
-        # Only accept if the full device name appears in the query (strict match)
-        if _compact_text(canonical) and _compact_text(canonical) in query_compact:
+        aliases = _device_aliases_from_name(canonical)
+        if any(alias in query_compact for alias in aliases):
             filtered.append(canonical)
     return _dedupe_queries(filtered)[:2]
 
@@ -1763,9 +2119,79 @@ def _extract_devices_from_query(device_names: List[str], query: str) -> List[str
         cleaned = str(name).strip()
         if not cleaned:
             continue
-        if _compact_text(cleaned) and _compact_text(cleaned) in query_compact:
+        aliases = _device_aliases_from_name(cleaned)
+        if any(alias in query_compact for alias in aliases):
             matches.append(cleaned)
     return _dedupe_queries(matches)[:2]
+
+
+def _extract_device_with_llm(
+    llm: BaseLLM,
+    device_names: List[str],
+    query: str,
+    top_k: int = 20,
+) -> Optional[str]:
+    """LLM을 사용하여 쿼리에서 장비명을 추출합니다.
+
+    사용자가 다양한 형태로 장비명을 입력할 수 있습니다:
+    - "supra XP", "SUPRA XP", "supraxp", "수프라XP" 등
+
+    Args:
+        llm: LLM 인스턴스
+        device_names: 유효한 장비명 목록
+        query: 사용자 쿼리
+        top_k: 프롬프트에 포함할 장비 수 (문서 수 기준 상위)
+
+    Returns:
+        매칭된 장비명 또는 None
+    """
+    if not device_names or not query:
+        return None
+
+    # 상위 장비만 선택 (프롬프트 길이 제한)
+    device_list = device_names[:top_k]
+    device_list_str = ", ".join(device_list)
+
+    prompt = f"""사용자 질문에서 장비(device) 이름을 추출하세요.
+
+유효한 장비 목록:
+{device_list_str}
+
+규칙:
+1. 사용자가 장비명을 다양한 형태로 입력할 수 있습니다 (예: "supra XP", "SUPRA XP", "수프라XP", "supraxp" 등)
+2. 위 목록에서 가장 일치하는 장비명을 선택하세요
+3. 장비명이 없거나 확실하지 않으면 "None"을 반환하세요
+4. 반드시 위 목록에 있는 정확한 장비명만 반환하세요
+
+사용자 질문: {query}
+
+장비명 (목록에 있는 이름 또는 None):"""
+
+    try:
+        response = llm.invoke(prompt)
+        result = response.content.strip() if hasattr(response, 'content') else str(response).strip()
+
+        # 결과 정리
+        result = result.strip('"\'').strip()
+
+        # None 체크
+        if result.lower() == "none" or not result:
+            return None
+
+        # 유효한 장비명인지 확인
+        for name in device_names:
+            if result.lower() == name.lower():
+                return name
+
+        # 부분 매칭 시도
+        for name in device_names:
+            if result.lower() in name.lower() or name.lower() in result.lower():
+                return name
+
+        return None
+    except Exception as e:
+        logger.warning("LLM device extraction failed: %s", e)
+        return None
 
 
 def _extract_doc_types_from_query(query: str) -> List[str]:
@@ -1851,12 +2277,19 @@ def auto_parse_node(
     """
     query = state["query"]
 
-    # 규칙 기반만 사용 (LLM 호출 없음 - 속도 최적화)
+    # 1. 규칙 기반 파싱 (빠름)
     detected_language = _detect_language_rule_based(query)
     devices = _extract_devices_from_query(device_names, query)
     doc_types = _extract_doc_types_from_query(query)
 
-    logger.info("auto_parse_node: devices=%s, doc_types=%s, language=%s (rule-based only)", devices, doc_types, detected_language)
+    # 2. 규칙 기반으로 장비를 찾지 못하면 LLM 사용
+    if not devices and device_names:
+        llm_device = _extract_device_with_llm(llm, device_names, query)
+        if llm_device:
+            devices = [llm_device]
+            logger.info("auto_parse_node: LLM detected device=%s", llm_device)
+
+    logger.info("auto_parse_node: devices=%s, doc_types=%s, language=%s", devices, doc_types, detected_language)
 
     # Build display message based on detected language
     # Language display labels
@@ -2152,6 +2585,7 @@ def device_selection_node(
 
 __all__ = [
     "AgentState",
+    "ChatHistoryEntry",
     "Route",
     "Gate",
     "PromptSpec",
@@ -2160,6 +2594,7 @@ __all__ = [
     "load_prompt_spec",
     # Node helpers
     "route_node",
+    "doc_lookup_node",
     "mq_node",
     "st_gate_node",
     "st_mq_node",

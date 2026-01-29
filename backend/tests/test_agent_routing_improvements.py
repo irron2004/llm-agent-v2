@@ -47,10 +47,13 @@ class StubLLM(BaseLLM):
             self.st_mq_called = True
             return LLMResponse(text='{"queries":["q1","q2","q3"]}')
 
-        # Router prompt
+        # Router prompt - return appropriate route based on new structure
         if "routing agent" in system.lower():
-            # Intentionally misroute to verify chat guardrail override.
-            return LLMResponse(text="ts")
+            # Check user content for routing decision
+            user_content = next((m["content"] for m in msgs if m.get("role") == "user"), "")
+            if "누구" in user_content or "안녕" in user_content:
+                return LLMResponse(text="general")
+            return LLMResponse(text="retrieval")
 
         return LLMResponse(text="general")
 
@@ -92,7 +95,7 @@ class DummyRetriever:
 
 
 def test_route_node_general_chat_query() -> None:
-    """Router should allow general chat queries to map to general."""
+    """Router should route general chat queries to 'general'."""
     spec = load_prompt_spec()
     llm = StubLLM()
     state = {"query": "너는 누구니?"}
@@ -100,7 +103,18 @@ def test_route_node_general_chat_query() -> None:
     result = route_node(state, llm=llm, spec=spec)
 
     assert result["route"] == "general"
-    assert result["is_chat_query"] is True
+
+
+def test_route_node_domain_query_retrieval() -> None:
+    """Domain-like queries should route to 'retrieval'."""
+    spec = load_prompt_spec()
+    llm = StubLLM()
+    state = {"query": "APC가 뭐야?"}
+
+    result = route_node(state, llm=llm, spec=spec)
+
+    # Domain queries should go through retrieval path
+    assert result["route"] == "retrieval"
 
 
 def test_st_mq_no_st_skips_llm_but_builds_bilingual_queries() -> None:

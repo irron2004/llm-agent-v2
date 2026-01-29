@@ -25,6 +25,7 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     auto_parse_node,
     chat_answer_node,
     device_selection_node,
+    doc_lookup_node,
     expand_related_docs_node,
     human_review_node,
     judge_node,
@@ -64,7 +65,7 @@ class LangGraphRAGAgent:
         search_service: SearchService,
         prompt_spec: Optional[PromptSpec] = None,
         top_k: int = 10,
-        retrieval_top_k: int = 20,
+        retrieval_top_k: int = 50,
         mode: str = "verified",  # base | verified
         checkpointer: Optional[MemorySaver] = None,
         ask_user_after_retrieve: bool = False,
@@ -251,6 +252,20 @@ class LangGraphRAGAgent:
                 queries = result.get("search_queries", [])
                 details_parts.append(f"{len(queries)}개 검색 쿼리")
 
+        elif name == "doc_lookup":
+            if result:
+                docs = result.get("docs", [])
+                lookup_doc_ids = result.get("lookup_doc_ids", [])
+                source = state.get("lookup_source", "")
+                if docs:
+                    details_parts.append(f"{len(docs)}개 청크 조회")
+                    if lookup_doc_ids:
+                        details_parts.append(f"doc_ids: {lookup_doc_ids[:2]}")
+                    if source:
+                        details_parts.append(f"source: {source}")
+                else:
+                    details_parts.append("fallback to MQ")
+
         elif name == "retrieve" or name == "retrieve_retry":
             if result:
                 docs = result.get("docs", [])
@@ -272,7 +287,10 @@ class LangGraphRAGAgent:
         elif name == "chat_answer":
             if result:
                 answer = result.get("answer", "")
+                chat_type = result.get("chat_type")
                 details_parts.append(f"chat {len(answer)}자")
+                if chat_type:
+                    details_parts.append(f"type: {chat_type}")
 
         elif name == "judge":
             if result:
@@ -340,7 +358,16 @@ class LangGraphRAGAgent:
         builder.add_node("chat_answer", self._wrap_node("chat_answer", chat_answer_node))
         builder.add_node("judge", self._wrap_node("judge", functools.partial(judge_node, llm=self.llm, spec=self.spec)))
 
-        # Auto-parse mode: auto_parse → translate → route → mq
+        # doc_lookup 노드: doc_id로 직접 문서 조회 (MQ 우회)
+        builder.add_node(
+            "doc_lookup",
+            self._wrap_node(
+                "doc_lookup",
+                functools.partial(doc_lookup_node, doc_fetcher=self.doc_fetcher),
+            ),
+        )
+
+        # Auto-parse mode: auto_parse → translate → route → (doc_lookup | mq | chat)
         # This ensures route receives translated query (query_en)
         if self.auto_parse_enabled:
             builder.add_node(
@@ -368,16 +395,23 @@ class LangGraphRAGAgent:
                     ),
                 ),
             )
-            # Flow: START → auto_parse → translate → route → mq
+            # Flow: START → auto_parse → translate → route → (doc_lookup | mq | chat)
             builder.add_edge(START, "auto_parse")
             builder.add_edge("auto_parse", "translate")
             builder.add_edge("translate", "route")
+
             def _route_decision(state: AgentState) -> str:
-                return "chat" if state.get("is_chat_query") else "default"
+                route = state.get("route")
+                if route == "general":
+                    return "general"
+                if route == "doc_lookup":
+                    return "doc_lookup"
+                return "retrieval"  # retrieval → mq
+
             builder.add_conditional_edges(
                 "route",
                 _route_decision,
-                {"chat": "chat_answer", "default": "mq"},
+                {"general": "chat_answer", "doc_lookup": "doc_lookup", "retrieval": "mq"},
             )
         # Device selection node (optional HIL) - legacy mode
         elif self.ask_device_selection:
@@ -390,27 +424,50 @@ class LangGraphRAGAgent:
             )
             builder.add_edge(START, "route")
             def _route_decision(state: AgentState) -> str:
-                return "chat" if state.get("is_chat_query") else "default"
+                route = state.get("route")
+                if route == "general":
+                    return "general"
+                if route == "doc_lookup":
+                    return "doc_lookup"
+                return "retrieval"
             builder.add_conditional_edges(
                 "route",
                 _route_decision,
-                {"chat": "chat_answer", "default": "device_selection"},
+                {"general": "chat_answer", "doc_lookup": "doc_lookup", "retrieval": "device_selection"},
             )
             # device_selection_node returns Command(goto="mq"), so no explicit edge needed
         else:
-            # Default flow: START → route → mq
+            # Default flow: START → route → (general | doc_lookup | retrieval)
             builder.add_edge(START, "route")
             def _route_decision(state: AgentState) -> str:
-                return "chat" if state.get("is_chat_query") else "default"
+                route = state.get("route")
+                if route == "general":
+                    return "general"
+                if route == "doc_lookup":
+                    return "doc_lookup"
+                return "retrieval"
             builder.add_conditional_edges(
                 "route",
                 _route_decision,
-                {"chat": "chat_answer", "default": "mq"},
+                {"general": "chat_answer", "doc_lookup": "doc_lookup", "retrieval": "mq"},
             )
 
         builder.add_edge("mq", "st_gate")
         builder.add_edge("st_gate", "st_mq")
         builder.add_edge("st_mq", "retrieve")
+
+        # doc_lookup 후 조건부 분기: docs 있으면 expand, 없으면 fallback to mq
+        def _doc_lookup_decision(state: AgentState) -> str:
+            docs = state.get("docs", [])
+            if docs:
+                return "expand"  # 문서 조회 성공 → expand_related로
+            return "mq"  # fallback → 일반 검색 플로우
+
+        builder.add_conditional_edges(
+            "doc_lookup",
+            _doc_lookup_decision,
+            {"expand": "expand_related", "mq": "mq"},
+        )
 
         # ask_user_after_retrieve 옵션: retrieve 후 사용자 확인
         if self.ask_user_after_retrieve:
@@ -466,8 +523,8 @@ class LangGraphRAGAgent:
             },
         )
 
-        # retry_expand: just increase expand_top_k and go back to expand_related
-        builder.add_edge("retry_expand", "expand_related")
+        # retry_expand: increase expand_top_k and re-retrieve
+        builder.add_edge("retry_expand", "retrieve_retry")
 
         # retry (refine_queries): refine queries and re-retrieve
         builder.add_edge("retry_bump", "refine_queries")
