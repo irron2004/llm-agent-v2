@@ -608,15 +608,16 @@ def results_to_ref_json(
         if truncated:
             metadata["truncated"] = True
 
-        ref.append(
-            {
-                "rank": i,
-                "doc_id": d.doc_id,
-                "content": content,
-                "metadata": metadata,
-                "score": getattr(d, "score", None),
-            }
-        )
+        item = {
+            "rank": i,
+            "doc_id": d.doc_id,
+            "content": content,
+            "metadata": metadata,
+        }
+        score = getattr(d, "score", None)
+        if score:  # score가 0이거나 None이면 제외
+            item["score"] = score
+        ref.append(item)
     return ref
 
 
@@ -1032,10 +1033,12 @@ def doc_lookup_node(
     """
     doc_ids = state.get("lookup_doc_ids", [])
     lookup_source = state.get("lookup_source", "unknown")
+    events: List[str] = []
 
     if not doc_ids:
-        logger.info("doc_lookup_node: no doc_ids, fallback to MQ")
-        return {"route": "general"}
+        msg = "doc_lookup_node: no doc_ids, fallback to MQ"
+        logger.info(msg)
+        return {"route": "general", "_events": [msg]}
 
     # fetch_doc_chunks로 직접 조회
     all_docs: List[RetrievalResult] = []
@@ -1043,7 +1046,9 @@ def doc_lookup_node(
 
     for doc_id in doc_ids[:3]:  # 최대 3개 문서
         if doc_fetcher is None:
-            logger.warning("doc_lookup_node: doc_fetcher is None")
+            msg = "doc_lookup_node: doc_fetcher is None"
+            logger.warning(msg)
+            events.append(msg)
             break
         chunks = doc_fetcher(doc_id)
         if chunks:
@@ -1055,8 +1060,9 @@ def doc_lookup_node(
 
     if not all_docs:
         # 모든 doc_id 검증 실패 → fallback
-        logger.info("doc_lookup_node: all doc_ids invalid, fallback to MQ")
-        return {"route": "general"}
+        msg = "doc_lookup_node: all doc_ids invalid, fallback to MQ"
+        logger.info(msg)
+        return {"route": "general", "_events": events + [msg]}
 
     # docs 필드에 직접 설정
     logger.info(
@@ -1065,10 +1071,14 @@ def doc_lookup_node(
         valid_doc_ids,
         len(all_docs),
     )
+    events.append(
+        f"doc_lookup_node: success source={lookup_source} doc_ids={valid_doc_ids} chunks={len(all_docs)}"
+    )
     return {
         "docs": all_docs,
         "all_docs": all_docs,  # 재생성용
         "lookup_doc_ids": valid_doc_ids,
+        "_events": events,
     }
 
 
@@ -1110,6 +1120,15 @@ def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
         payload["_events"] = list(events)
         return payload
 
+    # [0] 강제 retrieval: selected_devices가 명시적으로 전달된 경우 (기기 재검색)
+    selected_devices = state.get("selected_devices", [])
+    if selected_devices:
+        logger.info("[route_node] FORCED: retrieval (selected_devices=%s)", selected_devices)
+        return _return(
+            {"route": "retrieval"},
+            f"router_forced: retrieval (selected_devices={selected_devices})",
+        )
+
     # [1] Rule 기반: 쿼리에서 doc_id 패턴 체크 (LLM 호출 전에 빠르게 처리)
     doc_info = _extract_doc_id_from_query(original_query)
     if doc_info:
@@ -1147,14 +1166,14 @@ def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
                     "lookup_doc_ids": history_doc_ids,
                     "lookup_source": "history",
                 },
-                "router_final: doc_lookup (llm)",
+                f"router_final: doc_lookup (llm) doc_ids={history_doc_ids}",
             )
 
         # doc_ids를 찾을 수 없으면 history_answer로 fallback (summary 기반)
         logger.info("[route_node] FALLBACK: doc_lookup but no doc_ids -> history_answer")
         return _return(
             {"route": "history_answer"},
-            "router_fallback: doc_lookup→history_answer (no doc_ids)",
+            "router_fallback: doc_lookup→history_answer (no doc_ids in history)",
         )
 
     logger.info("[route_node] FINAL: route=%s", route)
@@ -1867,35 +1886,47 @@ def _get_answer_template(
 
 
 def _collect_suggested_devices(docs: List[Any]) -> List[Dict[str, Any]]:
-    """검색 결과에서 device_name 집계 (count 내림차순).
+    """검색 결과에서 device_name 집계 (문서 수 내림차순).
 
     Args:
         docs: RetrievalResult 또는 dict 리스트
 
     Returns:
         [{"name": "SUPRA XP", "count": 18}, ...] 형태의 리스트
+        count는 청크 수가 아닌 고유 문서(doc_id) 수
     """
-    from collections import Counter
+    from collections import defaultdict
 
     EXCLUDE_NAMES = {"", "ALL", "etc", "ETC", "all", "N/A", "Unknown"}
 
-    device_counts: Counter = Counter()
+    # device_name -> set of unique doc_ids
+    device_doc_ids: dict[str, set] = defaultdict(set)
+
     for doc in docs:
         # RetrievalResult 또는 dict 모두 지원
         if hasattr(doc, "metadata"):
             metadata = doc.metadata
+            doc_id = getattr(doc, "doc_id", None)
         elif isinstance(doc, dict):
             metadata = doc.get("metadata", {})
+            doc_id = doc.get("doc_id")
         else:
             continue
 
         device_name = metadata.get("device_name", "") if metadata else ""
-        if device_name and device_name.strip() not in EXCLUDE_NAMES:
-            device_counts[device_name.strip()] += 1
+        if device_name and device_name.strip() not in EXCLUDE_NAMES and doc_id:
+            device_doc_ids[device_name.strip()].add(doc_id)
+
+    # count 내림차순 정렬
+    sorted_devices = sorted(
+        device_doc_ids.items(),
+        key=lambda x: len(x[1]),
+        reverse=True
+    )
 
     return [
-        {"name": name, "count": count}
-        for name, count in device_counts.most_common()
+        {"name": name, "count": len(doc_ids)}
+        for name, doc_ids in sorted_devices
     ]
 
 
@@ -1933,23 +1964,58 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     logger.info("answer_node: answer_chars=%d, reasoning_chars=%d, answer_preview=%s", len(answer), len(reasoning) if reasoning else 0, answer[:500] if answer else "(empty)")
 
     # suggested_devices 집계 (장비 미지정 시에만)
+    events: List[str] = []
     suggested_devices = None
     auto_parsed_device = state.get("auto_parsed_device")
     auto_parsed_devices = state.get("auto_parsed_devices")
-    has_device_filter = bool(auto_parsed_device or auto_parsed_devices)
+    selected_devices = state.get("selected_devices")
+    selected_device = state.get("selected_device")
+    has_device_filter = bool(auto_parsed_device or auto_parsed_devices or selected_devices or selected_device)
+
+    logger.info(
+        "answer_node: auto_parsed_device=%s, auto_parsed_devices=%s, selected_devices=%s, selected_device=%s, has_device_filter=%s",
+        auto_parsed_device, auto_parsed_devices, selected_devices, selected_device, has_device_filter
+    )
 
     if not has_device_filter:
         # all_docs (retrieve 결과) 또는 docs 사용
-        docs_for_suggestion = state.get("all_docs") or state.get("docs", [])
+        docs_for_suggestion = state.get("all_docs") or state.get("docs") or state.get("display_docs") or []
+        logger.info(
+            "answer_node: docs_for_suggestion count=%d (from all_docs=%s, docs=%s, display_docs=%s)",
+            len(docs_for_suggestion) if docs_for_suggestion else 0,
+            len(state.get("all_docs", [])) if state.get("all_docs") else "None",
+            len(state.get("docs", [])) if state.get("docs") else "None",
+            len(state.get("display_docs", [])) if state.get("display_docs") else "None",
+        )
         if docs_for_suggestion:
+            # 디버깅: 처음 3개 문서의 device_name 확인
+            for i, doc in enumerate(docs_for_suggestion[:3]):
+                meta = doc.metadata if hasattr(doc, "metadata") else doc.get("metadata", {}) if isinstance(doc, dict) else {}
+                device_name = meta.get("device_name", "(없음)") if meta else "(메타없음)"
+                logger.info("answer_node: doc[%d] device_name=%s", i, device_name)
+
             suggested_devices = _collect_suggested_devices(docs_for_suggestion)
             logger.info(
                 "answer_node: suggested_devices=%d devices (top3: %s)",
                 len(suggested_devices),
                 [d["name"] for d in suggested_devices[:3]] if suggested_devices else []
             )
+            events.append(
+                f"answer_node: suggested_devices={len(suggested_devices)} (top3: {[d['name'] for d in suggested_devices[:3]] if suggested_devices else []})"
+            )
+        else:
+            logger.info("answer_node: no docs for suggestion (all_docs and docs are empty)")
+            events.append("answer_node: no docs for suggestion")
+    else:
+        logger.info("answer_node: skipping device suggestion (device filter active)")
+        events.append("answer_node: skip suggested_devices (device filter active)")
 
-    return {"answer": answer, "reasoning": reasoning, "suggested_devices": suggested_devices}
+    return {
+        "answer": answer,
+        "reasoning": reasoning,
+        "suggested_devices": suggested_devices,
+        "_events": events,
+    }
 
 
 def _detect_chat_type(query: str) -> str:
@@ -2189,6 +2255,13 @@ def should_retry(state: AgentState) -> Literal["done", "retry", "retry_expand", 
 
     attempts = state.get("attempts", 0)
     max_attempts = state.get("max_attempts", 0)
+    route = state.get("route")
+
+    # doc_lookup은 재검색 없이 같은 문서로 재답변만 허용
+    if route == "doc_lookup":
+        if attempts < max_attempts:
+            return "retry_expand"
+        return "done"
 
     if attempts < max_attempts:
         if attempts == 0:
@@ -2489,10 +2562,14 @@ def _extract_device_with_llm(
 {device_list_str}
 
 규칙:
-1. 사용자가 장비명을 다양한 형태로 입력할 수 있습니다 (예: "supra XP", "SUPRA XP", "수프라XP", "supraxp" 등)
-2. 위 목록에서 가장 일치하는 장비명을 선택하세요
-3. 장비명이 없거나 확실하지 않으면 "None"을 반환하세요
-4. 반드시 위 목록에 있는 정확한 장비명만 반환하세요
+1. 사용자가 장비명을 다양한 형태로 입력할 수 있습니다:
+   - 영어: "supra XP", "SUPRA XP", "supraxp"
+   - 한국어: "수프라XP", "수프라 엑스피"
+   - 일본어: "スプラXP", "スプラ・エックスピー", "スープラ"
+2. 일본어 카타카나는 영어 발음을 표기한 것입니다 (예: スプラ=Supra, エックスピー=XP)
+3. 위 목록에서 가장 일치하는 장비명을 선택하세요
+4. 장비명이 없거나 확실하지 않으면 "None"을 반환하세요
+5. 반드시 위 목록에 있는 정확한 장비명만 반환하세요
 
 사용자 질문: {query}
 
@@ -2670,8 +2747,8 @@ def auto_parse_node(
         "detected_language": detected_language,
     }
 
-    # 파싱 결과가 있으면 추가
     if devices or doc_types:
+        # 파싱 결과가 있으면 추가
         result.update({
             "auto_parsed_device": devices[0] if devices else None,
             "auto_parsed_doc_type": doc_types[0] if doc_types else None,
@@ -2693,6 +2770,30 @@ def auto_parse_node(
                     "message": auto_parse_message,
                 }
             ] if auto_parse_message else [],
+        })
+    else:
+        # 이전 턴의 파싱 결과가 남지 않도록 명시적으로 초기화
+        result.update({
+            "auto_parsed_device": None,
+            "auto_parsed_doc_type": None,
+            "auto_parsed_devices": None,
+            "auto_parsed_doc_types": None,
+            "auto_parse_message": None,
+            "selected_devices": [],
+            "selected_doc_types": [],
+            "device_selection_skipped": True,
+            "doc_type_selection_skipped": True,
+            "_events": [
+                {
+                    "type": "auto_parse",
+                    "device": None,
+                    "doc_type": None,
+                    "devices": [],
+                    "doc_types": [],
+                    "language": detected_language,
+                    "message": "auto_parse: no device/doc_type detected",
+                }
+            ],
         })
 
     return result

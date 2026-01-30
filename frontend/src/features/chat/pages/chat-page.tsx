@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useChatSession } from "../hooks/use-chat-session";
 import { useChatHistoryContext } from "../context/chat-history-context";
@@ -9,7 +9,8 @@ import {
   InputArea,
   MessageItem,
   ChatInput,
-  DeviceSelectionPanel,
+  // [LEGACY] DeviceSelectionPanel - 채팅 화면 내 기기/문서 선택 패널 (사용 안 함)
+  // DeviceSelectionPanel,
 } from "../components";
 import type { RegeneratePayload } from "../components/message-item";
 import { Alert, Spin } from "antd";
@@ -46,13 +47,41 @@ export default function ChatPage() {
     markNextTurnEdited,
     inputPlaceholder,
     pendingReview,
-    pendingDeviceSelection,
+    // [LEGACY] 채팅 화면 내 기기/문서 선택 패널 (사용 안 함)
+    // pendingDeviceSelection,
     submitReview,
     submitSearchQueries,
-    submitDeviceSelection,
+    // submitDeviceSelection,
     submitFeedback,
     submitDetailedFeedback,
   } = useChatSession({ onTurnSaved: handleTurnSaved });
+
+  // 기기 선택 활성화 상태 (ESC로 닫을 수 있음)
+  const [isDeviceSelectionDismissed, setIsDeviceSelectionDismissed] = useState(false);
+
+  // 마지막 assistant 메시지에 suggestedDevices가 있는지 확인
+  const lastAssistantMessage = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "assistant") {
+        return messages[i];
+      }
+    }
+    return null;
+  }, [messages]);
+
+  const hasDeviceSuggestions = !isStreaming &&
+    lastAssistantMessage?.suggestedDevices &&
+    lastAssistantMessage.suggestedDevices.length > 0 &&
+    !isDeviceSelectionDismissed;
+
+  // 새 메시지가 오면 dismiss 상태 리셋
+  useEffect(() => {
+    setIsDeviceSelectionDismissed(false);
+  }, [messages.length]);
+
+  const handleDeviceDismiss = useCallback(() => {
+    setIsDeviceSelectionDismissed(true);
+  }, []);
 
   // Load session from URL parameter
   useEffect(() => {
@@ -79,7 +108,7 @@ export default function ChatPage() {
     setPendingRegeneration(null);
     send({
       text: payload.originalQuery,
-      askDeviceSelection: true,
+      askDeviceSelection: false,  // 이미 기기/문서 선택 완료
       overrides: {
         filterDevices: payload.selectedDevices,
         filterDocTypes: payload.selectedDocTypes,
@@ -155,6 +184,28 @@ export default function ChatPage() {
       selectedDocTypes: payload.selectedDocTypes ?? [],
     });
   }, [setPendingRegeneration]);
+
+  // Handle device selection from suggested devices
+  const handleDeviceSelect = useCallback((messageId: string, deviceName: string) => {
+    // Find the original query for this assistant message
+    let originalQuery = "";
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].role === "user" && i + 1 < messages.length && messages[i + 1].id === messageId) {
+        originalQuery = messages[i].content;
+        break;
+      }
+    }
+    if (!originalQuery) return;
+
+    // 원본 쿼리 + 기기 필터로 재검색
+    // MQ는 원본 쿼리 기반으로 다시 생성됨
+    send({
+      text: `[${deviceName}] ${originalQuery}`,
+      overrides: {
+        filterDevices: [deviceName],
+      },
+    });
+  }, [messages, send]);
 
   const handleEditAndResend = useCallback(async (payload: { messageId: string; content: string }) => {
     const trimmed = payload.content.trim();
@@ -246,6 +297,9 @@ export default function ChatPage() {
                     onDetailedFeedback={submitDetailedFeedback}
                     onRegenerate={msg.role === "assistant" ? handleRegenerate : undefined}
                     onEditAndResend={msg.role === "user" ? handleEditAndResend : undefined}
+                    onDeviceSelect={msg.role === "assistant" ? handleDeviceSelect : undefined}
+                    onDeviceDismiss={handleDeviceDismiss}
+                    isDeviceSelectionActive={hasDeviceSuggestions && msg.id === lastAssistantMessage?.id}
                     originalQuery={msg.role === "assistant" ? getOriginalQuery(msg.id) : undefined}
                   />
                 ))
@@ -253,7 +307,9 @@ export default function ChatPage() {
             </MessageList>
           )}
 
-          {/* Device selection panel */}
+          {/* Review panel moved to right sidebar */}
+
+          {/* [LEGACY] Device selection panel - 채팅 화면 내 기기/문서 선택 패널 (사용 안 함)
           {pendingDeviceSelection && (
             (pendingDeviceSelection.devices && pendingDeviceSelection.devices.length > 0) ||
             (pendingDeviceSelection.docTypes && pendingDeviceSelection.docTypes.length > 0)
@@ -266,8 +322,7 @@ export default function ChatPage() {
               onSelect={submitDeviceSelection}
             />
           )}
-
-          {/* Review panel moved to right sidebar */}
+          */}
 
           {error && (
             <Alert
@@ -284,8 +339,8 @@ export default function ChatPage() {
               onSend={handleSend}
               onStop={stop}
               isStreaming={isStreaming}
-              placeholder={inputPlaceholder}
-              disabled={isLoadingSession}
+              placeholder={hasDeviceSuggestions ? "기기를 선택하거나 ESC를 눌러주세요" : inputPlaceholder}
+              disabled={isLoadingSession || hasDeviceSuggestions}
             />
           </InputArea>
         </ChatContainer>

@@ -1,3 +1,7 @@
+/**
+ * [LEGACY] 채팅 화면 내 기기/문서 선택 패널
+ * 현재 사용하지 않음 - 우측 사이드바의 재생성 패널로 대체됨
+ */
 import { useState, ChangeEvent } from "react";
 import { Button, Card, Checkbox, Input, Space, Typography } from "antd";
 import { LaptopOutlined, GlobalOutlined, SearchOutlined } from "@ant-design/icons";
