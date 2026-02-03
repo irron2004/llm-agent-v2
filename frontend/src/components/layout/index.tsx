@@ -22,7 +22,12 @@ export default function Layout() {
   const isChatPage = location.pathname === "/";
 
   // Get logs from context
-  const { logs } = useChatLogs();
+  const { logs, activeMessageId } = useChatLogs();
+
+  const visibleLogs = useMemo(() => {
+    if (!activeMessageId) return logs;
+    return logs.filter((log) => log.messageId === activeMessageId);
+  }, [logs, activeMessageId]);
 
   // Get review data from context
   const {
@@ -44,7 +49,7 @@ export default function Layout() {
 
   // Show right sidebar when there are logs, pending review, or completed retrieved docs
   const shouldShowRightSidebar = isChatPage && (
-    logs.length > 0 ||
+    visibleLogs.length > 0 ||
     pendingReview !== null ||
     pendingRegeneration !== null ||
     (completedRetrievedDocs !== null && completedRetrievedDocs.length > 0)
@@ -71,10 +76,10 @@ export default function Layout() {
   // Priority: streaming (show logs) > regeneration > review > docs > logs
   const rightSidebarContent = useMemo(() => {
     // 새 요청 스트리밍 중이면 로그 표시
-    if (isStreaming && logs.length > 0) {
+    if (isStreaming && visibleLogs.length > 0) {
       return {
         title: "실행 로그",
-        subtitle: `${logs.length}개 항목`,
+        subtitle: `${visibleLogs.length}개 항목`,
       };
     }
     if (pendingRegeneration) {
@@ -97,9 +102,9 @@ export default function Layout() {
     }
     return {
       title: "실행 로그",
-      subtitle: `${logs.length}개 항목`,
+      subtitle: `${visibleLogs.length}개 항목`,
     };
-  }, [isStreaming, pendingRegeneration, pendingReview, completedRetrievedDocs, logs.length]);
+  }, [isStreaming, pendingRegeneration, pendingReview, completedRetrievedDocs, visibleLogs.length]);
 
   return (
     <div
@@ -153,8 +158,8 @@ export default function Layout() {
           subtitle={rightSidebarContent.subtitle}
         >
           {/* 스트리밍 중이면 로그 표시 (최우선) */}
-          {isStreaming && logs.length > 0 ? (
-            <ChatLogsContent logs={logs} />
+          {isStreaming && visibleLogs.length > 0 ? (
+            <ChatLogsContent logs={visibleLogs} />
           ) : pendingRegeneration ? (
             <RegeneratePanelContent
               pendingRegeneration={pendingRegeneration}
@@ -177,7 +182,7 @@ export default function Layout() {
           ) : completedRetrievedDocs && completedRetrievedDocs.length > 0 ? (
             <RetrievedDocsContent docs={completedRetrievedDocs} />
           ) : (
-            <ChatLogsContent logs={logs} />
+            <ChatLogsContent logs={visibleLogs} />
           )}
         </RightSidebar>
       )}

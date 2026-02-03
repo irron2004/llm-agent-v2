@@ -77,8 +77,12 @@ export function useChatSession() {
             setIsStreaming(false);
           },
           onFinalResult: (result: FinalResult) => {
+            console.log('[useChatSession] onFinalResult:', result);
             if (result.suggestedDevices && result.suggestedDevices.length > 0) {
+              console.log('[useChatSession] updating suggestedDevices:', result.suggestedDevices);
               updateLastAssistantSuggestions(result.suggestedDevices);
+            } else {
+              console.log('[useChatSession] no suggestedDevices in result');
             }
           },
         }

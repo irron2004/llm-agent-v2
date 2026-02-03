@@ -339,8 +339,9 @@ export default function ChatPage() {
               onSend={handleSend}
               onStop={stop}
               isStreaming={isStreaming}
-              placeholder={hasDeviceSuggestions ? "기기를 선택하거나 ESC를 눌러주세요" : inputPlaceholder}
+              placeholder={hasDeviceSuggestions ? "기기를 선택하거나 여기를 클릭하세요" : inputPlaceholder}
               disabled={isLoadingSession || hasDeviceSuggestions}
+              onDisabledClick={hasDeviceSuggestions ? handleDeviceDismiss : undefined}
             />
           </InputArea>
         </ChatContainer>

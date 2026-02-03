@@ -10,14 +10,17 @@ export interface ChatLogEntry {
 
 interface ChatLogsContextValue {
   logs: ChatLogEntry[];
+  activeMessageId: string | null;
   addLog: (messageId: string, content: string, node?: string | null) => void;
   clearLogs: () => void;
+  setActiveMessageId: (messageId: string | null) => void;
 }
 
 const ChatLogsContext = createContext<ChatLogsContextValue | undefined>(undefined);
 
 export function ChatLogsProvider({ children }: { children: ReactNode }) {
   const [logs, setLogs] = useState<ChatLogEntry[]>([]);
+  const [activeMessageId, setActiveMessageId] = useState<string | null>(null);
 
   const addLog = useCallback((messageId: string, content: string, node?: string | null) => {
     setLogs((prev) => [
@@ -34,10 +37,11 @@ export function ChatLogsProvider({ children }: { children: ReactNode }) {
 
   const clearLogs = useCallback(() => {
     setLogs([]);
+    setActiveMessageId(null);
   }, []);
 
   return (
-    <ChatLogsContext.Provider value={{ logs, addLog, clearLogs }}>
+    <ChatLogsContext.Provider value={{ logs, activeMessageId, addLog, clearLogs, setActiveMessageId }}>
       {children}
     </ChatLogsContext.Provider>
   );

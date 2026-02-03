@@ -7,6 +7,7 @@ type ChatInputProps = {
   isStreaming?: boolean;
   disabled?: boolean;
   placeholder?: string;
+  onDisabledClick?: () => void;  // 비활성화 상태에서 클릭 시 호출
 };
 
 export function ChatInput({
@@ -15,6 +16,7 @@ export function ChatInput({
   isStreaming = false,
   disabled = false,
   placeholder = "메시지를 입력하세요...",
+  onDisabledClick,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -42,8 +44,14 @@ export function ChatInput({
     }
   };
 
+  const handleWrapperClick = () => {
+    if (disabled && onDisabledClick) {
+      onDisabledClick();
+    }
+  };
+
   return (
-    <div className="input-wrapper">
+    <div className="input-wrapper" onClick={handleWrapperClick}>
       <textarea
         ref={textareaRef}
         className="input-textarea"
@@ -53,6 +61,7 @@ export function ChatInput({
         placeholder={placeholder}
         disabled={disabled}
         rows={1}
+        style={disabled ? { pointerEvents: "none" } : undefined}
       />
       {isStreaming ? (
         <button

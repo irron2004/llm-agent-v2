@@ -198,7 +198,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   }, [sessionId]);
 
   // Get chat logs context (Provider is always available in AppProviders)
-  const { addLog, clearLogs } = useChatLogs();
+  const { addLog, clearLogs, setActiveMessageId } = useChatLogs();
   
   // Get chat review context for setting completed retrieved docs
   const { setCompletedRetrievedDocs } = useChatReview();
@@ -424,6 +424,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         selectedDevices: res.selected_devices ?? null,
         selectedDocTypes: res.selected_doc_types ?? null,
         searchQueries: res.search_queries ?? null,
+        // Device suggestion (장비 미지정 시)
+        suggestedDevices: res.suggested_devices ?? undefined,
       }));
 
       // Save turn to backend
@@ -481,8 +483,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         return;
       }
 
-      // Clear logs when starting a new conversation (not resuming)
-      if (!isResume && isFirstMessageRef.current) {
+      // Always reset logs for a new user request (not resuming)
+      if (!isResume) {
         clearLogs();
       }
 
@@ -497,6 +499,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
       const userId = nanoid();
       const assistantId = nanoid();
+      setActiveMessageId(assistantId);
 
       const requestMessage = isResume && pending ? pending.question : text;
       const decision = isResume ? (decisionOverride ?? resolveDecision(text)) : undefined;
@@ -535,6 +538,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
       const payload = {
         message: requestMessage,
+        session_id: activeSessionId,  // 세션 ID 전달 (BE에서 history 자동 로드)
         auto_parse: autoParseEnabled,  // 자동 파싱 모드 활성화 (기본값)
         ask_user_after_retrieve: shouldAskUserAfterRetrieve,
         ask_device_selection: shouldAskDeviceSelection,
@@ -680,7 +684,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         setIsStreaming(false);
       }
     },
-    [appendMessage, stop, updateMessage, handleAgentResponse, pendingInterrupt, sessionId, addLog, clearLogs]
+    [appendMessage, stop, updateMessage, handleAgentResponse, pendingInterrupt, sessionId, addLog, clearLogs, setActiveMessageId]
   );
 
   const submitReview = useCallback(
