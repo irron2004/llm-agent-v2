@@ -22,7 +22,11 @@ from backend.api.dependencies import (
 from backend.domain.doc_type_mapping import group_doc_type_buckets
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
 from backend.llm_infrastructure.llm.langgraph_agent import ChatHistoryEntry
-from backend.services.agents.langgraph_rag_agent import LangGraphRAGAgent
+from backend.services.agents.langgraph_rag_agent import (
+    LangGraphRAGAgent,
+    reset_event_sink_context,
+    set_event_sink_context,
+)
 from backend.services.chat_history_service import ChatHistoryService
 from backend.services.search_service import SearchService
 
@@ -336,13 +340,13 @@ def _get_hil_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent:
     """HIL용 싱글톤 에이전트. 동일한 graph 인스턴스로 interrupt/resume 보장."""
     global _hil_agent
     if _hil_agent is None:
-        logger.info("Creating HIL agent singleton with top_k=20 retrieval_top_k=50")
+        logger.info("Creating HIL agent singleton with top_k=20 retrieval_top_k=100")
         _hil_agent = LangGraphRAGAgent(
             llm=llm,
             search_service=search_service,
             prompt_spec=prompt_spec,
             top_k=20,
-            retrieval_top_k=50,
+            retrieval_top_k=100,
             mode="verified",
             ask_user_after_retrieve=True,
             ask_device_selection=True,
@@ -356,13 +360,13 @@ def _get_auto_parse_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent
     """Auto-parse용 싱글톤 에이전트. 장비/문서종류를 자동으로 파싱."""
     global _auto_parse_agent
     if _auto_parse_agent is None:
-        logger.info("Creating Auto-parse agent singleton with top_k=20 retrieval_top_k=50")
+        logger.info("Creating Auto-parse agent singleton with top_k=20 retrieval_top_k=100")
         _auto_parse_agent = LangGraphRAGAgent(
             llm=llm,
             search_service=search_service,
             prompt_spec=prompt_spec,
             top_k=20,
-            retrieval_top_k=50,
+            retrieval_top_k=100,
             mode="verified",
             ask_user_after_retrieve=False,  # 문서 선택 UI 비활성화
             ask_device_selection=False,      # 기기 선택 UI 비활성화
@@ -376,13 +380,13 @@ def _get_device_selection_agent(llm, search_service, prompt_spec) -> LangGraphRA
     """Device selection용 싱글톤 에이전트. 기기/문서종류 선택만 수행."""
     global _device_selection_agent
     if _device_selection_agent is None:
-        logger.info("Creating device-selection agent singleton with top_k=20 retrieval_top_k=50")
+        logger.info("Creating device-selection agent singleton with top_k=20 retrieval_top_k=100")
         _device_selection_agent = LangGraphRAGAgent(
             llm=llm,
             search_service=search_service,
             prompt_spec=prompt_spec,
             top_k=20,
-            retrieval_top_k=50,
+            retrieval_top_k=100,
             mode="verified",
             ask_user_after_retrieve=False,
             ask_device_selection=True,
@@ -409,8 +413,8 @@ class ChatHistoryEntryModel(BaseModel):
 
 class AgentRequest(BaseModel):
     message: str = Field(..., description="사용자 질문")
-    top_k: int = Field(10, ge=1, le=50, description="검색 상위 문서 수")
-    max_attempts: int = Field(3, ge=0, le=3, description="judge 실패 시 재시도 횟수")
+    top_k: int = Field(20, ge=1, le=50, description="검색 상위 문서 수")
+    max_attempts: int = Field(2, ge=0, le=3, description="judge 실패 시 재시도 횟수")
     mode: str = Field("verified", description="base 또는 verified")
     thread_id: Optional[str] = Field(None, description="LangGraph thread_id")
     session_id: Optional[str] = Field(None, description="대화 세션 ID (BE에서 history 자동 로드)")
@@ -521,6 +525,54 @@ def _to_suggested_devices(devices: List[Dict[str, Any]] | None) -> List[Suggeste
         for d in devices
         if d.get("name")
     ] or None
+
+
+def _collect_suggested_devices_from_docs(docs: List[Any]) -> List[Dict[str, Any]]:
+    """검색 결과에서 device_name 집계 (count 내림차순)."""
+    from collections import Counter
+
+    EXCLUDE_NAMES = {"", "ALL", "etc", "ETC", "all", "N/A", "Unknown"}
+
+    device_counts: Counter = Counter()
+    for doc in docs or []:
+        # RetrievalResult 또는 dict 모두 지원
+        if hasattr(doc, "metadata"):
+            metadata = doc.metadata
+        elif isinstance(doc, dict):
+            metadata = doc.get("metadata", {})
+        else:
+            continue
+
+        device_name = metadata.get("device_name", "") if metadata else ""
+        if device_name and device_name.strip() not in EXCLUDE_NAMES:
+            device_counts[device_name.strip()] += 1
+
+    return [
+        {"name": name, "count": count}
+        for name, count in device_counts.most_common()
+    ]
+
+
+def _resolve_suggested_devices(result: Dict[str, Any]) -> List[SuggestedDevice] | None:
+    """suggested_devices가 비어있을 때, docs에서 fallback 계산."""
+    existing = _to_suggested_devices(result.get("suggested_devices"))
+    if existing:
+        return existing
+
+    has_device_filter = bool(
+        result.get("auto_parsed_device")
+        or result.get("auto_parsed_devices")
+        or result.get("selected_devices")
+        or result.get("selected_device")
+    )
+    if has_device_filter:
+        return None
+
+    docs = result.get("all_docs") or result.get("docs") or result.get("display_docs") or []
+    if not docs:
+        return None
+
+    return _to_suggested_devices(_collect_suggested_devices_from_docs(docs))
 
 
 def _select_display_docs(result: Dict[str, Any]) -> List[RetrievalResult]:
@@ -788,7 +840,7 @@ async def run_agent(
         summary=summary,
         refs=refs if refs else None,
         ref_doc_ids=ref_doc_ids if ref_doc_ids else None,
-        suggested_devices=_to_suggested_devices(result.get("suggested_devices")),
+        suggested_devices=_resolve_suggested_devices(result),
     )
 
 
@@ -827,15 +879,14 @@ async def run_agent_stream(
         loop.call_soon_threadsafe(queue.put_nowait, None)
 
     def _worker() -> None:
+        token = set_event_sink_context(_enqueue)
         try:
             # Auto-parse 모드 (기본값: True), skip when overrides or device selection are provided
             if req.auto_parse and not is_resume and not req.ask_user_after_retrieve and not req.ask_device_selection and not has_overrides:
                 agent = _get_auto_parse_agent(llm, search_service, prompt_spec)
-                agent._event_sink = _enqueue  # type: ignore[attr-defined]
                 result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid)
             elif req.ask_device_selection and not is_resume:
                 agent = _get_device_selection_agent(llm, search_service, prompt_spec)
-                agent._event_sink = _enqueue  # type: ignore[attr-defined]
                 result = agent.run(
                     req.message,
                     attempts=0,
@@ -853,7 +904,6 @@ async def run_agent_stream(
                     mode=req.mode,
                     ask_user_after_retrieve=False,
                     checkpointer=None,
-                    event_sink=_enqueue,
                 )
                 result = agent.run(
                     req.message,
@@ -868,8 +918,6 @@ async def run_agent_stream(
                     agent = _get_device_selection_agent(llm, search_service, prompt_spec)
                 else:
                     agent = _get_hil_agent(llm, search_service, prompt_spec)
-                # Attach per-request sink (best-effort; concurrent streams may interleave).
-                agent._event_sink = _enqueue  # type: ignore[attr-defined]
                 config = {"configurable": {"thread_id": tid}}
 
                 if is_resume:
@@ -899,7 +947,6 @@ async def run_agent_stream(
                     mode=req.mode,
                     ask_user_after_retrieve=False,
                     checkpointer=None,
-                    event_sink=_enqueue,
                 )
                 result = agent.run(
                     req.message,
@@ -961,7 +1008,7 @@ async def run_agent_stream(
                     summary=stream_summary,
                     refs=stream_refs if stream_refs else None,
                     ref_doc_ids=stream_ref_doc_ids if stream_ref_doc_ids else None,
-                    suggested_devices=_to_suggested_devices(result.get("suggested_devices")),
+                    suggested_devices=_resolve_suggested_devices(result),
                 )
             else:
                 # 정상 완료 - 턴 저장
@@ -998,7 +1045,7 @@ async def run_agent_stream(
                     summary=stream_summary,
                     refs=stream_refs if stream_refs else None,
                     ref_doc_ids=stream_ref_doc_ids if stream_ref_doc_ids else None,
-                    suggested_devices=_to_suggested_devices(result.get("suggested_devices")),
+                    suggested_devices=_resolve_suggested_devices(result),
                 )
 
             _enqueue({"type": "final", "result": resp.model_dump()})
@@ -1008,6 +1055,7 @@ async def run_agent_stream(
         except Exception as exc:
             _enqueue({"type": "error", "status": 500, "detail": str(exc)})
         finally:
+            reset_event_sink_context(token)
             _close()
 
     asyncio.create_task(asyncio.to_thread(_worker))

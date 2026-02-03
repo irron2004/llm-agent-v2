@@ -2671,19 +2671,26 @@ def auto_parse_node(
     device_names: List[str],
     doc_type_names: List[str],
 ) -> Dict[str, Any]:
-    """Auto-parse device, doc_type, and language from user query using LLM.
+    """Auto-parse device, doc_type from user query using LLM.
+
+    translate_node 이후에 실행되므로 query_en을 사용하여 장비 파싱.
+    언어 정보는 translate_node에서 이미 감지됨.
 
     Args:
-        state: Agent state with query.
+        state: Agent state with query, query_en (from translate_node).
         llm: LLM instance for generation.
         spec: Prompt specification (must have auto_parse template).
         device_names: List of available device names.
         doc_type_names: List of available doc type names.
 
     Returns:
-        State update with auto_parsed_device, auto_parsed_doc_type, detected_language, and auto_parse_message.
+        State update with auto_parsed_device, auto_parsed_doc_type, and auto_parse_message.
     """
     query = state["query"]
+    # translate_node에서 번역된 영어 쿼리 사용 (장비명 파싱에 유리)
+    query_en = state.get("query_en", query)
+    # 언어는 translate_node에서 이미 감지됨
+    detected_language = state.get("detected_language") or _detect_language_rule_based(query)
 
     # skip_auto_parse가 True이면 건너뛰기 (filter_devices 재검색 시)
     if state.get("skip_auto_parse"):
@@ -2692,21 +2699,20 @@ def auto_parse_node(
         return {
             "auto_parsed_device": selected_devices[0] if selected_devices else None,
             "auto_parsed_devices": selected_devices if selected_devices else None,
-            "detected_language": _detect_language_rule_based(query),
             "auto_parse_message": f"필터 적용: {', '.join(selected_devices)}" if selected_devices else "",
         }
 
-    # 1. 규칙 기반 파싱 (빠름)
-    detected_language = _detect_language_rule_based(query)
-    devices = _extract_devices_from_query(device_names, query)
-    doc_types = _extract_doc_types_from_query(query)
+    # 1. 규칙 기반 파싱 - query_en 사용 (장비명은 영어)
+    devices = _extract_devices_from_query(device_names, query_en)
+    # doc_types는 원본 쿼리에서도 추출 (한국어 문서 종류명)
+    doc_types = _extract_doc_types_from_query(query) or _extract_doc_types_from_query(query_en)
 
-    # 2. 규칙 기반으로 장비를 찾지 못하면 LLM 사용
+    # 2. 규칙 기반으로 장비를 찾지 못하면 LLM 사용 (영어 쿼리로)
     if not devices and device_names:
-        llm_device = _extract_device_with_llm(llm, device_names, query)
+        llm_device = _extract_device_with_llm(llm, device_names, query_en)
         if llm_device:
             devices = [llm_device]
-            logger.info("auto_parse_node: LLM detected device=%s", llm_device)
+            logger.info("auto_parse_node: LLM detected device=%s from query_en", llm_device)
 
     logger.info("auto_parse_node: devices=%s, doc_types=%s, language=%s", devices, doc_types, detected_language)
 
@@ -2810,9 +2816,15 @@ def translate_node(
     - If detected_language is 'en': query_en = query, translate to Korean
     - If detected_language is 'ko': query_ko = query, translate to English
     - Otherwise (ja, etc.): translate to both
+
+    Also detects language if not already set.
     """
     query = state["query"]
-    detected_language = state.get("detected_language", "ko")
+    # 언어가 아직 감지되지 않았으면 여기서 감지
+    detected_language = state.get("detected_language")
+    if not detected_language:
+        detected_language = _detect_language_rule_based(query)
+        logger.info("translate_node: detected language = %s", detected_language)
 
     # Check if translate prompt is available
     if spec.translate is None:
@@ -2856,12 +2868,14 @@ def translate_node(
     return {
         "query_en": query_en,
         "query_ko": query_ko,
+        "detected_language": detected_language,  # 언어 정보 전달
         "_events": [
             {
                 "type": "translate",
                 "original": query,
                 "query_en": query_en,
                 "query_ko": query_ko,
+                "detected_language": detected_language,
             }
         ],
     }

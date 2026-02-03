@@ -9,6 +9,7 @@ from __future__ import annotations
 import functools
 import logging
 import time
+from contextvars import ContextVar
 from typing import Any, Callable, Dict, Optional
 
 from langgraph.checkpoint.memory import MemorySaver
@@ -48,6 +49,18 @@ from backend.services.device_cache import ensure_device_cache_initialized
 
 
 logger = logging.getLogger(__name__)
+
+# Per-request event sink (avoids cross-stream log mixing when agent is singleton)
+EventSink = Callable[[Dict[str, Any]], None]
+_event_sink_ctx: ContextVar[EventSink | None] = ContextVar("event_sink", default=None)
+
+
+def set_event_sink_context(sink: EventSink | None):
+    return _event_sink_ctx.set(sink)
+
+
+def reset_event_sink_context(token) -> None:
+    _event_sink_ctx.reset(token)
 # Ensure LangGraph node logs are emitted even if root logger is higher level
 if not logger.handlers:
     _handler = logging.StreamHandler()
@@ -65,8 +78,8 @@ class LangGraphRAGAgent:
         llm: BaseLLM,
         search_service: SearchService,
         prompt_spec: Optional[PromptSpec] = None,
-        top_k: int = 10,
-        retrieval_top_k: int = 50,
+        top_k: int = 20,
+        retrieval_top_k: int = 100,
         mode: str = "verified",  # base | verified
         checkpointer: Optional[MemorySaver] = None,
         ask_user_after_retrieve: bool = False,
@@ -110,10 +123,13 @@ class LangGraphRAGAgent:
         self._graph = self._build_graph(mode)
 
     def _emit_event(self, event: Dict[str, Any]) -> None:
-        if self._event_sink is None:
+        sink = _event_sink_ctx.get()
+        if sink is None:
+            sink = self._event_sink
+        if sink is None:
             return
         try:
-            self._event_sink(event)
+            sink(event)
         except Exception:
             # Never allow observability hooks to break the agent execution.
             logger.exception("event_sink failed")
@@ -281,9 +297,19 @@ class LangGraphRAGAgent:
             if result:
                 answer = result.get("answer", "")
                 reasoning = result.get("reasoning")
+                suggested_devices = result.get("suggested_devices")
                 details_parts.append(f"{len(answer)}자")
                 if reasoning:
                     details_parts.append(f"reasoning: {len(reasoning)}자")
+                if suggested_devices:
+                    details_parts.append(f"suggested: {len(suggested_devices)}개 장비")
+                # 로그에 answer/reasoning/suggested_devices 내용 출력
+                if answer:
+                    logger.info("[langgraph] >>> answer content:\n%s", answer[:2000])
+                if reasoning:
+                    logger.info("[langgraph] >>> reasoning content:\n%s", reasoning[:2000])
+                if suggested_devices:
+                    logger.info("[langgraph] >>> suggested_devices: %s", suggested_devices)
 
         elif name == "chat_answer":
             if result:
@@ -374,9 +400,21 @@ class LangGraphRAGAgent:
             ),
         )
 
-        # Auto-parse mode: auto_parse → translate → route → (doc_lookup | mq | chat)
-        # This ensures route receives translated query (query_en)
+        # Auto-parse mode: translate → auto_parse → route → (doc_lookup | mq | chat)
+        # translate 먼저 실행하여 query_en 생성 후 auto_parse에서 영어 기반 장비 파싱
         if self.auto_parse_enabled:
+            # Translate node: translate query to EN and KO, detect language
+            builder.add_node(
+                "translate",
+                self._wrap_node(
+                    "translate",
+                    functools.partial(
+                        translate_node,
+                        llm=self.llm,
+                        spec=self.spec,
+                    ),
+                ),
+            )
             builder.add_node(
                 "auto_parse",
                 self._wrap_node(
@@ -390,22 +428,10 @@ class LangGraphRAGAgent:
                     ),
                 ),
             )
-            # Translate node: translate query to EN and KO for better retrieval
-            builder.add_node(
-                "translate",
-                self._wrap_node(
-                    "translate",
-                    functools.partial(
-                        translate_node,
-                        llm=self.llm,
-                        spec=self.spec,
-                    ),
-                ),
-            )
-            # Flow: START → auto_parse → translate → route → (doc_lookup | history_answer | mq | chat)
-            builder.add_edge(START, "auto_parse")
-            builder.add_edge("auto_parse", "translate")
-            builder.add_edge("translate", "route")
+            # Flow: START → translate → auto_parse → route → (doc_lookup | history_answer | mq | chat)
+            builder.add_edge(START, "translate")
+            builder.add_edge("translate", "auto_parse")
+            builder.add_edge("auto_parse", "route")
 
             def _route_decision(state: AgentState) -> str:
                 route = state.get("route")
@@ -537,8 +563,15 @@ class LangGraphRAGAgent:
             },
         )
 
-        # retry_expand: increase expand_top_k and re-retrieve
-        builder.add_edge("retry_expand", "retrieve_retry")
+        # retry_expand: doc_lookup이면 재검색 없이 expand로, 그 외는 재검색
+        def _retry_expand_next(state: AgentState) -> str:
+            return "expand_related" if state.get("route") == "doc_lookup" else "retrieve_retry"
+
+        builder.add_conditional_edges(
+            "retry_expand",
+            _retry_expand_next,
+            {"expand_related": "expand_related", "retrieve_retry": "retrieve_retry"},
+        )
 
         # retry (refine_queries): refine queries and re-retrieve
         builder.add_edge("retry_bump", "refine_queries")
@@ -592,4 +625,4 @@ class LangGraphRAGAgent:
         return self._graph.invoke(state, config=config)
 
 
-__all__ = ["LangGraphRAGAgent"]
+__all__ = ["LangGraphRAGAgent", "set_event_sink_context", "reset_event_sink_context"]
