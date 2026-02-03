@@ -197,6 +197,12 @@ def _to_search_items(results, start_idx: int, query: str) -> list[SearchResultIt
 
         # Extract new fields from metadata
         chunk_summary = metadata.get("chunk_summary")
+        # chunk_summary가 list인 경우 문자열로 변환
+        if isinstance(chunk_summary, list):
+            chunk_summary = " ".join(str(s) for s in chunk_summary) if chunk_summary else None
+        elif chunk_summary is not None and not isinstance(chunk_summary, str):
+            chunk_summary = str(chunk_summary)
+
         chunk_keywords = metadata.get("chunk_keywords", [])
         if isinstance(chunk_keywords, str):
             chunk_keywords = [chunk_keywords]

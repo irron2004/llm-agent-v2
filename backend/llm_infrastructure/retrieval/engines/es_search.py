@@ -402,7 +402,7 @@ class EsSearchEngine:
                     doc_id=source.get("doc_id", hit.get("_id", "")),
                     chunk_id=source.get("chunk_id", hit.get("_id", "")),
                     content=source.get(self.content_field, ""),
-                    score=float(hit.get("_score", 0.0)),
+                    score=float(hit.get("_score") or 0.0),
                     page=source.get("page"),
                     metadata={
                         k: v

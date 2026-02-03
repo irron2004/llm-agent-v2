@@ -147,7 +147,7 @@ class RAGSettings(BaseSettings):
 
     # Reranking
     rerank_enabled: bool = Field(
-        default=False,
+        default=True,
         description="Enable reranking of retrieval results"
     )
     rerank_method: str = Field(

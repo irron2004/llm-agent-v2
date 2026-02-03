@@ -104,7 +104,7 @@ services:
       - /home/llm-share/hf:/data/hf_cache
       - ./data/models:/data/models
     ports:
-      - "${LLM_PORT:-${VLLM_PORT:-8003}}:8000"
+      - "${LLM_PORT:-8003}:8000"
     networks:
       - rag_net
     # GPU configuration (NVIDIA GPU)
