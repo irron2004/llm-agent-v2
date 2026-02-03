@@ -14,6 +14,9 @@ import {
   FeedbackResponse,
   FeedbackListResponse,
   FeedbackStatisticsResponse,
+  DocRelevanceEvaluationRequest,
+  DocRelevanceEvaluationResponse,
+  DocRelevanceEvaluationListResponse,
 } from "./types";
 
 // ─── Agent API ───
@@ -166,4 +169,41 @@ export async function exportFeedbackCsv(minScore = 3.0): Promise<Blob> {
     throw new Error(`Export failed: ${res.status}`);
   }
   return res.blob();
+}
+
+// --- Retrieval Evaluation API (document relevance scoring) ---
+
+export async function saveDocRelevanceEvaluation(
+  sessionId: string,
+  turnId: number,
+  docId: string,
+  data: DocRelevanceEvaluationRequest
+): Promise<DocRelevanceEvaluationResponse> {
+  return apiClient.post<DocRelevanceEvaluationResponse>(
+    `/api/retrieval-evaluation/${sessionId}/${turnId}/${encodeURIComponent(docId)}`,
+    data
+  );
+}
+
+export async function getDocRelevanceEvaluation(
+  sessionId: string,
+  turnId: number,
+  docId: string
+): Promise<DocRelevanceEvaluationResponse | null> {
+  try {
+    return await apiClient.get<DocRelevanceEvaluationResponse>(
+      `/api/retrieval-evaluation/${sessionId}/${turnId}/${encodeURIComponent(docId)}`
+    );
+  } catch {
+    return null;
+  }
+}
+
+export async function listDocRelevanceEvaluations(
+  sessionId: string,
+  turnId: number
+): Promise<DocRelevanceEvaluationListResponse> {
+  return apiClient.get<DocRelevanceEvaluationListResponse>(
+    `/api/retrieval-evaluation/${sessionId}/${turnId}`
+  );
 }

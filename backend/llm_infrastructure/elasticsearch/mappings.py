@@ -554,13 +554,144 @@ def get_feedback_mapping() -> dict[str, Any]:
 FEEDBACK_MAPPING = get_feedback_mapping()
 
 
+def get_retrieval_evaluation_mapping() -> dict[str, Any]:
+    """Get retrieval evaluation index mapping for document relevance scoring.
+
+    Index naming convention:
+        - Index: retrieval_evaluations_{env}_v{version}  (e.g., retrieval_evaluations_dev_v1)
+        - Alias: retrieval_evaluations_{env}_current     (e.g., retrieval_evaluations_dev_current)
+
+    Each document represents a relevance evaluation for a single retrieved document.
+    Used for retrieval test set creation and search parameter tuning.
+    """
+    return {
+        "properties": {
+            # ===================================================================
+            # Reference Keys (session/turn/message context)
+            # ===================================================================
+            "session_id": {
+                "type": "keyword",
+                "doc_values": True,
+            },
+            "turn_id": {
+                "type": "integer",
+            },
+            "message_id": {
+                "type": "keyword",
+                "doc_values": True,
+                # Frontend message ID for cross-reference
+            },
+            # ===================================================================
+            # Query Information (for retrieval test reproducibility)
+            # ===================================================================
+            "query": {
+                "type": "text",
+                "analyzer": "nori",
+                # Original user query
+            },
+            "query_id": {
+                "type": "keyword",
+                "doc_values": True,
+                # Query grouping ID (e.g., session_id:turn_id)
+            },
+            # ===================================================================
+            # Document Reference
+            # ===================================================================
+            "doc_id": {
+                "type": "keyword",
+                "doc_values": True,
+            },
+            "chunk_id": {
+                "type": "keyword",
+                "doc_values": True,
+            },
+            "doc_title": {
+                "type": "text",
+                "fields": {
+                    "raw": {"type": "keyword"},
+                },
+            },
+            "doc_snippet": {
+                "type": "text",
+                "index": False,  # Stored but not searched
+            },
+            # ===================================================================
+            # Retrieval Metrics
+            # ===================================================================
+            "doc_rank": {
+                "type": "integer",
+                # 1-based rank in search results
+            },
+            "retrieval_score": {
+                "type": "float",
+                # Original search score from retrieval engine
+            },
+            # ===================================================================
+            # Relevance Evaluation
+            # ===================================================================
+            "relevance_score": {
+                "type": "integer",
+                # Human-evaluated relevance score (1-5)
+            },
+            "is_relevant": {
+                "type": "boolean",
+                # Derived: relevance_score >= 3
+            },
+            # ===================================================================
+            # Reviewer Info
+            # ===================================================================
+            "reviewer_name": {
+                "type": "keyword",
+                # Evaluator name (optional, for tracking)
+            },
+            # ===================================================================
+            # Filter Context (for search reproducibility)
+            # ===================================================================
+            "filter_devices": {
+                "type": "keyword",
+                "doc_values": True,
+                # Device filter used during search
+            },
+            "filter_doc_types": {
+                "type": "keyword",
+                "doc_values": True,
+                # Document type filter used during search
+            },
+            "search_queries": {
+                "type": "text",
+                "analyzer": "nori",
+                # Multi-query expansion results (for debugging retrieval issues)
+            },
+            # ===================================================================
+            # Timestamps
+            # ===================================================================
+            "ts": {
+                "type": "date",
+                # Evaluation timestamp
+            },
+            "created_at": {
+                "type": "date",
+            },
+            "updated_at": {
+                "type": "date",
+            },
+        },
+    }
+
+
+# Default retrieval evaluation mapping
+RETRIEVAL_EVALUATION_MAPPING = get_retrieval_evaluation_mapping()
+
+
 __all__ = [
     "get_rag_chunks_mapping",
     "get_index_settings",
     "get_index_meta",
     "get_chat_turns_mapping",
     "get_feedback_mapping",
+    "get_retrieval_evaluation_mapping",
     "RAG_CHUNKS_MAPPING",
     "CHAT_TURNS_MAPPING",
     "FEEDBACK_MAPPING",
+    "RETRIEVAL_EVALUATION_MAPPING",
 ]

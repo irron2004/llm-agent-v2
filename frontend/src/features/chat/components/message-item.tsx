@@ -1,10 +1,12 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { CopyOutlined, CheckOutlined, ReloadOutlined, FilterOutlined, LikeOutlined, LikeFilled, DislikeOutlined, DislikeFilled, EditOutlined } from "@ant-design/icons";
-import { Message, FeedbackRating, RetrievedDoc, MessageFeedback } from "../types";
+import { Message, FeedbackRating, RetrievedDoc, MessageFeedback, SuggestedDevice } from "../types";
 import { MarkdownContent } from "./markdown-content";
 import { Collapse, Tag } from "antd";
 import { ImagePreviewModal, ImagePreviewItem } from "../../../components/image-preview-modal";
 import { FeedbackForm } from "./feedback-form";
+import { DeviceSuggestions } from "./device-suggestions";
+import { DocRelevanceRating } from "./doc-relevance-rating";
 
 // Preprocess snippet for better markdown rendering
 function preprocessSnippet(snippet: string): string {
@@ -220,10 +222,13 @@ type MessageItemProps = {
   onDetailedFeedback?: (payload: DetailedFeedbackPayload) => void;
   onRegenerate?: (payload: RegeneratePayload) => void;
   onEditAndResend?: (payload: { messageId: string; content: string }) => void;
+  onDeviceSelect?: (messageId: string, deviceName: string) => void;
+  onDeviceDismiss?: () => void;  // ESC로 기기 선택 닫기
+  isDeviceSelectionActive?: boolean;  // 기기 선택 활성화 상태
   originalQuery?: string;  // Original user query for regeneration
 };
 
-export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedback, onRegenerate, onEditAndResend, originalQuery }: MessageItemProps) {
+export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedback, onRegenerate, onEditAndResend, onDeviceSelect, onDeviceDismiss, isDeviceSelectionActive, originalQuery }: MessageItemProps) {
   const [copied, setCopied] = useState(false);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
@@ -238,6 +243,49 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
   const hasFeedback = Boolean(message.feedback?.accuracy || message.feedback?.rating);
   const canFeedback = Boolean(message.sessionId && message.turnId);
   const regenerateQuery = (originalQuery || message.originalQuery || "").trim();
+  const suggestedDevices = useMemo<SuggestedDevice[] | null>(() => {
+    if (message.suggestedDevices && message.suggestedDevices.length > 0) {
+      return message.suggestedDevices;
+    }
+
+    const hasDeviceFilter =
+      (message.selectedDevices && message.selectedDevices.length > 0) ||
+      Boolean(message.autoParse?.device) ||
+      (message.autoParse?.devices && message.autoParse.devices.length > 0);
+    if (hasDeviceFilter) return null;
+
+    const sourceDocs = (message.retrievedDocs && message.retrievedDocs.length > 0)
+      ? message.retrievedDocs
+      : (message.allRetrievedDocs && message.allRetrievedDocs.length > 0)
+        ? message.allRetrievedDocs
+        : [];
+
+    if (sourceDocs.length === 0) return null;
+
+    const EXCLUDE_NAMES = new Set(["", "ALL", "etc", "ETC", "all", "N/A", "Unknown"]);
+    const counts = new Map<string, number>();
+    for (const doc of sourceDocs) {
+      const meta = doc.metadata ?? {};
+      const rawName = typeof (meta as any).device_name === "string"
+        ? (meta as any).device_name
+        : "";
+      const name = rawName.trim();
+      if (!name || EXCLUDE_NAMES.has(name)) continue;
+      counts.set(name, (counts.get(name) ?? 0) + 1);
+    }
+
+    if (counts.size === 0) return null;
+
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+  }, [
+    message.suggestedDevices,
+    message.selectedDevices,
+    message.autoParse,
+    message.retrievedDocs,
+    message.allRetrievedDocs,
+  ]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -490,6 +538,15 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
             </div>
           )}
 
+          {isAssistant && suggestedDevices && suggestedDevices.length > 0 && (
+            <DeviceSuggestions
+              devices={suggestedDevices}
+              onSelect={(_, deviceName) => onDeviceSelect?.(message.id, deviceName)}
+              onDismiss={onDeviceDismiss}
+              isActive={isDeviceSelectionActive}
+            />
+          )}
+
           {/* Retrieved documents (collapsible) */}
           {isAssistant && message.retrievedDocs && message.retrievedDocs.length > 0 && (
             <div style={{ marginTop: 12 }}>
@@ -597,6 +654,24 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
                                 <div style={{ fontSize: 12, opacity: 0.6 }}>
                                   score: {doc.score.toFixed(3)} {doc.score_percent ? `(${doc.score_percent}%)` : ""}
                                 </div>
+                              )}
+                              {/* Document relevance rating */}
+                              {message.sessionId && message.turnId && regenerateQuery && (
+                                <DocRelevanceRating
+                                  sessionId={message.sessionId}
+                                  turnId={message.turnId}
+                                  docId={doc.id}
+                                  docRank={idx + 1}
+                                  docTitle={displayTitle}
+                                  docSnippet={doc.snippet || ""}
+                                  query={regenerateQuery}
+                                  messageId={message.id}
+                                  chunkId={doc.id}
+                                  retrievalScore={doc.score}
+                                  filterDevices={message.selectedDevices}
+                                  filterDocTypes={message.selectedDocTypes}
+                                  searchQueries={message.searchQueries}
+                                />
                               )}
                             </div>
                           );

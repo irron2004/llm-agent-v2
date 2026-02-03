@@ -14,6 +14,11 @@ export type MessageFeedback = {
   comment?: string | null;
 };
 
+export type SuggestedDevice = {
+  name: string;
+  count: number;
+};
+
 export type Message = {
   id: string;
   role: MessageRole;
@@ -35,6 +40,8 @@ export type Message = {
   selectedDevices?: string[] | null;
   selectedDocTypes?: string[] | null;
   searchQueries?: string[] | null;
+  // Device suggestion (장비 미지정 시)
+  suggestedDevices?: SuggestedDevice[];
 };
 
 export type DeviceInfo = {
@@ -113,6 +120,8 @@ export type AgentResponse = {
   selected_devices?: string[] | null;
   selected_doc_types?: string[] | null;
   search_queries?: string[] | null;
+  // Device suggestion (장비 미지정 시)
+  suggested_devices?: SuggestedDevice[];
 };
 
 export type AgentRequest = {
@@ -245,4 +254,46 @@ export type FeedbackStatisticsResponse = {
   avg_relevance?: number | null;
   avg_score?: number | null;
   rating_distribution: Record<string, number>;
+};
+
+// --- Retrieval Evaluation Types (for document relevance scoring) ---
+
+export type DocRelevanceEvaluationRequest = {
+  relevance_score: number;  // 1-5
+  reviewer_name?: string | null;
+  query: string;
+  doc_rank: number;  // 1-based
+  doc_title: string;
+  doc_snippet: string;
+  message_id?: string | null;
+  chunk_id?: string | null;
+  retrieval_score?: number | null;
+  filter_devices?: string[] | null;
+  filter_doc_types?: string[] | null;
+  search_queries?: string[] | null;  // Multi-query expansion results
+};
+
+export type DocRelevanceEvaluationResponse = {
+  session_id: string;
+  turn_id: number;
+  doc_id: string;
+  relevance_score: number;
+  is_relevant: boolean;
+  query: string;
+  doc_rank: number;
+  doc_title?: string;
+  doc_snippet?: string;
+  message_id?: string | null;
+  chunk_id?: string | null;
+  retrieval_score?: number | null;
+  reviewer_name?: string | null;
+  filter_devices?: string[] | null;
+  filter_doc_types?: string[] | null;
+  search_queries?: string[] | null;  // Multi-query expansion results
+  ts: string;
+};
+
+export type DocRelevanceEvaluationListResponse = {
+  items: DocRelevanceEvaluationResponse[];
+  total: number;
 };
