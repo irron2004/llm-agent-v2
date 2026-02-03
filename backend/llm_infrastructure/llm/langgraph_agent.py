@@ -1202,15 +1202,25 @@ def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, A
         system_en = spec_template.system + "\n\n**IMPORTANT: Generate all queries in English.**"
         user_en = _format_prompt(spec_template.user, {"sys.query": query_en})
         raw_en = _invoke_llm(llm, system_en, user_en, **mq_kwargs)
+        logger.debug("mq_node(retrieval/en) raw LLM output:\n%s", raw_en)
         mq_en = _parse_queries(raw_en)
-        logger.info("mq_node(retrieval/en): %d queries: %s", len(mq_en), mq_en)
+        logger.info("mq_node(retrieval/en): %d queries generated", len(mq_en))
+        for i, q in enumerate(mq_en, 1):
+            logger.info("  [EN-%d] %s", i, q)
+        if len(mq_en) == 0:
+            logger.warning("mq_node(retrieval/en): parsing failed! raw output:\n%s", raw_en)
 
         # Korean MQ - add explicit Korean language instruction
         system_ko = spec_template.system + "\n\n**중요: 모든 검색어를 반드시 한국어로 생성하세요. Generate all queries in Korean.**"
         user_ko = _format_prompt(spec_template.user, {"sys.query": query_ko})
         raw_ko = _invoke_llm(llm, system_ko, user_ko, **mq_kwargs)
+        logger.debug("mq_node(retrieval/ko) raw LLM output:\n%s", raw_ko)
         mq_ko = _parse_queries(raw_ko)
-        logger.info("mq_node(retrieval/ko): %d queries: %s", len(mq_ko), mq_ko)
+        logger.info("mq_node(retrieval/ko): %d queries generated", len(mq_ko))
+        for i, q in enumerate(mq_ko, 1):
+            logger.info("  [KO-%d] %s", i, q)
+        if len(mq_ko) == 0:
+            logger.warning("mq_node(retrieval/ko): parsing failed! raw output:\n%s", raw_ko)
 
         return mq_en, mq_ko
 
@@ -2206,19 +2216,26 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     else:
         sys = spec.judge_general_sys
 
+    answer = state.get('answer', '')
     user = (
         f"질문: {query_for_judge}\n"
-        f"답안: {state.get('answer', '')}\n"
+        f"답안: {answer}\n"
         f"증거(REFS): {ref_text}\n"
         "JSON 한 줄로 반환: {\"faithful\": bool, \"issues\": [...], \"hint\": \"...\"}"
     )
+    logger.info("[judge_node] input lengths: system=%d, user=%d, answer=%d, refs=%d",
+                len(sys), len(user), len(answer), len(ref_text))
 
     raw = _invoke_llm(llm, sys, user)
+    if not raw:
+        logger.warning("[judge_node] LLM returned empty response! input_user_len=%d", len(user))
+    logger.debug("[judge_node] raw LLM output: %s", raw)
     try:
         judge = json.loads(raw)
         if not isinstance(judge, dict):
             raise ValueError("judge not dict")
-    except Exception:
+    except Exception as e:
+        logger.warning("[judge_node] JSON parse failed: %s\nraw output:\n%s", e, raw[:500])
         judge = {"faithful": False, "issues": ["parse_error"], "hint": "judge JSON parse failed"}
 
     # 불충실 판정 시 상세 로그
@@ -2843,8 +2860,34 @@ def translate_node(
             "target_language": target_name,
         })
         result = _invoke_llm(llm, system, user)
-        # Clean up result (remove quotes, extra whitespace)
+        logger.debug("translate_node: raw LLM output for %s: %s", target_lang, result)
+
+        # Extract content after "Translation:" if present
+        if "translation:" in result.lower():
+            parts = re.split(r"translation\s*:", result, flags=re.IGNORECASE)
+            if len(parts) > 1:
+                result = parts[-1]
+
+        # Clean up result (remove quotes, extra whitespace, newlines)
         result = result.strip().strip('"').strip("'").strip()
+        result = result.split('\n')[0].strip()  # Take first line only
+
+        # Detect meta-explanations (LLM outputting instructions instead of translation)
+        meta_patterns = [
+            "we need to", "let me", "i will", "i'll", "here is", "here's",
+            "the translation", "translated", "translating", "sure", "of course",
+            "certainly", "below is", "following is",
+        ]
+        result_lower = result.lower()
+        if any(result_lower.startswith(p) for p in meta_patterns):
+            logger.warning("translate_node: LLM returned meta-explanation: %s", result[:100])
+            return text  # Fall back to original
+
+        # If result is too long (likely explanation), fallback
+        if len(result) > len(text) * 3:
+            logger.warning("translate_node: result too long, likely explanation: %d vs %d", len(result), len(text))
+            return text
+
         return result if result else text
 
     query_en = query
