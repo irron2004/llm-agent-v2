@@ -174,31 +174,16 @@ class PromptSpec:
     router: PromptTemplate
     # Unified retrieval MQ (replaces setup_mq, ts_mq, general_mq)
     retrieval_mq: PromptTemplate
-    # Legacy MQ prompts (kept for compatibility during transition)
-    setup_mq: PromptTemplate
-    ts_mq: PromptTemplate
-    general_mq: PromptTemplate
     st_gate: PromptTemplate
     st_mq: PromptTemplate
     # Unified retrieval answer (replaces setup_ans, ts_ans, general_ans)
     retrieval_ans: PromptTemplate
-    # Legacy answer prompts (kept for compatibility)
-    setup_ans: PromptTemplate
-    ts_ans: PromptTemplate
-    general_ans: PromptTemplate
     judge_setup_sys: str
     judge_ts_sys: str
     judge_general_sys: str
     auto_parse: Optional[PromptTemplate] = None  # Auto-parse device/doc_type
     auto_parse_device: Optional[PromptTemplate] = None  # Auto-parse device only (LLM fallback)
     translate: Optional[PromptTemplate] = None  # Translate query to en/ko
-    # Language-specific answer prompts (legacy)
-    setup_ans_en: Optional[PromptTemplate] = None
-    setup_ans_ja: Optional[PromptTemplate] = None
-    ts_ans_en: Optional[PromptTemplate] = None
-    ts_ans_ja: Optional[PromptTemplate] = None
-    general_ans_en: Optional[PromptTemplate] = None
-    general_ans_ja: Optional[PromptTemplate] = None
     # Unified retrieval answer - language-specific
     retrieval_ans_en: Optional[PromptTemplate] = None
     retrieval_ans_ja: Optional[PromptTemplate] = None
@@ -271,31 +256,16 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
     router = load_prompt_template("router", version)
     # Unified retrieval MQ
     retrieval_mq = load_prompt_template("retrieval_mq", version)
-    # Legacy MQ prompts (kept for compatibility)
-    setup_mq = load_prompt_template("setup_mq", version)
-    ts_mq = load_prompt_template("ts_mq", version)
-    general_mq = load_prompt_template("general_mq", version)
     st_gate = load_prompt_template("st_gate", version)
     st_mq = load_prompt_template("st_mq", version)
     # Unified retrieval answer
     retrieval_ans = load_prompt_template("retrieval_ans", version)
-    # Legacy answer prompts (kept for compatibility)
-    setup_ans = load_prompt_template("setup_ans", version)
-    ts_ans = load_prompt_template("ts_ans", version)
-    general_ans = load_prompt_template("general_ans", version)
 
     # Try to load optional prompts
     auto_parse = _try_load_prompt("auto_parse", version)
     auto_parse_device = _try_load_prompt("auto_parse_device", version)
     translate = _try_load_prompt("translate", version)
 
-    # Load language-specific answer prompts (optional, legacy)
-    setup_ans_en = _try_load_prompt("setup_ans_en", version)
-    setup_ans_ja = _try_load_prompt("setup_ans_ja", version)
-    ts_ans_en = _try_load_prompt("ts_ans_en", version)
-    ts_ans_ja = _try_load_prompt("ts_ans_ja", version)
-    general_ans_en = _try_load_prompt("general_ans_en", version)
-    general_ans_ja = _try_load_prompt("general_ans_ja", version)
     # Unified retrieval answer - language-specific
     retrieval_ans_en = _try_load_prompt("retrieval_ans_en", version)
     retrieval_ans_ja = _try_load_prompt("retrieval_ans_ja", version)
@@ -303,27 +273,15 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
     return PromptSpec(
         router=router,
         retrieval_mq=retrieval_mq,
-        setup_mq=setup_mq,
-        ts_mq=ts_mq,
-        general_mq=general_mq,
         st_gate=st_gate,
         st_mq=st_mq,
         retrieval_ans=retrieval_ans,
-        setup_ans=setup_ans,
-        ts_ans=ts_ans,
-        general_ans=general_ans,
         judge_setup_sys=DEFAULT_JUDGE_SETUP,
         judge_ts_sys=DEFAULT_JUDGE_TS,
         judge_general_sys=DEFAULT_JUDGE_GENERAL,
         auto_parse=auto_parse,
         auto_parse_device=auto_parse_device,
         translate=translate,
-        setup_ans_en=setup_ans_en,
-        setup_ans_ja=setup_ans_ja,
-        ts_ans_en=ts_ans_en,
-        ts_ans_ja=ts_ans_ja,
-        general_ans_en=general_ans_en,
-        general_ans_ja=general_ans_ja,
         retrieval_ans_en=retrieval_ans_en,
         retrieval_ans_ja=retrieval_ans_ja,
     )
@@ -2038,36 +1996,12 @@ def _get_answer_template(
     route: Route,
     language: Optional[str],
 ) -> PromptTemplate:
-    """Get the appropriate answer template based on route and language."""
-    # Default templates (Korean or language-agnostic)
-    default_templates = {
-        "setup": spec.setup_ans,
-        "ts": spec.ts_ans,
-        "general": spec.general_ans,
-    }
-
-    # Language-specific templates
-    lang_templates = {
-        "en": {
-            "setup": spec.setup_ans_en,
-            "ts": spec.ts_ans_en,
-            "general": spec.general_ans_en,
-        },
-        "ja": {
-            "setup": spec.setup_ans_ja,
-            "ts": spec.ts_ans_ja,
-            "general": spec.general_ans_ja,
-        },
-    }
-
-    # Try to get language-specific template
-    if language and language in lang_templates:
-        lang_tmpl = lang_templates[language].get(route)
-        if lang_tmpl is not None:
-            return lang_tmpl
-
-    # Fallback to default template
-    return default_templates.get(route, spec.general_ans)
+    """Get the unified retrieval answer template based on language."""
+    if language == "en" and spec.retrieval_ans_en is not None:
+        return spec.retrieval_ans_en
+    if language == "ja" and spec.retrieval_ans_ja is not None:
+        return spec.retrieval_ans_ja
+    return spec.retrieval_ans
 
 
 def _collect_suggested_devices(docs: List[Any]) -> List[Dict[str, Any]]:
@@ -2396,7 +2330,7 @@ def history_answer_node(state: AgentState, *, llm: BaseLLM) -> Dict[str, Any]:
     }
 
 
-MAX_JUDGE_REF_CHARS = 10000  # Truncate refs to avoid LLM context overflow
+MAX_JUDGE_REF_CHARS = 50000  # Truncate refs to avoid LLM context overflow
 
 
 def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
