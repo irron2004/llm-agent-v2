@@ -219,12 +219,16 @@ class EsSearchEngine:
         device_boost: str | None = None,
         device_boost_weight: float = 2.0,
     ) -> list[EsSearchHit]:
-        """Hybrid search using ES 8.x RRF."""
+        """Hybrid search using ES 8.x RRF.
+
+        Note: When using sub_searches with RRF, knn query should NOT include 'k'.
+        Only 'num_candidates' is used. Result count is controlled by 'size'.
+        """
+        # ES 8.x RRF with sub_searches: knn should only have num_candidates, not k
         knn_query: dict[str, Any] = {
             "field": self.vector_field,
             "query_vector": query_vector,
-            "k": top_k,
-            "num_candidates": top_k * 2,
+            "num_candidates": max(top_k * 2, 100),
         }
         if filters:
             knn_query["filter"] = filters
@@ -245,7 +249,7 @@ class EsSearchEngine:
             ],
             "rank": {
                 "rrf": {
-                    "window_size": top_k * 2,
+                    "window_size": max(top_k * 2, 100),
                     "rank_constant": rrf_k,
                 }
             },

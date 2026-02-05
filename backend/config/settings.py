@@ -92,6 +92,10 @@ class RAGSettings(BaseSettings):
         default=60,
         description="RRF k parameter"
     )
+    hybrid_use_rrf: bool = Field(
+        default=False,
+        description="Use RRF for hybrid search (requires ES Platinum license)"
+    )
 
     # Chunking
     chunking_enabled: bool = Field(

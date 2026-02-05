@@ -555,94 +555,123 @@ FEEDBACK_MAPPING = get_feedback_mapping()
 
 
 def get_retrieval_evaluation_mapping() -> dict[str, Any]:
-    """Get retrieval evaluation index mapping for document relevance scoring.
+    """Get retrieval evaluation index mapping for query-unit relevance scoring.
 
     Index naming convention:
         - Index: retrieval_evaluations_{env}_v{version}  (e.g., retrieval_evaluations_dev_v1)
         - Alias: retrieval_evaluations_{env}_current     (e.g., retrieval_evaluations_dev_current)
 
-    Each document represents a relevance evaluation for a single retrieved document.
+    Each document represents a query-unit evaluation containing multiple document relevance scores.
     Used for retrieval test set creation and search parameter tuning.
+
+    Storage structure:
+        {
+            "query_id": "sess1:turn1",  # PK (chat: session:turn, search: search:timestamp)
+            "query": "원본 쿼리",
+            "relevant_docs": ["doc_001", "doc_003"],      # 자동 생성 (score >= 3)
+            "irrelevant_docs": ["doc_002", "doc_004"],    # 자동 생성 (score < 3)
+            "doc_details": [{ ... }]                      # 필수, 개별 문서 점수
+        }
     """
     return {
         "properties": {
             # ===================================================================
-            # Reference Keys (session/turn/message context)
+            # Primary Key
             # ===================================================================
+            "query_id": {
+                "type": "keyword",
+                "doc_values": True,
+                # PK: chat="{session_id}:{turn_id}", search="search:{timestamp}"
+            },
+            # ===================================================================
+            # Source Context
+            # ===================================================================
+            "source": {
+                "type": "keyword",
+                "doc_values": True,
+                # "chat" or "search"
+            },
             "session_id": {
                 "type": "keyword",
                 "doc_values": True,
+                # Chat only: session reference
             },
             "turn_id": {
                 "type": "integer",
-            },
-            "message_id": {
-                "type": "keyword",
-                "doc_values": True,
-                # Frontend message ID for cross-reference
+                # Chat only: turn reference
             },
             # ===================================================================
-            # Query Information (for retrieval test reproducibility)
+            # Query Information
             # ===================================================================
             "query": {
                 "type": "text",
                 "analyzer": "nori",
-                # Original user query
-            },
-            "query_id": {
-                "type": "keyword",
-                "doc_values": True,
-                # Query grouping ID (e.g., session_id:turn_id)
-            },
-            # ===================================================================
-            # Document Reference
-            # ===================================================================
-            "doc_id": {
-                "type": "keyword",
-                "doc_values": True,
-            },
-            "chunk_id": {
-                "type": "keyword",
-                "doc_values": True,
-            },
-            "doc_title": {
-                "type": "text",
                 "fields": {
                     "raw": {"type": "keyword"},
                 },
-            },
-            "doc_snippet": {
-                "type": "text",
-                "index": False,  # Stored but not searched
+                # Original user query
             },
             # ===================================================================
-            # Retrieval Metrics
+            # Aggregated Document Lists (auto-generated from doc_details)
             # ===================================================================
-            "doc_rank": {
-                "type": "integer",
-                # 1-based rank in search results
-            },
-            "retrieval_score": {
-                "type": "float",
-                # Original search score from retrieval engine
-            },
-            # ===================================================================
-            # Relevance Evaluation
-            # ===================================================================
-            "relevance_score": {
-                "type": "integer",
-                # Human-evaluated relevance score (1-5)
-            },
-            "is_relevant": {
-                "type": "boolean",
-                # Derived: relevance_score >= 3
-            },
-            # ===================================================================
-            # Reviewer Info
-            # ===================================================================
-            "reviewer_name": {
+            "relevant_docs": {
                 "type": "keyword",
-                # Evaluator name (optional, for tracking)
+                "doc_values": True,
+                # Doc IDs with relevance_score >= 3
+            },
+            "irrelevant_docs": {
+                "type": "keyword",
+                "doc_values": True,
+                # Doc IDs with relevance_score < 3
+            },
+            # ===================================================================
+            # Document Details (nested, required)
+            # ===================================================================
+            "doc_details": {
+                "type": "nested",
+                "properties": {
+                    "doc_id": {
+                        "type": "keyword",
+                        "doc_values": True,
+                    },
+                    "chunk_id": {
+                        "type": "keyword",
+                        "doc_values": True,
+                    },
+                    "doc_rank": {
+                        "type": "integer",
+                        # 1-based rank in search results
+                    },
+                    "doc_title": {
+                        "type": "text",
+                        "fields": {
+                            "raw": {"type": "keyword"},
+                        },
+                    },
+                    "doc_snippet": {
+                        "type": "text",
+                        "index": False,  # Stored but not searched
+                    },
+                    "page": {
+                        "type": "integer",
+                    },
+                    "relevance_score": {
+                        "type": "integer",
+                        # Human-evaluated relevance score (1-5)
+                    },
+                    "retrieval_score": {
+                        "type": "float",
+                        # Original search score from retrieval engine
+                    },
+                },
+            },
+            # ===================================================================
+            # Search Parameters (for reproducibility, Search page only)
+            # ===================================================================
+            "search_params": {
+                "type": "object",
+                "enabled": False,  # Stored but not indexed
+                # Contains: field_weights, bm25_only, dense_weight, sparse_weight, size, etc.
             },
             # ===================================================================
             # Filter Context (for search reproducibility)
@@ -663,11 +692,18 @@ def get_retrieval_evaluation_mapping() -> dict[str, Any]:
                 # Multi-query expansion results (for debugging retrieval issues)
             },
             # ===================================================================
+            # Reviewer Info
+            # ===================================================================
+            "reviewer_name": {
+                "type": "keyword",
+                # Evaluator name (optional, for tracking)
+            },
+            # ===================================================================
             # Timestamps
             # ===================================================================
             "ts": {
                 "type": "date",
-                # Evaluation timestamp
+                # Last evaluation timestamp
             },
             "created_at": {
                 "type": "date",
@@ -683,6 +719,286 @@ def get_retrieval_evaluation_mapping() -> dict[str, Any]:
 RETRIEVAL_EVALUATION_MAPPING = get_retrieval_evaluation_mapping()
 
 
+def get_batch_answer_runs_mapping() -> dict[str, Any]:
+    """Get batch answer runs index mapping for batch answer generation metadata.
+
+    Index naming convention:
+        - Index: batch_answer_runs_{env}_v{version}  (e.g., batch_answer_runs_dev_v1)
+        - Alias: batch_answer_runs_{env}_current     (e.g., batch_answer_runs_dev_current)
+
+    Each document represents a batch answer generation run configuration and status.
+    """
+    return {
+        "properties": {
+            # ===================================================================
+            # Run Identity
+            # ===================================================================
+            "run_id": {
+                "type": "keyword",
+                "doc_values": True,
+                # UUID for this run
+            },
+            "name": {
+                "type": "text",
+                "fields": {
+                    "raw": {"type": "keyword"},
+                },
+                # User-defined run name (e.g., "RRF k=60 테스트")
+            },
+            "description": {
+                "type": "text",
+                "analyzer": "nori",
+                # Optional description
+            },
+            # ===================================================================
+            # Status
+            # ===================================================================
+            "status": {
+                "type": "keyword",
+                "doc_values": True,
+                # "pending" | "running" | "completed" | "failed" | "cancelled"
+            },
+            "progress": {
+                "type": "object",
+                "properties": {
+                    "total": {"type": "integer"},
+                    "completed": {"type": "integer"},
+                    "failed": {"type": "integer"},
+                },
+            },
+            "error_message": {
+                "type": "text",
+                "index": False,
+                # Error message if status is "failed"
+            },
+            # ===================================================================
+            # Source Configuration
+            # ===================================================================
+            "source_type": {
+                "type": "keyword",
+                "doc_values": True,
+                # "retrieval_test" - 현재는 retrieval test 결과만 지원
+            },
+            "source_run_id": {
+                "type": "keyword",
+                "doc_values": True,
+                # Reference to retrieval test run (if applicable)
+            },
+            "source_config": {
+                "type": "object",
+                "enabled": False,  # Stored but not indexed
+                # Search config snapshot: use_rrf, rrf_k, rerank, dense_weight, sparse_weight, etc.
+            },
+            # ===================================================================
+            # LLM Configuration
+            # ===================================================================
+            "llm_config": {
+                "type": "object",
+                "enabled": False,
+                # LLM settings: model, temperature, max_tokens, etc.
+            },
+            # ===================================================================
+            # Aggregated Metrics (updated on completion)
+            # ===================================================================
+            "metrics": {
+                "type": "object",
+                "properties": {
+                    "avg_rating": {"type": "float"},
+                    "rating_count": {"type": "integer"},
+                    "avg_latency_ms": {"type": "float"},
+                    "total_tokens": {"type": "integer"},
+                },
+            },
+            # ===================================================================
+            # Timestamps
+            # ===================================================================
+            "started_at": {
+                "type": "date",
+            },
+            "completed_at": {
+                "type": "date",
+            },
+            "created_at": {
+                "type": "date",
+            },
+            "updated_at": {
+                "type": "date",
+            },
+        },
+    }
+
+
+# Default batch answer runs mapping
+BATCH_ANSWER_RUNS_MAPPING = get_batch_answer_runs_mapping()
+
+
+def get_batch_answer_results_mapping() -> dict[str, Any]:
+    """Get batch answer results index mapping for individual answer results.
+
+    Index naming convention:
+        - Index: batch_answer_results_{env}_v{version}  (e.g., batch_answer_results_dev_v1)
+        - Alias: batch_answer_results_{env}_current     (e.g., batch_answer_results_dev_current)
+
+    Each document represents a single question's answer result within a batch run.
+    """
+    return {
+        "properties": {
+            # ===================================================================
+            # Result Identity
+            # ===================================================================
+            "result_id": {
+                "type": "keyword",
+                "doc_values": True,
+                # UUID for this result
+            },
+            "run_id": {
+                "type": "keyword",
+                "doc_values": True,
+                # FK to batch_answer_runs
+            },
+            # ===================================================================
+            # Question Information
+            # ===================================================================
+            "question_id": {
+                "type": "keyword",
+                "doc_values": True,
+                # Original question ID from source
+            },
+            "question": {
+                "type": "text",
+                "analyzer": "nori",
+                "fields": {
+                    "raw": {"type": "keyword"},
+                },
+            },
+            "category": {
+                "type": "keyword",
+                "doc_values": True,
+                # Question category (optional)
+            },
+            # ===================================================================
+            # Answer Content
+            # ===================================================================
+            "answer": {
+                "type": "text",
+                "analyzer": "nori",
+                # Generated answer text
+            },
+            "reasoning": {
+                "type": "text",
+                "index": False,
+                # LLM reasoning/chain-of-thought (stored but not searched)
+            },
+            # ===================================================================
+            # Search Results Used (nested for per-doc details)
+            # ===================================================================
+            "search_results": {
+                "type": "nested",
+                "properties": {
+                    "rank": {"type": "integer"},
+                    "doc_id": {"type": "keyword"},
+                    "chunk_id": {"type": "keyword"},
+                    "title": {
+                        "type": "text",
+                        "fields": {"raw": {"type": "keyword"}},
+                    },
+                    "snippet": {
+                        "type": "text",
+                        "index": False,
+                    },
+                    "content": {
+                        "type": "text",
+                        "index": False,  # Full content for LLM context
+                    },
+                    "score": {"type": "float"},
+                    "page": {"type": "integer"},
+                    "device_name": {"type": "keyword"},
+                    "doc_type": {"type": "keyword"},
+                },
+            },
+            "search_result_count": {
+                "type": "integer",
+                # Number of search results used
+            },
+            # ===================================================================
+            # Ground Truth (for metrics calculation)
+            # ===================================================================
+            "ground_truth_doc_ids": {
+                "type": "keyword",
+                "doc_values": True,
+                # Expected relevant doc IDs
+            },
+            # ===================================================================
+            # Metrics
+            # ===================================================================
+            "retrieval_metrics": {
+                "type": "object",
+                "properties": {
+                    "hit_at_1": {"type": "boolean"},
+                    "hit_at_3": {"type": "boolean"},
+                    "hit_at_5": {"type": "boolean"},
+                    "hit_at_10": {"type": "boolean"},
+                    "reciprocal_rank": {"type": "float"},
+                    "first_relevant_rank": {"type": "integer"},
+                },
+            },
+            "latency_ms": {
+                "type": "integer",
+                # Answer generation latency
+            },
+            "token_count": {
+                "type": "object",
+                "properties": {
+                    "input": {"type": "integer"},
+                    "output": {"type": "integer"},
+                },
+            },
+            # ===================================================================
+            # Human Evaluation (optional, filled later)
+            # ===================================================================
+            "rating": {
+                "type": "integer",
+                # Human rating 1-5
+            },
+            "rating_comment": {
+                "type": "text",
+                "index": False,
+            },
+            "rated_by": {
+                "type": "keyword",
+            },
+            "rated_at": {
+                "type": "date",
+            },
+            # ===================================================================
+            # Status
+            # ===================================================================
+            "status": {
+                "type": "keyword",
+                "doc_values": True,
+                # "pending" | "completed" | "failed"
+            },
+            "error_message": {
+                "type": "text",
+                "index": False,
+            },
+            # ===================================================================
+            # Timestamps
+            # ===================================================================
+            "created_at": {
+                "type": "date",
+            },
+            "updated_at": {
+                "type": "date",
+            },
+        },
+    }
+
+
+# Default batch answer results mapping
+BATCH_ANSWER_RESULTS_MAPPING = get_batch_answer_results_mapping()
+
+
 __all__ = [
     "get_rag_chunks_mapping",
     "get_index_settings",
@@ -690,8 +1006,12 @@ __all__ = [
     "get_chat_turns_mapping",
     "get_feedback_mapping",
     "get_retrieval_evaluation_mapping",
+    "get_batch_answer_runs_mapping",
+    "get_batch_answer_results_mapping",
     "RAG_CHUNKS_MAPPING",
     "CHAT_TURNS_MAPPING",
     "FEEDBACK_MAPPING",
     "RETRIEVAL_EVALUATION_MAPPING",
+    "BATCH_ANSWER_RUNS_MAPPING",
+    "BATCH_ANSWER_RESULTS_MAPPING",
 ]

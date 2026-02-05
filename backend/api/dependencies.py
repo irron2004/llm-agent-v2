@@ -197,3 +197,36 @@ def get_query_expander() -> BaseQueryExpander:
         version="v1",
         prompt_template=rag_settings.multi_query_prompt,
     )
+
+
+# Singleton RAG agent for batch answer generation
+_rag_agent_instance = None
+
+
+def get_rag_agent():
+    """Provide a LangGraph RAG agent for batch answer generation.
+
+    Creates a singleton agent with auto-parse disabled (used for answer-only mode).
+    """
+    global _rag_agent_instance
+
+    if _rag_agent_instance is not None:
+        return _rag_agent_instance
+
+    from backend.services.agents.langgraph_rag_agent import LangGraphRAGAgent
+
+    search_service = get_search_service()
+    llm = get_default_llm()
+    prompt_spec = get_prompt_spec_cached()
+
+    _rag_agent_instance = LangGraphRAGAgent(
+        llm=llm,
+        search_service=search_service,
+        prompt_spec=prompt_spec,
+        top_k=20,
+        retrieval_top_k=100,
+        mode="verified",
+        auto_parse_enabled=False,
+    )
+
+    return _rag_agent_instance

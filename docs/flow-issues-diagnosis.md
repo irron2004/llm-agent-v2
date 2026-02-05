@@ -176,41 +176,33 @@ _hybrid_search_script_score()로 폴백
 
 ### 해결 (완료)
 
-`es_hybrid.py:83` 기본값 변경:
+`es_search.py`의 `_hybrid_search_rrf` 메서드에서 knn 쿼리 구문 수정:
 
 ```python
-# 변경 전
-use_rrf: bool = True,
-
-# 변경 후
-use_rrf: bool = False,  # RRF disabled: ES 8.x sub_searches knn syntax issue
-```
-
-### RRF 완전 복구 방법 (별도 작업 필요)
-
-ES 8.x 올바른 RRF + knn 쿼리 형식:
-
-```python
-{
-    "knn": {  # top-level knn (sub_searches 밖)
-        "field": "vector_field",
-        "query_vector": [...],
-        "k": 10,
-        "num_candidates": 100
-    },
-    "query": {...},  # BM25 query
-    "rank": {
-        "rrf": {"rank_constant": 60, "window_size": 100}
-    }
+# 변경 전 (오류 발생)
+knn_query = {
+    "field": self.vector_field,
+    "query_vector": query_vector,
+    "k": top_k,              # ← ES 8.x rank API에서 지원 안 됨
+    "num_candidates": top_k * 2,
 }
+
+# 변경 후 (정상 동작)
+knn_query = {
+    "field": self.vector_field,
+    "query_vector": query_vector,
+    "num_candidates": max(top_k * 2, 100),  # k 제거, num_candidates만 사용
+}
+# 결과 개수는 body의 "size" 파라미터로 제어
 ```
 
-### 현재 상태
-- [x] 임시 완화 (use_rrf=False 기본값으로 변경)
-- [ ] 완전 해결 (knn 쿼리 구문 수정 필요)
+**핵심 수정 사항:**
+- ES 8.x rank API와 함께 사용 시, knn 절에서 `k` 필드 제거
+- `num_candidates`만 사용하고, 최종 결과 개수는 `size`로 제어
+- `window_size`도 충분히 크게 설정 (최소 100)
 
-> **주의**: `use_rrf=False`가 기본값이지만, API나 프론트엔드에서 명시적으로 `use_rrf=True`를 요청하면
-> 여전히 동일한 오류가 발생합니다. 완전한 해결을 위해서는 ES 8.x에 맞는 knn 쿼리 구문 수정이 필요합니다.
+### 상태
+- [x] 완전 해결 (knn 쿼리 구문 수정 완료)
 
 ---
 
@@ -276,7 +268,7 @@ if any(result_lower.startswith(p) for p in meta_patterns):
 |------|--------|----------|------|
 | MQ 파싱 로그 부족 | 낮음 | 없음 (디버깅 불편) | ✅ 해결 |
 | Judge JSON 파싱 실패 | **높음** | 불필요한 재시도 3회 | ✅ 로그 개선 |
-| ES RRF 검색 실패 | 중간 | 폴백으로 동작 | ⚠️ 완화 (use_rrf=True 시 여전히 실패) |
+| ES RRF 검색 실패 | 중간 | 폴백으로 동작 | ✅ 해결 (knn 구문 수정) |
 | Translate 메타 설명 | **높음** | 잘못된 query_en 전파 | ⚠️ 완화 (패턴 필터링만 적용) |
 
 ---
@@ -288,5 +280,5 @@ if any(result_lower.startswith(p) for p in meta_patterns):
    - Judge 로그 개선: 파싱 실패 시 raw LLM output 출력
    - Translate 필터링: 메타 설명 패턴 감지 및 원본 폴백
 
-2. `backend/llm_infrastructure/retrieval/adapters/es_hybrid.py`
-   - `use_rrf` 기본값 False로 변경 (ES knn 구문 호환성)
+2. `backend/llm_infrastructure/retrieval/engines/es_search.py`
+   - `_hybrid_search_rrf`: ES 8.x rank API 호환 knn 구문으로 수정 (k 필드 제거)

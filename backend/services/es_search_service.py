@@ -172,8 +172,8 @@ class EsSearchService:
             logger.warning(f"Could not validate ES index dimensions: {e}")
 
         # ES Hybrid Retriever
-        # use_rrf defaults to True (RRF mode), can be overridden per-request via API
-        # When use_rrf=False, dense_weight/sparse_weight control the score combination
+        # use_rrf=False: use script_score weighted combination (no ES license required)
+        # use_rrf=True: use ES 8.x RRF (requires Platinum license)
         retriever = EsHybridRetriever(
             es_engine=es_engine,
             embedder=embedder_instance,
@@ -181,6 +181,8 @@ class EsSearchService:
             sparse_weight=rag_settings.hybrid_sparse_weight,
             top_k=rag_settings.retrieval_top_k,
             normalize_vectors=rag_settings.vector_normalize,
+            use_rrf=rag_settings.hybrid_use_rrf,
+            rrf_k=rag_settings.hybrid_rrf_k,
             preprocessor=preprocessor,
         )
 

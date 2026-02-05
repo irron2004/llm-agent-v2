@@ -29,6 +29,7 @@ DOC_TYPE_GROUPS: dict[str, list[str]] = {
         "trouble shooting guide",
         "trouble shooting guilde",
         "troubleshooting",
+        "trouble_shooting_guide",  # ES 실제 값
         "Guide",
         "ts",
         "t/s",
@@ -39,6 +40,7 @@ DOC_TYPE_GROUPS: dict[str, list[str]] = {
         "매뉴얼",
         "설치 매뉴얼",
         "setup",
+        "set_up_manual",  # ES 실제 값
         "Manual",
     ],
     "gcb": [

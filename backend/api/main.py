@@ -1,10 +1,14 @@
 """FastAPI application entrypoint."""
 
 import logging
+import os
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routers import agent, assets, chat, conversations, devices, feedback, health, ingestions, preprocessing, query_expansion, rerank, retrieval_evaluation, search, summarization
+from backend.api.routers import agent, assets, batch_answer, chat, conversations, devices, feedback, health, ingestions, logs, preprocessing, query_expansion, rerank, retrieval_evaluation, search, summarization
 from backend.api.dependencies import set_search_service
 from backend.config.settings import api_settings, rag_settings, search_settings
 from backend.llm_infrastructure.preprocessing import get_preprocessor
@@ -17,6 +21,53 @@ from backend.llm_infrastructure.elasticsearch.manager import EsIndexManager
 logging.basicConfig(level=logging.INFO)
 APP_VERSION = "0.1.0"
 logger = logging.getLogger(__name__)
+
+
+def _setup_rag_trace_logger() -> None:
+    """RAG 파이프라인 트레이스 로거 설정.
+
+    로그 파일: logs/rag_trace.log (최대 10MB, 5개 백업)
+    형식: JSON (한 줄씩)
+    """
+    trace_logger = logging.getLogger("rag_trace")
+    trace_logger.setLevel(logging.INFO)
+
+    # 이미 핸들러가 있으면 추가하지 않음
+    if trace_logger.handlers:
+        return
+
+    # 로그 디렉토리 생성
+    log_dir = Path(os.getenv("RAG_TRACE_LOG_DIR", "logs"))
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_file = log_dir / "rag_trace.log"
+
+    # 파일 핸들러 (회전, 최대 10MB, 5개 백업)
+    file_handler = RotatingFileHandler(
+        log_file,
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5,
+        encoding="utf-8",
+    )
+    file_handler.setLevel(logging.INFO)
+    # JSON 형식이므로 포맷터는 단순하게
+    file_handler.setFormatter(logging.Formatter("%(message)s"))
+    trace_logger.addHandler(file_handler)
+
+    # 콘솔에도 출력 (환경변수로 제어)
+    if os.getenv("RAG_TRACE_CONSOLE", "false").lower() == "true":
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        console_handler.setFormatter(logging.Formatter("[RAG_TRACE] %(message)s"))
+        trace_logger.addHandler(console_handler)
+
+    # 상위 로거로 전파하지 않음
+    trace_logger.propagate = False
+
+    logger.info("RAG trace logger configured: %s", log_file)
+
+
+# 앱 시작 시 트레이스 로거 설정
+_setup_rag_trace_logger()
 
 
 def create_app() -> FastAPI:
@@ -50,6 +101,8 @@ def create_app() -> FastAPI:
     app.include_router(conversations.router, prefix="/api")
     app.include_router(feedback.router, prefix="/api")
     app.include_router(retrieval_evaluation.router, prefix="/api")
+    app.include_router(batch_answer.router, prefix="/api")
+    app.include_router(logs.router, prefix="/api")
 
     @app.on_event("startup")
     async def startup_search_service():
