@@ -192,7 +192,7 @@
   flex-direction: column;
   height: 100%;
   gap: var(--spacing-md);
-  overflow: hidden;  /* 내부 스크롤이 작동하도록 설정 */
+  overflow-y: auto;  /* 콘텐츠 스크롤 허용, sticky 버튼을 위해 */
 }
 
 .review-panel-sidebar .review-queries {
@@ -222,6 +222,10 @@
   margin-top: auto;
   padding-top: var(--spacing-md);
   border-top: 1px solid var(--color-border);
+  position: sticky;
+  bottom: 0;
+  background-color: var(--color-bg-card);
+  padding-bottom: var(--spacing-sm);
 }
 
 /* Retrieved Docs Styles */

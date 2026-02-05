@@ -15,7 +15,7 @@ export function ChatInput({
   onStop,
   isStreaming = false,
   disabled = false,
-  placeholder = "메시지를 입력하세요...",
+  placeholder = "Enter your message...",
   onDisabledClick,
 }: ChatInputProps) {
   const [value, setValue] = useState("");

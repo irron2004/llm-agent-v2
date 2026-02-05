@@ -32,6 +32,7 @@ export interface SearchResult {
   id: string;
   title: string;
   snippet: string;
+  content?: string; // 본문 전체 (LLM 컨텍스트용, max 10,000자)
   score: number;
   score_display: string;
   chunk_summary?: string;
@@ -40,6 +41,9 @@ export interface SearchResult {
   doc_type?: string;
   device_name?: string;
   page?: number;
+  // Expanded pages (Chat/Search와 동일한 로직)
+  expanded_pages?: number[];
+  expanded_page_urls?: string[];
 }
 
 export interface ResultMetrics {
@@ -69,4 +73,32 @@ export interface AggregatedMetrics {
   hit_at_10: number;
   mrr: number;
   avg_first_relevant_rank: number | null;
+}
+
+// Chat Pipeline 검색 요청/응답 타입
+export interface ChatPipelineSearchRequest {
+  query: string;
+  search_override?: {
+    dense_weight?: number;
+    sparse_weight?: number;
+    use_rrf?: boolean;
+    rrf_k?: number;
+    rerank?: boolean;
+    rerank_top_k?: number;
+    top_k?: number;
+  };
+  selected_devices?: string[];
+  selected_doc_types?: string[];
+}
+
+export interface ChatPipelineSearchResponse {
+  query: string;
+  query_en?: string;
+  query_ko?: string;
+  route?: string;
+  search_queries: string[];
+  auto_parsed_device?: string;
+  auto_parsed_doc_type?: string;
+  items: SearchResult[];
+  total: number;
 }

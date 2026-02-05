@@ -37,7 +37,7 @@ export function PageNavigator({
         className="page-navigator__btn"
         onClick={handlePrev}
         disabled={currentPage <= 1}
-        aria-label="이전 페이지"
+        aria-label="Previous page"
       >
         <LeftOutlined />
       </button>
@@ -59,7 +59,7 @@ export function PageNavigator({
         className="page-navigator__btn"
         onClick={handleNext}
         disabled={currentPage >= totalPages}
-        aria-label="다음 페이지"
+        aria-label="Next page"
       >
         <RightOutlined />
       </button>
@@ -72,7 +72,7 @@ export function PageNavigator({
               page === currentPage ? "page-navigator__thumb--active" : ""
             }`}
             onClick={() => onPageChange(page)}
-            aria-label={`페이지 ${page}`}
+            aria-label={`Page ${page}`}
           />
         ))}
       </div>

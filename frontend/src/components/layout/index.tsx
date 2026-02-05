@@ -22,7 +22,7 @@ export default function Layout() {
   const isChatPage = location.pathname === "/";
 
   // Get logs from context
-  const { logs, activeMessageId } = useChatLogs();
+  const { logs, activeMessageId, clearLogs } = useChatLogs();
 
   const visibleLogs = useMemo(() => {
     if (!activeMessageId) return logs;
@@ -41,10 +41,13 @@ export default function Layout() {
     setSelectedRanks,
     setEditableQueries,
     setIsEditingQueries,
+    setPendingReview,
+    setCompletedRetrievedDocs,
     submitReview,
     submitSearchQueries,
     submitRegeneration,
     setPendingRegeneration,
+    setIsStreaming,
   } = useChatReview();
 
   // Show right sidebar when there are logs, pending review, or completed retrieved docs
@@ -55,6 +58,34 @@ export default function Layout() {
     (completedRetrievedDocs !== null && completedRetrievedDocs.length > 0)
   );
 
+  // Auto-expand right sidebar when regeneration or review panel is triggered
+  useEffect(() => {
+    if (pendingRegeneration !== null || pendingReview !== null) {
+      setIsRightSidebarCollapsed(false);
+    }
+  }, [pendingRegeneration, pendingReview]);
+
+  // Reset right sidebar state and content when starting a new chat
+  useEffect(() => {
+    const handleNewChat = () => {
+      setIsRightSidebarCollapsed(false);
+      clearLogs();
+      setPendingReview(null);
+      setPendingRegeneration(null);
+      setCompletedRetrievedDocs(null);
+      setIsStreaming(false);
+    };
+    window.addEventListener("pe-agent:new-chat", handleNewChat);
+    return () => {
+      window.removeEventListener("pe-agent:new-chat", handleNewChat);
+    };
+  }, [
+    clearLogs,
+    setPendingReview,
+    setPendingRegeneration,
+    setCompletedRetrievedDocs,
+    setIsStreaming,
+  ]);
 
   const handleOpenSidebar = useCallback(() => {
     setIsSidebarOpen(true);
@@ -78,31 +109,31 @@ export default function Layout() {
     // 새 요청 스트리밍 중이면 로그 표시
     if (isStreaming && visibleLogs.length > 0) {
       return {
-        title: "실행 로그",
-        subtitle: `${visibleLogs.length}개 항목`,
+        title: "Activity Log",
+        subtitle: `${visibleLogs.length} items`,
       };
     }
     if (pendingRegeneration) {
       return {
-        title: "답변 재생성",
-        subtitle: "필터/문서 선택 후 재검색",
+        title: "Regenerate Answer",
+        subtitle: "Select filters/documents to re-search",
       };
     }
     if (pendingReview) {
       return {
-        title: "검색 결과 확인",
+        title: "Review Search Results",
         subtitle: pendingReview.instruction,
       };
     }
     if (completedRetrievedDocs && completedRetrievedDocs.length > 0) {
       return {
-        title: "확장 문서/참고 문서",
-        subtitle: `${completedRetrievedDocs.length}개 문서`,
+        title: "Reference Documents",
+        subtitle: `${completedRetrievedDocs.length} documents`,
       };
     }
     return {
-      title: "실행 로그",
-      subtitle: `${visibleLogs.length}개 항목`,
+      title: "Activity Log",
+      subtitle: `${visibleLogs.length} items`,
     };
   }, [isStreaming, pendingRegeneration, pendingReview, completedRetrievedDocs, visibleLogs.length]);
 
@@ -338,14 +369,14 @@ function ReviewPanelContent({
       {/* Search Query Editor Section */}
       <div className="review-queries">
         <div className="review-queries-header">
-          <span className="review-queries-label">검색어</span>
+          <span className="review-queries-label">Search queries</span>
           <button
             className="action-button"
             onClick={toggleEditMode}
             disabled={isStreaming}
             style={{ fontSize: "var(--font-size-xs)", padding: "4px 12px" }}
           >
-            {isEditingQueries ? "편집 완료" : "검색어 수정"}
+            {isEditingQueries ? "Done" : "Edit queries"}
           </button>
         </div>
 
@@ -358,13 +389,13 @@ function ReviewPanelContent({
                   className="review-query-input"
                   value={query}
                   onChange={(e) => handleQueryChange(idx, e.target.value)}
-                  placeholder="검색어 입력"
+                  placeholder="Enter query"
                 />
                 {editableQueries.length > 1 && (
                   <button
                     className="review-query-remove"
                     onClick={() => handleRemoveQuery(idx)}
-                    title="삭제"
+                    title="Remove"
                   >
                     ×
                   </button>
@@ -373,7 +404,7 @@ function ReviewPanelContent({
             ))}
             {editableQueries.length < 5 && (
               <button className="review-query-add" onClick={handleAddQuery}>
-                + 검색어 추가
+                + Add query
               </button>
             )}
           </div>
@@ -390,17 +421,17 @@ function ReviewPanelContent({
 
       {pendingReview.docs.length === 0 ? (
         <div className="review-empty">
-          검색 결과가 없습니다. 키워드를 입력해 재검색하세요.
+          No search results. Enter keywords to search again.
         </div>
       ) : (
         <>
           <div className="review-controls">
             <label className="review-select-all">
               <input type="checkbox" checked={allSelected} onChange={toggleAll} />
-              전체 선택
+              Select all
             </label>
             <span className="review-count">
-              {selectedRanks.length}/{pendingReview.docs.length} 선택
+              {selectedRanks.length}/{pendingReview.docs.length} selected
             </span>
           </div>
           <div className="review-docs">
@@ -410,7 +441,7 @@ function ReviewPanelContent({
               const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
               const displayTitle = isSpecialDocType
                 ? `${docType}_${doc.docId}`
-                : (doc.title || `문서 ${doc.rank ?? idx + 1}`);
+                : (doc.title || `Document ${doc.rank ?? idx + 1}`);
 
               return (
               <label key={`${doc.rank}-${doc.docId}`} className="review-doc">
@@ -468,7 +499,7 @@ function ReviewPanelContent({
                         e.stopPropagation();
                         handleDocClick(idx);
                       }}
-                      title="확대"
+                      title="Zoom"
                       style={{
                         position: "absolute",
                         top: 4,
@@ -504,7 +535,7 @@ function ReviewPanelContent({
             onClick={handleSearchWithQueries}
             disabled={isStreaming || editableQueries.every((q) => !q.trim())}
           >
-            재검색
+            Search again
           </button>
         ) : (
           <>
@@ -513,7 +544,7 @@ function ReviewPanelContent({
               onClick={handleSearchWithQueries}
               disabled={isStreaming}
             >
-              재검색
+              Search again
             </button>
             <button
               className="action-button"
@@ -522,7 +553,7 @@ function ReviewPanelContent({
                 isStreaming || pendingReview.docs.length === 0 || selectedRanks.length === 0
               }
             >
-              선택 문서로 답변
+              Answer with selected documents
             </button>
           </>
         )}
@@ -644,7 +675,7 @@ function RegeneratePanelContent({
       })
       .catch(() => {
         if (!active) return;
-        setError("장비/문서 종류 목록을 불러오지 못했습니다.");
+        setError("Failed to load equipment/document types.");
       });
     return () => {
       active = false;
@@ -760,7 +791,7 @@ function RegeneratePanelContent({
   const handleSubmit = () => {
     const queries = editableQueries.map((q) => q.trim()).filter((q) => q.length > 0);
     if (selectedIndices.length === 0) {
-      setError("재검색할 문서를 1개 이상 선택해 주세요.");
+      setError("Select at least one document to re-search.");
       return;
     }
     // Convert selected indices to doc IDs
@@ -783,7 +814,7 @@ function RegeneratePanelContent({
     <div className="review-panel-sidebar">
       <div className="review-queries">
         <div className="review-queries-header">
-          <span className="review-queries-label">검색어 (MQ)</span>
+          <span className="review-queries-label">Search queries (MQ)</span>
         </div>
         <div className="review-queries-editor">
           {editableQueries.map((query, idx) => (
@@ -793,13 +824,13 @@ function RegeneratePanelContent({
                 className="review-query-input"
                 value={query}
                 onChange={(e) => handleQueryChange(idx, e.target.value)}
-                placeholder="검색어 입력"
+                placeholder="Enter query"
               />
               {editableQueries.length > 1 && (
                 <button
                   className="review-query-remove"
                   onClick={() => handleRemoveQuery(idx)}
-                  title="삭제"
+                  title="Remove"
                 >
                   ×
                 </button>
@@ -808,7 +839,7 @@ function RegeneratePanelContent({
           ))}
           {editableQueries.length < 5 && (
             <button className="review-query-add" onClick={handleAddQuery}>
-              + 검색어 추가
+              + Add query
             </button>
           )}
         </div>
@@ -820,18 +851,18 @@ function RegeneratePanelContent({
         border: "1px solid var(--color-border)",
         background: "var(--color-bg-secondary)",
       }}>
-        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>기기 선택</div>
+        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Select equipment</div>
         <input
           type="text"
           value={deviceFilter}
           onChange={(e) => setDeviceFilter(e.target.value)}
-          placeholder="기기 검색"
+          placeholder="Search equipment"
           className="review-query-input"
           style={{ marginBottom: 8 }}
         />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-            {allDevicesSelected ? "전체선택됨" : null}
+            {allDevicesSelected ? "All selected" : null}
           </span>
           <button
             className="action-button"
@@ -840,13 +871,13 @@ function RegeneratePanelContent({
               setSelectedDevices(allDevicesSelected ? [] : allDeviceNames);
             }}
           >
-            {allDevicesSelected ? "전체 해제" : "전체 선택"}
+            {allDevicesSelected ? "Clear all" : "Select all"}
           </button>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {visibleDevices.length === 0 && (
             <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-              표시할 기기가 없습니다.
+              No equipment to display.
             </span>
           )}
           {visibleDevices.map((device) => {
@@ -879,18 +910,18 @@ function RegeneratePanelContent({
         border: "1px solid var(--color-border)",
         background: "var(--color-bg-secondary)",
       }}>
-        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>문서 종류 선택</div>
+        <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 8 }}>Select document types</div>
         <input
           type="text"
           value={docTypeFilter}
           onChange={(e) => setDocTypeFilter(e.target.value)}
-          placeholder="문서 종류 검색"
+          placeholder="Search document types"
           className="review-query-input"
           style={{ marginBottom: 8 }}
         />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-            {allDocTypesSelected ? "전체선택됨" : null}
+            {allDocTypesSelected ? "All selected" : null}
           </span>
           <button
             className="action-button"
@@ -899,13 +930,13 @@ function RegeneratePanelContent({
               setSelectedDocTypes(allDocTypesSelected ? [] : allowedDocTypes.map((d) => d.toLowerCase()));
             }}
           >
-            {allDocTypesSelected ? "전체 해제" : "전체 선택"}
+            {allDocTypesSelected ? "Clear all" : "Select all"}
           </button>
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
           {filteredDocTypes.length === 0 && (
             <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
-              표시할 문서 종류가 없습니다.
+              No document types to display.
             </span>
           )}
           {filteredDocTypes.map((docType) => {
@@ -936,10 +967,10 @@ function RegeneratePanelContent({
       <div className="review-controls">
         <label className="review-select-all">
           <input type="checkbox" checked={allDocsSelected} onChange={toggleAllDocs} />
-          이전 문서 전체 선택
+          Select all previous documents
         </label>
         <span className="review-count">
-          {selectedIndices.length}/{pendingRegeneration.docs.length} 선택
+          {selectedIndices.length}/{pendingRegeneration.docs.length} selected
         </span>
       </div>
 
@@ -950,7 +981,7 @@ function RegeneratePanelContent({
           const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
           const displayTitle = isSpecialDocType
             ? `${docType}_${docId}`
-            : (doc.title || `문서 ${idx + 1}`);
+            : (doc.title || `Document ${idx + 1}`);
           return (
             <label key={`doc-${idx}`} className="review-doc">
               <input
@@ -1010,7 +1041,7 @@ function RegeneratePanelContent({
                       e.stopPropagation();
                       handleDocClick(idx);
                     }}
-                    title="확대"
+                    title="Zoom"
                     style={{
                       position: "absolute",
                       top: 4,
@@ -1046,10 +1077,10 @@ function RegeneratePanelContent({
 
       <div className="review-actions">
         <button className="action-button" onClick={onClose}>
-          닫기
+          Close
         </button>
         <button className="action-button" onClick={handleSubmit}>
-          재검색
+          Search again
         </button>
       </div>
 
@@ -1179,33 +1210,71 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
     return typeof url === 'string' && url.trim().length > 0;
   };
 
-  // 모든 문서를 미리보기 배열로 생성 (이미지 또는 텍스트)
-  const previewImages: ImagePreviewItem[] = useMemo(() => {
-    return docs.map((doc) => {
-      // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
+  // 모든 문서의 모든 페이지를 미리보기 배열로 생성 (expanded 포함)
+  // 각 문서의 시작 인덱스도 추적
+  const { previewImages, docStartIndices } = useMemo(() => {
+    const images: ImagePreviewItem[] = [];
+    const startIndices: number[] = [];
+
+    docs.forEach((doc) => {
+      // 현재 문서의 시작 인덱스 저장
+      startIndices.push(images.length);
+
       const docType = doc.metadata?.doc_type as string | undefined;
       const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
       const displayTitle = isSpecialDocType
         ? `${docType}_${doc.id}`
         : (doc.title || undefined);
 
-      return {
-        url: hasValidImageUrl(doc.page_image_url) ? doc.page_image_url : undefined,
-        content: doc.snippet || undefined,
-        title: displayTitle,
-        page: doc.page || undefined,
-        docId: doc.id,
-      };
+      // expanded_page_urls가 있으면 모든 페이지 추가
+      const pageUrls = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
+        ? doc.expanded_page_urls.filter(url => hasValidImageUrl(url))
+        : hasValidImageUrl(doc.page_image_url)
+          ? [doc.page_image_url]
+          : [];
+
+      const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
+        ? doc.expanded_pages
+        : doc.page !== null && doc.page !== undefined
+          ? [doc.page]
+          : [];
+
+      if (pageUrls.length > 0) {
+        // 이미지가 있는 경우: 각 페이지별로 항목 추가
+        pageUrls.forEach((url, idx) => {
+          images.push({
+            url,
+            content: idx === 0 ? doc.snippet || undefined : undefined, // 첫 페이지에만 snippet
+            title: displayTitle,
+            page: pageNumbers[idx] || undefined,
+            docId: doc.id,
+          });
+        });
+      } else {
+        // 이미지가 없는 경우: snippet만 추가
+        images.push({
+          url: undefined,
+          content: doc.snippet || undefined,
+          title: displayTitle,
+          page: doc.page || undefined,
+          docId: doc.id,
+        });
+      }
     });
+
+    return { previewImages: images, docStartIndices: startIndices };
   }, [docs]);
 
   const handleDocClick = (docIndex: number) => {
-    setPreviewIndex(docIndex);
+    // 문서의 첫 번째 이미지로 이동
+    setPreviewIndex(docStartIndices[docIndex] || 0);
     setPreviewVisible(true);
   };
 
-  const handleImageClick = (docIndex: number, _pageIndex: number) => {
-    setPreviewIndex(docIndex);
+  const handleImageClick = (docIndex: number, pageIndex: number) => {
+    // 해당 문서의 특정 페이지 이미지로 이동
+    const startIdx = docStartIndices[docIndex] || 0;
+    setPreviewIndex(startIdx + pageIndex);
     setPreviewVisible(true);
   };
 
@@ -1293,7 +1362,7 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
               <button
                 className="retrieved-doc-zoom"
                 onClick={() => handleDocClick(index)}
-                title="확대"
+                title="Zoom"
                 style={{
                   position: "absolute",
                   top: 4,
@@ -1358,8 +1427,8 @@ function ChatLogsContent({
     return (
       <EmptyState
         icon={<FileTextOutlined />}
-        title="로그가 없습니다"
-        description="대화를 시작하면 실행 로그가 표시됩니다"
+        title="No logs"
+        description="Activity log will be displayed when you start a conversation"
         size="medium"
       />
     );

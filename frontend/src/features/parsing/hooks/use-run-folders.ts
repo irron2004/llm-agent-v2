@@ -32,7 +32,7 @@ export function useRunFolders(): UseRunFoldersReturn {
         const data = await res.json();
         setFolders(data.folders || []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "폴더 목록 로드 실패");
+        setError(err instanceof Error ? err.message : "Failed to load folder list");
       } finally {
         setIsLoading(false);
       }

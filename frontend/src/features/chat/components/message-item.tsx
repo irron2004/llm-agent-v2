@@ -6,7 +6,9 @@ import { Collapse, Tag } from "antd";
 import { ImagePreviewModal, ImagePreviewItem } from "../../../components/image-preview-modal";
 import { FeedbackForm } from "./feedback-form";
 import { DeviceSuggestions } from "./device-suggestions";
-import { DocRelevanceRating } from "./doc-relevance-rating";
+import { RetrievalEvaluationProvider } from "./retrieval-evaluation-context";
+import { InlineDocRating } from "./inline-doc-rating";
+import { RetrievalEvaluationSubmit } from "./retrieval-evaluation-submit";
 
 // Preprocess snippet for better markdown rendering
 function preprocessSnippet(snippet: string): string {
@@ -113,20 +115,35 @@ function ReferenceItem({ doc, idx, onImageClick }: ReferenceItemProps) {
 
   const hasImageUrls = pageUrls.length > 0;
 
-  // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
+  // 문서 타입별 제목 표시 방식
+  // - SOP, set_up_manual, trouble_shooting_guide → doc_id 표시
+  // - myservice, gcb → chunk_summary 표시
   const docType = (doc.metadata as Record<string, unknown>)?.doc_type as string | undefined;
-  const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
-  const displayTitle = isSpecialDocType
-    ? `${docType}_${doc.id}`
-    : (doc.title || `Document ${idx + 1}`);
+  const chunkSummary = (doc.metadata as Record<string, unknown>)?.chunk_summary as string | undefined;
+  const docTypeLower = docType?.toLowerCase() || "";
+  const isDocIdType = ["sop", "set_up_manual", "trouble_shooting_guide"].includes(docTypeLower);
+  const isSummaryType = ["myservice", "gcb"].includes(docTypeLower);
+
+  let displayTitle: string;
+  if (isDocIdType) {
+    displayTitle = doc.id;
+  } else if (isSummaryType) {
+    displayTitle = chunkSummary || doc.title || doc.id;
+  } else {
+    displayTitle = doc.title || `Document ${idx + 1}`;
+  }
 
   // 이미지가 있고 로드에 성공했으면 텍스트 숨김
   const showText = !hasImageUrls || imageLoadError || !imageLoadSuccess;
+  const displayIndex = idx + 1;
 
   return (
     <div className="reference-item" style={{ marginBottom: 16 }}>
       <div style={{ fontWeight: 600, marginBottom: 4 }}>
-        {displayTitle}
+        <span style={{ marginRight: 6, color: "var(--color-text-secondary)" }}>
+          {displayIndex}.
+        </span>
+        <span>{displayTitle}</span>
         {pageNumbers.length > 0 && (
           <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, color: "var(--color-text-secondary)" }}>
             {pageNumbers.length === 1
@@ -159,7 +176,7 @@ function ReferenceItem({ doc, idx, onImageClick }: ReferenceItemProps) {
                     border: "1px solid var(--color-border)",
                     cursor: "pointer",
                   }}
-                  title={`클릭하여 확대`}
+                  title="Click to zoom"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -361,12 +378,23 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
 
     const images: ImagePreviewItem[] = [];
     message.retrievedDocs.forEach((doc) => {
-      // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
+      // 문서 타입별 제목 표시 방식
+      // - SOP, set_up_manual, trouble_shooting_guide → doc_id 표시
+      // - myservice, gcb → chunk_summary 표시
       const docType = (doc.metadata as Record<string, unknown>)?.doc_type as string | undefined;
-      const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
-      const displayTitle = isSpecialDocType
-        ? `${docType}_${doc.id}`
-        : (doc.title || undefined);
+      const chunkSummary = (doc.metadata as Record<string, unknown>)?.chunk_summary as string | undefined;
+      const docTypeLower = docType?.toLowerCase() || "";
+      const isDocIdType = ["sop", "set_up_manual", "trouble_shooting_guide"].includes(docTypeLower);
+      const isSummaryType = ["myservice", "gcb"].includes(docTypeLower);
+
+      let displayTitle: string | undefined;
+      if (isDocIdType) {
+        displayTitle = doc.id;
+      } else if (isSummaryType) {
+        displayTitle = chunkSummary || doc.title || doc.id;
+      } else {
+        displayTitle = doc.title || undefined;
+      }
 
       // expanded_page_urls가 있으면 사용
       if (doc.expanded_page_urls && doc.expanded_page_urls.length > 0) {
@@ -494,8 +522,8 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
                     onKeyDown={handleEditKeyDown}
                     rows={3}
                     disabled={isStreaming}
-                    aria-label="메시지 편집"
-                    placeholder="메시지를 수정하세요. Ctrl+Enter로 재전송, Escape로 취소"
+                    aria-label="Edit message"
+                    placeholder="Edit your message. Ctrl+Enter to resend, Esc to cancel"
                   />
                   <div className="message-edit-actions">
                     <button
@@ -503,14 +531,14 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
                       onClick={handleEditCancel}
                       disabled={isStreaming}
                     >
-                      취소
+                      Cancel
                     </button>
                     <button
                       className="action-button"
                       onClick={handleEditResend}
                       disabled={isStreaming || !editValue.trim()}
                     >
-                      재전송
+                      Resend
                     </button>
                   </div>
                 </div>
@@ -528,13 +556,13 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
           </div>
 
           {isUser && message.edited && !isEditing && (
-            <div className="edited-indicator">수정됨</div>
+            <div className="edited-indicator">Edited</div>
           )}
 
           {isAssistant && isStreaming && message.currentNode && (
             <div className="node-indicator">
               <span className="node-indicator-dot" aria-hidden="true" />
-              <span>처리중: {message.currentNode}</span>
+              <span>Processing: {message.currentNode}</span>
             </div>
           )}
 
@@ -555,128 +583,142 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
                 items={[
                   {
                     key: "retrieved",
-                    label: `확장 문서/참고 문서 (${message.retrievedDocs.length})`,
+                    label: `Reference Documents (${message.retrievedDocs.length})`,
                     children: (
-                      <div className="reference-list">
-                        {message.retrievedDocs.map((doc, idx) => {
-                          const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
-                            ? doc.expanded_pages
-                            : doc.page !== null && doc.page !== undefined
-                              ? [doc.page]
-                              : [];
-                          // 실제 이미지 URL만 사용 (동적 URL 생성 안 함)
-                          const pageUrls = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
-                            ? doc.expanded_page_urls.filter(url => hasValidImageUrl(url))
-                            : hasValidImageUrl(doc.page_image_url)
-                              ? [doc.page_image_url]
-                              : [];
+                      <RetrievalEvaluationProvider
+                        queryId={message.sessionId && message.turnId ? `${message.sessionId}:${message.turnId}` : `temp:${message.id}`}
+                        source="chat"
+                        query={regenerateQuery || ""}
+                        docs={message.retrievedDocs || []}
+                        sessionId={message.sessionId}
+                        turnId={message.turnId}
+                        filterDevices={message.selectedDevices}
+                        filterDocTypes={message.selectedDocTypes}
+                        searchQueries={message.searchQueries}
+                      >
+                        <div className="reference-list">
+                          {message.retrievedDocs.map((doc, idx) => {
+                            const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
+                              ? doc.expanded_pages
+                              : doc.page !== null && doc.page !== undefined
+                                ? [doc.page]
+                                : [];
+                            // 실제 이미지 URL만 사용 (동적 URL 생성 안 함)
+                            const pageUrls = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
+                              ? doc.expanded_page_urls.filter(url => hasValidImageUrl(url))
+                              : hasValidImageUrl(doc.page_image_url)
+                                ? [doc.page_image_url]
+                                : [];
 
-                          const hasImageUrls = pageUrls.length > 0;
+                            const hasImageUrls = pageUrls.length > 0;
 
-                          // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
-                          const docType = (doc.metadata as Record<string, unknown>)?.doc_type as string | undefined;
-                          const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
-                          const displayTitle = isSpecialDocType
-                            ? `${docType}_${doc.id}`
-                            : (doc.title || `Document ${idx + 1}`);
+                            // 문서 타입별 제목 표시 방식
+                            // - SOP, set_up_manual, trouble_shooting_guide → doc_id 표시
+                            // - myservice, gcb → chunk_summary 표시
+                            const docType = (doc.metadata as Record<string, unknown>)?.doc_type as string | undefined;
+                            const chunkSummary = (doc.metadata as Record<string, unknown>)?.chunk_summary as string | undefined;
+                            const docTypeLower = docType?.toLowerCase() || "";
+                            const isDocIdType = ["sop", "set_up_manual", "trouble_shooting_guide"].includes(docTypeLower);
+                            const isSummaryType = ["myservice", "gcb"].includes(docTypeLower);
 
-                          return (
-                            <div key={doc.id || idx} className="reference-item" style={{ marginBottom: 16 }}>
-                              <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                                {displayTitle}
-                                {pageNumbers.length > 0 && (
-                                  <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, color: "var(--color-text-secondary)" }}>
-                                    {pageNumbers.length === 1
-                                      ? `p.${pageNumbers[0]}`
-                                      : `p.${pageNumbers[0]}-${pageNumbers[pageNumbers.length - 1]}`}
+                            let displayTitle: string;
+                            if (isDocIdType) {
+                              displayTitle = doc.id;
+                            } else if (isSummaryType) {
+                              displayTitle = chunkSummary || doc.title || doc.id;
+                            } else {
+                              displayTitle = doc.title || `Document ${idx + 1}`;
+                            }
+                            const displayIndex = idx + 1;
+
+                            return (
+                              <div key={doc.id || idx} className="reference-item" style={{ marginBottom: 16 }}>
+                                <div style={{ fontWeight: 600, marginBottom: 4, display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+                                  <span style={{ marginRight: 6, color: "var(--color-text-secondary)" }}>
+                                    {displayIndex}.
                                   </span>
-                                )}
-                              </div>
-                              {/* 이미지와 텍스트 래퍼 */}
-                              <div className="reference-content-wrapper" style={{ position: "relative" }}>
-                                {/* 이미지가 있으면 표시 */}
-                                {hasImageUrls && (
-                                  <div
-                                    className="reference-images-container"
-                                    style={{
-                                      display: "flex",
-                                      flexWrap: "wrap",
-                                      gap: 8,
-                                      marginBottom: 8,
-                                    }}
-                                  >
-                                    {pageUrls.map((url, pageIdx) => (
-                                      <div key={pageIdx} className="reference-image-wrapper">
-                                        <div style={{ position: "relative", display: "inline-block" }}>
-                                          <img
-                                            src={url}
-                                            alt={`${displayTitle} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
-                                            style={{
-                                              maxWidth: pageUrls.length > 1 ? 150 : "100%",
-                                              maxHeight: pageUrls.length > 1 ? 200 : 300,
-                                              borderRadius: 4,
-                                              border: "1px solid var(--color-border)",
-                                              cursor: "pointer",
-                                            }}
-                                            title={`클릭하여 확대`}
-                                            onClick={(e) => {
-                                              e.preventDefault();
-                                              e.stopPropagation();
-                                              handleImageClick(idx, pageIdx);
-                                            }}
-                                            onLoad={(e) => {
-                                              // 이미지 로드 성공 시 텍스트 숨기기
-                                              const wrapper = e.currentTarget.closest(".reference-content-wrapper");
-                                              const textContent = wrapper?.querySelector(".reference-text-content") as HTMLElement;
-                                              if (textContent) textContent.style.display = "none";
-                                            }}
-                                            onError={(e) => {
-                                              // 이미지 로드 실패 시 이미지 숨기기
-                                              e.currentTarget.style.display = "none";
-                                            }}
-                                          />
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                                {/* 텍스트 콘텐츠 (항상 렌더링, 이미지 로드 성공 시 숨김) */}
-                                {doc.snippet && (
-                                  <div
-                                    className="reference-text-content"
-                                    style={{ fontSize: 12, color: "var(--color-text-secondary)" }}
-                                  >
-                                    <MarkdownContent content={preprocessSnippet(doc.snippet)} />
-                                  </div>
-                                )}
-                              </div>
-                              {(doc.score !== null && doc.score !== undefined) && (
-                                <div style={{ fontSize: 12, opacity: 0.6 }}>
-                                  score: {doc.score.toFixed(3)} {doc.score_percent ? `(${doc.score_percent}%)` : ""}
+                                  <span>{displayTitle}</span>
+                                  {pageNumbers.length > 0 && (
+                                    <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, color: "var(--color-text-secondary)" }}>
+                                      {pageNumbers.length === 1
+                                        ? `p.${pageNumbers[0]}`
+                                        : `p.${pageNumbers[0]}-${pageNumbers[pageNumbers.length - 1]}`}
+                                    </span>
+                                  )}
+                                  <InlineDocRating docId={doc.id} size="small" />
                                 </div>
-                              )}
-                              {/* Document relevance rating */}
-                              {message.sessionId && message.turnId && regenerateQuery && (
-                                <DocRelevanceRating
-                                  sessionId={message.sessionId}
-                                  turnId={message.turnId}
-                                  docId={doc.id}
-                                  docRank={idx + 1}
-                                  docTitle={displayTitle}
-                                  docSnippet={doc.snippet || ""}
-                                  query={regenerateQuery}
-                                  messageId={message.id}
-                                  chunkId={doc.id}
-                                  retrievalScore={doc.score}
-                                  filterDevices={message.selectedDevices}
-                                  filterDocTypes={message.selectedDocTypes}
-                                  searchQueries={message.searchQueries}
-                                />
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
+                                {/* 이미지와 텍스트 래퍼 */}
+                                <div className="reference-content-wrapper" style={{ position: "relative" }}>
+                                  {/* 이미지가 있으면 표시 */}
+                                  {hasImageUrls && (
+                                    <div
+                                      className="reference-images-container"
+                                      style={{
+                                        display: "flex",
+                                        flexWrap: "wrap",
+                                        gap: 8,
+                                        marginBottom: 8,
+                                      }}
+                                    >
+                                      {pageUrls.map((url, pageIdx) => (
+                                        <div key={pageIdx} className="reference-image-wrapper">
+                                          <div style={{ position: "relative", display: "inline-block" }}>
+                                            <img
+                                              src={url}
+                                              alt={`${displayTitle} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
+                                              style={{
+                                                maxWidth: pageUrls.length > 1 ? 150 : "100%",
+                                                maxHeight: pageUrls.length > 1 ? 200 : 300,
+                                                borderRadius: 4,
+                                                border: "1px solid var(--color-border)",
+                                                cursor: "pointer",
+                                              }}
+                                              title="Click to zoom"
+                                              onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                handleImageClick(idx, pageIdx);
+                                              }}
+                                              onLoad={(e) => {
+                                                // 이미지 로드 성공 시 텍스트 숨기기
+                                                const wrapper = e.currentTarget.closest(".reference-content-wrapper");
+                                                const textContent = wrapper?.querySelector(".reference-text-content") as HTMLElement;
+                                                if (textContent) textContent.style.display = "none";
+                                              }}
+                                              onError={(e) => {
+                                                // 이미지 로드 실패 시 이미지 숨기기
+                                                e.currentTarget.style.display = "none";
+                                              }}
+                                            />
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {/* 텍스트 콘텐츠 (항상 렌더링, 이미지 로드 성공 시 숨김) */}
+                                  {doc.snippet && (
+                                    <div
+                                      className="reference-text-content"
+                                      style={{ fontSize: 12, color: "var(--color-text-secondary)" }}
+                                    >
+                                      <MarkdownContent content={preprocessSnippet(doc.snippet)} />
+                                    </div>
+                                  )}
+                                </div>
+                                {(doc.score !== null && doc.score !== undefined) && (
+                                  <div style={{ fontSize: 12, opacity: 0.6 }}>
+                                    score: {doc.score.toFixed(3)} {doc.score_percent ? `(${doc.score_percent}%)` : ""}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          {/* Evaluation submit button */}
+                          {message.sessionId && message.turnId && regenerateQuery && (
+                            <RetrievalEvaluationSubmit />
+                          )}
+                        </div>
+                      </RetrievalEvaluationProvider>
                     ),
                   },
                 ]}
@@ -686,11 +728,11 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
                   <button
                     className="action-button regenerate-button"
                     onClick={handleRegenerate}
-                    title="답변 재생성"
+                    title="Regenerate answer"
                     disabled={isStreaming}
                   >
                     <ReloadOutlined />
-                    <span style={{ marginLeft: 4, fontSize: 12 }}>재생성</span>
+                    <span style={{ marginLeft: 4, fontSize: 12 }}>Regenerate</span>
                   </button>
                 </div>
               )}
@@ -716,7 +758,7 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
                     <button
                       className="action-button"
                       onClick={handleFeedbackClick}
-                      title="답변 평가"
+                      title="Rate answer"
                       disabled={!canFeedback}
                     >
                       <LikeOutlined />
@@ -726,7 +768,7 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
                     <button
                       className={`action-button ${showFilterInfo ? "active" : ""}`}
                       onClick={() => setShowFilterInfo(!showFilterInfo)}
-                      title="검색 필터 정보"
+                      title="Search filter info"
                     >
                       <FilterOutlined />
                     </button>
@@ -737,7 +779,7 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
                 <button
                   className="action-button"
                   onClick={handleEditClick}
-                  title="메시지 수정"
+                  title="Edit message"
                   disabled={isStreaming}
                 >
                   <EditOutlined />
@@ -756,7 +798,7 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
               )}
               {message.selectedDevices && message.selectedDevices.length > 0 && (
                 <div style={{ marginBottom: 4 }}>
-                  <span style={{ color: "var(--color-text-secondary)" }}>장비: </span>
+                  <span style={{ color: "var(--color-text-secondary)" }}>Equipment: </span>
                   {message.selectedDevices.map((d, i) => (
                     <Tag key={i} style={{ marginRight: 4 }}>{d}</Tag>
                   ))}
@@ -764,7 +806,7 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
               )}
               {message.selectedDocTypes && message.selectedDocTypes.length > 0 && (
                 <div style={{ marginBottom: 4 }}>
-                  <span style={{ color: "var(--color-text-secondary)" }}>문서 종류: </span>
+                  <span style={{ color: "var(--color-text-secondary)" }}>Document type: </span>
                   {message.selectedDocTypes.map((d, i) => (
                     <Tag key={i} style={{ marginRight: 4 }}>{d}</Tag>
                   ))}
@@ -772,12 +814,12 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
               )}
               {message.searchQueries && message.searchQueries.length > 0 && (
                 <div>
-                  <span style={{ color: "var(--color-text-secondary)" }}>검색 쿼리: </span>
+                  <span style={{ color: "var(--color-text-secondary)" }}>Search queries: </span>
                   {message.searchQueries.slice(0, 3).map((q, i) => (
                     <div key={i} style={{ marginLeft: 8, color: "var(--color-text-secondary)" }}>• {q}</div>
                   ))}
                   {message.searchQueries.length > 3 && (
-                    <div style={{ marginLeft: 8, color: "var(--color-text-secondary)" }}>...외 {message.searchQueries.length - 3}개</div>
+                    <div style={{ marginLeft: 8, color: "var(--color-text-secondary)" }}>...and {message.searchQueries.length - 3} more</div>
                   )}
                 </div>
               )}
@@ -813,17 +855,17 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
               <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                 {message.feedback?.accuracy && (
                   <span>
-                    정확성: <strong>{message.feedback.accuracy}</strong>
+                    Accuracy: <strong>{message.feedback.accuracy}</strong>
                   </span>
                 )}
                 {message.feedback?.completeness && (
                   <span>
-                    완성도: <strong>{message.feedback.completeness}</strong>
+                    Completeness: <strong>{message.feedback.completeness}</strong>
                   </span>
                 )}
                 {message.feedback?.relevance && (
                   <span>
-                    관련성: <strong>{message.feedback.relevance}</strong>
+                    Relevance: <strong>{message.feedback.relevance}</strong>
                   </span>
                 )}
                 {feedbackAvgScore !== null && (
@@ -841,7 +883,7 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
               </div>
               {message.feedback?.comment && (
                 <div style={{ marginTop: 4, color: "var(--color-text-secondary)" }}>
-                  의견: {message.feedback.comment}
+                  Comment: {message.feedback.comment}
                 </div>
               )}
             </div>

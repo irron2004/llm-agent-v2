@@ -121,7 +121,7 @@ export function ImagePreviewModal({
           <button
             className="image-preview-modal-close"
             onClick={onClose}
-            aria-label="닫기"
+            aria-label="Close"
           >
             <CloseOutlined />
           </button>
@@ -136,7 +136,7 @@ export function ImagePreviewModal({
             className="image-preview-modal-nav prev"
             onClick={handlePrev}
             disabled={currentIndex === 0}
-            aria-label="이전"
+            aria-label="Previous"
           >
             <LeftOutlined />
           </button>
@@ -160,7 +160,7 @@ export function ImagePreviewModal({
             className="image-preview-modal-nav next"
             onClick={handleNext}
             disabled={currentIndex === images.length - 1}
-            aria-label="다음"
+            aria-label="Next"
           >
             <RightOutlined />
           </button>
@@ -170,7 +170,7 @@ export function ImagePreviewModal({
         <div className="image-preview-modal-footer">
           <div className="image-preview-modal-info">
             <span className="image-preview-modal-title">
-              {currentImage.title || "문서"}
+              {currentImage.title || "Document"}
             </span>
             {currentImage.page && (
               <span className="image-preview-modal-page">
@@ -186,10 +186,10 @@ export function ImagePreviewModal({
             >
               {isCurrentSelected ? (
                 <>
-                  <CheckOutlined /> 선택됨
+                  <CheckOutlined /> Selected
                 </>
               ) : (
-                "이 문서 선택"
+                "Select this document"
               )}
             </button>
           )}

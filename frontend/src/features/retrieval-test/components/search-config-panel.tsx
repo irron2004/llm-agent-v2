@@ -26,10 +26,10 @@ export default function SearchConfigPanel({ config, onChange }: Props) {
 
   const resetWeights = () => {
     const defaultFields: FieldConfig[] = [
-      { field: "search_text", label: "본문 텍스트", enabled: true, weight: 1.0 },
-      { field: "chunk_summary", label: "청크 요약", enabled: true, weight: 0.7 },
-      { field: "chunk_keywords.text", label: "키워드", enabled: true, weight: 0.8 },
-      { field: "content", label: "원본 콘텐츠", enabled: false, weight: 0.6 },
+      { field: "search_text", label: "Body text", enabled: true, weight: 1.0 },
+      { field: "chunk_summary", label: "Chunk summary", enabled: true, weight: 0.7 },
+      { field: "chunk_keywords.text", label: "Keywords", enabled: true, weight: 0.8 },
+      { field: "content", label: "Raw content", enabled: false, weight: 0.6 },
     ];
     onChange({
       fieldWeights: defaultFields,
@@ -47,7 +47,7 @@ export default function SearchConfigPanel({ config, onChange }: Props) {
 
   return (
     <Card
-      title="검색 설정"
+      title="Search settings"
       style={{
         background: "var(--color-bg-card)",
         borderColor: "var(--color-border)",
@@ -60,7 +60,7 @@ export default function SearchConfigPanel({ config, onChange }: Props) {
       <Space direction="vertical" style={{ width: "100%" }} size="large">
         {/* Search Size */}
         <div>
-          <Text strong>검색 결과 개수</Text>
+          <Text strong>Number of results</Text>
           <div style={{ marginTop: "8px" }}>
             <InputNumber
               style={{ width: "100%" }}
@@ -68,11 +68,11 @@ export default function SearchConfigPanel({ config, onChange }: Props) {
               max={100}
               value={config.size}
               onChange={(v) => v && onChange({ size: v })}
-              addonAfter="개"
+              addonAfter="items"
             />
           </div>
           <Text type="secondary" style={{ fontSize: "11px", fontStyle: "italic" }}>
-            💡 검색 결과로 반환받을 문서 개수 (1~100)
+            💡 Number of documents to return (1-100)
           </Text>
         </div>
 
@@ -80,7 +80,7 @@ export default function SearchConfigPanel({ config, onChange }: Props) {
 
         {/* Hybrid Search Mode */}
         <div>
-          <Text strong>Hybrid Search 모드</Text>
+          <Text strong>Hybrid Search mode</Text>
           <div
             style={{
               display: "flex",
@@ -113,7 +113,7 @@ export default function SearchConfigPanel({ config, onChange }: Props) {
                 marks={{ 1: "1", 60: "60", 100: "100" }}
               />
               <Text type="secondary" style={{ fontSize: "11px", fontStyle: "italic" }}>
-                💡 RRF는 순위 기반 병합으로 가중치를 사용하지 않음
+                💡 RRF merges by rank and does not use weights
               </Text>
             </div>
           ) : (
@@ -121,7 +121,7 @@ export default function SearchConfigPanel({ config, onChange }: Props) {
             <>
               <div style={{ marginTop: "12px" }}>
                 <Text type="secondary" style={{ fontSize: "12px" }}>
-                  Dense (벡터 검색): {config.denseWeight.toFixed(1)}
+                  Dense (vector search): {config.denseWeight.toFixed(1)}
                 </Text>
                 <Slider
                   min={0}
@@ -146,7 +146,7 @@ export default function SearchConfigPanel({ config, onChange }: Props) {
                 />
               </div>
               <Text type="secondary" style={{ fontSize: "11px", fontStyle: "italic" }}>
-                💡 Dense=0, Sparse=1 → BM25 전용 모드
+                💡 Dense=0, Sparse=1 → BM25-only mode
               </Text>
             </>
           )}
@@ -212,7 +212,7 @@ export default function SearchConfigPanel({ config, onChange }: Props) {
           {config.multiQuery && (
             <div style={{ marginTop: "12px", paddingLeft: "8px" }}>
               <Text type="secondary" style={{ fontSize: "12px" }}>
-                확장 쿼리 개수
+                Number of expanded queries
               </Text>
               <InputNumber
                 style={{ width: "100%", marginTop: "4px" }}
@@ -237,15 +237,15 @@ export default function SearchConfigPanel({ config, onChange }: Props) {
               marginBottom: "12px",
             }}
           >
-            <Text strong>필드별 가중치</Text>
+            <Text strong>Field weights</Text>
             <Space size="small">
               <Button size="small" onClick={toggleAllFields}>
                 {config.fieldWeights.every((f) => f.enabled)
-                  ? "전체 해제"
-                  : "전체 선택"}
+                  ? "Clear all"
+                  : "Select all"}
               </Button>
               <Button size="small" onClick={resetWeights}>
-                초기화
+                Reset
               </Button>
             </Space>
           </div>

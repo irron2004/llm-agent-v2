@@ -10,7 +10,7 @@ import "./parsing-page.css";
 export default function ParsingPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  // Run 폴더 목록 가져오기
+  // Load run folders
   const { folders, isLoading: isLoadingFolders } = useRunFolders();
 
   const runId = searchParams.get("run") || env.defaultIngestionRun || folders[0]?.name || "";
@@ -62,7 +62,7 @@ export default function ParsingPage() {
               value={runId || undefined}
               onChange={handleRunChange}
               loading={isLoadingFolders}
-              placeholder="Run 폴더 선택"
+              placeholder="Select run folder"
               style={{ minWidth: 200 }}
               options={folders.map((f) => ({ label: f.name, value: f.name }))}
             />
@@ -71,7 +71,7 @@ export default function ParsingPage() {
               value={selectedDoc || undefined}
               onChange={handleDocChange}
               loading={isLoadingDocs}
-              placeholder="문서 선택"
+              placeholder="Select document"
               style={{ minWidth: 300 }}
               options={documents.map((doc) => ({ label: doc, value: doc }))}
               disabled={!runId}
@@ -80,7 +80,7 @@ export default function ParsingPage() {
         </div>
         <div className="parsing-header__right">
           <a href="/" className="parsing-header__link">
-            Chat으로 이동
+            Go to Chat
           </a>
         </div>
       </header>
@@ -98,7 +98,7 @@ export default function ParsingPage() {
           <div className="parsing-error">
             <Alert
               type="error"
-              message="데이터 로드 실패"
+              message="Failed to load data"
               description={error}
               showIcon
             />
@@ -111,8 +111,8 @@ export default function ParsingPage() {
       {!isLoading && sections.length > 0 && (
         <footer className="parsing-footer">
           <div className="parsing-footer__summary">
-            <strong>섹션 수:</strong> {sections.length}개 &nbsp;|&nbsp;
-            <strong>총 페이지:</strong> {totalPages}페이지
+            <strong>Sections:</strong> {sections.length} &nbsp;|&nbsp;
+            <strong>Total pages:</strong> {totalPages}
           </div>
         </footer>
       )}

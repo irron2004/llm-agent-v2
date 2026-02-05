@@ -33,7 +33,7 @@ export function FeedbackForm({
   const handleSubmit = useCallback(() => {
     // Validate
     if (accuracy === 0 || completeness === 0 || relevance === 0) {
-      setError("모든 항목의 점수를 선택해 주세요.");
+      setError("Please select a score for all items.");
       return;
     }
 
@@ -79,7 +79,7 @@ export function FeedbackForm({
             color: "var(--color-text-primary)",
           }}
         >
-          답변 평가
+          Answer Rating
         </h4>
         <button
           onClick={onCancel}
@@ -90,7 +90,7 @@ export function FeedbackForm({
             color: "var(--color-text-secondary)",
             padding: 4,
           }}
-          title="닫기"
+          title="Close"
         >
           <CloseOutlined />
         </button>
@@ -98,19 +98,19 @@ export function FeedbackForm({
 
       <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
         <RatingStars
-          label="정확성 (Accuracy)"
+          label="Accuracy"
           value={accuracy}
           onChange={setAccuracy}
           disabled={isSubmitting}
         />
         <RatingStars
-          label="완성도 (Completeness)"
+          label="Completeness"
           value={completeness}
           onChange={setCompleteness}
           disabled={isSubmitting}
         />
         <RatingStars
-          label="관련성 (Relevance)"
+          label="Relevance"
           value={relevance}
           onChange={setRelevance}
           disabled={isSubmitting}
@@ -127,10 +127,10 @@ export function FeedbackForm({
           color: "var(--color-text-secondary)",
         }}
       >
-        평균 점수: <strong style={{ color: "var(--color-text-primary)" }}>{avgScore}</strong>
+        Average score: <strong style={{ color: "var(--color-text-primary)" }}>{avgScore}</strong>
         {avgScore !== "-" && (
           <span style={{ marginLeft: 8 }}>
-            ({Number(avgScore) >= 3 ? "만족" : "불만족"})
+            ({Number(avgScore) >= 3 ? "Satisfied" : "Dissatisfied"})
           </span>
         )}
       </div>
@@ -145,13 +145,13 @@ export function FeedbackForm({
             fontWeight: 500,
           }}
         >
-          의견 (선택사항)
+          Comment (optional)
         </label>
         <textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           rows={3}
-          placeholder="추가 의견이 있다면 입력해 주세요."
+          placeholder="Add any additional comments."
           disabled={isSubmitting}
           style={{
             width: "100%",
@@ -177,13 +177,13 @@ export function FeedbackForm({
           }}
         >
           <UserOutlined style={{ marginRight: 4 }} />
-          이름 (선택사항)
+          Name (optional)
         </label>
         <input
           type="text"
           value={reviewerName}
           onChange={(e) => setReviewerName(e.target.value)}
-          placeholder="피드백 제출자 이름"
+          placeholder="Reviewer name"
           disabled={isSubmitting}
           style={{
             width: "100%",
@@ -226,7 +226,7 @@ export function FeedbackForm({
             fontSize: 12,
           }}
         >
-          취소
+          Cancel
         </button>
         <button
           className="action-button"
@@ -240,7 +240,7 @@ export function FeedbackForm({
             border: "none",
           }}
         >
-          {isSubmitting ? "저장 중..." : "저장"}
+          {isSubmitting ? "Saving..." : "Save"}
         </button>
       </div>
     </div>

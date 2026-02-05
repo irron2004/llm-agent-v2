@@ -94,8 +94,8 @@ export function RatingStars({
                 transform: hoverValue === star ? "scale(1.1)" : "scale(1)",
                 opacity: disabled ? 0.5 : 1,
               }}
-              title={`${star}점`}
-              aria-label={`${label} ${star}점`}
+              title={`${star} stars`}
+              aria-label={`${label} ${star} stars`}
             >
               {filled ? <StarFilled /> : <StarOutlined />}
             </button>
@@ -108,7 +108,7 @@ export function RatingStars({
             color: "var(--color-text-secondary)",
           }}
         >
-          {value > 0 ? `${value}점` : "선택 안함"}
+          {value > 0 ? `${value} stars` : "Not selected"}
         </span>
       </div>
     </div>

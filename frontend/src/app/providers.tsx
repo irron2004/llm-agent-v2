@@ -6,6 +6,7 @@ import { ChatHistoryProvider } from "../features/chat/context/chat-history-conte
 import { ChatLogsProvider } from "../features/chat/context/chat-logs-context";
 import { ChatReviewProvider } from "../features/chat/context/chat-review-context";
 import { GlobalSearchProvider } from "../components/global-search";
+import { RetrievalTestProvider } from "../features/retrieval-test/context/retrieval-test-context";
 
 function createClient() {
   return new QueryClient({
@@ -47,9 +48,11 @@ export default function AppProviders({ children }: PropsWithChildren) {
           <ChatLogsProvider>
             <ChatReviewProvider>
               <GlobalSearchProvider>
-                <AntdConfigProvider>
-                  {children}
-                </AntdConfigProvider>
+                <RetrievalTestProvider>
+                  <AntdConfigProvider>
+                    {children}
+                  </AntdConfigProvider>
+                </RetrievalTestProvider>
               </GlobalSearchProvider>
             </ChatReviewProvider>
           </ChatLogsProvider>

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { SuggestedDevice } from "../types";
 
 type DeviceSuggestionsProps = {
@@ -8,7 +8,19 @@ type DeviceSuggestionsProps = {
   isActive?: boolean;  // 활성화 상태 (마지막 메시지에서만)
 };
 
+type Step = "confirm" | "select";
+
 export function DeviceSuggestions({ devices, onSelect, onDismiss, isActive = false }: DeviceSuggestionsProps) {
+  // 2단계 플로우: confirm -> select
+  const [step, setStep] = useState<Step>("confirm");
+
+  // isActive가 변경되면 step을 초기화
+  useEffect(() => {
+    if (isActive) {
+      setStep("confirm");
+    }
+  }, [isActive]);
+
   // 숫자 키 및 ESC 키 처리 (isActive일 때만)
   useEffect(() => {
     if (!isActive || !devices || devices.length === 0) return;
@@ -22,44 +34,89 @@ export function DeviceSuggestions({ devices, onSelect, onDismiss, isActive = fal
         return;
       }
 
-      // 숫자 키 1-9: 기기 선택
-      const key = e.key;
-      if (key >= "1" && key <= "9" && onSelect) {
-        const index = parseInt(key, 10);
-        if (index <= devices.length) {
+      if (step === "confirm") {
+        // confirm 단계: 1 = Yes (기기 선택으로 이동), 2 = No (닫기)
+        if (e.key === "1") {
           e.preventDefault();
           e.stopPropagation();
-          onSelect(index, devices[index - 1].name);
+          setStep("select");
+        } else if (e.key === "2") {
+          e.preventDefault();
+          e.stopPropagation();
+          onDismiss?.();
+        }
+      } else if (step === "select") {
+        // select 단계: 숫자 키 1-9로 기기 선택
+        const key = e.key;
+        if (key >= "1" && key <= "9" && onSelect) {
+          const index = parseInt(key, 10);
+          if (index <= devices.length) {
+            e.preventDefault();
+            e.stopPropagation();
+            onSelect(index, devices[index - 1].name);
+          }
         }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown, true);
     return () => window.removeEventListener("keydown", handleKeyDown, true);
-  }, [isActive, devices, onSelect, onDismiss]);
+  }, [isActive, devices, onSelect, onDismiss, step]);
 
   if (!devices || devices.length === 0) return null;
 
-  // 활성화 상태가 아니면 작은 버전으로 표시
+  // Show compact view when inactive
   if (!isActive) {
     return (
       <div className="device-suggestions device-suggestions-inactive">
         <p className="device-suggestions-title-small">
-          검색된 기기: {devices.map(d => d.name).join(", ")}
+          Detected equipment: {devices.map(d => d.name).join(", ")}
         </p>
       </div>
     );
   }
 
-  // 활성화 상태: 크게 표시
+  // Step 1: 확인 단계 - 기기 필터 검색 여부 물어보기
+  if (step === "confirm") {
+    return (
+      <div className="device-suggestions-overlay">
+        <div className="device-suggestions-modal device-suggestions-confirm">
+          <p className="device-suggestions-title">
+            Should I search for a specific equipment?
+          </p>
+          <p className="device-suggestions-hint">
+            Press <kbd>ESC</kbd> to go back to the chat
+          </p>
+          <div className="device-suggestions-confirm-buttons">
+            <button
+              className="device-confirm-button device-confirm-yes"
+              onClick={() => setStep("select")}
+            >
+              <span className="device-number">1.</span>
+              <span>Yes</span>
+            </button>
+            <button
+              className="device-confirm-button device-confirm-no"
+              onClick={() => onDismiss?.()}
+            >
+              <span className="device-number">2.</span>
+              <span>No</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2: select equipment
   return (
     <div className="device-suggestions-overlay">
       <div className="device-suggestions-modal">
         <p className="device-suggestions-title">
-          다음의 기기 중에서 어떤 기기를 중심으로 다시 검색할까요?
+          Which equipment would you like to search for?
         </p>
         <p className="device-suggestions-hint">
-          추가 검색을 원하지 않으면 <kbd>ESC</kbd>를 눌러주세요.
+          Press <kbd>ESC</kbd> if you don't want additional search.
         </p>
         <div className="device-suggestions-list">
           {devices.map((device, index) => (
@@ -70,7 +127,7 @@ export function DeviceSuggestions({ devices, onSelect, onDismiss, isActive = fal
             >
               <span className="device-number">{index + 1}.</span>
               <span className="device-name">{device.name}</span>
-              <span className="device-count">({device.count}건)</span>
+              <span className="device-count">({device.count} results)</span>
             </button>
           ))}
         </div>

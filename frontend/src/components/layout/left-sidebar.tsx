@@ -4,6 +4,7 @@ import {
   SearchOutlined,
   FileTextOutlined,
   ExperimentOutlined,
+  RobotOutlined,
   PlusOutlined,
   MenuFoldOutlined,
   DeleteOutlined,
@@ -55,6 +56,11 @@ export default function LeftSidebar({
       key: "/retrieval-test",
       icon: <ExperimentOutlined />,
       label: "Retrieval Test",
+    },
+    {
+      key: "/batch-answer",
+      icon: <RobotOutlined />,
+      label: "Batch Answer",
     },
     {
       key: "/parsing",
@@ -116,12 +122,12 @@ export default function LeftSidebar({
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
     // Format time as HH:MM
-    const timeStr = date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: false });
+    const timeStr = date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
 
-    if (diffDays === 0) return `오늘 ${timeStr}`;
-    if (diffDays === 1) return `어제 ${timeStr}`;
-    if (diffDays < 7) return `${diffDays}일 전`;
-    return date.toLocaleDateString("ko-KR");
+    if (diffDays === 0) return `Today ${timeStr}`;
+    if (diffDays === 1) return `Yesterday ${timeStr}`;
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString("en-US");
   };
 
   return (
@@ -189,16 +195,16 @@ export default function LeftSidebar({
           {filteredHistory.length === 0 ? (
             <EmptyState
               icon={searchQuery ? <SearchOutlined /> : <InboxOutlined />}
-              title={searchQuery ? "검색 결과 없음" : "대화 내역이 없습니다"}
+              title={searchQuery ? "No search results" : "No chat history"}
               description={
                 searchQuery
-                  ? "다른 검색어를 시도해 보세요"
-                  : "새 대화를 시작해 보세요"
+                  ? "Try a different search"
+                  : "Start a new chat"
               }
               action={
                 searchQuery
                   ? undefined
-                  : { label: "새 대화 시작", onClick: handleNewChat }
+                  : { label: "Start new chat", onClick: handleNewChat }
               }
               size="small"
             />
@@ -215,7 +221,7 @@ export default function LeftSidebar({
                     {item.title}
                     {item.isBranch && (
                       <span className="history-item-badge">
-                        <BranchesOutlined /> 브랜치
+                        <BranchesOutlined /> Branch
                       </span>
                     )}
                   </div>

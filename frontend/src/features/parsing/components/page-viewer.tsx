@@ -11,7 +11,7 @@ export function PageViewer({ page, isLoading }: PageViewerProps) {
     return (
       <div className="page-viewer page-viewer--loading">
         <div className="page-viewer__spinner" />
-        <span>로딩 중...</span>
+        <span>Loading...</span>
       </div>
     );
   }
@@ -19,7 +19,7 @@ export function PageViewer({ page, isLoading }: PageViewerProps) {
   if (!page) {
     return (
       <div className="page-viewer page-viewer--empty">
-        <span>페이지를 선택해주세요</span>
+        <span>Select a page</span>
       </div>
     );
   }
@@ -27,10 +27,10 @@ export function PageViewer({ page, isLoading }: PageViewerProps) {
   return (
     <div className="page-viewer">
       <div className="page-viewer__content">
-        {/* 왼쪽: 원본 이미지 */}
+        {/* Left: original image */}
         <div className="page-viewer__panel page-viewer__panel--image">
           <div className="page-viewer__panel-header">
-            <h3>원본 이미지</h3>
+            <h3>Original Image</h3>
             <span className="page-viewer__page-number">Page {page.pageNumber}</span>
           </div>
           <div className="page-viewer__panel-body">
@@ -42,16 +42,16 @@ export function PageViewer({ page, isLoading }: PageViewerProps) {
           </div>
         </div>
 
-        {/* 오른쪽: VLM 파싱 결과 */}
+        {/* Right: VLM parse result */}
         <div className="page-viewer__panel page-viewer__panel--vlm">
           <div className="page-viewer__panel-header">
-            <h3>VLM 파싱 결과</h3>
+            <h3>VLM Parse Result</h3>
             <span className="page-viewer__char-count">
-              {page.vlmText.length.toLocaleString()} 자
+              {page.vlmText.length.toLocaleString()} chars
             </span>
           </div>
           <div className="page-viewer__panel-body">
-            <pre className="page-viewer__vlm-text">{page.vlmText || "(텍스트 없음)"}</pre>
+            <pre className="page-viewer__vlm-text">{page.vlmText || "(No text)"}</pre>
           </div>
         </div>
       </div>

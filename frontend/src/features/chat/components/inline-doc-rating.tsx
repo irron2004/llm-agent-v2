@@ -1,65 +1,59 @@
 import { useState, useCallback } from "react";
 import { StarOutlined, StarFilled } from "@ant-design/icons";
+import { useRetrievalEvaluationOptional } from "./retrieval-evaluation-context";
 
 /**
- * Simple star rating component for document relevance evaluation.
- *
- * This component only manages local state and notifies parent via onChange.
- * API calls should be handled by the parent component (e.g., RetrievalEvaluationForm).
+ * Inline star rating component that integrates with RetrievalEvaluationContext.
+ * Designed to be placed next to document titles.
  */
 
-type DocRelevanceRatingProps = {
+type InlineDocRatingProps = {
   docId: string;
-  initialScore?: number;
-  onChange: (docId: string, score: number) => void;
-  disabled?: boolean;
-  showLabel?: boolean;
+  size?: "small" | "default";
 };
 
-export function DocRelevanceRating({
-  docId,
-  initialScore = 0,
-  onChange,
-  disabled = false,
-  showLabel = true,
-}: DocRelevanceRatingProps) {
-  const [score, setScore] = useState<number>(initialScore);
+export function InlineDocRating({ docId, size = "small" }: InlineDocRatingProps) {
+  const context = useRetrievalEvaluationOptional();
   const [hoverScore, setHoverScore] = useState<number | null>(null);
 
-  const handleClick = useCallback((starValue: number) => {
-    if (disabled) return;
-    setScore(starValue);
-    onChange(docId, starValue);
-  }, [disabled, docId, onChange]);
+  // If no context, don't render anything
+  if (!context) {
+    return null;
+  }
 
-  const handleMouseEnter = useCallback((starValue: number) => {
+  const { scores, setScore, isSubmitting, isLoading } = context;
+  const score = scores.get(docId) || 0;
+  const displayScore = hoverScore ?? score;
+  const disabled = isSubmitting || isLoading;
+
+  const handleClick = (starValue: number) => {
+    if (disabled) return;
+    setScore(docId, starValue);
+  };
+
+  const handleMouseEnter = (starValue: number) => {
     if (!disabled) {
       setHoverScore(starValue);
     }
-  }, [disabled]);
+  };
 
-  const handleMouseLeave = useCallback(() => {
+  const handleMouseLeave = () => {
     setHoverScore(null);
-  }, []);
+  };
 
-  const displayScore = hoverScore ?? score;
+  const starSize = size === "small" ? 12 : 14;
 
   return (
     <div
-      className="doc-relevance-rating"
+      className="inline-doc-rating"
       style={{
-        display: "flex",
+        display: "inline-flex",
         alignItems: "center",
-        gap: 4,
-        fontSize: 12,
+        gap: 2,
+        marginLeft: 8,
       }}
       onMouseLeave={handleMouseLeave}
     >
-      {showLabel && (
-        <span style={{ color: "var(--color-text-secondary)", marginRight: 2 }}>
-          Relevance:
-        </span>
-      )}
       {[1, 2, 3, 4, 5].map((star) => {
         const filled = star <= displayScore;
         return (
@@ -77,7 +71,7 @@ export function DocRelevanceRating({
               color: filled
                 ? "var(--color-accent-primary, #1890ff)"
                 : "var(--color-border, #d9d9d9)",
-              fontSize: 14,
+              fontSize: starSize,
               lineHeight: 1,
               transition: "color 0.2s, transform 0.1s",
               transform: hoverScore === star ? "scale(1.15)" : "scale(1)",
@@ -90,18 +84,8 @@ export function DocRelevanceRating({
           </button>
         );
       })}
-      {score > 0 && (
-        <span
-          style={{
-            marginLeft: 4,
-            color: "var(--color-text-secondary)",
-          }}
-        >
-          {score} stars
-        </span>
-      )}
     </div>
   );
 }
 
-export default DocRelevanceRating;
+export default InlineDocRating;

@@ -14,6 +14,11 @@ import {
   FeedbackResponse,
   FeedbackListResponse,
   FeedbackStatisticsResponse,
+  // Query-unit retrieval evaluation types
+  RetrievalEvaluationRequest,
+  RetrievalEvaluationResponse,
+  RetrievalEvaluationListResponse,
+  // Legacy types (deprecated)
   DocRelevanceEvaluationRequest,
   DocRelevanceEvaluationResponse,
   DocRelevanceEvaluationListResponse,
@@ -171,8 +176,113 @@ export async function exportFeedbackCsv(minScore = 3.0): Promise<Blob> {
   return res.blob();
 }
 
-// --- Retrieval Evaluation API (document relevance scoring) ---
+// --- Retrieval Evaluation API (query-unit storage) ---
 
+/**
+ * Save query-unit evaluation (batch save).
+ * @param queryId - Query ID (chat: "{sessionId}:{turnId}", search: "search:{timestamp}")
+ * @param data - Evaluation data with doc_details
+ */
+export async function saveRetrievalEvaluation(
+  queryId: string,
+  data: RetrievalEvaluationRequest
+): Promise<RetrievalEvaluationResponse> {
+  return apiClient.post<RetrievalEvaluationResponse>(
+    `/api/retrieval-evaluation/query/${encodeURIComponent(queryId)}`,
+    data
+  );
+}
+
+/**
+ * Get evaluation by query_id.
+ * @param queryId - Query ID
+ */
+export async function getRetrievalEvaluation(
+  queryId: string
+): Promise<RetrievalEvaluationResponse | null> {
+  try {
+    return await apiClient.get<RetrievalEvaluationResponse>(
+      `/api/retrieval-evaluation/query/${encodeURIComponent(queryId)}`
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * List all query evaluations with pagination.
+ * @param params - Query parameters (limit, offset, source)
+ */
+export async function listRetrievalEvaluations(params?: {
+  limit?: number;
+  offset?: number;
+  source?: "chat" | "search";
+}): Promise<RetrievalEvaluationListResponse> {
+  const query = new URLSearchParams();
+  if (params?.limit !== undefined) query.set("limit", String(params.limit));
+  if (params?.offset !== undefined) query.set("offset", String(params.offset));
+  if (params?.source) query.set("source", params.source);
+
+  return apiClient.get<RetrievalEvaluationListResponse>(
+    `/api/retrieval-evaluation/list?${query.toString()}`
+  );
+}
+
+/**
+ * Delete evaluation by query_id.
+ * @param queryId - Query ID to delete
+ */
+export async function deleteRetrievalEvaluation(
+  queryId: string
+): Promise<{ message: string; query_id: string }> {
+  return apiClient.delete(
+    `/api/retrieval-evaluation/query/${encodeURIComponent(queryId)}`
+  );
+}
+
+/**
+ * Export retrieval evaluation data as JSON.
+ * @param minRelevance - Minimum relevance score for 'relevant' (default: 3)
+ * @param limit - Maximum number of records (default: 10000)
+ */
+export async function exportRetrievalEvaluationJson(
+  minRelevance = 3,
+  limit = 10000
+): Promise<Blob> {
+  const url = buildUrl(
+    `/api/retrieval-evaluation/export/json?min_relevance=${minRelevance}&limit=${limit}`
+  );
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Export failed: ${res.status}`);
+  }
+  return res.blob();
+}
+
+/**
+ * Export retrieval evaluation data as CSV.
+ * @param minRelevance - Minimum relevance score for 'relevant' (default: 3)
+ * @param limit - Maximum number of records (default: 10000)
+ */
+export async function exportRetrievalEvaluationCsv(
+  minRelevance = 3,
+  limit = 10000
+): Promise<Blob> {
+  const url = buildUrl(
+    `/api/retrieval-evaluation/export/csv?min_relevance=${minRelevance}&limit=${limit}`
+  );
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Export failed: ${res.status}`);
+  }
+  return res.blob();
+}
+
+// --- Legacy Retrieval Evaluation API (deprecated) ---
+
+/**
+ * @deprecated Use saveRetrievalEvaluation for query-unit storage
+ */
 export async function saveDocRelevanceEvaluation(
   sessionId: string,
   turnId: number,
@@ -185,6 +295,9 @@ export async function saveDocRelevanceEvaluation(
   );
 }
 
+/**
+ * @deprecated Use getRetrievalEvaluation for query-unit storage
+ */
 export async function getDocRelevanceEvaluation(
   sessionId: string,
   turnId: number,
@@ -199,6 +312,9 @@ export async function getDocRelevanceEvaluation(
   }
 }
 
+/**
+ * @deprecated Use listRetrievalEvaluations for query-unit storage
+ */
 export async function listDocRelevanceEvaluations(
   sessionId: string,
   turnId: number

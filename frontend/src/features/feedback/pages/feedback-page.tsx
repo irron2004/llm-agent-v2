@@ -63,7 +63,7 @@ export default function FeedbackPage() {
       setStats(statsRes);
     } catch (err) {
       console.error("Failed to fetch feedback:", err);
-      message.error("피드백 데이터를 불러오는데 실패했습니다.");
+      message.error("Failed to load feedback data.");
     } finally {
       setLoading(false);
     }
@@ -82,9 +82,9 @@ export default function FeedbackPage() {
       a.download = "feedback_export.json";
       a.click();
       URL.revokeObjectURL(url);
-      message.success("JSON 내보내기 완료");
+      message.success("JSON export complete.");
     } catch {
-      message.error("JSON 내보내기 실패");
+      message.error("JSON export failed.");
     }
   };
 
@@ -97,23 +97,23 @@ export default function FeedbackPage() {
       a.download = "feedback_export.csv";
       a.click();
       URL.revokeObjectURL(url);
-      message.success("CSV 내보내기 완료");
+      message.success("CSV export complete.");
     } catch {
-      message.error("CSV 내보내기 실패");
+      message.error("CSV export failed.");
     }
   };
 
   const columns: ColumnsType<FeedbackResponse> = [
     {
-      title: "시간",
+      title: "Time",
       dataIndex: "ts",
       key: "ts",
       width: 150,
       render: (ts: string) =>
-        ts ? new Date(ts).toLocaleString("ko-KR") : "-",
+        ts ? new Date(ts).toLocaleString("en-US") : "-",
     },
     {
-      title: "평균",
+      title: "Avg",
       dataIndex: "avg_score",
       key: "avg_score",
       width: 80,
@@ -131,39 +131,39 @@ export default function FeedbackPage() {
       sorter: (a, b) => a.avg_score - b.avg_score,
     },
     {
-      title: "정확",
+      title: "Acc",
       dataIndex: "accuracy",
       key: "accuracy",
       width: 60,
       align: "center",
     },
     {
-      title: "완성",
+      title: "Comp",
       dataIndex: "completeness",
       key: "completeness",
       width: 60,
       align: "center",
     },
     {
-      title: "관련",
+      title: "Rel",
       dataIndex: "relevance",
       key: "relevance",
       width: 60,
       align: "center",
     },
     {
-      title: "평가",
+      title: "Rating",
       dataIndex: "rating",
       key: "rating",
       width: 80,
       render: (rating: string) => (
         <Tag color={rating === "up" ? "green" : "red"}>
-          {rating === "up" ? "만족" : "불만족"}
+          {rating === "up" ? "Satisfied" : "Dissatisfied"}
         </Tag>
       ),
     },
     {
-      title: "질문",
+      title: "Question",
       dataIndex: "user_text",
       key: "user_text",
       ellipsis: true,
@@ -172,7 +172,7 @@ export default function FeedbackPage() {
       ),
     },
     {
-      title: "의견",
+      title: "Comment",
       dataIndex: "comment",
       key: "comment",
       width: 150,
@@ -181,7 +181,7 @@ export default function FeedbackPage() {
         comment ? <span title={comment}>{comment.slice(0, 30)}...</span> : "-",
     },
     {
-      title: "평가자",
+      title: "Reviewer",
       dataIndex: "reviewer_name",
       key: "reviewer_name",
       width: 100,
@@ -200,7 +200,7 @@ export default function FeedbackPage() {
             setDetailModalOpen(true);
           }}
         >
-          상세
+          Details
         </Button>
       ),
     },
@@ -208,20 +208,20 @@ export default function FeedbackPage() {
 
   return (
     <div style={{ padding: 24 }}>
-      <h1 style={{ marginBottom: 24 }}>피드백 관리</h1>
+      <h1 style={{ marginBottom: 24 }}>Feedback Management</h1>
 
       {/* Statistics Cards */}
       {stats && (
         <Row gutter={16} style={{ marginBottom: 24 }}>
           <Col span={6}>
             <Card>
-              <Statistic title="전체 피드백" value={stats.total_count} />
+              <Statistic title="Total feedback" value={stats.total_count} />
             </Card>
           </Col>
           <Col span={6}>
             <Card>
               <Statistic
-                title="평균 점수"
+                title="Average score"
                 value={stats.avg_score?.toFixed(2) ?? "-"}
                 suffix="/ 5"
               />
@@ -230,7 +230,7 @@ export default function FeedbackPage() {
           <Col span={6}>
             <Card>
               <Statistic
-                title="만족"
+                title="Satisfied"
                 value={stats.rating_distribution?.up ?? 0}
                 valueStyle={{ color: "#52c41a" }}
               />
@@ -239,7 +239,7 @@ export default function FeedbackPage() {
           <Col span={6}>
             <Card>
               <Statistic
-                title="불만족"
+                title="Dissatisfied"
                 value={stats.rating_distribution?.down ?? 0}
                 valueStyle={{ color: "#ff4d4f" }}
               />
@@ -259,7 +259,7 @@ export default function FeedbackPage() {
         }}
       >
         <Select
-          placeholder="평가 필터"
+          placeholder="Rating filter"
           allowClear
           style={{ width: 120 }}
           value={ratingFilter}
@@ -268,14 +268,14 @@ export default function FeedbackPage() {
             setPage(1);
           }}
           options={[
-            { label: "만족", value: "up" },
-            { label: "불만족", value: "down" },
+            { label: "Satisfied", value: "up" },
+            { label: "Dissatisfied", value: "down" },
           ]}
         />
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <span>점수:</span>
+          <span>Score:</span>
           <InputNumber
-            placeholder="최소"
+            placeholder="Min"
             min={1}
             max={5}
             step={0.5}
@@ -288,7 +288,7 @@ export default function FeedbackPage() {
           />
           <span>~</span>
           <InputNumber
-            placeholder="최대"
+            placeholder="Max"
             min={1}
             max={5}
             step={0.5}
@@ -301,14 +301,14 @@ export default function FeedbackPage() {
           />
         </div>
         <Button icon={<ReloadOutlined />} onClick={fetchData}>
-          새로고침
+          Refresh
         </Button>
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <Button icon={<DownloadOutlined />} onClick={handleExportJson}>
-            JSON 내보내기
+            Export JSON
           </Button>
           <Button icon={<DownloadOutlined />} onClick={handleExportCsv}>
-            CSV 내보내기
+            Export CSV
           </Button>
         </div>
       </div>
@@ -324,7 +324,7 @@ export default function FeedbackPage() {
           pageSize: pageSize,
           total: total,
           showSizeChanger: true,
-          showTotal: (t) => `총 ${t}개`,
+          showTotal: (t) => `Total ${t}`,
           onChange: (p, ps) => {
             setPage(p);
             setPageSize(ps);
@@ -335,7 +335,7 @@ export default function FeedbackPage() {
 
       {/* Detail Modal */}
       <Modal
-        title="피드백 상세"
+        title="Feedback Details"
         open={detailModalOpen}
         onCancel={() => setDetailModalOpen(false)}
         footer={null}
@@ -344,19 +344,19 @@ export default function FeedbackPage() {
         {selectedFeedback && (
           <div>
             <div style={{ marginBottom: 16 }}>
-              <h4 style={{ marginBottom: 8 }}>점수</h4>
+              <h4 style={{ marginBottom: 8 }}>Scores</h4>
               <div style={{ display: "flex", gap: 24 }}>
                 <div>
-                  정확성: <strong>{selectedFeedback.accuracy}</strong>/5
+                  Accuracy: <strong>{selectedFeedback.accuracy}</strong>/5
                 </div>
                 <div>
-                  완성도: <strong>{selectedFeedback.completeness}</strong>/5
+                  Completeness: <strong>{selectedFeedback.completeness}</strong>/5
                 </div>
                 <div>
-                  관련성: <strong>{selectedFeedback.relevance}</strong>/5
+                  Relevance: <strong>{selectedFeedback.relevance}</strong>/5
                 </div>
                 <div>
-                  평균:{" "}
+                  Average:{" "}
                   <strong
                     style={{
                       color:
@@ -374,20 +374,20 @@ export default function FeedbackPage() {
 
             {selectedFeedback.comment && (
               <div style={{ marginBottom: 16 }}>
-                <h4 style={{ marginBottom: 8 }}>의견</h4>
+                <h4 style={{ marginBottom: 8 }}>Comment</h4>
                 <p>{selectedFeedback.comment}</p>
               </div>
             )}
 
             {selectedFeedback.reviewer_name && (
               <div style={{ marginBottom: 16 }}>
-                <h4 style={{ marginBottom: 8 }}>평가자</h4>
+                <h4 style={{ marginBottom: 8 }}>Reviewer</h4>
                 <p>{selectedFeedback.reviewer_name}</p>
               </div>
             )}
 
             <div style={{ marginBottom: 16 }}>
-              <h4 style={{ marginBottom: 8 }}>질문</h4>
+              <h4 style={{ marginBottom: 8 }}>Question</h4>
               <div
                 style={{
                   background: "var(--color-bg-secondary, #f5f5f5)",
@@ -400,7 +400,7 @@ export default function FeedbackPage() {
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <h4 style={{ marginBottom: 8 }}>답변</h4>
+              <h4 style={{ marginBottom: 8 }}>Answer</h4>
               <div
                 style={{
                   background: "var(--color-bg-secondary, #f5f5f5)",
@@ -416,7 +416,7 @@ export default function FeedbackPage() {
 
             {selectedFeedback.logs && selectedFeedback.logs.length > 0 && (
               <div>
-                <h4 style={{ marginBottom: 8 }}>실행 로그</h4>
+                <h4 style={{ marginBottom: 8 }}>Activity Log</h4>
                 <div
                   style={{
                     background: "#1e1e1e",
@@ -445,7 +445,7 @@ export default function FeedbackPage() {
             >
               Session: {selectedFeedback.session_id} | Turn:{" "}
               {selectedFeedback.turn_id} |{" "}
-              {new Date(selectedFeedback.ts).toLocaleString("ko-KR")}
+              {new Date(selectedFeedback.ts).toLocaleString("en-US")}
             </div>
           </div>
         )}

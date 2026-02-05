@@ -95,13 +95,13 @@ const resolveInterruptKind = (payload?: Record<string, unknown> | null): Interru
 
 const buildInterruptPrompt = (kind: InterruptKind, instruction?: string) => {
   if (kind === "device_selection") {
-    return "검색에 사용할 기기와 문서 종류를 각각 1개 이상 선택하세요.";
+    return "Select at least one equipment and one document type for search.";
   }
   if (kind === "retrieval_review") {
-    return "검색 결과가 준비되었습니다. 아래에서 문서를 선택하거나 추가 키워드를 입력해 주세요.";
+    return "Search results are ready. Select documents below or enter additional keywords.";
   }
   if (instruction && instruction.trim()) return instruction.trim();
-  return "추가 입력이 필요합니다. 승인/거절 또는 수정 답변을 입력해 주세요.";
+  return "Additional input is required. Enter approve/reject or a revised answer.";
 };
 
 const normalizeReviewDocs = (payload?: Record<string, unknown> | null): ReviewDoc[] => {
@@ -280,7 +280,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         newSessionId = res.session_id;
       } catch (err) {
         console.error("Failed to branch session:", err);
-        setError("브랜치 세션 생성에 실패했습니다.");
+        setError("Failed to create branch session.");
         return null;
       }
     }
@@ -327,7 +327,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       if (res.interrupted) {
         const threadId = res.thread_id ?? "";
         if (!threadId) {
-          setError("thread_id가 없어 검색 결과 확인을 이어갈 수 없습니다.");
+          setError("Missing thread_id; cannot continue reviewing search results.");
         }
 
         const payload = res.interrupt_payload ?? null;
@@ -339,7 +339,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         const instruction =
           typeof payload?.instruction === "string" && payload.instruction.trim()
             ? payload.instruction.trim()
-            : "검색 결과를 확인한 뒤 승인/거절/키워드를 입력하세요.";
+            : "Review the results, then enter approve/reject or keywords.";
         // Use res.retrieved_docs directly (same source as message.retrievedDocs)
         const docs: ReviewDoc[] = (res.retrieved_docs || []).map((doc, index) => ({
           docId: doc.id,
@@ -479,7 +479,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       }
       const isResume = Boolean(pending);
       if (isResume && !pending?.threadId) {
-        setError("thread_id가 없어 검색 결과 확인을 이어갈 수 없습니다.");
+        setError("Missing thread_id; cannot continue reviewing search results.");
         return;
       }
 
@@ -520,7 +520,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       appendMessage({
         id: assistantId,
         role: "assistant",
-        content: "처리 중...",
+        content: "Processing...",
         currentNode: null,
         sessionId: activeSessionId,
         originalQuery: requestMessage,
@@ -626,16 +626,16 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
                   return;
                 }
 
-                const messageText = parseMessage ?? `파싱 결과 - ${[
-                  parsedDevices.length > 0 ? `장비: ${parsedDevices.join(", ")}` : null,
-                  parsedDocTypes.length > 0 ? `문서: ${parsedDocTypes.join(", ")}` : null,
+                const messageText = parseMessage ?? `Parse result - ${[
+                  parsedDevices.length > 0 ? `Equipment: ${parsedDevices.join(", ")}` : null,
+                  parsedDocTypes.length > 0 ? `Document: ${parsedDocTypes.join(", ")}` : null,
                 ].filter(Boolean).join(", ")}`;
 
                 addLog(assistantId, `🔍 ${messageText}`, "auto_parse");
 
                 updateMessage(assistantId, (m) => ({
                   ...m,
-                  content: `🔍 ${messageText}\n\n처리 중...`,
+                  content: `🔍 ${messageText}\n\nProcessing...`,
                   autoParse: {
                     device: parsedDevice,
                     doc_type: parsedDocType,
@@ -650,11 +650,11 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
               }
 
               if (evt?.type === "error") {
-                const detail = typeof evt?.detail === "string" ? evt.detail : "요청 실패";
+                const detail = typeof evt?.detail === "string" ? evt.detail : "Request failed";
                 setError(detail);
                 updateMessage(assistantId, (m) => ({
                   ...m,
-                  content: "오류가 발생했습니다.",
+                  content: "An error occurred.",
                   currentNode: null,
                 }));
                 return;
@@ -669,7 +669,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
             onError: (err) => {
               // Abort is expected when user clicks Stop.
               if (err instanceof DOMException && err.name === "AbortError") return;
-              setError(err instanceof Error ? err.message : "요청 실패");
+              setError(err instanceof Error ? err.message : "Request failed");
             },
             onClose: () => {
               abortRef.current = null;
@@ -679,7 +679,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         );
       } catch (err) {
         currentTurnEditedRef.current = false;
-        setError(err instanceof Error ? err.message : "요청 실패");
+        setError(err instanceof Error ? err.message : "Request failed");
       } finally {
         setIsStreaming(false);
       }
@@ -697,8 +697,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           ? uniqueIds.join(", ")
           : uniqueRanks.length > 0
             ? uniqueRanks.join(", ")
-            : "없음";
-      const summary = `선택 문서: ${label}`;
+            : "None";
+      const summary = `Selected docs: ${label}`;
       // 버튼 클릭 시 즉시 문서 선택 UI 숨기기
       setPendingInterrupt(null);
       send({
@@ -719,11 +719,11 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       const validQueries = modifiedQueries.map((q) => q.trim()).filter((q) => q.length > 0);
 
       if (validQueries.length === 0) {
-        setError("최소 1개 이상의 검색어를 입력해야 합니다.");
+        setError("Enter at least one search query.");
         return;
       }
 
-      const summary = `검색어 수정: ${validQueries.join(", ")}`;
+      const summary = `Updated queries: ${validQueries.join(", ")}`;
       setPendingInterrupt(null);
 
       send({
@@ -745,7 +745,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       const hasDocTypes = selectedDocTypes.length > 0;
 
       if (!hasDevices || !hasDocTypes) {
-        setError("기기와 문서 종류를 각각 1개 이상 선택해야 합니다.");
+        setError("Select at least one equipment and one document type.");
         return;
       }
 
@@ -758,23 +758,23 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
       const summaryParts: string[] = [];
       if (allDevicesSelected) {
-        summaryParts.push("기기: 전체");
+        summaryParts.push("Equipment: All");
       } else if (selectedDevices.length > 10) {
-        summaryParts.push("기기: 다수 선택");
+        summaryParts.push("Equipment: Multiple");
       } else {
-        summaryParts.push(`기기: ${selectedDevices.join(", ")}`);
+        summaryParts.push(`Equipment: ${selectedDevices.join(", ")}`);
       }
 
       summaryParts.push(
         allDocTypesSelected
-          ? "문서: 전체"
-          : `문서: ${selectedDocTypes.join(", ")}`
+          ? "Documents: All"
+          : `Documents: ${selectedDocTypes.join(", ")}`
       );
 
       setPendingInterrupt(null);
 
       send({
-        text: summaryParts.length > 0 ? `선택: ${summaryParts.join(" / ")}` : "선택 조건 검색",
+        text: summaryParts.length > 0 ? `Selection: ${summaryParts.join(" / ")}` : "Search with selected filters",
         decisionOverride: {
           type: "device_selection",
           selected_devices: selectedDevices,
@@ -809,7 +809,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     async ({ messageId, sessionId: msgSessionId, turnId, rating, reason }: FeedbackPayload) => {
       const targetSessionId = msgSessionId || sessionId;
       if (!targetSessionId || !turnId) {
-        setError("만족도를 저장하려면 turn 정보가 필요합니다.");
+        setError("Turn info is required to save rating.");
         return;
       }
 
@@ -834,7 +834,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         }));
       } catch (err) {
         console.error("Failed to save feedback:", err);
-        setError(err instanceof Error ? err.message : "만족도 저장에 실패했습니다.");
+        setError(err instanceof Error ? err.message : "Failed to save rating.");
       }
     },
     [sessionId, updateMessage]
@@ -854,7 +854,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     }: DetailedFeedbackPayload) => {
       const targetSessionId = msgSessionId || sessionId;
       if (!targetSessionId || !turnId) {
-        setError("피드백을 저장하려면 turn 정보가 필요합니다.");
+        setError("Turn info is required to save feedback.");
         return;
       }
 
@@ -917,7 +917,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         });
       } catch (err) {
         console.error("Failed to save detailed feedback:", err);
-        setError(err instanceof Error ? err.message : "피드백 저장에 실패했습니다.");
+        setError(err instanceof Error ? err.message : "Failed to save feedback.");
       }
     },
     [sessionId, messages, updateMessage]
@@ -1009,7 +1009,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         currentUserTextRef.current = "";
       } catch (err) {
         console.error("[loadSession] Error:", err);
-        setError(err instanceof Error ? err.message : "세션을 불러오는데 실패했습니다.");
+        setError(err instanceof Error ? err.message : "Failed to load session.");
       } finally {
         setIsLoadingSession(false);
       }
@@ -1035,11 +1035,11 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       submitDetailedFeedback,
       inputPlaceholder: pendingInterrupt
         ? pendingInterrupt.kind === "device_selection"
-          ? "기기를 선택하거나 건너뛰기를 클릭하세요..."
+          ? "Select equipment or click skip..."
           : pendingInterrupt.kind === "retrieval_review"
-            ? "검색 결과 승인/거절 또는 추가 키워드를 입력하세요..."
-            : "승인/거절 또는 수정 답변을 입력하세요..."
-        : "메시지를 입력하세요...",
+            ? "Enter approve/reject or additional keywords..."
+            : "Enter approve/reject or a revised answer..."
+        : "Enter your message...",
       reset,
       loadSession,
       truncateMessagesFrom,

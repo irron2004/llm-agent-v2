@@ -6,7 +6,7 @@ export default function NotFoundPage() {
     <Result
       status="404"
       title="Page not found"
-      subTitle="요청하신 페이지를 찾을 수 없습니다."
+      subTitle="We couldn't find the page you requested."
       extra={
         <Link to="/">
           <Button type="primary">Go home</Button>

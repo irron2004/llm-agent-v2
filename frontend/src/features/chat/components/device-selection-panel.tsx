@@ -1,6 +1,6 @@
 /**
- * [LEGACY] 채팅 화면 내 기기/문서 선택 패널
- * 현재 사용하지 않음 - 우측 사이드바의 재생성 패널로 대체됨
+ * [LEGACY] In-chat equipment/document selection panel
+ * Not currently used - replaced by the regeneration panel in the right sidebar
  */
 import { useState, ChangeEvent } from "react";
 import { Button, Card, Checkbox, Input, Space, Typography } from "antd";
@@ -87,12 +87,12 @@ export function DeviceSelectionPanel({
 
   const selectionLabelParts: string[] = [];
   if (devices.length > 0) {
-    if (allDevicesSelected) selectionLabelParts.push("전체 기기");
-    else if (selectedDevices.length > 0) selectionLabelParts.push("기기 선택됨");
+    if (allDevicesSelected) selectionLabelParts.push("All equipment");
+    else if (selectedDevices.length > 0) selectionLabelParts.push("Equipment selected");
   }
   if (docTypes.length > 0) {
-    if (allDocTypesSelected) selectionLabelParts.push("전체 문서");
-    else if (selectedDocTypes.length > 0) selectionLabelParts.push(`문서 ${selectedDocTypes.length}종`);
+    if (allDocTypesSelected) selectionLabelParts.push("All documents");
+    else if (selectedDocTypes.length > 0) selectionLabelParts.push(`${selectedDocTypes.length} document types`);
   }
   const selectionLabel = selectionLabelParts.length > 0
     ? ` (${selectionLabelParts.join(", ")})`
@@ -119,10 +119,10 @@ export function DeviceSelectionPanel({
         <div>
           <Title level={5} style={{ margin: 0, marginBottom: 4 }}>
             <LaptopOutlined style={{ marginRight: 8 }} />
-            기기/문서 종류 선택
+            Select Equipment / Document Types
           </Title>
           <Text type="secondary" style={{ fontSize: 13 }}>
-            {instruction || "검색할 기기/문서 종류를 선택하세요. 기기/문서 각각 1개 이상 선택해야 합니다."}
+            {instruction || "Select equipment and document types to search. Choose at least one of each."}
           </Text>
         </div>
 
@@ -132,7 +132,7 @@ export function DeviceSelectionPanel({
           borderRadius: 8,
           fontSize: 13,
         }}>
-          <Text strong>질문:</Text> {question}
+          <Text strong>Question:</Text> {question}
         </div>
 
         {docTypes.length > 0 && (
@@ -146,14 +146,14 @@ export function DeviceSelectionPanel({
           >
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
               <Text type="secondary" style={{ fontSize: 12 }}>
-                문서 종류 {docTypes.length}종
+                Document types ({docTypes.length})
                 {allDocTypesSelected ? (
                   <span style={{ color: "var(--color-accent-primary)", marginLeft: 8 }}>
-                    전체 문서 선택
+                    All documents selected
                   </span>
                 ) : selectedDocTypes.length > 0 ? (
                   <span style={{ color: "var(--color-accent-primary)", marginLeft: 8 }}>
-                    {selectedDocTypes.length}종 선택 ({formatDocCount(selectedDocTypeCount)} 문서)
+                    {selectedDocTypes.length} selected ({formatDocCount(selectedDocTypeCount)} documents)
                   </span>
                 ) : null}
               </Text>
@@ -166,7 +166,7 @@ export function DeviceSelectionPanel({
                   setSelectedDocTypes(allDocTypesSelected ? [] : docTypes.map((d) => d.name));
                 }}
               >
-                전체 문서
+                All documents
               </Button>
             </div>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
@@ -207,7 +207,7 @@ export function DeviceSelectionPanel({
         {/* Search input - shown when there are many devices */}
         {devices.length > 10 && (
           <Input
-            placeholder="기기명으로 검색..."
+            placeholder="Search by equipment name..."
             prefix={<SearchOutlined style={{ color: "var(--color-text-secondary)" }} />}
             value={searchQuery}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
@@ -219,14 +219,14 @@ export function DeviceSelectionPanel({
         {/* Device count and select all */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            기기 선택
+            Equipment selection
             {allDevicesSelected ? (
               <span style={{ color: "var(--color-accent-primary)", marginLeft: 8 }}>
-                전체 기기 선택
+                All equipment selected
               </span>
             ) : selectedDevices.length > 0 ? (
               <span style={{ color: "var(--color-accent-primary)", marginLeft: 8 }}>
-                선택됨
+                Selected
               </span>
             ) : null}
           </Text>
@@ -239,7 +239,7 @@ export function DeviceSelectionPanel({
                 setSelectedDevices(allDevicesSelected ? [] : devices.map((d) => d.name));
               }}
             >
-              전체 기기
+              All equipment
             </Button>
             <Button
               type="link"
@@ -247,7 +247,7 @@ export function DeviceSelectionPanel({
               onClick={handleSelectAll}
               style={{ padding: 0 }}
             >
-              {allFilteredSelected ? "목록 전체 해제" : "목록 전체 선택"}
+              {allFilteredSelected ? "Clear list selection" : "Select all in list"}
             </Button>
           </Space>
         </div>
@@ -289,7 +289,7 @@ export function DeviceSelectionPanel({
                   <div style={{ flex: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ fontWeight: 500 }}>{device.name}</span>
                     <Text type="secondary" style={{ fontSize: 12 }}>
-                      {formatDocCount(device.doc_count)} 문서
+                      {formatDocCount(device.doc_count)} documents
                     </Text>
                   </div>
                 </div>
@@ -304,7 +304,7 @@ export function DeviceSelectionPanel({
             onClick={handleSubmit}
             disabled={!hasSelection}
           >
-            선택한 조건으로 검색{selectionLabel}
+            Search with selection{selectionLabel}
           </Button>
         </div>
       </Space>

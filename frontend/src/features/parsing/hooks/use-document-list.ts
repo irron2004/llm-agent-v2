@@ -34,7 +34,7 @@ export function useDocumentList({
         const res = await fetch(indexPath);
 
         if (!res.ok) {
-          throw new Error("index.html을 찾을 수 없습니다");
+          throw new Error("index.html not found");
         }
 
         const html = await res.text();
@@ -49,7 +49,7 @@ export function useDocumentList({
 
         setDocuments(docs);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "문서 목록 로드 실패");
+        setError(err instanceof Error ? err.message : "Failed to load document list");
       } finally {
         setIsLoading(false);
       }

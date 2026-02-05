@@ -41,7 +41,7 @@ export function useIngestionData({
     try {
       const sectionsRes = await fetch(`${basePath}/sections.json`);
       if (!sectionsRes.ok) {
-        throw new Error("sections.json을 찾을 수 없습니다");
+        throw new Error("sections.json not found");
       }
       const sectionsData: Section[] = await sectionsRes.json();
       setSections(sectionsData);
@@ -74,7 +74,7 @@ export function useIngestionData({
             vlmText = await vlmRes.text();
           }
         } catch {
-          // VLM 텍스트가 없어도 계속 진행
+          // Continue even if VLM text is missing
         }
 
         pageDataList.push({
@@ -86,7 +86,7 @@ export function useIngestionData({
 
       setPages(pageDataList);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "데이터 로드 실패");
+      setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setIsLoading(false);
     }

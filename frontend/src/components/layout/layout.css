@@ -12,12 +12,53 @@
     background-color var(--theme-transition-duration, 0.3s) var(--theme-transition-timing, ease);
 }
 
-/* Layout CSS Variables */
+/* Layout CSS Variables - ChatGPT 스타일 + 이미지 5장 표시 가능 */
+/*
+ * ChatGPT 기본: 왼쪽 사이드바 ~260px, 메인 콘텐츠 48rem(768px)
+ * 우리 요구사항: 이미지 5장 (5×150 + 4×8 = 782px) + 메시지 패딩
+ * 따라서 메인 콘텐츠는 ~900px 필요
+ */
 .gpt-layout {
-  --sidebar-width: 288px;
+  --sidebar-width: 260px;
   --sidebar-collapsed-width: 0px;
-  --right-sidebar-width: 480px;
-  --main-content-max-width: 900px;
+  --right-sidebar-width: 320px;  /* 필요 시에만 표시됨 (로그, 리뷰 등) */
+  --main-content-max-width: 900px;  /* 이미지 5장 + 패딩 */
+}
+
+/* Responsive layout for larger screens (1600px+) */
+@media (min-width: 1600px) {
+  .gpt-layout {
+    --sidebar-width: 280px;
+    --right-sidebar-width: 360px;
+    --main-content-max-width: 960px;
+  }
+}
+
+/* Responsive layout for notebook screens (1440px - 1600px) */
+@media (max-width: 1600px) and (min-width: 1441px) {
+  .gpt-layout {
+    --sidebar-width: 260px;
+    --right-sidebar-width: 320px;
+    --main-content-max-width: 900px;
+  }
+}
+
+/* Notebook screens (1200px - 1440px) - 15인치 노트북 기준 */
+@media (max-width: 1440px) and (min-width: 1201px) {
+  .gpt-layout {
+    --sidebar-width: 260px;
+    --right-sidebar-width: 300px;
+    --main-content-max-width: 850px;  /* 5장 가능 */
+  }
+}
+
+/* Smaller notebook screens (1024px - 1200px) */
+@media (max-width: 1200px) {
+  .gpt-layout {
+    --sidebar-width: 240px;
+    --right-sidebar-width: 280px;
+    --main-content-max-width: 720px;  /* 4장 표시 */
+  }
 }
 
 /* Mobile overlay backdrop */

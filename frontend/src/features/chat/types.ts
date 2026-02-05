@@ -256,8 +256,75 @@ export type FeedbackStatisticsResponse = {
   rating_distribution: Record<string, number>;
 };
 
-// --- Retrieval Evaluation Types (for document relevance scoring) ---
+// --- Retrieval Evaluation Types (query-unit storage) ---
 
+/**
+ * Individual document detail in evaluation
+ */
+export type DocDetail = {
+  doc_id: string;
+  doc_rank: number;           // 1-based
+  doc_title: string;
+  relevance_score: number;    // 1-5
+  retrieval_score?: number | null;
+  doc_snippet?: string;
+  chunk_id?: string | null;
+  page?: number | null;
+};
+
+/**
+ * Request to save query-unit evaluation (batch save)
+ * query_id: chat="{session_id}:{turn_id}", search="search:{timestamp}"
+ */
+export type RetrievalEvaluationRequest = {
+  source: "chat" | "search";
+  query: string;
+  doc_details: DocDetail[];   // Required: individual document scores
+  // Chat context (optional for search)
+  session_id?: string | null;
+  turn_id?: number | null;
+  // Filter context for reproducibility
+  filter_devices?: string[] | null;
+  filter_doc_types?: string[] | null;
+  search_queries?: string[] | null;  // Multi-query expansion results
+  // Search page only
+  search_params?: Record<string, unknown> | null;
+  // Reviewer info
+  reviewer_name?: string | null;
+};
+
+/**
+ * Response for query-unit evaluation
+ */
+export type RetrievalEvaluationResponse = {
+  query_id: string;
+  source: "chat" | "search";
+  query: string;
+  relevant_docs: string[];      // Auto-generated: score >= 3
+  irrelevant_docs: string[];    // Auto-generated: score < 3
+  doc_details: DocDetail[];
+  // Chat context
+  session_id?: string | null;
+  turn_id?: number | null;
+  // Filter context
+  filter_devices?: string[] | null;
+  filter_doc_types?: string[] | null;
+  search_queries?: string[] | null;
+  // Search params
+  search_params?: Record<string, unknown> | null;
+  // Reviewer info
+  reviewer_name?: string | null;
+  ts: string;
+};
+
+export type RetrievalEvaluationListResponse = {
+  items: RetrievalEvaluationResponse[];
+  total: number;
+};
+
+// --- Legacy types (deprecated, for backwards compatibility) ---
+
+/** @deprecated Use RetrievalEvaluationRequest instead */
 export type DocRelevanceEvaluationRequest = {
   relevance_score: number;  // 1-5
   reviewer_name?: string | null;
@@ -273,6 +340,7 @@ export type DocRelevanceEvaluationRequest = {
   search_queries?: string[] | null;  // Multi-query expansion results
 };
 
+/** @deprecated Use RetrievalEvaluationResponse instead */
 export type DocRelevanceEvaluationResponse = {
   session_id: string;
   turn_id: number;
@@ -293,6 +361,7 @@ export type DocRelevanceEvaluationResponse = {
   ts: string;
 };
 
+/** @deprecated Use RetrievalEvaluationListResponse instead */
 export type DocRelevanceEvaluationListResponse = {
   items: DocRelevanceEvaluationResponse[];
   total: number;

@@ -106,8 +106,18 @@ export default function ChatPage() {
     selectedDocIds: string[];
   }) => {
     setPendingRegeneration(null);
+
+    // 재생성 필터 정보 메시지 생성
+    const deviceInfo = payload.selectedDevices.length > 0
+      ? payload.selectedDevices.join(", ")
+      : "All equipment";
+    const docTypeInfo = payload.selectedDocTypes.length > 0
+      ? payload.selectedDocTypes.join(", ")
+      : "All documents";
+    const filterLabel = `[Regenerate with ${deviceInfo} / ${docTypeInfo}]`;
+
     send({
-      text: payload.originalQuery,
+      text: `${filterLabel} ${payload.originalQuery}`,
       askDeviceSelection: false,  // 이미 기기/문서 선택 완료
       overrides: {
         filterDevices: payload.selectedDevices,
@@ -245,7 +255,7 @@ export default function ChatPage() {
                 color: "var(--color-text-secondary)",
               }}
             >
-              <Spin size="large" tip="대화를 불러오는 중..." />
+              <Spin size="large" tip="Loading conversation..." />
             </div>
           ) : (
             <MessageList autoScrollToBottom>
@@ -280,10 +290,10 @@ export default function ChatPage() {
                   </div>
                   <div style={{ textAlign: "center" }}>
                     <h2 style={{ margin: "0 0 8px", color: "var(--color-text-primary)" }}>
-                      PE Agent에 오신 것을 환영합니다
+                      Welcome to PE Agent
                     </h2>
                     <p style={{ margin: 0 }}>
-                      질문을 입력하면 AI가 답변해 드립니다
+                      Enter your question and AI will answer
                     </p>
                   </div>
                 </div>
@@ -339,7 +349,7 @@ export default function ChatPage() {
               onSend={handleSend}
               onStop={stop}
               isStreaming={isStreaming}
-              placeholder={hasDeviceSuggestions ? "기기를 선택하거나 여기를 클릭하세요" : inputPlaceholder}
+              placeholder={hasDeviceSuggestions ? "Select equipment or click here" : inputPlaceholder}
               disabled={isLoadingSession || hasDeviceSuggestions}
               onDisabledClick={hasDeviceSuggestions ? handleDeviceDismiss : undefined}
             />

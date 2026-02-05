@@ -162,7 +162,7 @@ export default function MetricsDisplay({ metrics }: Props) {
               valueStyle={{ fontSize: "18px", color: "var(--color-text-primary)" }}
             />
             <Text type="secondary" style={{ fontSize: "11px" }}>
-              낮을수록 좋음
+              Lower is better
             </Text>
           </Card>
         </Col>
@@ -180,7 +180,7 @@ export default function MetricsDisplay({ metrics }: Props) {
       >
         <Space direction="vertical" size="small" style={{ width: "100%" }}>
           <Text strong style={{ fontSize: "12px", color: "var(--color-text-primary)" }}>
-            📊 성능 해석:
+            📊 Performance interpretation:
           </Text>
           <ul
             style={{
@@ -191,22 +191,22 @@ export default function MetricsDisplay({ metrics }: Props) {
             }}
           >
             <li>
-              Hit@1 ≥ 60%: 첫 번째 결과에 정답이 있는 비율 (
-              {metrics.hit_at_1 >= 0.6 ? "✅ 우수" : "❌ 개선 필요"})
+              Hit@1 ≥ 60%: Share of queries with the correct answer in the first result (
+              {metrics.hit_at_1 >= 0.6 ? "✅ Good" : "❌ Needs improvement"})
             </li>
             <li>
-              Hit@3 ≥ 75%: 상위 3개 결과에 정답이 있는 비율 (
-              {metrics.hit_at_3 >= 0.75 ? "✅ 우수" : "❌ 개선 필요"})
+              Hit@3 ≥ 75%: Share of queries with the correct answer in the top 3 (
+              {metrics.hit_at_3 >= 0.75 ? "✅ Good" : "❌ Needs improvement"})
             </li>
             <li>
-              MRR ≥ 0.6: 정답 순위의 역수 평균 (
-              {metrics.mrr >= 0.6 ? "✅ 우수" : "❌ 개선 필요"})
+              MRR ≥ 0.6: Mean reciprocal rank (
+              {metrics.mrr >= 0.6 ? "✅ Good" : "❌ Needs improvement"})
             </li>
             <li>
-              평균 정답 순위: {metrics.avg_first_relevant_rank?.toFixed(1) ?? "N/A"} (
+              Average rank of first relevant result: {metrics.avg_first_relevant_rank?.toFixed(1) ?? "N/A"} (
               {metrics.avg_first_relevant_rank && metrics.avg_first_relevant_rank <= 3
-                ? "✅ 우수"
-                : "⚠️ 보통"}
+                ? "✅ Good"
+                : "⚠️ Fair"}
               )
             </li>
           </ul>
