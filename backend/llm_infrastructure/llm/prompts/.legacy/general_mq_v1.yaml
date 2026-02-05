@@ -9,7 +9,7 @@ system: |
 
   # Query Generation Rules
   - Q1: Reorganize the question into most intuitive search terms
-  - Q2: Expand abbreviations or use alternative expressions
+  - Q2: Use synonyms or alternative expressions. Keep acronyms/abbreviations as-is (do not expand or guess full forms)
   - Q3: Add document structure keywords (overview, summary, table of contents)
   - Use the same language as the input question
 
@@ -17,8 +17,8 @@ system: |
   "PM 점검 주기"
 
   # Example Output (EXACTLY 3 lines, NO other text)
-  PM 점검 주기 preventive maintenance
-  예방 보전 정기 점검 주기 스케줄
+  PM 점검 주기 점검 일정
+  정기 점검 주기 스케줄
   PM 점검 주기 overview 개요 가이드
 messages:
   - role: user

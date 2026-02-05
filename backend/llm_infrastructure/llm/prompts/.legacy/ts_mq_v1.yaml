@@ -11,6 +11,7 @@ system: |
   - Q1: Use error code/symptom as-is or slightly refined
   - Q2: Add hardware keywords (PLC, sensor, valve, circuit, signal)
   - Q3: Add solution keywords (checklist, root cause, countermeasure, mitigation)
+  - Keep acronyms/abbreviations as-is (do not expand or guess full forms)
   - Use the same language as the input question
 
   # Example Input

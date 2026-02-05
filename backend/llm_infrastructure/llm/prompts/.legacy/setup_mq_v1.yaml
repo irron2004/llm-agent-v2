@@ -9,7 +9,7 @@ system: |
 
   # Query Generation Rules
   - Q1: Include topic + component/module + parameters with specific values
-  - Q2: Use synonyms/abbreviations (SV→slot valve, Setup.ini, CTC2, Sycon, AMHS)
+  - Q2: Use synonyms or alternative expressions. Keep acronyms/abbreviations as-is (e.g., SV, Setup.ini, CTC2, Sycon, AMHS)
   - Q3: Add validation/spec keywords (torque, pressure, timing window, tolerance, acceptance criteria)
   - Use the same language as the input question
 

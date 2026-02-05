@@ -3,44 +3,43 @@ version: v1
 description: Decide whether sequential thinking (need_st) is needed before query fusion.
 system: |
   # Role
-  In the multi-query generation flow for final retrieval, determine if additional refinement is needed.
+  Determine if additional query refinement is needed before document retrieval.
 
   # Input
   - Question: {sys.query}
-  - Setup MQ results: {setup_mq}
-  - TS MQ results: {ts_mq}
-  - General MQ results: {general_mq}
+  - Generated search queries: {retrieval_mq}
 
   # Output Format
   - Exactly ONE word: need_st | no_st
   - NO code blocks, explanations, or surrounding text
 
   # Decision Rules
-  - Ambiguous/broad scope/abbreviations only/multiple modules/no validation criteria → need_st
-  - Very specific (module/numeric values/buttons/steps included) → no_st
-  - Broad synthesis/summary requests across documents/logs/history → need_st
-  - Requests like "정리/요약/이력/기반/비교" without concrete constraints → need_st
+  ## need_st (추가 정제 필요)
+  - Ambiguous or broad scope questions
+  - Abbreviations only without context
+  - Multiple modules/components mentioned
+  - No specific validation criteria
+  - Broad synthesis/summary requests (정리/요약/이력/비교)
 
-  # Examples (few-shot guidance)
+  ## no_st (바로 검색 가능)
+  - Very specific questions with module names
+  - Includes numeric values, specs, or parameters
+  - Step-by-step procedure requests
+  - Specific error codes mentioned
+
+  # Examples
   - "GCB 기반으로 SUPRA Np 이슈 정리해줘" → need_st
   - "지난달 에러 이력 정리" → need_st
   - "APC 문제 원인 알려줘" → need_st
   - "SUPRA N slot valve 교체 토크 3.2Nm 맞나?" → no_st
-  - "Error E-001 on SUPRA N, check PLC sensor wiring step-by-step" → no_st
+  - "Error E-001 on SUPRA N, check PLC sensor wiring" → no_st
+  - "SUPRA N PM 절차 알려줘" → no_st
+
 messages:
   - role: user
     content: |
       Question: {sys.query}
-      SETUP_MQ:{setup_mq}
-      TS_MQ:{ts_mq}
-      GENERAL_MQ:{general_mq}
-      Decision rules:
-      - Ambiguous/broad/abbreviations only/multiple modules/no validation criteria → need_st
-      - Very specific (module/values/buttons/steps) → no_st
-      - Broad synthesis/summary across docs/logs/history → need_st
-      - "정리/요약/이력/기반/비교" without constraints → need_st
-      Examples:
-      - "GCB 기반으로 SUPRA Np 이슈 정리해줘" → need_st
-      - "지난달 에러 이력 정리" → need_st
-      - "SUPRA N slot valve 교체 토크 3.2Nm 맞나?" → no_st
+      Search queries:
+      {retrieval_mq}
+
       Output ONE word: need_st | no_st

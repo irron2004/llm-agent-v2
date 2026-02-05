@@ -10,7 +10,7 @@ import functools
 import logging
 import time
 from contextvars import ContextVar
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
@@ -623,6 +623,260 @@ class LangGraphRAGAgent:
         }
 
         return self._graph.invoke(state, config=config)
+
+    def retrieve_only(
+        self,
+        query: str,
+        *,
+        search_override: Dict[str, Any] | None = None,
+        selected_devices: List[str] | None = None,
+        selected_doc_types: List[str] | None = None,
+        thread_id: str | None = None,
+    ) -> Dict[str, Any]:
+        """검색만 실행하고 답변 생성은 스킵 (Retrieval Test용).
+
+        Chat과 동일한 파이프라인(translate → auto_parse → route → mq → retrieve → expand)을 실행하되,
+        answer 노드는 실행하지 않음.
+
+        Args:
+            query: 검색 쿼리
+            search_override: 검색 파라미터 override (dense_weight, sparse_weight, rerank 등)
+            selected_devices: 선택된 장비 필터
+            selected_doc_types: 선택된 문서 타입 필터
+            thread_id: 스레드 ID
+
+        Returns:
+            검색 결과:
+            - docs: 검색된 문서 목록
+            - answer_ref_json: 확장된 문서 정보 (이미지 URL 포함)
+            - query_en: 번역된 영어 쿼리
+            - query_ko: 번역된 한국어 쿼리
+            - route: 라우팅 결과
+            - search_queries: 생성된 검색 쿼리 목록
+        """
+        import uuid
+
+        tid = thread_id or str(uuid.uuid4())
+        state: AgentState = {
+            "query": query,
+            "attempts": 0,
+            "max_attempts": 1,
+            "thread_id": tid,
+            "_skip_human_review": True,
+        }
+
+        # Search parameter override
+        if search_override:
+            state["search_override"] = search_override
+
+        # Device/doc_type filters
+        if selected_devices:
+            state["selected_devices"] = selected_devices
+        if selected_doc_types:
+            state["selected_doc_types"] = selected_doc_types
+
+        # Run pipeline nodes sequentially
+        # 1. translate
+        if self.auto_parse_enabled:
+            result = translate_node(state, llm=self.llm, spec=self.spec)
+            state.update(result)
+
+            # 2. auto_parse
+            result = auto_parse_node(
+                state,
+                llm=self.llm,
+                spec=self.spec,
+                device_names=self._device_names,
+                doc_type_names=self._doc_type_names,
+            )
+            state.update(result)
+
+        # 3. route
+        result = route_node(state, llm=self.llm, spec=self.spec)
+        state.update(result)
+
+        route = state.get("route", "general")
+
+        # doc_lookup, history_answer, chat (general) routes - skip retrieval
+        if route == "general":
+            return {
+                "docs": [],
+                "answer_ref_json": [],
+                "query_en": state.get("query_en"),
+                "query_ko": state.get("query_ko"),
+                "route": route,
+                "search_queries": [],
+                "is_chat_query": True,
+            }
+
+        if route == "history_answer":
+            return {
+                "docs": [],
+                "answer_ref_json": [],
+                "query_en": state.get("query_en"),
+                "query_ko": state.get("query_ko"),
+                "route": route,
+                "search_queries": [],
+            }
+
+        if route == "doc_lookup":
+            # doc_lookup: fetch docs directly by doc_id
+            result = doc_lookup_node(state, doc_fetcher=self.doc_fetcher)
+            state.update(result)
+            docs = state.get("docs", [])
+            if docs:
+                # expand pages
+                result = expand_related_docs_node(
+                    state,
+                    page_fetcher=self.page_fetcher,
+                    doc_fetcher=self.doc_fetcher,
+                )
+                state.update(result)
+                return {
+                    "docs": state.get("docs", []),
+                    "answer_ref_json": state.get("answer_ref_json", []),
+                    "query_en": state.get("query_en"),
+                    "query_ko": state.get("query_ko"),
+                    "route": route,
+                    "search_queries": [],
+                    "lookup_doc_ids": state.get("lookup_doc_ids", []),
+                }
+            # fallback to mq if no docs found
+            route = "retrieval"
+            state["route"] = route
+
+        # 4. mq (multi-query generation)
+        result = mq_node(state, llm=self.llm, spec=self.spec)
+        state.update(result)
+
+        # 5. st_gate
+        result = st_gate_node(state, llm=self.llm, spec=self.spec)
+        state.update(result)
+
+        # 6. st_mq
+        result = st_mq_node(state, llm=self.llm, spec=self.spec)
+        state.update(result)
+
+        # 7. retrieve
+        result = retrieve_node(
+            state,
+            retriever=self.retriever,
+            reranker=self.reranker,
+            retrieval_top_k=self.retrieval_top_k,
+            final_top_k=self.top_k,
+        )
+        state.update(result)
+
+        # 8. expand_related
+        result = expand_related_docs_node(
+            state,
+            page_fetcher=self.page_fetcher,
+            doc_fetcher=self.doc_fetcher,
+        )
+        state.update(result)
+
+        return {
+            "docs": state.get("docs", []),
+            "answer_ref_json": state.get("answer_ref_json", []),
+            "query_en": state.get("query_en"),
+            "query_ko": state.get("query_ko"),
+            "route": state.get("route"),
+            "search_queries": state.get("search_queries", []),
+            "auto_parsed_device": state.get("auto_parsed_device"),
+            "auto_parsed_doc_type": state.get("auto_parsed_doc_type"),
+        }
+
+    def answer_only(
+        self,
+        query: str,
+        docs: List[Dict[str, Any]],
+        *,
+        thread_id: str | None = None,
+    ) -> Dict[str, Any]:
+        """검색 없이 주어진 문서로 답변만 생성 (Batch Answer용).
+
+        Retrieval Test에서 저장된 검색 결과를 사용하여 답변만 생성한다.
+        검색/MQ/라우팅 등은 수행하지 않음.
+
+        Args:
+            query: 사용자 질문
+            docs: 검색 결과 문서 목록 (id, title, content, snippet, page, score 등 포함)
+            thread_id: 스레드 ID
+
+        Returns:
+            답변 결과:
+            - answer: 생성된 답변
+            - reasoning: LLM 추론 과정 (있는 경우)
+            - token_count: 토큰 사용량 {"input": N, "output": M}
+        """
+        import uuid
+
+        tid = thread_id or str(uuid.uuid4())
+
+        # Convert docs to ref_json format for answer_node
+        # answer_node uses ref_json (not docs) to build the reference text
+        ref_json = []
+        total_chars = 0
+        for i, d in enumerate(docs, start=1):
+            content = d.get("content") or d.get("snippet") or ""
+            content = str(content).strip()
+            total_chars += len(content)
+            ref_json.append({
+                "rank": i,
+                "doc_id": d.get("id", ""),
+                "content": content,
+                "score": d.get("score"),
+            })
+
+        logger.info(
+            "answer_only: query=%s, docs=%d, ref_json=%d, total_chars=%d",
+            query[:50] if query else "",
+            len(docs),
+            len(ref_json),
+            total_chars,
+        )
+
+        # Build state with pre-loaded docs and ref_json
+        state: AgentState = {
+            "query": query,
+            "query_en": query,  # Assume query is already in appropriate form
+            "query_ko": query,
+            "detected_language": "ko",  # Default
+            "route": "retrieval",
+            "docs": docs,
+            "ref_json": ref_json,
+            "answer_ref_json": ref_json,
+            "attempts": 0,
+            "max_attempts": 1,
+            "thread_id": tid,
+            "_skip_human_review": True,
+        }
+
+        # Generate answer using answer_node directly
+        try:
+            result = answer_node(
+                state,
+                llm=self.llm,
+                spec=self.spec,
+            )
+            state.update(result)
+
+            # Extract answer and reasoning
+            answer = state.get("answer", "")
+            reasoning = state.get("reasoning")
+
+            # Token count from LLM usage (if available)
+            token_count = state.get("token_count")
+
+            return {
+                "answer": answer,
+                "reasoning": reasoning,
+                "token_count": token_count,
+            }
+
+        except Exception as e:
+            logger.exception("Failed to generate answer for query: %s", query[:100])
+            raise
 
 
 __all__ = ["LangGraphRAGAgent", "set_event_sink_context", "reset_event_sink_context"]
