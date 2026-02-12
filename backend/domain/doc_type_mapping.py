@@ -33,6 +33,7 @@ DOC_TYPE_GROUPS: dict[str, list[str]] = {
         "ts",
         "t/s",
         "Troubleshooting Guide",
+        "trouble_shooting_guide",
     ],
     "setup": [
         "Installation Manual",
@@ -40,6 +41,7 @@ DOC_TYPE_GROUPS: dict[str, list[str]] = {
         "설치 매뉴얼",
         "setup",
         "Manual",
+        "set_up_manual",
     ],
     "gcb": [
         "gcb",
@@ -105,6 +107,25 @@ def group_doc_type_buckets(buckets: Iterable[dict], use_unique_docs: bool = Fals
                 else:
                     count = bucket.get("doc_count", 0)
                 counts[group_name] += int(count)
+                break
+    return [{"name": name, "doc_count": counts[name]} for name in _GROUP_ORDER]
+
+
+def group_doc_type_items(items: Iterable[dict]) -> list[dict]:
+    """Group cached doc type items (name/doc_count) into canonical buckets."""
+    counts = {name: 0 for name in _GROUP_ORDER}
+    for item in items or []:
+        key = item.get("name") or item.get("key")
+        if not key:
+            continue
+        normalized = normalize_doc_type(str(key))
+        try:
+            count = int(item.get("doc_count", 0))
+        except Exception:
+            count = 0
+        for group_name, variants in _GROUP_VARIANTS_NORMALIZED.items():
+            if normalized in variants:
+                counts[group_name] += count
                 break
     return [{"name": name, "doc_count": counts[name]} for name in _GROUP_ORDER]
 

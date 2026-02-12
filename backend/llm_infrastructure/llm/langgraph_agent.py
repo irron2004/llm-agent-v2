@@ -47,7 +47,7 @@ class AgentState(TypedDict, total=False):
     skip_mq: bool
 
     # Retry strategy configuration
-    expand_top_k: int  # Number of docs to expand (default: 5, retry: 10)
+    expand_top_k: int  # Number of docs to expand (default: 20, retry: 40)
     retry_strategy: str  # "expand_more" | "refine_queries" | "regenerate_mq"
 
     # Auto-parsed filters (from LLM)
@@ -68,6 +68,7 @@ class AgentState(TypedDict, total=False):
     device_selection_skipped: bool
     available_doc_types: List[Dict[str, Any]]
     selected_doc_types: List[str]
+    selected_doc_types_strict: bool
     doc_type_selection_skipped: bool
     selected_doc_ids: List[str]
 
@@ -263,7 +264,7 @@ MAX_REF_CHARS_REVIEW = 200       # 검색 결과 리뷰용
 MAX_REF_CHARS_ANSWER = 1200      # 답변 생성용
 RELATED_PAGE_WINDOW = 2          # 인접 페이지 범위 (±N)
 DOC_TYPES_SAME_DOC = {"gcb", "myservice"}
-EXPAND_TOP_K = 5                 # 확장 대상 최대 개수 (rerank 상위)
+EXPAND_TOP_K = 20                # 확장 대상 최대 개수 (rerank 상위)
 
 
 def _invoke_llm(llm: BaseLLM, system: str, user: str, **kwargs: Any) -> str:
@@ -323,6 +324,46 @@ def _parse_gate(text: str) -> Gate:
     return "no_st"
 
 
+def _strip_regeneration_prefixes(text: str) -> str:
+    normalized = str(text).strip()
+    if not normalized:
+        return ""
+    normalized = re.sub(r"^(?:\[\s*regenerate with[^\]]*\]\s*)+", "", normalized, flags=re.I).strip()
+    normalized = re.sub(r"^(?:regenerate with\b[^:\n]*[:\-]?\s*)+", "", normalized, flags=re.I).strip()
+    normalized = re.sub(r"^(?:재검색\s*(?:조건|필터)?\s*[:\-]?\s*)+", "", normalized, flags=re.I).strip()
+    return normalized
+
+
+def _normalize_query_text(text: Any) -> str:
+    normalized = _strip_regeneration_prefixes(str(text))
+    normalized = normalized.strip().strip("\"'`").strip()
+    return normalized
+
+
+def _looks_like_placeholder_query(text: str) -> bool:
+    original = str(text).strip()
+    if not original:
+        return False
+    value = _normalize_query_text(original).lower()
+    if not value:
+        return True
+
+    if re.fullmatch(r"[.\s…·•\-_=~]+", value):
+        return True
+
+    if value in {"query", "queries", "search query", "search queries", "검색어", "질문"}:
+        return True
+
+    compact = re.sub(r"[\s\-_]+", "", value)
+    if compact in {"query", "queries", "searchquery", "searchqueries", "검색어", "질문"}:
+        return True
+
+    if re.fullmatch(r"(?:q|query|searchquery|검색어|질문)\d{0,3}", compact):
+        return True
+
+    return False
+
+
 def _parse_queries(text: str) -> List[str]:
     """Robust parser: JSON object/list or one-per-line strings."""
     t = text.strip()
@@ -333,12 +374,20 @@ def _parse_queries(text: str) -> List[str]:
     t = re.sub(r"```[a-zA-Z]*", "", t).strip()
 
     def _extract_queries(obj: Any) -> List[str]:
+        def _collect(items: List[Any]) -> List[str]:
+            collected: List[str] = []
+            for item in items:
+                cleaned = _normalize_query_text(item)
+                if cleaned and not _looks_like_placeholder_query(cleaned):
+                    collected.append(cleaned)
+            return collected
+
         if isinstance(obj, dict):
             for key in ("queries", "search_queries"):
                 if isinstance(obj.get(key), list):
-                    return [str(x).strip() for x in obj[key] if str(x).strip()]
+                    return _collect(obj[key])
         if isinstance(obj, list):
-            return [str(x).strip() for x in obj if str(x).strip()]
+            return _collect(obj)
         return []
 
     # Try to parse JSON directly or from an embedded snippet.
@@ -360,7 +409,11 @@ def _parse_queries(text: str) -> List[str]:
 
     if t.startswith("[") and t.endswith("]"):
         items = re.findall(r'"([^"]+)"', t)
-        qs = [i.strip() for i in items if i.strip()]
+        qs = [
+            cleaned
+            for i in items
+            if (cleaned := _normalize_query_text(i)) and not _looks_like_placeholder_query(cleaned)
+        ]
         if qs:
             return _dedupe_queries(qs)
 
@@ -369,9 +422,11 @@ def _parse_queries(text: str) -> List[str]:
         garbage_labels = {"queries", "search_queries", "setup_mq", "ts_mq", "general_mq", "gate"}
         items = re.findall(r'"([^"]+)"', t)
         qs = [
-            i.strip()
+            cleaned
             for i in items
-            if i.strip() and i.strip().lower() not in garbage_labels
+            if (cleaned := _normalize_query_text(i))
+            and cleaned.lower() not in garbage_labels
+            and not _looks_like_placeholder_query(cleaned)
         ]
         if qs:
             return _dedupe_queries(qs)
@@ -396,7 +451,7 @@ def _parse_queries(text: str) -> List[str]:
     def _strip_prefix(line: str) -> str:
         cleaned = line.strip()
         cleaned = re.sub(r"^[-*•]\s+", "", cleaned)
-        cleaned = re.sub(r"^(?:q\d+|\d+)\s*[:\.\)\-]\s*", "", cleaned, flags=re.I)
+        cleaned = re.sub(r"^(?:q(?:uery)?\d+|\d+)\s*[:\.\)\-]\s*", "", cleaned, flags=re.I)
         cleaned = cleaned.strip().strip("\"'`").strip()
         cleaned = re.sub(r"[;,，]\s*$", "", cleaned).strip()
         return cleaned
@@ -407,10 +462,12 @@ def _parse_queries(text: str) -> List[str]:
     for line in lines:
         if _is_meta_line(line):
             continue
-        if line.startswith(("{", "[")):
+        if line.startswith("{"):
             continue
-        cleaned = _strip_prefix(line)
-        if cleaned:
+        if line.startswith("[") and line.endswith("]") and "regenerate with" not in line.lower():
+            continue
+        cleaned = _normalize_query_text(_strip_prefix(line))
+        if cleaned and not _looks_like_placeholder_query(cleaned):
             filtered.append(cleaned)
 
     if len(filtered) == 1:
@@ -419,7 +476,11 @@ def _parse_queries(text: str) -> List[str]:
             if delim in single:
                 split_items = [part.strip() for part in single.split(delim) if part.strip()]
                 if len(split_items) > 1:
-                    filtered = split_items
+                    filtered = [
+                        cleaned
+                        for part in split_items
+                        if (cleaned := _normalize_query_text(part)) and not _looks_like_placeholder_query(cleaned)
+                    ]
                 break
 
     return _dedupe_queries(filtered)
@@ -632,7 +693,8 @@ def _combine_related_text(docs: List[RetrievalResult]) -> str:
 # -----------------------------
 def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     # Use English query for routing (after translation)
-    query = state.get("query_en") or state["query"]
+    route_query = state.get("query_en") or state["query"]
+    query = _normalize_query_text(route_query) or str(route_query).strip()
     user = _format_prompt(spec.router.user, {"sys.query": query})
     route = _parse_route(_invoke_llm(llm, spec.router.system, user))
     logger.info("route_node: query=%s..., route=%s", query[:50] if query else None, route)
@@ -726,11 +788,17 @@ def st_gate_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[s
 
 def _is_garbage_query(q: str) -> bool:
     """Check if a query is garbage (prompt label leak or too short)."""
-    lower = q.lower().strip()
+    normalized = _normalize_query_text(q)
+    lower = normalized.lower().strip()
+    if not lower:
+        return True
+    if _looks_like_placeholder_query(normalized):
+        return True
     # Filter out prompt label leaks
     garbage_patterns = [
         "setup_mq:", "ts_mq:", "general_mq:", "gate:",
         "질문:", "queries:", "search_queries:",
+        "[regenerate with",
     ]
     for pat in garbage_patterns:
         if pat in lower:
@@ -738,8 +806,10 @@ def _is_garbage_query(q: str) -> bool:
     # Filter out queries that are just labels without actual content
     if lower in {"setup_mq", "ts_mq", "general_mq", "gate", "no_st", "need_st"}:
         return True
+    if re.fullmatch(r"[.\s…·•\-_=~]+", normalized):
+        return True
     # Filter out very short queries (less than 3 chars)
-    if len(q.strip()) < 3:
+    if len(normalized) < 3:
         return True
     return False
 
@@ -750,8 +820,10 @@ def _contains_korean(text: str) -> bool:
 
 def _fill_to_n(base: List[str], candidates: List[str], n: int) -> List[str]:
     for q in candidates:
-        q = str(q).strip()
-        if q and q not in base:
+        q = _normalize_query_text(q)
+        if not q or _is_garbage_query(q):
+            continue
+        if q not in base:
             base.append(q)
         if len(base) >= n:
             break
@@ -765,7 +837,8 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     general_mq_list = state.get("general_mq_list", [])
 
     # Use English query for processing
-    q_en = state.get("query_en") or state["query"]
+    base_query_en = state.get("query_en") or state["query"]
+    q_en = _normalize_query_text(base_query_en) or str(base_query_en).strip()
     # Get Korean query for bilingual search
     q_ko = state.get("query_ko")
     route = state.get("route", "general")
@@ -779,62 +852,76 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
         mq_en_list = general_mq_list
         mq_ko_list = state.get("general_mq_ko_list", [])
 
+    def _translate(text: str, target_lang: str) -> str:
+        if spec.translate is None:
+            return text
+        target_name = {"en": "English", "ko": "Korean"}.get(target_lang, target_lang)
+        user = _format_prompt(spec.translate.user, {
+            "query": text,
+            "target_language": target_name,
+        })
+        result = _invoke_llm(llm, spec.translate.system, user)
+        result = _normalize_query_text(result.strip().strip('"').strip("'").strip())
+        return result if result else _normalize_query_text(text)
+
     if state.get("skip_mq") and state.get("search_queries"):
-        provided = [str(q).strip() for q in state.get("search_queries", []) if str(q).strip()]
-        if provided:
-            return {"search_queries": _dedupe_queries(provided)}
-        return {"search_queries": [q_en] if q_en else []}
+        queries = [
+            cleaned
+            for q in state.get("search_queries", [])
+            if (cleaned := _normalize_query_text(q)) and not _is_garbage_query(cleaned)
+        ]
+        logger.info("st_mq_node: using provided search_queries (skip_mq=True): %s", queries)
+    else:
+        mapping = {
+            "sys.query": q_en,
+            "setup_mq": "\n".join(setup_mq_list),
+            "ts_mq": "\n".join(ts_mq_list),
+            "general_mq": "\n".join(general_mq_list),
+            "st_gate": state.get("st_gate", "no_st"),
+        }
+        user = _format_prompt(spec.st_mq.user, mapping)
+        raw = _invoke_llm(llm, spec.st_mq.system, user)
+        logger.info("st_mq_node: raw output=%s", raw)
+        parsed = _parse_queries(raw)
+        queries = [q for q in parsed if not _is_garbage_query(q)]
 
-    mapping = {
-        "sys.query": q_en,
-        "setup_mq": "\n".join(setup_mq_list),
-        "ts_mq": "\n".join(ts_mq_list),
-        "general_mq": "\n".join(general_mq_list),
-        "st_gate": state.get("st_gate", "no_st"),
-    }
-    user = _format_prompt(spec.st_mq.user, mapping)
-    raw = _invoke_llm(llm, spec.st_mq.system, user)
-    logger.info("st_mq_node: raw output=%s", raw)
-    queries = _parse_queries(raw)
-
-    # Filter out garbage queries (prompt label leaks, too short, etc.)
-    queries = [q for q in queries if not _is_garbage_query(q)]
-
-    # Build English queries (prefer st_mq output, then q_en, then MQ list)
     english_queries: List[str] = []
-    _fill_to_n(english_queries, queries, 3)
-    if q_en:
+    english_seed = [q for q in queries if not _contains_korean(q)]
+    _fill_to_n(english_queries, english_seed, 3)
+    if q_en and not _contains_korean(q_en):
         _fill_to_n(english_queries, [q_en], 3)
-    _fill_to_n(english_queries, mq_en_list, 3)
+    _fill_to_n(english_queries, [q for q in mq_en_list if not _contains_korean(q)], 3)
 
-    # Build Korean queries (prefer KO MQ list, then q_ko, then translate EN if needed)
-    ko_candidates = [q for q in mq_ko_list if _contains_korean(q)]
+    if len(english_queries) < 3:
+        ko_seed_for_en = [q for q in queries if _contains_korean(q)]
+        if q_ko and _contains_korean(q_ko):
+            ko_seed_for_en = [q_ko] + ko_seed_for_en
+        for q in _dedupe_queries(ko_seed_for_en):
+            if len(english_queries) >= 3:
+                break
+            translated = _translate(q, "en")
+            if translated and not _contains_korean(translated) and not _is_garbage_query(translated):
+                _fill_to_n(english_queries, [translated], 3)
+
+    korean_queries: List[str] = []
+    ko_seed = [q for q in queries if _contains_korean(q)]
     if q_ko and _contains_korean(q_ko):
-        ko_candidates = [q_ko] + ko_candidates
-    korean_queries = _dedupe_queries(ko_candidates)
+        ko_seed = [q_ko] + ko_seed
+    ko_seed.extend([q for q in mq_ko_list if _contains_korean(q)])
+    _fill_to_n(korean_queries, ko_seed, 3)
 
-    if len(korean_queries) < 3 and spec.translate is not None:
-        def _translate(text: str, target_lang: str) -> str:
-            target_name = {"en": "English", "ko": "Korean"}.get(target_lang, target_lang)
-            user = _format_prompt(spec.translate.user, {
-                "query": text,
-                "target_language": target_name,
-            })
-            result = _invoke_llm(llm, spec.translate.system, user)
-            result = result.strip().strip('"').strip("'").strip()
-            return result if result else text
-
+    if len(korean_queries) < 3:
         for q in english_queries:
             if len(korean_queries) >= 3:
                 break
             if _contains_korean(q):
                 continue
             translated = _translate(q, "ko")
-            if translated and translated not in korean_queries:
-                korean_queries.append(translated)
+            if translated and _contains_korean(translated) and not _is_garbage_query(translated):
+                _fill_to_n(korean_queries, [translated], 3)
 
-    korean_queries = korean_queries[:3]
     english_queries = english_queries[:3]
+    korean_queries = korean_queries[:3]
 
     merged = english_queries + korean_queries
     logger.info("st_mq_node: final search_queries (bilingual)=%s", merged)
@@ -847,29 +934,40 @@ def retrieve_node(
     retriever: Retriever,
     reranker: Any = None,
     retrieval_top_k: int = 20,
-    final_top_k: int = 10,
+    final_top_k: int = 20,
 ) -> Dict[str, Any]:
-    """Retrieve documents with dual search strategy and rerank.
+    """Retrieve documents and rerank.
 
     If devices are selected:
-      - Search 1: retrieval_top_k docs filtered by selected devices (OR filter)
-      - Search 2: retrieval_top_k docs without filter (general search)
-      - Combine and rerank to get final_top_k docs
+      - Search only with selected device filter (strict)
 
     If no devices selected:
-      - Search retrieval_top_k docs without filter
-      - Rerank to get final_top_k docs
+      - Search without device filter
     """
-    queries = state.get("search_queries", [state["query"]])
+    queries = [
+        cleaned
+        for q in state.get("search_queries", [state["query"]])
+        if (cleaned := _normalize_query_text(q)) and not _is_garbage_query(cleaned)
+    ]
+    if not queries:
+        fallback_query = _normalize_query_text(state.get("query_en") or state["query"])
+        if fallback_query and not _is_garbage_query(fallback_query):
+            queries = [fallback_query]
     selected_devices = state.get("selected_devices", [])
     selected_doc_types = state.get("selected_doc_types", [])
     selected_doc_ids = [str(x).strip() for x in state.get("selected_doc_ids", []) if str(x).strip()]
-    selected_doc_type_filters = expand_doc_type_selection(selected_doc_types)
-    original_query = state["query"]
+    selected_doc_types_strict = bool(state.get("selected_doc_types_strict"))
+    if selected_doc_types_strict:
+        selected_doc_type_filters = _dedupe_queries(
+            [str(dt).strip() for dt in selected_doc_types if _normalize_doc_type(str(dt))]
+        )
+    else:
+        selected_doc_type_filters = expand_doc_type_selection(selected_doc_types)
+    original_query = _normalize_query_text(state["query"]) or state["query"]
 
     # search_queries from st_mq_node already contains EN+KO queries
     # No need to add bilingual queries here
-    query_en = state.get("query_en")
+    query_en = _normalize_query_text(state.get("query_en") or "")
 
     selected_device_set = {
         _normalize_device_name(d) for d in selected_devices if _normalize_device_name(d)
@@ -913,10 +1011,12 @@ def retrieve_node(
     all_queries = queries
 
     if selected_devices:
-        # Dual search strategy: device-filtered + general
-        logger.info("retrieve_node: dual search with devices=%s, queries=%d", selected_devices, len(all_queries))
-
-        # Search 1: Device-filtered search with device_names as OR filter
+        # Strict device filter: selected devices only
+        logger.info(
+            "retrieve_node: strict device-filtered search with devices=%s, queries=%d",
+            selected_devices,
+            len(all_queries),
+        )
         for q in all_queries:
             device_docs = retriever.retrieve(
                 q,
@@ -925,20 +1025,7 @@ def retrieve_node(
                 doc_types=selected_doc_type_filters,
             )
             _add_docs(device_docs, filter_devices=True)
-
-        device_filtered_count = len(all_docs)
-        logger.info("retrieve_node: device-filtered search found %d docs", device_filtered_count)
-
-        # Search 2: General search without device filter
-        for q in all_queries:
-            general_docs = retriever.retrieve(
-                q,
-                top_k=candidate_k,
-                doc_types=selected_doc_type_filters,
-            )
-            _add_docs(general_docs, filter_devices=False)
-
-        logger.info("retrieve_node: after general search, total %d docs", len(all_docs))
+        logger.info("retrieve_node: strict device-filtered search found %d docs", len(all_docs))
 
     else:
         # No device selection: search without filter
@@ -1378,7 +1465,7 @@ def should_retry(state: AgentState) -> Literal["done", "retry", "retry_expand", 
     """Determine retry strategy based on attempt count.
 
     Retry strategies:
-    - 1st unfaithful (attempt 0→1): retry_expand - use more docs (5→10)
+    - 1st unfaithful (attempt 0→1): retry_expand - use more docs (20→40)
     - 2nd unfaithful (attempt 1→2): retry - refine queries
     - 3rd unfaithful (attempt 2→3): retry_mq - regenerate multi-query from scratch
     """
@@ -1394,7 +1481,7 @@ def should_retry(state: AgentState) -> Literal["done", "retry", "retry_expand", 
 
     if attempts < max_attempts:
         if attempts == 0:
-            # 1st retry: expand more docs (5→10)
+            # 1st retry: expand more docs (20→40)
             return "retry_expand"
         elif attempts == 1:
             # 2nd retry: refine queries
@@ -1415,16 +1502,16 @@ def retry_bump_node(state: AgentState) -> Dict[str, Any]:
 
 
 def retry_expand_node(state: AgentState) -> Dict[str, Any]:
-    """1st retry strategy: increase expand_top_k from 5 to 10.
+    """1st retry strategy: increase expand_top_k from 20 to 40.
 
     This doesn't re-retrieve docs, just uses more of the already retrieved docs
     for answer generation.
     """
     attempts = int(state.get("attempts", 0)) + 1
-    logger.info("retry_expand_node: increasing expand_top_k to 10 (attempt %d)", attempts)
+    logger.info("retry_expand_node: increasing expand_top_k to 40 (attempt %d)", attempts)
     return {
         "attempts": attempts,
-        "expand_top_k": 10,
+        "expand_top_k": 40,
         "retry_strategy": "expand_more",
     }
 
@@ -1708,7 +1795,7 @@ def auto_parse_node(
     Returns:
         State update with auto_parsed_device, auto_parsed_doc_type, detected_language, and auto_parse_message.
     """
-    query = state["query"]
+    query = _normalize_query_text(state["query"]) or state["query"]
 
     # 규칙 기반만 사용 (LLM 호출 없음 - 속도 최적화)
     detected_language = _detect_language_rule_based(query)
@@ -1918,6 +2005,7 @@ def device_selection_node(
                 "device_selection_skipped": True,
                 "available_doc_types": [],
                 "selected_doc_types": [],
+                "selected_doc_types_strict": False,
                 "doc_type_selection_skipped": True,
             }
         )
@@ -1951,6 +2039,7 @@ def device_selection_node(
                 "device_selection_skipped": True,
                 "available_doc_types": available_doc_types,
                 "selected_doc_types": [],
+                "selected_doc_types_strict": False,
                 "doc_type_selection_skipped": True,
             }
         )
@@ -2005,6 +2094,7 @@ def device_selection_node(
             "device_selection_skipped": len(selected_devices) == 0,
             "available_doc_types": available_doc_types,
             "selected_doc_types": selected_doc_types,
+            "selected_doc_types_strict": len(selected_doc_types) > 0,
             "doc_type_selection_skipped": len(selected_doc_types) == 0,
         }
     )

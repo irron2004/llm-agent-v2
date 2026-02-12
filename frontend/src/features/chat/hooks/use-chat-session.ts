@@ -206,6 +206,14 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
   const handleAgentResponse = useCallback(
     (res: AgentResponse, assistantId: string, fallbackQuestion: string) => {
+      const metadataQueries = Array.isArray((res.metadata as any)?.search_queries)
+        ? (res.metadata as any).search_queries.filter((q: unknown): q is string => typeof q === "string" && q.trim().length > 0)
+        : [];
+      const responseQueries = Array.isArray(res.search_queries)
+        ? res.search_queries.filter((q: unknown): q is string => typeof q === "string" && q.trim().length > 0)
+        : [];
+      const effectiveSearchQueries = metadataQueries.length > 0 ? metadataQueries : responseQueries;
+
       if (res.interrupted) {
         const threadId = res.thread_id ?? "";
         if (!threadId) {
@@ -268,6 +276,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           rawAnswer: JSON.stringify(res, null, 2),
           currentNode: null,
           sessionId,
+          searchQueries: effectiveSearchQueries.length > 0 ? effectiveSearchQueries : null,
         }));
         setIsStreaming(false);
         return;
@@ -297,15 +306,24 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         ...m,
         content: res.answer || "",
         retrievedDocs: res.retrieved_docs || [],
-        allRetrievedDocs: res.all_retrieved_docs || [],  // 재생성용 전체 문서 (20개)
+        allRetrievedDocs: res.all_retrieved_docs || [],  // 재생성용 전체 문서 (최대 retrieval_top_k개)
         rawAnswer: JSON.stringify(res, null, 2),
         currentNode: null,
         sessionId,
         // Store auto_parse and filter info for regeneration
-        autoParse: res.auto_parse ?? null,
+        autoParse: (() => {
+          const existing = m.autoParse ?? null;
+          const incoming = res.auto_parse ?? null;
+          if (!incoming) return existing;
+          return {
+            ...existing,
+            ...incoming,
+            message: incoming.message ?? existing?.message ?? null,
+          };
+        })(),
         selectedDevices: res.selected_devices ?? null,
         selectedDocTypes: res.selected_doc_types ?? null,
-        searchQueries: res.search_queries ?? null,
+        searchQueries: effectiveSearchQueries.length > 0 ? effectiveSearchQueries : null,
       }));
 
       // Save turn to backend

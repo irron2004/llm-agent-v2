@@ -1,6 +1,8 @@
 """FastAPI application entrypoint."""
 
 import logging
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -14,9 +16,69 @@ from backend.services.search_service import SearchService
 from backend.services.es_search_service import EsSearchService
 from backend.llm_infrastructure.elasticsearch.manager import EsIndexManager
 
-logging.basicConfig(level=logging.INFO)
 APP_VERSION = "0.1.0"
 logger = logging.getLogger(__name__)
+
+
+def _resolve_log_level(level: str) -> int:
+    raw = (level or "info").strip().upper()
+    return getattr(logging, raw, logging.INFO)
+
+
+def _has_file_handler(target_logger: logging.Logger, file_path: Path) -> bool:
+    for handler in target_logger.handlers:
+        base_filename = getattr(handler, "baseFilename", None)
+        if not base_filename:
+            continue
+        try:
+            if Path(base_filename).resolve() == file_path.resolve():
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def _enable_file_logging() -> None:
+    level = _resolve_log_level(api_settings.log_level)
+    logging.basicConfig(level=level)
+
+    if not api_settings.log_to_file:
+        return
+
+    log_path = Path(api_settings.log_file_path).expanduser()
+    try:
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+    except Exception as exc:
+        logger.warning("Cannot create log directory '%s': %s", log_path.parent, exc)
+        return
+
+    formatter = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+    )
+
+    target_logger_names = ("", "uvicorn", "uvicorn.error", "uvicorn.access", "fastapi")
+    for logger_name in target_logger_names:
+        target = logging.getLogger(logger_name)
+        target.setLevel(level)
+        if _has_file_handler(target, log_path):
+            continue
+        try:
+            handler = RotatingFileHandler(
+                log_path,
+                maxBytes=max(1024, int(api_settings.log_max_bytes)),
+                backupCount=max(1, int(api_settings.log_backup_count)),
+                encoding="utf-8",
+            )
+            handler.setLevel(level)
+            handler.setFormatter(formatter)
+            target.addHandler(handler)
+        except Exception as exc:
+            logger.warning("Failed to attach file logging to '%s': %s", logger_name or "root", exc)
+
+    logger.info("API file logging enabled: %s", log_path)
+
+
+_enable_file_logging()
 
 
 def create_app() -> FastAPI:

@@ -21,6 +21,8 @@ services:
       # Inside the docker network, ES is reachable via service name + internal port.
       # (Using localhost here would point to the api container itself.)
       - SEARCH_ES_HOST=http://elasticsearch:9200
+      - API_LOG_TO_FILE=true
+      - API_LOG_FILE_PATH=/data/logs/api/api.log
 
     volumes:
       # Code hot-reload (development): mount backend source into /app/backend
@@ -35,6 +37,8 @@ services:
       - /home/llm-share/hf:/data/hf_cache
       # GCB and other PE data
       - /home/llm-share/datasets/pe_agent_data:/data/pe_agent_data
+      # API file logs
+      - ./data/logs/api:/data/logs/api
     ports:
       - "${API_PORT}:8000"
     depends_on:

@@ -67,6 +67,18 @@ export default function ChatPage() {
     registerSubmitHandlers({ submitReview, submitSearchQueries });
   }, [submitReview, submitSearchQueries, registerSubmitHandlers]);
 
+  const sanitizeRegenerationQuery = useCallback((query: string): string => {
+    let normalized = query.trim();
+    if (!normalized) return "";
+
+    normalized = normalized.replace(/^(?:\[\s*regenerate with[^\]]*\]\s*)+/gi, "").trim();
+    normalized = normalized.replace(/^(?:regenerate with\b[^:\n]*[:\-]?\s*)+/gi, "").trim();
+    normalized = normalized.replace(/^(?:재검색\s*(?:조건|필터)?\s*[:\-]?\s*)+/g, "").trim();
+
+    if (/^[.\s…·•\-_~=]+$/.test(normalized)) return "";
+    return normalized;
+  }, []);
+
   const submitRegeneration = useCallback((payload: {
     originalQuery: string;
     searchQueries: string[];
@@ -74,18 +86,25 @@ export default function ChatPage() {
     selectedDocTypes: string[];
     selectedDocIds: string[];
   }) => {
+    const normalizedOriginalQuery = sanitizeRegenerationQuery(payload.originalQuery);
+    const normalizedQueries = payload.searchQueries
+      .map((query) => sanitizeRegenerationQuery(query))
+      .filter((query) => query.length > 0);
+
     setPendingRegeneration(null);
     send({
-      text: payload.originalQuery,
+      text: normalizedOriginalQuery || payload.originalQuery,
       overrides: {
         filterDevices: payload.selectedDevices,
         filterDocTypes: payload.selectedDocTypes,
-        searchQueries: payload.searchQueries,
+        searchQueries: normalizedQueries.length > 0
+          ? normalizedQueries
+          : (normalizedOriginalQuery ? [normalizedOriginalQuery] : []),
         selectedDocIds: payload.selectedDocIds,
         autoParse: false,
       },
     });
-  }, [send, setPendingRegeneration]);
+  }, [send, setPendingRegeneration, sanitizeRegenerationQuery]);
 
   useEffect(() => {
     registerRegenerationHandlers({ submitRegeneration });

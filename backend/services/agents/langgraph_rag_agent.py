@@ -62,8 +62,8 @@ class LangGraphRAGAgent:
         llm: BaseLLM,
         search_service: SearchService,
         prompt_spec: Optional[PromptSpec] = None,
-        top_k: int = 10,
-        retrieval_top_k: int = 20,
+        top_k: int = 20,
+        retrieval_top_k: int = 50,
         mode: str = "verified",  # base | verified
         checkpointer: Optional[MemorySaver] = None,
         ask_user_after_retrieve: bool = False,
@@ -276,7 +276,7 @@ class LangGraphRAGAgent:
         elif name == "retry_expand":
             attempts = result.get("attempts") if result else state.get("attempts")
             expand_k = result.get("expand_top_k") if result else state.get("expand_top_k")
-            details_parts.append(f"문서 확장 5→{expand_k or 10}개")
+            details_parts.append(f"문서 확장 증가 →{expand_k or 40}개")
             if attempts:
                 details_parts.append(f"attempt {attempts}")
 
@@ -410,7 +410,7 @@ class LangGraphRAGAgent:
             return builder.compile(checkpointer=self.checkpointer if self.ask_user_after_retrieve else None)
 
         # verified: add retry/human with different strategies
-        # retry_expand: 1st retry - use more docs (5→10)
+        # retry_expand: 1st retry - use more docs (20→40)
         builder.add_node("retry_expand", self._wrap_node("retry_expand", retry_expand_node))
         # retry_bump + refine_queries: 2nd retry - refine queries and re-retrieve
         builder.add_node("retry_bump", self._wrap_node("retry_bump", retry_bump_node))

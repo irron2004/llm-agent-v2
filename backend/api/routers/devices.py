@@ -13,6 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from backend.api.dependencies import get_search_service
+from backend.domain.doc_type_mapping import group_doc_type_items
 from backend.services.device_cache import ensure_device_cache_initialized
 from backend.services.es_search_service import EsSearchService
 
@@ -148,7 +149,8 @@ async def get_device_catalog(
         devices.append(DeviceInfo(name=name, doc_count=doc_count))
 
     doc_types: list[DocTypeInfo] = []
-    for d in cache.doc_types or []:
+    grouped_doc_types = group_doc_type_items(cache.doc_types or [])
+    for d in grouped_doc_types:
         name = str(d.get("name", "")).strip()
         if not name:
             continue

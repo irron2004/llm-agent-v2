@@ -486,6 +486,22 @@ class APISettings(BaseSettings):
         default="info",
         description="Logging level"
     )
+    log_to_file: bool = Field(
+        default=False,
+        description="Write API logs to file"
+    )
+    log_file_path: str = Field(
+        default="/data/logs/api/api.log",
+        description="API log file path"
+    )
+    log_max_bytes: int = Field(
+        default=20 * 1024 * 1024,
+        description="Max bytes per log file before rotation"
+    )
+    log_backup_count: int = Field(
+        default=5,
+        description="Number of rotated log files to keep"
+    )
 
 
 class SummarizationSettings(BaseSettings):

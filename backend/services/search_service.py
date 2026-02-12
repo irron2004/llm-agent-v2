@@ -268,12 +268,14 @@ class SearchService:
         if should_rerank and self.reranker is not None:
             retrieval_top_k = max(final_top_k * 2, 20)
 
-        # Build retriever kwargs for device filtering
+        # Build retriever kwargs for retrieval-time filtering
         retriever_kwargs: dict = {}
         if device_names:
             retriever_kwargs["device_names"] = device_names
         elif device_name:
             retriever_kwargs["device_name"] = device_name
+        if doc_types:
+            retriever_kwargs["doc_types"] = doc_types
 
         # Step 1: Multi-Query Expansion (if enabled)
         if should_expand and self.query_expander is not None:

@@ -243,6 +243,18 @@ function ReviewPanelContent({
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
 
+  const sanitizeRegenerationQuery = useCallback((query: string): string => {
+    let normalized = query.trim();
+    if (!normalized) return "";
+
+    normalized = normalized.replace(/^(?:\[\s*regenerate with[^\]]*\]\s*)+/gi, "").trim();
+    normalized = normalized.replace(/^(?:regenerate with\b[^:\n]*[:\-]?\s*)+/gi, "").trim();
+    normalized = normalized.replace(/^(?:재검색\s*(?:조건|필터)?\s*[:\-]?\s*)+/g, "").trim();
+
+    if (/^[.\s…·•\-_~=]+$/.test(normalized)) return "";
+    return normalized;
+  }, []);
+
   // 이미지 URL이 유효한지 확인하는 헬퍼 함수
   const hasValidImageUrl = (url: string | null | undefined): url is string => {
     if (typeof url !== 'string') return false;
@@ -615,7 +627,15 @@ function RegeneratePanelContent({
     const baseQueries = pendingRegeneration.searchQueries.length > 0
       ? pendingRegeneration.searchQueries
       : (pendingRegeneration.originalQuery ? [pendingRegeneration.originalQuery] : []);
-    setEditableQueries(baseQueries);
+    const cleanedBaseQueries = baseQueries
+      .map((query) => sanitizeRegenerationQuery(query))
+      .filter((query) => query.length > 0);
+    const fallbackOriginal = sanitizeRegenerationQuery(pendingRegeneration.originalQuery);
+    setEditableQueries(
+      cleanedBaseQueries.length > 0
+        ? cleanedBaseQueries
+        : (fallbackOriginal ? [fallbackOriginal] : [])
+    );
     // Select all documents by index initially
     const allIndices = pendingRegeneration.docs.map((_, idx) => idx);
     setSelectedIndices(allIndices);
@@ -626,7 +646,7 @@ function RegeneratePanelContent({
       .filter((d) => allowedSet.has(d));
     setSelectedDocTypes(initialDocTypes);
     setError(null);
-  }, [pendingRegeneration, allowedDocTypes]);
+  }, [pendingRegeneration, allowedDocTypes, sanitizeRegenerationQuery]);
 
   useEffect(() => {
     let active = true;
@@ -753,21 +773,29 @@ function RegeneratePanelContent({
   const allDocTypesSelected = allowedDocTypes.length > 0 && selectedDocTypes.length === allowedDocTypes.length;
 
   const handleSubmit = () => {
-    const queries = editableQueries.map((q) => q.trim()).filter((q) => q.length > 0);
-    if (selectedIndices.length === 0) {
+    const queries = editableQueries
+      .map((q) => sanitizeRegenerationQuery(q))
+      .filter((q) => q.length > 0);
+    const normalizedOriginalQuery = sanitizeRegenerationQuery(pendingRegeneration.originalQuery);
+    if (pendingRegeneration.docs.length > 0 && selectedIndices.length === 0) {
       setError("재검색할 문서를 1개 이상 선택해 주세요.");
       return;
     }
-    // Convert selected indices to doc IDs
-    const selectedDocIds = selectedIndices
-      .map((idx) => pendingRegeneration.docs[idx]?.id)
-      .filter((id): id is string => typeof id === "string" && id.trim().length > 0);
+    // Convert selected indices to doc IDs.
+    // If all previous documents are selected, do not constrain by doc_id.
+    const selectedDocIds = allDocsSelected
+      ? []
+      : selectedIndices
+        .map((idx) => pendingRegeneration.docs[idx]?.id)
+        .filter((id): id is string => typeof id === "string" && id.trim().length > 0);
     // 전체 선택 시 빈 배열로 전달 (필터 없이 검색)
     const deviceFilter = allDevicesSelected ? [] : selectedDevices;
     const docTypeFilter = allDocTypesSelected ? [] : selectedDocTypes;
     submitRegeneration({
-      originalQuery: pendingRegeneration.originalQuery,
-      searchQueries: queries.length > 0 ? queries : [pendingRegeneration.originalQuery],
+      originalQuery: normalizedOriginalQuery || pendingRegeneration.originalQuery,
+      searchQueries: queries.length > 0
+        ? queries
+        : (normalizedOriginalQuery ? [normalizedOriginalQuery] : []),
       selectedDevices: deviceFilter,
       selectedDocTypes: docTypeFilter,
       selectedDocIds,
@@ -778,7 +806,7 @@ function RegeneratePanelContent({
     <div className="review-panel-sidebar">
       <div className="review-queries">
         <div className="review-queries-header">
-          <span className="review-queries-label">검색어 (MQ)</span>
+          <span className="review-queries-label">최종 검색어 (MQ)</span>
         </div>
         <div className="review-queries-editor">
           {editableQueries.map((query, idx) => (
@@ -801,7 +829,7 @@ function RegeneratePanelContent({
               )}
             </div>
           ))}
-          {editableQueries.length < 5 && (
+          {editableQueries.length < 6 && (
             <button className="review-query-add" onClick={handleAddQuery}>
               + 검색어 추가
             </button>

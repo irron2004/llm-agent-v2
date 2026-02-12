@@ -32,14 +32,14 @@ def _make_doc(
 class TestExpandTopKLimit:
     """상위 K개 확장 제한 테스트"""
 
-    def test_expand_top_k_constant_is_5(self):
-        """EXPAND_TOP_K 상수가 5인지 확인"""
-        assert EXPAND_TOP_K == 5
+    def test_expand_top_k_constant_is_20(self):
+        """EXPAND_TOP_K 상수가 20인지 확인"""
+        assert EXPAND_TOP_K == 20
 
-    def test_expand_only_top_5_docs(self):
-        """10개 문서 중 상위 5개만 확장 시도"""
-        # Given: 10개 문서
-        docs = [_make_doc(f"doc_{i}", page=i + 1) for i in range(10)]
+    def test_expand_only_top_k_docs(self):
+        """문서 수가 top_k를 초과하면 상위 top_k만 확장 시도"""
+        # Given: top_k보다 많은 문서
+        docs = [_make_doc(f"doc_{i}", page=i + 1) for i in range(EXPAND_TOP_K + 10)]
         state = {"docs": docs}
 
         page_fetcher = MagicMock(return_value=[])
@@ -47,8 +47,8 @@ class TestExpandTopKLimit:
         # When
         expand_related_docs_node(state, page_fetcher=page_fetcher)
 
-        # Then: page_fetcher는 상위 5개에 대해서만 호출 (5회)
-        assert page_fetcher.call_count == 5
+        # Then: page_fetcher는 상위 top_k에 대해서만 호출
+        assert page_fetcher.call_count == EXPAND_TOP_K
 
     def test_docs_less_than_top_k_all_expanded(self):
         """문서가 5개 미만일 때 전부 확장 시도"""
@@ -64,10 +64,10 @@ class TestExpandTopKLimit:
         # Then: 3회 호출
         assert page_fetcher.call_count == 3
 
-    def test_exactly_5_docs_all_expanded(self):
-        """정확히 5개 문서일 때 전부 확장"""
-        # Given: 5개 문서
-        docs = [_make_doc(f"doc_{i}", page=i + 1) for i in range(5)]
+    def test_exactly_top_k_docs_all_expanded(self):
+        """정확히 top_k 문서일 때 전부 확장"""
+        # Given: top_k개 문서
+        docs = [_make_doc(f"doc_{i}", page=i + 1) for i in range(EXPAND_TOP_K)]
         state = {"docs": docs}
 
         page_fetcher = MagicMock(return_value=[])
@@ -75,8 +75,8 @@ class TestExpandTopKLimit:
         # When
         expand_related_docs_node(state, page_fetcher=page_fetcher)
 
-        # Then: 5회 호출
-        assert page_fetcher.call_count == 5
+        # Then: top_k회 호출
+        assert page_fetcher.call_count == EXPAND_TOP_K
 
 
 class TestRemainingDocsPreserved:
@@ -93,7 +93,7 @@ class TestRemainingDocsPreserved:
         # When
         result = expand_related_docs_node(state, page_fetcher=page_fetcher)
 
-        # Then: answer_ref_json은 상위 5개만 포함
+        # Then: answer_ref_json은 상위 top_k만 포함
         assert len(result["answer_ref_json"]) == min(EXPAND_TOP_K, len(docs))
 
     def test_remaining_docs_have_original_content(self):
@@ -108,7 +108,7 @@ class TestRemainingDocsPreserved:
         # When
         result = expand_related_docs_node(state, page_fetcher=page_fetcher)
 
-        # Then: 상위 5개 문서만 확인
+        # Then: 상위 top_k 문서만 확인
         ref_json = result["answer_ref_json"]
         for i, ref in enumerate(ref_json):
             # raw_text가 있으면 raw_text, 없으면 content 사용

@@ -13,6 +13,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from backend.domain.doc_type_mapping import group_doc_type_buckets, group_doc_type_items
+
 logger = logging.getLogger(__name__)
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -147,7 +149,7 @@ class DeviceCache:
         local_catalog = _load_catalog_from_file(_CATALOG_PATH)
         if local_catalog is not None:
             self._devices = local_catalog.get("devices", [])
-            self._doc_types = local_catalog.get("doc_types", [])
+            self._doc_types = group_doc_type_items(local_catalog.get("doc_types", []))
             self._visible_devices = local_catalog.get("vis", []) or _compute_visible_devices(self._devices)
             self._initialized = True
             logger.info(
@@ -207,14 +209,7 @@ class DeviceCache:
                 if bucket.get("key")
             ]
 
-            self._doc_types = [
-                {
-                    "name": bucket["key"],
-                    "doc_count": bucket.get("unique_docs", {}).get("value", bucket["doc_count"])
-                }
-                for bucket in doc_type_buckets
-                if bucket.get("key")
-            ]
+            self._doc_types = group_doc_type_buckets(doc_type_buckets, use_unique_docs=True)
 
             self._visible_devices = _compute_visible_devices(self._devices)
             self._initialized = True

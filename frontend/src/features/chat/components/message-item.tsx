@@ -86,6 +86,29 @@ function hasValidImageUrl(url: string | null | undefined): url is string {
   return true;
 }
 
+function containsKorean(text: string): boolean {
+  return /[가-힣]/.test(text || "");
+}
+
+function extractSearchQueriesFromRawAnswer(rawAnswer?: string): string[] {
+  if (!rawAnswer) return [];
+  try {
+    const parsed = JSON.parse(rawAnswer) as {
+      search_queries?: unknown;
+      metadata?: { search_queries?: unknown };
+    };
+    const fromTopLevel = Array.isArray(parsed?.search_queries) ? parsed.search_queries : [];
+    const fromMetadata = Array.isArray(parsed?.metadata?.search_queries) ? parsed.metadata.search_queries : [];
+    const merged = [...fromTopLevel, ...fromMetadata];
+    const cleaned = merged
+      .map((value) => (typeof value === "string" ? value.trim() : ""))
+      .filter((value) => value.length > 0);
+    return Array.from(new Set(cleaned));
+  } catch {
+    return [];
+  }
+}
+
 // 개별 참고 문서 아이템 - 이미지 로드 상태를 자체 관리
 type ReferenceItemProps = {
   doc: RetrievedDoc;
@@ -235,25 +258,40 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
   const hasFeedback = Boolean(message.feedback?.accuracy || message.feedback?.rating);
   const canFeedback = Boolean(message.sessionId && message.turnId);
   const regenerateQuery = (originalQuery || message.originalQuery || "").trim();
+  const effectiveSearchQueries = useMemo(() => {
+    const direct = Array.isArray(message.searchQueries)
+      ? message.searchQueries.map((q) => (typeof q === "string" ? q.trim() : "")).filter((q) => q.length > 0)
+      : [];
+    if (direct.length > 0) return direct;
+    return extractSearchQueriesFromRawAnswer(message.rawAnswer);
+  }, [message.searchQueries, message.rawAnswer]);
+  const englishSearchQueries = useMemo(
+    () => effectiveSearchQueries.filter((q) => !containsKorean(q)).slice(0, 3),
+    [effectiveSearchQueries]
+  );
+  const koreanSearchQueries = useMemo(
+    () => effectiveSearchQueries.filter((q) => containsKorean(q)).slice(0, 3),
+    [effectiveSearchQueries]
+  );
 
   // Check if regeneration info is available
   const hasFilterInfo = Boolean(
     message.selectedDevices?.length ||
     message.selectedDocTypes?.length ||
-    message.searchQueries?.length ||
+    effectiveSearchQueries.length ||
     message.autoParse
   );
 
   const handleRegenerate = () => {
     if (!onRegenerate || !regenerateQuery) return;
-    // 재생성용으로 allRetrievedDocs (20개) 사용, 없으면 retrievedDocs fallback
+    // 재생성용으로 allRetrievedDocs(최대 retrieval_top_k개) 사용, 없으면 retrievedDocs fallback
     onRegenerate({
       messageId: message.id,
       originalQuery: regenerateQuery,
       retrievedDocs: message.allRetrievedDocs ?? message.retrievedDocs ?? [],
       selectedDevices: message.selectedDevices,
       selectedDocTypes: message.selectedDocTypes,
-      searchQueries: message.searchQueries,
+      searchQueries: effectiveSearchQueries.length > 0 ? effectiveSearchQueries : null,
     });
   };
 
@@ -546,6 +584,21 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
             </div>
           )}
 
+          {isAssistant && !isStreaming && message.autoParse?.message && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: "6px 10px",
+                borderRadius: 6,
+                background: "var(--color-bg-secondary)",
+                color: "var(--color-accent-primary)",
+                fontSize: 12,
+              }}
+            >
+              🔍 {message.autoParse.message}
+            </div>
+          )}
+
           {/* Execution logs moved to right sidebar */}
 
           {/* Action buttons - only for assistant messages */}
@@ -584,11 +637,6 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
           {/* Filter info display */}
           {isAssistant && !isStreaming && showFilterInfo && hasFilterInfo && (
             <div className="filter-info" style={{ marginTop: 8, padding: "8px 12px", background: "var(--color-bg-secondary)", borderRadius: 6, fontSize: 12 }}>
-              {message.autoParse?.message && (
-                <div style={{ marginBottom: 4, color: "var(--color-accent-primary)" }}>
-                  🔍 {message.autoParse.message}
-                </div>
-              )}
               {message.selectedDevices && message.selectedDevices.length > 0 && (
                 <div style={{ marginBottom: 4 }}>
                   <span style={{ color: "var(--color-text-secondary)" }}>장비: </span>
@@ -605,14 +653,24 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
                   ))}
                 </div>
               )}
-              {message.searchQueries && message.searchQueries.length > 0 && (
+              {effectiveSearchQueries.length > 0 && (
                 <div>
-                  <span style={{ color: "var(--color-text-secondary)" }}>검색 쿼리: </span>
-                  {message.searchQueries.slice(0, 3).map((q, i) => (
-                    <div key={i} style={{ marginLeft: 8, color: "var(--color-text-secondary)" }}>• {q}</div>
-                  ))}
-                  {message.searchQueries.length > 3 && (
-                    <div style={{ marginLeft: 8, color: "var(--color-text-secondary)" }}>...외 {message.searchQueries.length - 3}개</div>
+                  <span style={{ color: "var(--color-text-secondary)" }}>검색 쿼리(MQ): </span>
+                  {englishSearchQueries.length > 0 && (
+                    <div style={{ marginTop: 4 }}>
+                      <span style={{ color: "var(--color-text-secondary)" }}>EN</span>
+                      {englishSearchQueries.map((q, i) => (
+                        <div key={`en-${i}`} style={{ marginLeft: 8, color: "var(--color-text-secondary)" }}>• {q}</div>
+                      ))}
+                    </div>
+                  )}
+                  {koreanSearchQueries.length > 0 && (
+                    <div style={{ marginTop: 4 }}>
+                      <span style={{ color: "var(--color-text-secondary)" }}>KO</span>
+                      {koreanSearchQueries.map((q, i) => (
+                        <div key={`ko-${i}`} style={{ marginLeft: 8, color: "var(--color-text-secondary)" }}>• {q}</div>
+                      ))}
+                    </div>
                   )}
                 </div>
               )}

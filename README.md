@@ -179,7 +179,7 @@ python -m experiments.run \
 - RAG: `RAG_PREPROCESS_METHOD`, `RAG_PREPROCESS_VERSION`, `RAG_EMBEDDING_METHOD`, `RAG_EMBEDDING_VERSION`, `RAG_RETRIEVAL_PRESET`, `RAG_RAGFLOW_ENABLED`, `RAG_RAGFLOW_BASE_URL`, `RAG_RAGFLOW_API_KEY`, `RAG_RAGFLOW_AGENT_ID`
 - vLLM: `VLLM_BASE_URL`, `VLLM_MODEL_NAME`, `VLLM_TEMPERATURE`, `VLLM_MAX_TOKENS`, `VLLM_TIMEOUT`
 - TEI: `TEI_ENDPOINT_URL`, `TEI_TIMEOUT`
-- API: `API_TITLE`, `API_VERSION`, `API_DESCRIPTION`, `API_HOST`, `API_PORT`, `API_RELOAD`, `API_LOG_LEVEL`
+- API: `API_TITLE`, `API_VERSION`, `API_DESCRIPTION`, `API_HOST`, `API_PORT`, `API_RELOAD`, `API_LOG_LEVEL`, `API_LOG_TO_FILE`, `API_LOG_FILE_PATH`, `API_LOG_MAX_BYTES`, `API_LOG_BACKUP_COUNT`
 
 ### 공용 모델 캐시(.env.llm) 활용
 여러 사용자가 공유 모델/데이터 캐시를 쓰려면 `/home/llm-share/.env.llm`를 만들어 프로젝트에서 먼저 로드합니다.
@@ -209,6 +209,16 @@ services:
     env_file:
       - /home/llm-share/.env.llm  # 공용
       - ./.env                    # 프로젝트 개별(선택)
+```
+
+### Docker 로그 파일 저장
+- API 컨테이너는 `docker-compose.yml`에서 `API_LOG_TO_FILE=true`, `API_LOG_FILE_PATH=/data/logs/api/api.log`로 설정되어 `./data/logs/api/`에 로그를 남깁니다.
+- 전체 컨테이너 로그를 파일로 저장하려면 아래 스크립트를 사용하세요.
+
+```bash
+./scripts/docker/save_compose_logs.sh
+# 또는 사용자 지정 경로
+./scripts/docker/save_compose_logs.sh ./data/logs/docker
 ```
 
 ## 전처리(정규화) 개요

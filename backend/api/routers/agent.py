@@ -19,7 +19,8 @@ from backend.api.dependencies import (
     get_prompt_spec_cached,
     get_search_service,
 )
-from backend.domain.doc_type_mapping import group_doc_type_buckets
+from backend.domain.doc_type_mapping import expand_doc_type_selection, group_doc_type_buckets
+from backend.llm_infrastructure.llm.langgraph_agent import _detect_language_rule_based
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
 from backend.services.agents.langgraph_rag_agent import LangGraphRAGAgent
 from backend.services.search_service import SearchService
@@ -27,6 +28,9 @@ from backend.services.search_service import SearchService
 
 router = APIRouter(prefix="/agent", tags=["LangGraph Agent"])
 logger = logging.getLogger(__name__)
+
+DEFAULT_RETRIEVAL_TOP_K = 50
+DEFAULT_FINAL_TOP_K = 20
 
 # =============================================================================
 # 전역 상태: HIL(Human-in-the-Loop) 지원 및 Auto-Parse 모드
@@ -131,7 +135,9 @@ def _build_state_overrides(req: "AgentRequest") -> Dict[str, Any]:
     if req.filter_doc_types is not None:
         doc_types = [str(d).strip() for d in req.filter_doc_types if str(d).strip()]
         if doc_types:
-            overrides["selected_doc_types"] = doc_types
+            # FE는 그룹명("sop","ts" 등)을 보내므로 ES 실제값으로 확장 후 strict 적용
+            overrides["selected_doc_types"] = expand_doc_type_selection(doc_types)
+            overrides["selected_doc_types_strict"] = True
 
     if req.search_queries is not None:
         queries = [str(q).strip() for q in req.search_queries if str(q).strip()]
@@ -144,19 +150,28 @@ def _build_state_overrides(req: "AgentRequest") -> Dict[str, Any]:
         if doc_ids:
             overrides["selected_doc_ids"] = doc_ids
 
+    # Override/regeneration 경로는 auto_parse 노드를 건너뛰므로
+    # 답변 언어 템플릿 선택을 위해 최소 언어 감지를 보정한다.
+    if overrides:
+        overrides["detected_language"] = _detect_language_rule_based(req.message or "")
+
     return overrides
 
 def _get_hil_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent:
     """HIL용 싱글톤 에이전트. 동일한 graph 인스턴스로 interrupt/resume 보장."""
     global _hil_agent
     if _hil_agent is None:
-        logger.info("Creating HIL agent singleton with top_k=20 retrieval_top_k=50")
+        logger.info(
+            "Creating HIL agent singleton with top_k=%d retrieval_top_k=%d",
+            DEFAULT_FINAL_TOP_K,
+            DEFAULT_RETRIEVAL_TOP_K,
+        )
         _hil_agent = LangGraphRAGAgent(
             llm=llm,
             search_service=search_service,
             prompt_spec=prompt_spec,
-            top_k=20,
-            retrieval_top_k=50,
+            top_k=DEFAULT_FINAL_TOP_K,
+            retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
             mode="verified",
             ask_user_after_retrieve=True,
             ask_device_selection=True,
@@ -170,13 +185,17 @@ def _get_auto_parse_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent
     """Auto-parse용 싱글톤 에이전트. 장비/문서종류를 자동으로 파싱."""
     global _auto_parse_agent
     if _auto_parse_agent is None:
-        logger.info("Creating Auto-parse agent singleton with top_k=20 retrieval_top_k=50")
+        logger.info(
+            "Creating Auto-parse agent singleton with top_k=%d retrieval_top_k=%d",
+            DEFAULT_FINAL_TOP_K,
+            DEFAULT_RETRIEVAL_TOP_K,
+        )
         _auto_parse_agent = LangGraphRAGAgent(
             llm=llm,
             search_service=search_service,
             prompt_spec=prompt_spec,
-            top_k=20,
-            retrieval_top_k=50,
+            top_k=DEFAULT_FINAL_TOP_K,
+            retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
             mode="verified",
             ask_user_after_retrieve=False,  # 문서 선택 UI 비활성화
             ask_device_selection=False,      # 기기 선택 UI 비활성화
@@ -191,7 +210,7 @@ def _get_auto_parse_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent
 # =============================================================================
 class AgentRequest(BaseModel):
     message: str = Field(..., description="사용자 질문")
-    top_k: int = Field(10, ge=1, le=50, description="검색 상위 문서 수")
+    top_k: int = Field(DEFAULT_FINAL_TOP_K, ge=1, le=50, description="검색 상위 문서 수")
     max_attempts: int = Field(3, ge=0, le=3, description="judge 실패 시 재시도 횟수")
     mode: str = Field("verified", description="base 또는 verified")
     thread_id: Optional[str] = Field(None, description="LangGraph thread_id")
@@ -242,7 +261,7 @@ class AgentResponse(BaseModel):
     reasoning: Optional[str] = Field(None, description="LLM reasoning 과정 (reasoning 모델인 경우)")
     judge: Dict[str, Any]
     retrieved_docs: List[RetrievedDoc]
-    all_retrieved_docs: Optional[List[RetrievedDoc]] = Field(None, description="전체 검색 문서 (재생성용, 20개)")
+    all_retrieved_docs: Optional[List[RetrievedDoc]] = Field(None, description="전체 검색 문서 (재생성용, 최대 retrieval_top_k개)")
     expanded_docs: Optional[List[ExpandedDoc]] = Field(None, description="확장된 문서 (답변 생성용)")
     metadata: Dict[str, Any] = Field(default_factory=dict)
     interrupted: bool = Field(False)
@@ -382,6 +401,7 @@ async def run_agent(
                 search_service=search_service,
                 prompt_spec=prompt_spec,
                 top_k=req.top_k,
+                retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
                 mode=req.mode,
                 ask_user_after_retrieve=False,
                 checkpointer=None,
@@ -426,6 +446,7 @@ async def run_agent(
                 search_service=search_service,
                 prompt_spec=prompt_spec,
                 top_k=req.top_k,
+                retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
                 mode=req.mode,
                 ask_user_after_retrieve=False,
                 checkpointer=None,
@@ -554,6 +575,7 @@ async def run_agent_stream(
                     search_service=search_service,
                     prompt_spec=prompt_spec,
                     top_k=req.top_k,
+                    retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
                     mode=req.mode,
                     ask_user_after_retrieve=False,
                     checkpointer=None,
@@ -597,6 +619,7 @@ async def run_agent_stream(
                     search_service=search_service,
                     prompt_spec=prompt_spec,
                     top_k=req.top_k,
+                    retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
                     mode=req.mode,
                     ask_user_after_retrieve=False,
                     checkpointer=None,
