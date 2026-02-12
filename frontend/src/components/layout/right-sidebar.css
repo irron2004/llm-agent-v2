@@ -79,7 +79,8 @@
 .right-sidebar-content {
   flex: 1;
   padding: var(--spacing-lg);
-  overflow-y: auto;
+  overflow: hidden;
+  min-height: 0;  /* flex item이 shrink할 수 있도록 */
 }
 
 /* Section styles for content */
@@ -191,8 +192,17 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow: hidden;  /* 부모는 overflow hidden */
+}
+
+/* 스크롤 가능한 콘텐츠 영역 */
+.review-panel-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
   gap: var(--spacing-md);
-  overflow-y: auto;  /* 콘텐츠 스크롤 허용, sticky 버튼을 위해 */
 }
 
 .review-panel-sidebar .review-queries {
@@ -201,10 +211,8 @@
 }
 
 .review-panel-sidebar .review-docs {
-  flex: 1;
+  flex-shrink: 0;
   max-height: none;
-  overflow-y: auto;
-  min-height: 0;
 }
 
 .review-panel-sidebar .review-doc-content {
@@ -219,13 +227,9 @@
 
 .review-panel-sidebar .review-actions {
   flex-shrink: 0;
-  margin-top: auto;
   padding-top: var(--spacing-md);
   border-top: 1px solid var(--color-border);
-  position: sticky;
-  bottom: 0;
   background-color: var(--color-bg-card);
-  padding-bottom: var(--spacing-sm);
 }
 
 /* Retrieved Docs Styles */

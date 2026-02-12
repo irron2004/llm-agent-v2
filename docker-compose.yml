@@ -2,56 +2,20 @@
 # RAG System Docker Compose
 # Local development / PoC environment
 # Services: FastAPI + Elasticsearch + vLLM + Ingestion volumes
+#
+# Usage:
+#   docker compose --profile prod up -d              # Production only
+#   docker compose --profile dev up -d               # Development only
+#   docker compose --profile prod --profile dev up -d # Both (different ports)
+#   docker compose --profile prod --profile with-llm up -d # Prod + vLLM
 # =============================================================================
 
 services:
   # ---------------------------------------------------------------------------
-  # FastAPI Backend API
+  # Shared Infrastructure (no profile - always running)
   # ---------------------------------------------------------------------------
-  api:
-    container_name: rag-api
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
-    env_file:
-      - .env
-    environment:
-      - HF_HOME=/data/hf_cache
-      - TRANSFORMERS_CACHE=/data/hf_cache
-      # Inside the docker network, ES is reachable via service name + internal port.
-      # (Using localhost here would point to the api container itself.)
-      - SEARCH_ES_HOST=http://elasticsearch:9200
 
-    volumes:
-      # Code hot-reload (development): mount backend source into /app/backend
-      - ./backend:/app/backend
-      # Scripts for batch jobs
-      - ./scripts:/app/scripts
-      # Ingestion data (original pdf, pages, parsed.json)
-      - ./data/ingestions:/data/ingestions
-      # Vector store persistence (local-only; can be moved later)
-      - ./data/vector_store:/data/vector_store
-      # HuggingFace model cache (shared host cache)
-      - /home/llm-share/hf:/data/hf_cache
-      # GCB and other PE data
-      - /home/llm-share/datasets/pe_agent_data:/data/pe_agent_data
-      # Application logs (rag_trace.log, etc.)
-      - ./data/logs:/app/logs
-      # Docker socket for log streaming
-      - /var/run/docker.sock:/var/run/docker.sock
-    ports:
-      - "${API_PORT}:8000"
-    depends_on:
-      elasticsearch:
-        condition: service_healthy
-      # vllm dependency removed - vllm is optional (with-llm profile)
-    networks:
-      - rag_net
-    restart: unless-stopped
-
-  # ---------------------------------------------------------------------------
   # Elasticsearch (Vector + BM25 search)
-  # ---------------------------------------------------------------------------
   elasticsearch:
     container_name: rag-elasticsearch
     build:
@@ -62,7 +26,6 @@ services:
       - ES_JAVA_OPTS=-Xms2g -Xmx2g
       - xpack.security.enabled=false
       - xpack.security.enrollment.enabled=false
-      # Nori plugin (Korean analyzer) installed via custom Dockerfile
     ulimits:
       memlock:
         soft: -1
@@ -71,10 +34,9 @@ services:
         soft: 65536
         hard: 65536
     volumes:
-      # ES data persistence (host path or named volume via ES_DATA_PATH env)
       - ${ES_DATA_PATH:?ES_DATA_PATH is required}:/usr/share/elasticsearch/data
     ports:
-      - "${ES_PORT}:9200"
+      - "${ES_PORT:-9200}:9200"
     networks:
       - rag_net
     healthcheck:
@@ -85,9 +47,52 @@ services:
       start_period: 60s
     restart: unless-stopped
 
+  # MinIO (S3-compatible object storage for document images)
+  minio:
+    container_name: rag-minio
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    volumes:
+      - ./data/minio:/data
+    networks:
+      - rag_net
+    ports:
+      - "127.0.0.1:9000:9000"
+      - "127.0.0.1:9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  minio-init:
+    container_name: rag-minio-init
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} &&
+      /usr/bin/mc mb -p local/$${MINIO_BUCKET} || true
+      "
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - MINIO_BUCKET=${MINIO_BUCKET}
+    networks:
+      - rag_net
+
   # ---------------------------------------------------------------------------
+  # Optional Services (profile-based)
+  # ---------------------------------------------------------------------------
+
   # vLLM (OpenAI compatible LLM server)
-  # ---------------------------------------------------------------------------
   vllm:
     container_name: rag-vllm
     image: vllm/vllm-openai:latest
@@ -113,7 +118,6 @@ services:
       - "${LLM_PORT:-8003}:8000"
     networks:
       - rag_net
-    # GPU configuration (NVIDIA GPU)
     deploy:
       resources:
         reservations:
@@ -124,11 +128,9 @@ services:
     shm_size: ${VLLM_SHM_SIZE:-8g}
     restart: unless-stopped
     profiles:
-      - with-llm  # Only start with: docker compose --profile with-llm up
+      - with-llm
 
-  # ---------------------------------------------------------------------------
-  # VLM (Vision/Multimodal) vLLM server - Optional
-  # ---------------------------------------------------------------------------
+  # VLM (Vision/Multimodal) vLLM server
   vlm:
     container_name: rag-vlm
     image: vllm/vllm-openai:latest
@@ -161,11 +163,9 @@ services:
     shm_size: ${VLM_SHM_SIZE:-8g}
     restart: unless-stopped
     profiles:
-      - with-vlm  # Only start with: docker compose --profile with-vlm up
+      - with-vlm
 
-  # ---------------------------------------------------------------------------
-  # TEI (Text Embeddings Inference) - Optional
-  # ---------------------------------------------------------------------------
+  # TEI (Text Embeddings Inference)
   tei:
     container_name: rag-tei
     image: ghcr.io/huggingface/text-embeddings-inference:${TEI_VERSION:-cpu-1.8}
@@ -182,75 +182,131 @@ services:
       - rag_net
     restart: unless-stopped
     profiles:
-      - with-tei  # Only start with: docker compose --profile with-tei up
+      - with-tei
 
   # ---------------------------------------------------------------------------
-  # MinIO (S3-compatible object storage for document images)
+  # Production Services (profile: prod)
   # ---------------------------------------------------------------------------
-  minio:
-    container_name: rag-minio
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
+
+  api:
+    container_name: rag-api
+    profiles:
+      - prod
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
     environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+      - HF_HOME=/data/hf_cache
+      - TRANSFORMERS_CACHE=/data/hf_cache
+      - SEARCH_ES_HOST=http://elasticsearch:9200
+      - SEARCH_ES_ENV=dev
     volumes:
-      - ./data/minio:/data
+      # No source mount for prod (use built image)
+      - ./scripts:/app/scripts
+      - ./data/ingestions:/data/ingestions
+      - ./data/vector_store:/data/vector_store
+      - /home/llm-share/hf:/data/hf_cache
+      - /home/llm-share/datasets/pe_agent_data:/data/pe_agent_data
+      - ./data/logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "${API_PORT:-8001}:8000"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
     networks:
       - rag_net
-    # Expose for local script access
-    ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
     restart: unless-stopped
 
-  minio-init:
-    container_name: rag-minio-init
-    image: minio/mc
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      /usr/bin/mc alias set local http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD} &&
-      /usr/bin/mc mb -p local/$${MINIO_BUCKET} || true
-      "
-    environment:
-      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
-      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
-      - MINIO_BUCKET=${MINIO_BUCKET}
-    networks:
-      - rag_net
-
-  # ---------------------------------------------------------------------------
-  # Frontend (Vite dev server)
-  # ---------------------------------------------------------------------------
   frontend:
     container_name: rag-frontend
+    profiles:
+      - prod
     build:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        # Empty VITE_API_BASE to use nginx proxy (/api/ -> api:8000)
         VITE_API_BASE: ""
         VITE_CHAT_PATH: ${VITE_CHAT_PATH:-/api/agent/run}
         VITE_INGESTIONS_BASE: ${VITE_INGESTIONS_BASE:-/data/ingestions}
         VITE_DEFAULT_INGESTION_RUN: ${VITE_DEFAULT_INGESTION_RUN:-}
+        VITE_BUILD_TARGET: prod
+        API_PROXY_TARGET: http://api:8000
     env_file:
       - .env
     volumes:
-      # Ingestion data (shared with backend)
       - ./data/ingestions:/data/ingestions
     ports:
       - "${FRONTEND_PORT:-9097}:9097"
     depends_on:
       api:
+        condition: service_started
+    networks:
+      - rag_net
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Development Services (profile: dev)
+  # ---------------------------------------------------------------------------
+
+  api-dev:
+    container_name: rag-api-dev
+    profiles:
+      - dev
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - .env
+    environment:
+      - HF_HOME=/data/hf_cache
+      - TRANSFORMERS_CACHE=/data/hf_cache
+      - SEARCH_ES_HOST=http://elasticsearch:9200
+      - SEARCH_ES_ENV=dev
+    volumes:
+      # Source mount for hot-reload
+      - ./backend:/app/backend
+      - ./scripts:/app/scripts
+      - ./data/ingestions:/data/ingestions
+      - ./data/vector_store:/data/vector_store
+      - /home/llm-share/hf:/data/hf_cache
+      - /home/llm-share/datasets/pe_agent_data:/data/pe_agent_data
+      - ./data/logs:/app/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "${API_PORT_DEV:-8011}:8000"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - rag_net
+    restart: unless-stopped
+
+  frontend-dev:
+    container_name: rag-frontend-dev
+    profiles:
+      - dev
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: ""
+        VITE_CHAT_PATH: ${VITE_CHAT_PATH:-/api/agent/run}
+        VITE_INGESTIONS_BASE: ${VITE_INGESTIONS_BASE:-/data/ingestions}
+        VITE_DEFAULT_INGESTION_RUN: ${VITE_DEFAULT_INGESTION_RUN:-}
+        VITE_BUILD_TARGET: dev
+        API_PROXY_TARGET: http://api-dev:8000
+    env_file:
+      - .env
+    volumes:
+      - ./data/ingestions:/data/ingestions
+    ports:
+      - "${FRONTEND_PORT_DEV:-9098}:9097"
+    depends_on:
+      api-dev:
         condition: service_started
     networks:
       - rag_net

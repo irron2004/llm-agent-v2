@@ -13,8 +13,8 @@ system: |
     - Q1 (Specific): Include exact terms, error codes, component names for precision
     - Q2 (Broad): Use general terms, category keywords for recall
     - Q3 (Alternative): Use different perspective (user language vs documentation language)
-  - Acronyms/Abbreviations: Keep them as-is. Do NOT expand or guess full forms, EXCEPT for known abbreviations below.
-  - Known Abbreviations (MUST expand in queries): AR → Ashing Rate
+  - Acronyms/Abbreviations: Keep them as-is. Do NOT expand, translate, or guess full forms.
+    - Do NOT add parenthetical explanations.
   - Language: Use the same language as the input question
 
   # Output Format

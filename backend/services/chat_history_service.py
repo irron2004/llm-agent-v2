@@ -95,6 +95,7 @@ class ChatTurn:
     ts: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    auto_parse_message: Optional[str] = None  # 파싱 결과 메시지 (🔍 파싱 결과 - ...)
 
     def to_dict(self) -> dict[str, Any]:
         now = datetime.utcnow().isoformat()
@@ -117,6 +118,7 @@ class ChatTurn:
             "schema_version": CHAT_TURNS_SCHEMA_VERSION,
             "created_at": self.created_at.isoformat() if self.created_at else now,
             "updated_at": now,
+            "auto_parse_message": self.auto_parse_message,
         }
 
     @classmethod
@@ -140,6 +142,7 @@ class ChatTurn:
             ts=datetime.fromisoformat(data["ts"]) if data.get("ts") else None,
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None,
+            auto_parse_message=data.get("auto_parse_message"),
         )
 
 
@@ -280,9 +283,56 @@ class ChatHistoryService:
                 routing=session_id,
             )
             hits = result.get("hits", {}).get("hits", [])
-            return [ChatTurn.from_dict(hit["_source"]) for hit in hits]
+            turns = [ChatTurn.from_dict(hit["_source"]) for hit in hits]
+            return self._dedupe_turns(turns)
         except NotFoundError:
             return []
+
+    def _turn_doc_ids(self, turn: ChatTurn) -> tuple[str, ...]:
+        return tuple(ref.doc_id for ref in turn.doc_refs)
+
+    def _turn_quality_score(self, turn: ChatTurn) -> int:
+        score = 0
+        if turn.feedback_rating or turn.feedback_reason or turn.feedback_ts:
+            score += 1_000_000
+        if turn.title:
+            score += 10_000
+        if turn.edited:
+            score += 1_000
+        score += sum(len(ref.snippet or "") for ref in turn.doc_refs)
+        score += len(turn.doc_refs)
+        return score
+
+    def _is_duplicate_turn(self, prev: ChatTurn, curr: ChatTurn) -> bool:
+        if prev.user_text != curr.user_text:
+            return False
+        if prev.assistant_text != curr.assistant_text:
+            return False
+        if self._turn_doc_ids(prev) != self._turn_doc_ids(curr):
+            return False
+        if prev.ts and curr.ts:
+            diff = abs((curr.ts - prev.ts).total_seconds())
+            if diff > 2:
+                return False
+        return True
+
+    def _dedupe_turns(self, turns: list[ChatTurn]) -> list[ChatTurn]:
+        """Remove consecutive duplicate turns caused by double-saving.
+
+        Heuristic: same user/assistant text, same doc_ids, and timestamp within 2s.
+        Keeps the "better" turn (richer doc refs / feedback info).
+        """
+        if not turns:
+            return []
+        deduped: list[ChatTurn] = []
+        for turn in turns:
+            if deduped and self._is_duplicate_turn(deduped[-1], turn):
+                prev = deduped[-1]
+                if self._turn_quality_score(turn) >= self._turn_quality_score(prev):
+                    deduped[-1] = turn
+                continue
+            deduped.append(turn)
+        return deduped
 
     def get_turn(self, session_id: str, turn_id: int) -> ChatTurn | None:
         """Get a specific turn.

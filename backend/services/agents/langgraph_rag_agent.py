@@ -219,6 +219,23 @@ class LangGraphRAGAgent:
         """Build human-readable details for each node type."""
         details_parts = []
 
+        def _preview_queries(value: Any, *, max_items: int = 3, max_len: int = 60) -> str | None:
+            if not isinstance(value, list) or not value:
+                return None
+            parts: list[str] = []
+            for q in value[:max_items]:
+                qs = str(q).strip()
+                if not qs:
+                    continue
+                if len(qs) > max_len:
+                    qs = qs[:max_len] + "..."
+                parts.append(qs)
+            if not parts:
+                return None
+            if len(value) > max_items:
+                parts.append(f"+{len(value) - max_items} more")
+            return " | ".join(parts)
+
         if name == "route":
             route = result.get("route") if result else state.get("route")
             if route:
@@ -252,12 +269,16 @@ class LangGraphRAGAgent:
                     details_parts.append(f"KO: {preview}")
 
         elif name == "mq":
-            if result:
-                route = state.get("route", "")
-                key = f"{route}_mq_list"
-                mq_list = result.get(key, [])
-                if mq_list:
-                    details_parts.append(f"{len(mq_list)}개 쿼리 생성")
+            route = state.get("route", "")
+            key = f"{route}_mq_list"
+            mq_list = (result or {}).get(key, [])
+            if mq_list:
+                details_parts.append(f"{len(mq_list)}개 쿼리 생성")
+            elif state.get("skip_mq") and state.get("search_queries"):
+                preview = _preview_queries(state.get("search_queries"))
+                details_parts.append("MQ 스킵 (오버라이드)")
+                if preview:
+                    details_parts.append(f"쿼리: {preview}")
 
         elif name == "st_gate":
             gate = result.get("st_gate") if result else None
@@ -287,6 +308,9 @@ class LangGraphRAGAgent:
             if result:
                 docs = result.get("docs", [])
                 details_parts.append(f"{len(docs)}개 문서 검색")
+                preview = _preview_queries(state.get("search_queries"))
+                if preview:
+                    details_parts.append(f"쿼리: {preview}")
 
         elif name == "expand_related":
             if result:

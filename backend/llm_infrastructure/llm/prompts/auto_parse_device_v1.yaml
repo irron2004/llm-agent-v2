@@ -8,6 +8,7 @@ system: |
   # Input
   - User query: {sys.query}
   - Valid device list: {sys.devices}
+  - Previous device (if any): {sys.prev_device}
 
   # Rules
   1. Users may input device names in various forms:
@@ -16,8 +17,9 @@ system: |
      - Japanese: "スプラXP", "スプラ・エックスピー", "スープラ"
   2. Japanese katakana represents English pronunciation (e.g., スプラ=Supra, エックスピー=XP)
   3. Select the best matching device name from the list above.
-  4. If no device is mentioned or uncertain, return "None".
-  5. You must return only an exact device name from the list.
+  4. If no NEW device is mentioned in the current query but prev_device exists, return the prev_device value exactly.
+  5. If no device is mentioned AND no prev_device exists, return "None".
+  6. You must return only an exact device name from the list (or "None").
 
 messages:
   - role: user
@@ -25,5 +27,7 @@ messages:
       Query: {sys.query}
       Device list:
       {sys.devices}
+      Previous device:
+      {sys.prev_device}
 
       Device name (exact from list or None):

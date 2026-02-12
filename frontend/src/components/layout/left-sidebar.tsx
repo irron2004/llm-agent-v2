@@ -41,38 +41,22 @@ export default function LeftSidebar({
   const [searchQuery, setSearchQuery] = useState("");
   const { history, hideChat } = useChatHistoryContext();
 
-  const menuItems: MenuItem[] = [
-    {
-      key: "/",
-      icon: <MessageOutlined />,
-      label: "Chat",
-    },
-    {
-      key: "/search",
-      icon: <SearchOutlined />,
-      label: "Search",
-    },
-    {
-      key: "/retrieval-test",
-      icon: <ExperimentOutlined />,
-      label: "Retrieval Test",
-    },
-    {
-      key: "/batch-answer",
-      icon: <RobotOutlined />,
-      label: "Batch Answer",
-    },
-    {
-      key: "/parsing",
-      icon: <FileTextOutlined />,
-      label: "Parsing",
-    },
-    {
-      key: "/feedback",
-      icon: <StarOutlined />,
-      label: "Feedback",
-    },
-  ];
+  // Build target: prod shows only Chat/Feedback, dev shows all
+  const isProd = import.meta.env.VITE_BUILD_TARGET === "prod";
+
+  const menuItems: MenuItem[] = isProd
+    ? [
+        { key: "/", icon: <MessageOutlined />, label: "Chat" },
+        { key: "/feedback", icon: <StarOutlined />, label: "Feedback" },
+      ]
+    : [
+        { key: "/", icon: <MessageOutlined />, label: "Chat" },
+        { key: "/search", icon: <SearchOutlined />, label: "Search" },
+        { key: "/retrieval-test", icon: <ExperimentOutlined />, label: "Retrieval Test" },
+        { key: "/batch-answer", icon: <RobotOutlined />, label: "Batch Answer" },
+        { key: "/parsing", icon: <FileTextOutlined />, label: "Parsing" },
+        { key: "/feedback", icon: <StarOutlined />, label: "Feedback" },
+      ];
 
   // Filter history by search query
   const filteredHistory = useMemo(() => {

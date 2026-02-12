@@ -19,8 +19,10 @@ interface SearchItem {
   path?: string;
 }
 
+const isProd = import.meta.env.VITE_BUILD_TARGET === "prod";
+
 // Static page routes for navigation
-const PAGE_ITEMS: SearchItem[] = [
+const DEV_PAGE_ITEMS: SearchItem[] = [
   {
     id: "page-chat",
     type: "page",
@@ -54,6 +56,9 @@ const PAGE_ITEMS: SearchItem[] = [
     path: "/parsing",
   },
 ];
+const PAGE_ITEMS: SearchItem[] = isProd
+  ? DEV_PAGE_ITEMS.filter((item) => item.path === "/" || item.path === "/feedback")
+  : DEV_PAGE_ITEMS;
 
 export function GlobalSearch() {
   const { isOpen, close } = useGlobalSearch();

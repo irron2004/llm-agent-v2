@@ -39,6 +39,7 @@ import {
 
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
+const LAST_RUN_STORAGE_KEY = "batchAnswer:lastRunId";
 
 // ─── Results Table ───
 
@@ -295,12 +296,16 @@ export default function BatchAnswerPage() {
     results,
     isCreating,
     isExecuting,
+    isDownloading,
     error,
     createRun,
+    loadRuns,
+    loadRun,
     executeNext,
     saveRating,
     clearCurrentRun,
     clearError,
+    downloadResultsJson,
   } = useBatchAnswer();
 
   const [detailModal, setDetailModal] = useState<{
@@ -309,9 +314,47 @@ export default function BatchAnswerPage() {
   }>({ visible: false, result: null });
 
   const [isRunning, setIsRunning] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
   // Use retrieval test results if available, otherwise use saved evaluations
   const sourceQuestions = retrievalResults.length > 0 ? retrievalResults : [];
+
+  // Restore last run on mount
+  useEffect(() => {
+    if (initialized) return;
+    setInitialized(true);
+
+    const restore = async () => {
+      try {
+        const storedRunId = localStorage.getItem(LAST_RUN_STORAGE_KEY);
+        const runsResponse = await loadRuns({ limit: 20 });
+        if (storedRunId) {
+          try {
+            await loadRun(storedRunId);
+            return;
+          } catch (err) {
+            localStorage.removeItem(LAST_RUN_STORAGE_KEY);
+          }
+        }
+        if (runsResponse.items.length > 0) {
+          await loadRun(runsResponse.items[0].run_id);
+        }
+      } catch (err) {
+        console.error("Failed to restore batch answer run:", err);
+      }
+    };
+
+    restore();
+  }, [initialized, loadRuns, loadRun]);
+
+  // Persist current run id
+  useEffect(() => {
+    if (currentRun?.run_id) {
+      localStorage.setItem(LAST_RUN_STORAGE_KEY, currentRun.run_id);
+    } else {
+      localStorage.removeItem(LAST_RUN_STORAGE_KEY);
+    }
+  }, [currentRun]);
 
   // Start batch execution
   const handleStartBatch = useCallback(async () => {
@@ -404,6 +447,15 @@ export default function BatchAnswerPage() {
     },
     [detailModal.result, saveRating]
   );
+
+  const handleDownloadResults = useCallback(async () => {
+    if (!currentRun) return;
+    try {
+      await downloadResultsJson(currentRun.run_id);
+    } catch (err) {
+      console.error("Failed to download results:", err);
+    }
+  }, [currentRun, downloadResultsJson]);
 
   // Calculate metrics
   const completedResults = results.filter((r) => r.status === "completed");
@@ -631,6 +683,17 @@ export default function BatchAnswerPage() {
 
           <Card
             title="Results"
+            extra={
+              <Button
+                size="small"
+                icon={<FileTextOutlined />}
+                onClick={handleDownloadResults}
+                disabled={!currentRun || results.length === 0 || isDownloading}
+                loading={isDownloading}
+              >
+                Download JSON
+              </Button>
+            }
             style={{
               background: "var(--color-bg-card)",
               borderColor: "var(--color-border)",

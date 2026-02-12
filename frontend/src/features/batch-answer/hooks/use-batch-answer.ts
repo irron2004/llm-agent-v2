@@ -28,6 +28,7 @@ interface UseBatchAnswerState {
   isExecuting: boolean;
   isLoadingRuns: boolean;
   isLoadingResults: boolean;
+  isDownloading: boolean;
   // Error state
   error: string | null;
 }
@@ -43,6 +44,7 @@ export function useBatchAnswer() {
     isExecuting: false,
     isLoadingRuns: false,
     isLoadingResults: false,
+    isDownloading: false,
     error: null,
   });
 
@@ -118,6 +120,31 @@ export function useBatchAnswer() {
   /**
    * Load a specific run and its results.
    */
+  const fetchAllResults = useCallback(async (runId: string) => {
+    const pageSize = 500;
+    let offset = 0;
+    let allResults: BatchAnswerResult[] = [];
+    let total = 0;
+
+    while (true) {
+      const response = await api.listResults(runId, {
+        limit: pageSize,
+        offset,
+      });
+      total = response.total;
+      if (response.items.length === 0) {
+        break;
+      }
+      allResults = [...allResults, ...response.items];
+      offset += response.items.length;
+      if (allResults.length >= total) {
+        break;
+      }
+    }
+
+    return { items: allResults, total };
+  }, []);
+
   const loadRun = useCallback(async (runId: string) => {
     setState((prev) => ({
       ...prev,
@@ -127,10 +154,8 @@ export function useBatchAnswer() {
     }));
 
     try {
-      const [run, resultsResponse] = await Promise.all([
-        api.getRun(runId),
-        api.listResults(runId, { limit: 500 }),
-      ]);
+      const run = await api.getRun(runId);
+      const resultsResponse = await fetchAllResults(runId);
 
       setState((prev) => ({
         ...prev,
@@ -152,7 +177,46 @@ export function useBatchAnswer() {
       }));
       throw err;
     }
-  }, []);
+  }, [fetchAllResults]);
+
+  /**
+   * Download results as JSON (all pages).
+   */
+  const downloadResultsJson = useCallback(
+    async (runId: string) => {
+      setState((prev) => ({ ...prev, isDownloading: true, error: null }));
+      try {
+        const run = await api.getRun(runId);
+        const resultsResponse = await fetchAllResults(runId);
+
+        const payload = {
+          downloaded_at: new Date().toISOString(),
+          run,
+          results: resultsResponse.items,
+        };
+
+        const blob = new Blob([JSON.stringify(payload, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `batch-answer-${runId}.json`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Failed to download results";
+        setState((prev) => ({ ...prev, error: message }));
+        throw err;
+      } finally {
+        setState((prev) => ({ ...prev, isDownloading: false }));
+      }
+    },
+    [fetchAllResults]
+  );
 
   /**
    * Delete a run.
@@ -398,5 +462,6 @@ export function useBatchAnswer() {
     // Utility
     clearCurrentRun,
     clearError,
+    downloadResultsJson,
   };
 }

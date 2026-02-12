@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { SuggestedDevice } from "../types";
 
 type DeviceSuggestionsProps = {
@@ -13,6 +13,7 @@ type Step = "confirm" | "select";
 export function DeviceSuggestions({ devices, onSelect, onDismiss, isActive = false }: DeviceSuggestionsProps) {
   // 2단계 플로우: confirm -> select
   const [step, setStep] = useState<Step>("confirm");
+  const listRef = useRef<HTMLDivElement>(null);
 
   // isActive가 변경되면 step을 초기화
   useEffect(() => {
@@ -118,7 +119,17 @@ export function DeviceSuggestions({ devices, onSelect, onDismiss, isActive = fal
         <p className="device-suggestions-hint">
           Press <kbd>ESC</kbd> if you don't want additional search.
         </p>
-        <div className="device-suggestions-list">
+        <div
+          ref={listRef}
+          className="device-suggestions-list"
+          tabIndex={0}
+          style={{
+            height: '280px',
+            maxHeight: '280px',
+            overflowY: 'scroll',
+            overflowX: 'hidden',
+          }}
+        >
           {devices.map((device, index) => (
             <button
               key={device.name}

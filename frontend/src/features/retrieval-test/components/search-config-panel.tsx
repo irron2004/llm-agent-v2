@@ -37,9 +37,9 @@ export default function SearchConfigPanel({ config, onChange }: Props) {
       sparseWeight: 0.3,
       useRrf: true,
       rrfK: 60,
-      rerank: false,
+      rerank: true,
       rerankTopK: 10,
-      multiQuery: false,
+      multiQuery: true,
       multiQueryN: 3,
       size: 20,
     });

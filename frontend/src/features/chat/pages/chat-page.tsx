@@ -84,6 +84,8 @@ export default function ChatPage() {
   }, []);
 
   // Load session from URL parameter
+  // Note: loadSession is intentionally excluded from deps to prevent double-loading
+  // when the callback reference changes
   useEffect(() => {
     if (sessionParam) {
       // Clear the URL parameter first to prevent re-triggering
@@ -91,7 +93,8 @@ export default function ChatPage() {
       // Then load the session
       loadSession(sessionParam);
     }
-  }, [sessionParam, loadSession, setSearchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionParam]);
 
   // Register submit handlers for right sidebar to use
   useEffect(() => {

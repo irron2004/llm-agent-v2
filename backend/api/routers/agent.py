@@ -141,6 +141,28 @@ def _summarize_answer(answer: str, max_length: int = 150) -> str:
     return truncated + "..."
 
 
+WARNING_UNFAITHFUL_MESSAGE = "warning 답변의 근거가 충분하지 않습니다. 유의해서 확인하세요."
+
+
+def _apply_judge_warning(
+    answer: str,
+    judge: Dict[str, Any],
+    attempts: int,
+    max_attempts: int,
+) -> tuple[str, bool]:
+    """Add warning message when judge is unfaithful after max attempts."""
+    faithful = bool(judge.get("faithful", True))
+    if faithful or attempts < max_attempts:
+        return answer, False
+
+    if WARNING_UNFAITHFUL_MESSAGE in answer:
+        return answer, True
+
+    if answer:
+        return f"{WARNING_UNFAITHFUL_MESSAGE}\n\n{answer}", True
+    return WARNING_UNFAITHFUL_MESSAGE, True
+
+
 def _extract_refs_from_result(result: Dict[str, Any]) -> tuple[List[str], List[str]]:
     """결과에서 참조 문서 title과 doc_id 추출 (rank 순)."""
     refs: List[str] = []
@@ -250,8 +272,6 @@ def _build_state_overrides(req: "AgentRequest") -> Dict[str, Any]:
         devices = [str(d).strip() for d in req.filter_devices if str(d).strip()]
         if devices:
             overrides["selected_devices"] = devices
-            # filter_devices가 명시적으로 제공되면 auto_parse 건너뛰기
-            overrides["skip_auto_parse"] = True
 
     if req.filter_doc_types is not None:
         doc_types = [str(d).strip() for d in req.filter_doc_types if str(d).strip()]
@@ -418,6 +438,7 @@ class AgentRequest(BaseModel):
     mode: str = Field("verified", description="base 또는 verified")
     thread_id: Optional[str] = Field(None, description="LangGraph thread_id")
     session_id: Optional[str] = Field(None, description="대화 세션 ID (BE에서 history 자동 로드)")
+    save_history: bool = Field(True, description="서버에서 채팅 히스토리를 저장할지 여부")
     ask_user_after_retrieve: bool = Field(False, description="검색 후 사용자 확인")
     ask_device_selection: bool = Field(False, description="검색 전 기기/문서 종류 선택")
     resume_decision: Optional[Any] = Field(None, description="interrupt 재개 응답")
@@ -665,17 +686,23 @@ async def run_agent(
     if not hasattr(search_service, "search"):
         raise HTTPException(status_code=503, detail="Search service not configured")
 
-    tid = req.thread_id or str(uuid.uuid4())
+    tid = req.thread_id or req.session_id or str(uuid.uuid4())
     is_resume = req.resume_decision is not None and req.thread_id is not None
 
     state_overrides = _build_state_overrides(req)
     has_overrides = bool(state_overrides)
 
     try:
-        # Auto-parse 모드 (기본값: True), skip when overrides or device selection are provided
-        if req.auto_parse and not is_resume and not req.ask_user_after_retrieve and not req.ask_device_selection and not has_overrides:
+        # Auto-parse 모드 (기본값: True), skip only for resume/human-review flows
+        if req.auto_parse and not is_resume and not req.ask_user_after_retrieve and not req.ask_device_selection:
             agent = _get_auto_parse_agent(llm, search_service, prompt_spec)
-            result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid)
+            result = agent.run(
+                req.message,
+                attempts=0,
+                max_attempts=req.max_attempts,
+                thread_id=tid,
+                state_overrides=state_overrides or None,
+            )
         elif req.ask_device_selection and not is_resume:
             agent = _get_device_selection_agent(llm, search_service, prompt_spec)
             result = agent.run(
@@ -766,7 +793,16 @@ async def run_agent(
         )
 
     # Extract refs for chat history
-    answer = result.get("answer", "")
+    judge = result.get("judge", {}) or {}
+    attempts = int(result.get("attempts", 0))
+    max_attempts = int(result.get("max_attempts", req.max_attempts))
+    raw_answer = result.get("answer", "")
+    answer, warned = _apply_judge_warning(
+        raw_answer,
+        judge,
+        attempts,
+        max_attempts,
+    )
     summary = _summarize_answer(answer) if answer else None
     refs, ref_doc_ids = _extract_refs_from_result(result)
 
@@ -777,10 +813,11 @@ async def run_agent(
         if len(interrupt_info) > 0:
             payload = interrupt_info[0].value if hasattr(interrupt_info[0], "value") else None
 
+        interrupt_summary = _summarize_answer(raw_answer) if raw_answer else None
         return AgentResponse(
             query=req.message,
-            answer=result.get("answer", "") or "",
-            judge=result.get("judge", {}) or {},
+            answer=raw_answer or "",
+            judge=judge,
             retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
             all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
             expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
@@ -800,13 +837,13 @@ async def run_agent(
             selected_doc_types=result.get("selected_doc_types"),
             search_queries=result.get("search_queries"),
             detected_language=result.get("detected_language"),
-            summary=summary,
+            summary=interrupt_summary,
             refs=refs if refs else None,
             ref_doc_ids=ref_doc_ids if ref_doc_ids else None,
         )
 
     # 정상 완료 - 턴 저장
-    if req.session_id and answer:
+    if req.save_history and req.session_id and answer:
         _save_turn_to_history(
             session_id=req.session_id,
             user_text=req.message,
@@ -817,8 +854,8 @@ async def run_agent(
 
     return AgentResponse(
         query=req.message,
-        answer=result.get("answer", ""),
-        judge=result.get("judge", {}),
+        answer=answer,
+        judge=judge,
         retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
         all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
         expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
@@ -829,6 +866,8 @@ async def run_agent(
             "selected_device": result.get("selected_device"),
             "is_chat_query": result.get("is_chat_query", False),
             "chat_type": result.get("chat_type"),
+            "warning": "judge_unfaithful" if warned else None,
+            "warning_message": WARNING_UNFAITHFUL_MESSAGE if warned else None,
         },
         interrupted=False,
         thread_id=tid,
@@ -856,7 +895,7 @@ async def run_agent_stream(
     if not hasattr(search_service, "search"):
         raise HTTPException(status_code=503, detail="Search service not configured")
 
-    tid = req.thread_id or str(uuid.uuid4())
+    tid = req.thread_id or req.session_id or str(uuid.uuid4())
     is_resume = req.resume_decision is not None and req.thread_id is not None
 
     state_overrides = _build_state_overrides(req)
@@ -881,10 +920,16 @@ async def run_agent_stream(
     def _worker() -> None:
         token = set_event_sink_context(_enqueue)
         try:
-            # Auto-parse 모드 (기본값: True), skip when overrides or device selection are provided
-            if req.auto_parse and not is_resume and not req.ask_user_after_retrieve and not req.ask_device_selection and not has_overrides:
+            # Auto-parse 모드 (기본값: True), skip only for resume/human-review flows
+            if req.auto_parse and not is_resume and not req.ask_user_after_retrieve and not req.ask_device_selection:
                 agent = _get_auto_parse_agent(llm, search_service, prompt_spec)
-                result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid)
+                result = agent.run(
+                    req.message,
+                    attempts=0,
+                    max_attempts=req.max_attempts,
+                    thread_id=tid,
+                    state_overrides=state_overrides or None,
+                )
             elif req.ask_device_selection and not is_resume:
                 agent = _get_device_selection_agent(llm, search_service, prompt_spec)
                 result = agent.run(
@@ -969,7 +1014,16 @@ async def run_agent_stream(
                 )
 
             # Extract refs for chat history
-            stream_answer = result.get("answer", "")
+            stream_judge = result.get("judge", {}) or {}
+            stream_attempts = int(result.get("attempts", 0))
+            stream_max_attempts = int(result.get("max_attempts", req.max_attempts))
+            raw_stream_answer = result.get("answer", "")
+            stream_answer, warned = _apply_judge_warning(
+                raw_stream_answer,
+                stream_judge,
+                stream_attempts,
+                stream_max_attempts,
+            )
             stream_summary = _summarize_answer(stream_answer) if stream_answer else None
             stream_refs, stream_ref_doc_ids = _extract_refs_from_result(result)
 
@@ -983,11 +1037,12 @@ async def run_agent_stream(
                 if len(interrupt_info) > 0:
                     payload = interrupt_info[0].value if hasattr(interrupt_info[0], "value") else None
 
+                interrupt_summary = _summarize_answer(raw_stream_answer) if raw_stream_answer else None
                 resp = AgentResponse(
                     query=req.message,
-                    answer=result.get("answer", "") or "",
+                    answer=raw_stream_answer or "",
                     reasoning=result.get("reasoning"),
-                    judge=result.get("judge", {}) or {},
+                    judge=stream_judge,
                     retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
                     all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
                     expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
@@ -1005,14 +1060,14 @@ async def run_agent_stream(
                     selected_doc_types=result.get("selected_doc_types"),
                     search_queries=result.get("search_queries"),
                     detected_language=result.get("detected_language"),
-                    summary=stream_summary,
+                    summary=interrupt_summary,
                     refs=stream_refs if stream_refs else None,
                     ref_doc_ids=stream_ref_doc_ids if stream_ref_doc_ids else None,
                     suggested_devices=_resolve_suggested_devices(result),
                 )
             else:
                 # 정상 완료 - 턴 저장
-                if req.session_id and stream_answer:
+                if req.save_history and req.session_id and stream_answer:
                     _save_turn_to_history(
                         session_id=req.session_id,
                         user_text=req.message,
@@ -1023,9 +1078,9 @@ async def run_agent_stream(
 
                 resp = AgentResponse(
                     query=req.message,
-                    answer=result.get("answer", ""),
+                    answer=stream_answer,
                     reasoning=result.get("reasoning"),
-                    judge=result.get("judge", {}),
+                    judge=stream_judge,
                     retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
                     all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
                     expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
@@ -1034,6 +1089,8 @@ async def run_agent_stream(
                         "st_gate": result.get("st_gate"),
                         "search_queries": result.get("search_queries", []),
                         "selected_device": result.get("selected_device"),
+                        "warning": "judge_unfaithful" if warned else None,
+                        "warning_message": WARNING_UNFAITHFUL_MESSAGE if warned else None,
                     },
                     interrupted=False,
                     thread_id=tid,

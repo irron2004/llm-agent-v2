@@ -196,11 +196,6 @@ function ReferenceItem({ doc, idx, onImageClick }: ReferenceItemProps) {
           <MarkdownContent content={preprocessSnippet(doc.snippet)} />
         </div>
       )}
-      {(doc.score !== null && doc.score !== undefined) && (
-        <div style={{ fontSize: 12, opacity: 0.6 }}>
-          score: {doc.score.toFixed(3)} {doc.score_percent ? `(${doc.score_percent}%)` : ""}
-        </div>
-      )}
     </div>
   );
 }
@@ -509,6 +504,11 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
           {isUser ? "U" : "RTM"}
         </div>
         <div className="message-body">
+          {isAssistant && message.autoParse?.message && (
+            <div className="auto-parse-indicator">
+              🔍 {message.autoParse.message}
+            </div>
+          )}
           <div className={`message-bubble ${isUser ? "user" : "assistant"}`}>
             {isAssistant ? (
               <MarkdownContent content={message.content} />
@@ -705,11 +705,6 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
                                     </div>
                                   )}
                                 </div>
-                                {(doc.score !== null && doc.score !== undefined) && (
-                                  <div style={{ fontSize: 12, opacity: 0.6 }}>
-                                    score: {doc.score.toFixed(3)} {doc.score_percent ? `(${doc.score_percent}%)` : ""}
-                                  </div>
-                                )}
                               </div>
                             );
                           })}

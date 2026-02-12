@@ -130,6 +130,8 @@ export type AgentRequest = {
   max_attempts?: number;
   mode?: string;
   thread_id?: string | null;
+  session_id?: string | null;
+  save_history?: boolean;
   ask_user_after_retrieve?: boolean;
   ask_device_selection?: boolean;
   resume_decision?: unknown;
@@ -173,6 +175,7 @@ export type TurnResponse = {
   feedback_rating?: FeedbackRating | null;
   feedback_reason?: string | null;
   feedback_ts?: string | null;
+  auto_parse_message?: string | null;
 };
 
 export type SessionListItem = {
@@ -211,6 +214,7 @@ export type SaveTurnRequest = {
   parent_session_id?: string | null;
   branched_from_turn_id?: number | null;
   is_branch?: boolean | null;
+  auto_parse_message?: string | null;
 };
 
 // --- Detailed Feedback Types (for feedback index) ---

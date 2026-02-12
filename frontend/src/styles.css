@@ -332,6 +332,12 @@ a:hover {
   line-height: 1.6;
 }
 
+.auto-parse-indicator {
+  margin: 0 0 6px 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
 /* ============================================
    Retrieval Review
    ============================================ */
@@ -718,6 +724,8 @@ a:hover {
   left: calc(50% + var(--main-content-max-width, 900px) / 2 - 380px);
   z-index: 1000;
   animation: slideUpRight 0.2s ease;
+  pointer-events: auto;
+  overflow: visible;
 }
 
 /* 화면이 작을 때 (main-content가 화면 너비보다 클 때) 오른쪽 끝으로 */
@@ -757,8 +765,12 @@ a:hover {
   border-radius: var(--radius-lg);
   padding: var(--spacing-lg);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  min-width: 400px;
-  max-width: 600px;
+  min-width: 320px;
+  max-width: 360px;
+  display: flex !important;
+  flex-direction: column !important;
+  max-height: 90vh;
+  overflow: visible !important;
 }
 
 .device-suggestions-modal .device-suggestions-title {
@@ -787,24 +799,61 @@ a:hover {
 }
 
 .device-suggestions-modal .device-suggestions-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  max-height: 300px;
-  overflow-y: auto;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  height: 280px !important;
+  max-height: 280px !important;
+  min-height: 280px !important;
+  overflow-y: scroll !important;
+  overflow-x: hidden !important;
+  scrollbar-gutter: stable;
+  overscroll-behavior: auto !important;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.5) rgba(0, 0, 0, 0.1);
+  touch-action: pan-y !important;
+  -webkit-overflow-scrolling: touch !important;
+  padding-right: 8px;
+  box-sizing: border-box;
+  position: relative;
+  will-change: scroll-position;
+  /* 스크롤 강제 활성화 */
+  scroll-behavior: smooth;
+}
+
+.device-suggestions-modal .device-suggestions-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.device-suggestions-modal .device-suggestions-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.device-suggestions-modal .device-suggestions-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+  background-clip: padding-box;
+}
+
+.device-suggestions-modal .device-suggestions-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 10px;
 }
 
 .device-suggestions-modal .device-suggestion-item {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-md);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   background-color: var(--color-bg-secondary);
   font-size: var(--font-size-sm);
   text-align: left;
   width: 100%;
+  box-sizing: border-box;
   transition: all 0.15s ease;
 }
 
@@ -829,8 +878,17 @@ a:hover {
 }
 
 .device-suggestions-modal .device-name {
-  flex: 1;
+  flex: 0 1 auto;
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-weight: 500;
+}
+
+.device-suggestions-modal .device-count {
+  margin-left: 6px;
+  white-space: nowrap;
 }
 
 /* Device suggestions - confirm step */

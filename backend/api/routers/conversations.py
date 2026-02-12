@@ -58,6 +58,7 @@ class TurnRequest(BaseModel):
     parent_session_id: Optional[str] = Field(None, description="Parent session ID if branched")
     branched_from_turn_id: Optional[int] = Field(None, description="Turn ID where this branch started")
     is_branch: Optional[bool] = Field(None, description="Whether this session is a branch")
+    auto_parse_message: Optional[str] = Field(None, description="Auto-parse result message")
 
 
 class TurnResponse(BaseModel):
@@ -76,6 +77,7 @@ class TurnResponse(BaseModel):
     feedback_rating: Optional[str] = None
     feedback_reason: Optional[str] = None
     feedback_ts: Optional[str] = None
+    auto_parse_message: Optional[str] = None
 
 
 class FeedbackRequest(BaseModel):
@@ -198,6 +200,7 @@ async def get_session(
                 feedback_rating=t.feedback_rating,
                 feedback_reason=t.feedback_reason,
                 feedback_ts=t.feedback_ts.isoformat() if t.feedback_ts else None,
+                auto_parse_message=t.auto_parse_message,
             )
             for t in turns
         ],
@@ -244,6 +247,7 @@ async def save_turn(
         is_branch=req.is_branch,
         doc_refs=doc_refs,
         title=req.title if turn_id == 1 else None,  # Only set title on first turn
+        auto_parse_message=req.auto_parse_message,
     )
     service.save_turn(turn)
 
@@ -262,6 +266,7 @@ async def save_turn(
         feedback_rating=turn.feedback_rating,
         feedback_reason=turn.feedback_reason,
         feedback_ts=turn.feedback_ts.isoformat() if turn.feedback_ts else None,
+        auto_parse_message=turn.auto_parse_message,
     )
 
 

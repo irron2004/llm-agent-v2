@@ -1,0 +1,53 @@
+import { createBrowserRouter } from "react-router-dom";
+import Layout from "../components/layout";
+import ChatPage from "../features/chat/pages/chat-page";
+import ParsingPage from "../features/parsing/pages/parsing-page";
+import SearchPage from "../features/search/pages/search-page";
+import RetrievalTestPage from "../features/retrieval-test/pages/retrieval-test-page";
+import BatchAnswerPage from "../features/batch-answer/pages/batch-answer-page";
+import FeedbackPage from "../features/feedback/pages/feedback-page";
+import LogsPage from "../features/logs/pages/logs-page";
+import NotFoundPage from "../components/not-found-page";
+
+const router = createBrowserRouter([
+  {
+    path: "/",
+    element: <Layout />,
+    children: [
+      {
+        index: true,
+        element: <ChatPage />,
+      },
+      {
+        path: "parsing",
+        element: <ParsingPage />,
+      },
+      {
+        path: "search",
+        element: <SearchPage />,
+      },
+      {
+        path: "retrieval-test",
+        element: <RetrievalTestPage />,
+      },
+      {
+        path: "batch-answer",
+        element: <BatchAnswerPage />,
+      },
+      {
+        path: "feedback",
+        element: <FeedbackPage />,
+      },
+      {
+        path: "logs",
+        element: <LogsPage />,
+      },
+      {
+        path: "*",
+        element: <NotFoundPage />,
+      },
+    ],
+  },
+]);
+
+export default router;

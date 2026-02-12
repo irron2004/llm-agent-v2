@@ -177,6 +177,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   const [pendingInterrupt, setPendingInterrupt] = useState<PendingInterrupt | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const sendingRef = useRef(false);
+  const lastSendRef = useRef<{ key: string; ts: number } | null>(null);
   const isFirstMessageRef = useRef(true);
   const currentUserTextRef = useRef<string>("");
   const sessionTitleRef = useRef<string | null>(null);
@@ -453,6 +455,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         parent_session_id: branchMetaRef.current?.parentSessionId ?? undefined,
         branched_from_turn_id: branchMetaRef.current?.branchedFromTurnId ?? undefined,
         is_branch: branchMetaRef.current?.isBranch ?? undefined,
+        auto_parse_message: res.auto_parse?.message ?? undefined,
       }).then((turn) => {
         updateMessage(assistantId, (m) => ({
           ...m,
@@ -470,9 +473,16 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
   const send = useCallback(
     async ({ text, decisionOverride, overrides, askDeviceSelection }: SendOptions) => {
-      stop();
       setError(null);
+      if (sendingRef.current) return;
       const pending = pendingInterrupt;
+      const normalizedText = text.trim();
+      const sendKey = `${sessionIdRef.current}|${pending?.threadId ?? "new"}|${normalizedText}`;
+      const now = Date.now();
+      if (lastSendRef.current && lastSendRef.current.key === sendKey && now - lastSendRef.current.ts < 1000) {
+        return;
+      }
+      lastSendRef.current = { key: sendKey, ts: now };
       // Only update user text if not resuming (keep original question for saves)
       if (!pending) {
         currentUserTextRef.current = text;
@@ -482,6 +492,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         setError("Missing thread_id; cannot continue reviewing search results.");
         return;
       }
+      sendingRef.current = true;
+      stop();
 
       // Always reset logs for a new user request (not resuming)
       if (!isResume) {
@@ -528,7 +540,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       setIsStreaming(true);
 
       try {
-        const autoParseEnabled = overrides?.autoParse ?? !Boolean(overrides);
+      const autoParseEnabled = overrides?.autoParse ?? true;
       const shouldAskDeviceSelection = Boolean(
         (isResume && pending?.kind === "device_selection") || (!isResume && askDeviceSelection)
       );
@@ -539,6 +551,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       const payload = {
         message: requestMessage,
         session_id: activeSessionId,  // 세션 ID 전달 (BE에서 history 자동 로드)
+        save_history: false,  // FE에서 저장하므로 BE 저장은 비활성화 (중복 방지)
         auto_parse: autoParseEnabled,  // 자동 파싱 모드 활성화 (기본값)
         ask_user_after_retrieve: shouldAskUserAfterRetrieve,
         ask_device_selection: shouldAskDeviceSelection,
@@ -681,6 +694,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         currentTurnEditedRef.current = false;
         setError(err instanceof Error ? err.message : "Request failed");
       } finally {
+        sendingRef.current = false;
         setIsStreaming(false);
       }
     },
@@ -923,10 +937,19 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     [sessionId, messages, updateMessage]
   );
 
+  // Track currently loading session to prevent duplicate loads
+  const loadingSessionRef = useRef<string | null>(null);
+
   // Load an existing session from the backend
   const loadSession = useCallback(
     async (targetSessionId: string) => {
+      // Prevent duplicate loads of the same session
+      if (loadingSessionRef.current === targetSessionId) {
+        console.log("[loadSession] Already loading session:", targetSessionId);
+        return;
+      }
       console.log("[loadSession] Loading session:", targetSessionId);
+      loadingSessionRef.current = targetSessionId;
       stop();
       setError(null);
       setIsLoadingSession(true);
@@ -956,6 +979,10 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
             sessionId: session.session_id,
             turnId: turn.turn_id,
             feedback: extractFeedback(turn),
+            // Restore autoParse from saved auto_parse_message
+            autoParse: turn.auto_parse_message
+              ? { message: turn.auto_parse_message }
+              : null,
             retrievedDocs: turn.doc_refs.map((ref) => ({
               id: ref.doc_id,
               title: ref.title,
@@ -1012,6 +1039,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         setError(err instanceof Error ? err.message : "Failed to load session.");
       } finally {
         setIsLoadingSession(false);
+        loadingSessionRef.current = null;
       }
     },
     [stop, clearLogs, setCompletedRetrievedDocs]

@@ -18,10 +18,10 @@ function getDefaultConfig(): SearchConfig {
     sparseWeight: 0.3,
     useRrf: true, // RRF enabled by default (weights ignored)
     rrfK: 60, // RRF constant
-    rerank: false,
+    rerank: true,
     rerankModel: "cross-encoder/ms-marco-MiniLM-L-6-v2",
     rerankTopK: 10,
-    multiQuery: false,
+    multiQuery: true,
     multiQueryN: 3,
     size: 20,
     fieldWeights: [

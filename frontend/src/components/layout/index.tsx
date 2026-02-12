@@ -366,10 +366,11 @@ function ReviewPanelContent({
 
   return (
     <div className="review-panel-sidebar">
-      {/* Search Query Editor Section */}
-      <div className="review-queries">
-        <div className="review-queries-header">
-          <span className="review-queries-label">Search queries</span>
+      <div className="review-panel-scrollable">
+        {/* Search Query Editor Section */}
+        <div className="review-queries">
+          <div className="review-queries-header">
+            <span className="review-queries-label">Search queries</span>
           <button
             className="action-button"
             onClick={toggleEditMode}
@@ -527,6 +528,7 @@ function ReviewPanelContent({
           </div>
         </>
       )}
+      </div>
 
       <div className="review-actions">
         {isEditingQueries ? (
@@ -812,10 +814,11 @@ function RegeneratePanelContent({
 
   return (
     <div className="review-panel-sidebar">
-      <div className="review-queries">
-        <div className="review-queries-header">
-          <span className="review-queries-label">Search queries (MQ)</span>
-        </div>
+      <div className="review-panel-scrollable">
+        <div className="review-queries">
+          <div className="review-queries-header">
+            <span className="review-queries-label">Search queries (MQ)</span>
+          </div>
         <div className="review-queries-editor">
           {editableQueries.map((query, idx) => (
             <div key={idx} className="review-query-input-row">
@@ -1069,11 +1072,12 @@ function RegeneratePanelContent({
         })}
       </div>
 
-      {error && (
-        <div style={{ color: "var(--color-danger, #d32f2f)", fontSize: 12 }}>
-          {error}
-        </div>
-      )}
+        {error && (
+          <div style={{ color: "var(--color-danger, #d32f2f)", fontSize: 12 }}>
+            {error}
+          </div>
+        )}
+      </div>
 
       <div className="review-actions">
         <button className="action-button" onClick={onClose}>
@@ -1211,10 +1215,16 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
   };
 
   // 모든 문서의 모든 페이지를 미리보기 배열로 생성 (expanded 포함)
-  // 각 문서의 시작 인덱스도 추적
-  const { previewImages, docStartIndices } = useMemo(() => {
+  // 각 문서의 시작 인덱스와 렌더링용 데이터도 함께 계산
+  const { previewImages, docStartIndices, docRenderData } = useMemo(() => {
     const images: ImagePreviewItem[] = [];
     const startIndices: number[] = [];
+    const renderData: Array<{
+      pageUrls: string[];
+      pageNumbers: number[];
+      displayTitle: string | undefined;
+      hasImageUrls: boolean;
+    }> = [];
 
     docs.forEach((doc) => {
       // 현재 문서의 시작 인덱스 저장
@@ -1239,6 +1249,11 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
           ? [doc.page]
           : [];
 
+      const hasImageUrls = pageUrls.length > 0;
+
+      // 렌더링용 데이터 저장
+      renderData.push({ pageUrls, pageNumbers, displayTitle, hasImageUrls });
+
       if (pageUrls.length > 0) {
         // 이미지가 있는 경우: 각 페이지별로 항목 추가
         pageUrls.forEach((url, idx) => {
@@ -1262,7 +1277,7 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
       }
     });
 
-    return { previewImages: images, docStartIndices: startIndices };
+    return { previewImages: images, docStartIndices: startIndices, docRenderData: renderData };
   }, [docs]);
 
   const handleDocClick = (docIndex: number) => {
@@ -1274,33 +1289,17 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
   const handleImageClick = (docIndex: number, pageIndex: number) => {
     // 해당 문서의 특정 페이지 이미지로 이동
     const startIdx = docStartIndices[docIndex] || 0;
-    setPreviewIndex(startIdx + pageIndex);
+    const targetIndex = startIdx + pageIndex;
+    console.log("[RetrievedDocs] handleImageClick:", { docIndex, pageIndex, startIdx, targetIndex, totalImages: previewImages.length });
+    setPreviewIndex(targetIndex);
     setPreviewVisible(true);
   };
 
   return (
     <div className="retrieved-docs-container">
       {docs.map((doc, index) => {
-        const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
-          ? doc.expanded_pages
-          : doc.page !== null && doc.page !== undefined
-            ? [doc.page]
-            : [];
-        // 실제 이미지 URL만 사용 (동적 URL 생성 안 함)
-        const pageUrls = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
-          ? doc.expanded_page_urls.filter(url => hasValidImageUrl(url))
-          : hasValidImageUrl(doc.page_image_url)
-            ? [doc.page_image_url]
-            : [];
-
-        const hasImageUrls = pageUrls.length > 0;
-
-        // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
-        const docType = doc.metadata?.doc_type as string | undefined;
-        const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
-        const displayTitle = isSpecialDocType
-          ? `${docType}_${doc.id}`
-          : doc.title;
+        // useMemo에서 계산된 동일한 데이터 사용
+        const { pageUrls, pageNumbers, displayTitle, hasImageUrls } = docRenderData[index];
 
         return (
           <div key={doc.id || index} className="retrieved-doc-item">
@@ -1314,13 +1313,6 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
                   {pageNumbers.length === 1
                     ? `p.${pageNumbers[0]}`
                     : `p.${pageNumbers[0]}-${pageNumbers[pageNumbers.length - 1]}`}
-                </span>
-              )}
-              {doc.score !== null && doc.score !== undefined && (
-                <span className="retrieved-doc-score">
-                  {typeof doc.score_percent === "number"
-                    ? `${doc.score_percent.toFixed(1)}%`
-                    : doc.score.toFixed(3)}
                 </span>
               )}
             </div>

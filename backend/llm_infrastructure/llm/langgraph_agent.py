@@ -1451,9 +1451,11 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
 
     # Build English queries (prefer st_mq output, then q_en, then MQ list)
     english_queries: List[str] = []
-    _fill_to_n(english_queries, queries, 3)
+    # Always include the original query to avoid ST output crowding out
+    # the user's intent (ST often emits clarification questions).
     if q_en:
         _fill_to_n(english_queries, [q_en], 3)
+    _fill_to_n(english_queries, queries, 3)
     _fill_to_n(english_queries, mq_en_list, 3)
 
     # Build Korean queries (prefer KO MQ list, then q_ko, then translate EN if needed)
@@ -2049,6 +2051,29 @@ def _collect_suggested_devices(docs: List[Any]) -> List[Dict[str, Any]]:
     ]
 
 
+def _sanitize_ar_expansion(text: str) -> str:
+    """Remove AR expansions like 'AR(…)' or 'AR = …' while keeping AR itself."""
+    if not text:
+        return text
+
+    def _strip_paren(match: re.Match[str]) -> str:
+        content = match.group(1)
+        # Only strip if there is alphabetic/Korean content inside parentheses
+        if re.search(r"[A-Za-z가-힣]", content):
+            return "AR"
+        return match.group(0)
+
+    def _strip_equals(match: re.Match[str]) -> str:
+        rhs = match.group(2)
+        if re.search(r"[A-Za-z가-힣]", rhs):
+            return "AR"
+        return match.group(0)
+
+    text = re.sub(r"\bAR\s*\(([^)]*)\)", _strip_paren, text)
+    text = re.sub(r"\bAR\s*(=|:)\s*([^\n\r,.]{1,60})", _strip_equals, text)
+    return text
+
+
 def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     """Generate answer using unified retrieval_ans prompt."""
     route = state["route"]
@@ -2094,6 +2119,7 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     user = _format_prompt(tmpl.user, mapping)
     logger.info("answer_node: user_prompt_chars=%d, system_prompt_chars=%d", len(user), len(tmpl.system))
     answer, reasoning = _invoke_llm_with_reasoning(llm, tmpl.system, user, max_tokens=MAX_TOKENS_ANSWER)
+    answer = _sanitize_ar_expansion(answer)
     logger.info("answer_node: answer_chars=%d, reasoning_chars=%d, answer_preview=%s", len(answer), len(reasoning) if reasoning else 0, answer[:500] if answer else "(empty)")
 
     # suggested_devices 집계 (장비 미지정 시에만)
@@ -2762,6 +2788,7 @@ def _extract_device_with_llm(
     query: str,
     *,
     prompt_template: Optional[PromptTemplate] = None,
+    prev_device: Optional[str] = None,
     top_k: int = 20,
 ) -> Optional[str]:
     """LLM을 사용하여 쿼리에서 장비명을 추출합니다.
@@ -2793,6 +2820,7 @@ def _extract_device_with_llm(
     user = _format_prompt(template.user, {
         "sys.query": query,
         "sys.devices": device_list_str,
+        "sys.prev_device": prev_device or "None",
     })
 
     try:
@@ -2911,15 +2939,9 @@ def auto_parse_node(
     # 언어는 translate_node에서 이미 감지됨
     detected_language = state.get("detected_language") or _detect_language_rule_based(query)
 
-    # skip_auto_parse가 True이면 건너뛰기 (filter_devices 재검색 시)
-    if state.get("skip_auto_parse"):
-        selected_devices = state.get("selected_devices", [])
-        logger.info("auto_parse_node: SKIPPED (skip_auto_parse=True), using selected_devices=%s", selected_devices)
-        return {
-            "auto_parsed_device": selected_devices[0] if selected_devices else None,
-            "auto_parsed_devices": selected_devices if selected_devices else None,
-            "auto_parse_message": f"필터 적용: {', '.join(selected_devices)}" if selected_devices else "",
-        }
+    # 이전 장비 정보 (같은 세션 상태에서 유지)
+    prev_devices = state.get("selected_devices") or state.get("auto_parsed_devices") or []
+    prev_device = prev_devices[0] if prev_devices else state.get("auto_parsed_device")
 
     # 1. 규칙 기반 파싱 - query_en 사용 (장비명은 영어)
     devices = _extract_devices_from_query(device_names, query_en)
@@ -2933,10 +2955,17 @@ def auto_parse_node(
             device_names,
             query_en,
             prompt_template=spec.auto_parse_device,
+            prev_device=prev_device,
         )
         if llm_device:
             devices = [llm_device]
             logger.info("auto_parse_node: LLM detected device=%s from query_en", llm_device)
+
+    # 3. 신규 장비를 찾지 못했으면 이전 장비 유지
+    if not devices and prev_devices:
+        devices = prev_devices
+    elif not devices and prev_device:
+        devices = [prev_device]
 
     logger.info("auto_parse_node: devices=%s, doc_types=%s, language=%s", devices, doc_types, detected_language)
 
@@ -2947,24 +2976,24 @@ def auto_parse_node(
 
     message_parts: List[str] = []
     if detected_language == "en":
-        if devices:
-            message_parts.append(f"Device: {', '.join(devices)}")
-        if doc_types:
-            message_parts.append(f"Doc type: {', '.join(doc_types)}")
+        device_text = ", ".join(devices) if devices else "All"
+        doc_text = ", ".join(doc_types) if doc_types else "All"
+        message_parts.append(f"Device: {device_text}")
+        message_parts.append(f"Doc type: {doc_text}")
         message_parts.append(f"lang: {lang_label}")
         auto_parse_message = f"Parsed - {', '.join(message_parts)}"
     elif detected_language == "ja":
-        if devices:
-            message_parts.append(f"機器: {', '.join(devices)}")
-        if doc_types:
-            message_parts.append(f"文書: {', '.join(doc_types)}")
+        device_text = ", ".join(devices) if devices else "全て"
+        doc_text = ", ".join(doc_types) if doc_types else "全て"
+        message_parts.append(f"機器: {device_text}")
+        message_parts.append(f"文書種類: {doc_text}")
         message_parts.append(f"lang: {lang_label}")
         auto_parse_message = f"パース結果 - {', '.join(message_parts)}"
     else:  # ko (default)
-        if devices:
-            message_parts.append(f"장비: {', '.join(devices)}")
-        if doc_types:
-            message_parts.append(f"문서: {', '.join(doc_types)}")
+        device_text = ", ".join(devices) if devices else "전체"
+        doc_text = ", ".join(doc_types) if doc_types else "전체"
+        message_parts.append(f"장비: {device_text}")
+        message_parts.append(f"문서종류: {doc_text}")
         message_parts.append(f"lang: {lang_label}")
         auto_parse_message = f"파싱 결과 - {', '.join(message_parts)}"
 
@@ -2977,54 +3006,29 @@ def auto_parse_node(
         "detected_language": detected_language,
     }
 
-    if devices or doc_types:
-        # 파싱 결과가 있으면 추가
-        result.update({
-            "auto_parsed_device": devices[0] if devices else None,
-            "auto_parsed_doc_type": doc_types[0] if doc_types else None,
-            "auto_parsed_devices": devices,
-            "auto_parsed_doc_types": doc_types,
-            "auto_parse_message": auto_parse_message,
-            "selected_devices": selected_devices,
-            "selected_doc_types": selected_doc_types,
-            "device_selection_skipped": not bool(devices),
-            "doc_type_selection_skipped": not bool(doc_types),
-            "_events": [
-                {
-                    "type": "auto_parse",
-                    "device": devices[0] if devices else None,
-                    "doc_type": doc_types[0] if doc_types else None,
-                    "devices": devices,
-                    "doc_types": doc_types,
-                    "language": detected_language,
-                    "message": auto_parse_message,
-                }
-            ] if auto_parse_message else [],
-        })
-    else:
-        # 이전 턴의 파싱 결과가 남지 않도록 명시적으로 초기화
-        result.update({
-            "auto_parsed_device": None,
-            "auto_parsed_doc_type": None,
-            "auto_parsed_devices": None,
-            "auto_parsed_doc_types": None,
-            "auto_parse_message": None,
-            "selected_devices": [],
-            "selected_doc_types": [],
-            "device_selection_skipped": True,
-            "doc_type_selection_skipped": True,
-            "_events": [
-                {
-                    "type": "auto_parse",
-                    "device": None,
-                    "doc_type": None,
-                    "devices": [],
-                    "doc_types": [],
-                    "language": detected_language,
-                    "message": "auto_parse: no device/doc_type detected",
-                }
-            ],
-        })
+    # 파싱 결과가 없더라도 동일한 메시지 형식으로 표시
+    result.update({
+        "auto_parsed_device": devices[0] if devices else None,
+        "auto_parsed_doc_type": doc_types[0] if doc_types else None,
+        "auto_parsed_devices": devices or None,
+        "auto_parsed_doc_types": doc_types or None,
+        "auto_parse_message": auto_parse_message,
+        "selected_devices": selected_devices if devices else [],
+        "selected_doc_types": selected_doc_types if doc_types else [],
+        "device_selection_skipped": not bool(devices),
+        "doc_type_selection_skipped": not bool(doc_types),
+        "_events": [
+            {
+                "type": "auto_parse",
+                "device": devices[0] if devices else None,
+                "doc_type": doc_types[0] if doc_types else None,
+                "devices": devices,
+                "doc_types": doc_types,
+                "language": detected_language,
+                "message": auto_parse_message,
+            }
+        ],
+    })
 
     return result
 

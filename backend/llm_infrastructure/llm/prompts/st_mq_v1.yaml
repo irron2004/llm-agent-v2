@@ -17,11 +17,9 @@ system: |
 
   # Generation Rules (need_st)
   - Re-analyze the original question
-  - Create 3-5 clarifying queries that fill missing information:
-    - Which specific module/component?
-    - Full alarm/error code?
-    - Specific symptoms or conditions?
-    - Related procedures or specifications?
+  - Create 3-5 SEARCH QUERIES (not questions) as short keyword phrases you would type into a search engine
+  - Do NOT ask the user questions (no "Which/What/When...", no question marks)
+  - If details are missing, infer likely concrete keywords (module names, alarm names, procedures, specs) instead of asking
   - Keep acronyms/abbreviations as-is (do NOT expand)
   - Use the same language as the input question
 
