@@ -1623,7 +1623,8 @@ def _extract_devices_from_query(device_names: List[str], query: str) -> List[str
             continue
         if _compact_text(cleaned) and _compact_text(cleaned) in query_compact:
             matches.append(cleaned)
-    return _dedupe_queries(matches)[:2]
+    # STRICT: Only one device allowed
+    return _dedupe_queries(matches)[:1]
 
 
 def _extract_doc_types_from_query(query: str) -> List[str]:
@@ -1745,7 +1746,8 @@ def auto_parse_node(
         auto_parse_message = f"파싱 결과 - {', '.join(message_parts)}"
 
     # Set selected_devices and selected_doc_types for downstream nodes
-    selected_devices = devices[:2]
+    # STRICT: Only one device allowed
+    selected_devices = devices[:1]
     selected_doc_types = doc_types[:2]
 
     # 언어는 항상 반환 (다른 파싱 결과가 없어도)
