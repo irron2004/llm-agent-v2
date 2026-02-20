@@ -56,6 +56,7 @@ class EsChunkDocument:
 
     # Document-level Metadata (extracted from first pages)
     device_name: str = ""
+    equip_id: str = ""
     doc_description: str = ""
     chapter: str = ""
     chunk_summary: str = ""
@@ -108,6 +109,8 @@ class EsChunkDocument:
         # Add document-level metadata if set
         if self.device_name:
             doc["device_name"] = self.device_name
+        if self.equip_id:
+            doc["equip_id"] = self.equip_id
         if self.doc_description:
             doc["doc_description"] = self.doc_description
         if self.chapter:
@@ -181,6 +184,7 @@ class EsChunkDocument:
         section_meta = section.metadata or {}
         page_image_path = section_meta.get("page_image_path")
         device_name = section_meta.get("device_name", "")
+        equip_id = str(section_meta.get("equip_id", "") or "").strip()
         doc_description = section_meta.get("doc_description", "")
         chapter = section_meta.get("chapter", "")
         chunk_summary = section_meta.get("chunk_summary", "")
@@ -205,6 +209,7 @@ class EsChunkDocument:
             tags=doc_tags,
             page_image_path=page_image_path,
             device_name=device_name,
+            equip_id=equip_id,
             doc_description=doc_description,
             chapter=chapter,
             chunk_summary=chunk_summary,

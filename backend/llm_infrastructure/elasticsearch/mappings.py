@@ -102,6 +102,11 @@ def get_rag_chunks_mapping(dims: int = 768) -> dict[str, Any]:
                 "doc_values": True,
                 # 장비명 (e.g., "SUPRA XP", "EFEM", "RFID")
             },
+            "equip_id": {
+                "type": "keyword",
+                "doc_values": True,
+                # 설비 ID (e.g., "EPAG50", "4ESPE101")
+            },
             "doc_description": {
                 "type": "text",
                 "index": False,  # Stored but not searched

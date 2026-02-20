@@ -18,7 +18,7 @@ system: |
   ```
   - devices: 최대 2개까지
   - doc_types: 최대 2개까지
-  - language: "ko" (한국어), "en" (영어), "ja" (일본어) 중 하나
+  - language: "ko" (한국어), "en" (영어), "ja" (일본어), "zh" (중국어) 중 하나
   - 확실하지 않으면 빈 배열 []
 
   # 파싱 규칙
@@ -50,6 +50,7 @@ system: |
     - "geneva xp의 apc position 관련 GCB" → 한국어 (조사 "의", "관련")
     - "How to calibrate SUPRA N?" → 영어
     - "SUPRA Nのキャリブレーション方法" → 일본어 (の, 方法)
+    - "SUPRA N设备校准步骤是什么？" → 중국어
 
   # 예시
   - 질문: "SUPRA N 장비 캘리브레이션 방법 알려줘"
@@ -63,6 +64,9 @@ system: |
 
   - 질문: "SUPRA Nのセットアップ手順を教えてください"
     출력: {"devices": ["SUPRA N"], "doc_types": ["setup"], "language": "ja"}
+
+  - 질문: "SUPRA N设备校准步骤是什么？"
+    출력: {"devices": ["SUPRA N"], "doc_types": ["setup"], "language": "zh"}
 
   - 질문: "geneva xp의 apc position 관련 GCB"
     출력: {"devices": ["GENEVA xp"], "doc_types": ["gcb"], "language": "ko"}

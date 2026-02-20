@@ -187,8 +187,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   // Get chat logs context (Provider is always available in AppProviders)
   const { addLog, clearLogs } = useChatLogs();
   
-  // Get chat review context for setting completed retrieved docs
-  const { setCompletedRetrievedDocs } = useChatReview();
+  // Get chat review context for right-sidebar review/regeneration states
+  const { setCompletedRetrievedDocs, setPendingRegeneration } = useChatReview();
 
   const appendMessage = useCallback((msg: Message) => {
     setMessages((prev) => [...prev, msg]);
@@ -326,6 +326,58 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         searchQueries: effectiveSearchQueries.length > 0 ? effectiveSearchQueries : null,
       }));
 
+      // If auto-parse could not detect device/equip_id, proactively open
+      // the regeneration panel so user can run an additional device-filtered search.
+      const autoParseInfo = res.auto_parse as (Record<string, unknown> & {
+        device?: string | null;
+        devices?: string[] | null;
+        equip_id?: string | null;
+        equip_ids?: string[] | null;
+      }) | null | undefined;
+      const hasAutoParseResult = Boolean(autoParseInfo);
+      const parsedDevices = Array.isArray(autoParseInfo?.devices)
+        ? autoParseInfo.devices.map((d) => String(d).trim()).filter((d) => d.length > 0)
+        : [];
+      const parsedDevice = typeof autoParseInfo?.device === "string" ? autoParseInfo.device.trim() : "";
+      const parsedEquipIds = Array.isArray(autoParseInfo?.equip_ids)
+        ? autoParseInfo.equip_ids.map((eid) => String(eid).trim()).filter((eid) => eid.length > 0)
+        : [];
+      const parsedEquipId = typeof autoParseInfo?.equip_id === "string" ? autoParseInfo.equip_id.trim() : "";
+
+      const selectedDevicesFromResponse = Array.isArray(res.selected_devices)
+        ? res.selected_devices.filter((d): d is string => typeof d === "string" && d.trim().length > 0)
+        : [];
+      const selectedEquipIdsFromResponse = Array.isArray(res.selected_equip_ids)
+        ? res.selected_equip_ids
+            .filter((eid: unknown): eid is string => typeof eid === "string" && eid.trim().length > 0)
+        : [];
+      const hasParsedDeviceSignal =
+        parsedDevices.length > 0 ||
+        parsedDevice.length > 0 ||
+        parsedEquipIds.length > 0 ||
+        parsedEquipId.length > 0 ||
+        selectedDevicesFromResponse.length > 0 ||
+        selectedEquipIdsFromResponse.length > 0;
+      const docsForRegeneration = (res.all_retrieved_docs && res.all_retrieved_docs.length > 0)
+        ? res.all_retrieved_docs
+        : (res.retrieved_docs || []);
+
+      if (hasAutoParseResult && !hasParsedDeviceSignal && docsForRegeneration.length > 0) {
+        setPendingRegeneration({
+          messageId: assistantId,
+          originalQuery: res.query || fallbackQuestion,
+          docs: docsForRegeneration,
+          searchQueries: effectiveSearchQueries.length > 0
+            ? effectiveSearchQueries
+            : [res.query || fallbackQuestion].filter((q) => q && q.trim().length > 0),
+          selectedDevices: [],
+          selectedDocTypes: Array.isArray(res.selected_doc_types)
+            ? res.selected_doc_types.filter((d): d is string => typeof d === "string" && d.trim().length > 0)
+            : [],
+          reason: "missing_device_parse",
+        });
+      }
+
       // Save turn to backend
       const userText = currentUserTextRef.current;
       const assistantText = res.answer || "";
@@ -357,13 +409,14 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         console.error("Failed to save turn:", err);
       });
     },
-    [sessionId, updateMessage, setIsStreaming, clearLogs, setCompletedRetrievedDocs]
+    [sessionId, updateMessage, setIsStreaming, clearLogs, setCompletedRetrievedDocs, setPendingRegeneration]
   );
 
   const send = useCallback(
     async ({ text, decisionOverride, overrides }: SendOptions) => {
       stop();
       setError(null);
+      setPendingRegeneration(null);
       const pending = pendingInterrupt;
       // Only update user text if not resuming (keep original question for saves)
       if (!pending) {
@@ -413,11 +466,31 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       setIsStreaming(true);
 
       try {
+        // Extract previous turn for chat_history (only when not resuming)
+        let chatHistory: { user_text: string; assistant_text: string; doc_ids: string[] }[] | undefined;
+        if (!isResume && messages.length >= 2) {
+          const lastAssistant = [...messages].reverse().find(
+            (m) => m.role === "assistant" && m.content && m.content !== "처리 중..."
+          );
+          const lastAssistantIdx = lastAssistant ? messages.indexOf(lastAssistant) : -1;
+          const lastUser = lastAssistantIdx > 0
+            ? messages.slice(0, lastAssistantIdx).reverse().find((m) => m.role === "user")
+            : undefined;
+          if (lastUser && lastAssistant) {
+            chatHistory = [{
+              user_text: lastUser.content,
+              assistant_text: lastAssistant.content,
+              doc_ids: (lastAssistant.retrievedDocs || []).map((d) => d.id).filter(Boolean),
+            }];
+          }
+        }
+
         const autoParseEnabled = overrides?.autoParse ?? !Boolean(overrides);
         const payload = {
           message: requestMessage,
           auto_parse: autoParseEnabled,  // 자동 파싱 모드 활성화 (기본값)
           ask_user_after_retrieve: false,  // 문서 선택 UI 비활성화
+          ...(chatHistory ? { chat_history: chatHistory } : {}),
           ...(overrides ? {
             filter_devices: overrides.filterDevices,
             filter_doc_types: overrides.filterDocTypes,
@@ -488,6 +561,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
               // Handle auto_parse event (display parsing result)
               if (evt?.type === "auto_parse") {
                 const parseMessage = typeof evt?.message === "string" ? evt.message : null;
+                const parseLanguage = typeof evt?.language === "string" ? evt.language : null;
                 const parsedDevice = typeof evt?.device === "string" ? evt.device : null;
                 const parsedDocType = typeof evt?.doc_type === "string" ? evt.doc_type : null;
                 const parsedDevices = Array.isArray(evt?.devices)
@@ -497,13 +571,14 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
                   ? evt.doc_types.map((d: any) => String(d)).filter((d: string) => d.trim())
                   : (parsedDocType ? [parsedDocType] : []);
 
-                if (!parseMessage && parsedDevices.length === 0 && parsedDocTypes.length === 0) {
+                if (!parseMessage && parsedDevices.length === 0 && parsedDocTypes.length === 0 && !parseLanguage) {
                   return;
                 }
 
                 const messageText = parseMessage ?? `파싱 결과 - ${[
                   parsedDevices.length > 0 ? `장비: ${parsedDevices.join(", ")}` : null,
                   parsedDocTypes.length > 0 ? `문서: ${parsedDocTypes.join(", ")}` : null,
+                  parseLanguage ? `언어: ${parseLanguage}` : null,
                 ].filter(Boolean).join(", ")}`;
 
                 addLog(assistantId, `🔍 ${messageText}`, "auto_parse");
@@ -516,6 +591,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
                     doc_type: parsedDocType,
                     devices: parsedDevices,
                     doc_types: parsedDocTypes,
+                    language: parseLanguage,
                     message: messageText,
                   },
                   selectedDevices: parsedDevices.length > 0 ? parsedDevices : m.selectedDevices ?? null,
@@ -558,7 +634,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         setIsStreaming(false);
       }
     },
-    [appendMessage, stop, updateMessage, handleAgentResponse, pendingInterrupt, sessionId, addLog, clearLogs]
+    [appendMessage, stop, updateMessage, handleAgentResponse, pendingInterrupt, sessionId, addLog, clearLogs, setPendingRegeneration]
   );
 
   const submitReview = useCallback(

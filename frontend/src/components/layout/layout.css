@@ -108,31 +108,28 @@
 /* Right sidebar expand button (when collapsed) */
 .right-sidebar-toggle {
   position: fixed;
-  right: var(--spacing-md);
-  top: 50%;
-  transform: translateY(-50%);
-  width: 36px;
-  height: 48px;
+  right: var(--spacing-lg);
+  top: var(--spacing-lg);
+  width: 28px;
+  height: 28px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background-color: var(--color-bg-card);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  z-index: 100;
+  z-index: 150;
   transition:
     all 0.2s ease,
-    background-color var(--theme-transition-duration, 0.3s) var(--theme-transition-timing, ease),
-    border-color var(--theme-transition-duration, 0.3s) var(--theme-transition-timing, ease);
-  box-shadow: var(--shadow-sm);
+    background-color var(--theme-transition-duration, 0.3s) var(--theme-transition-timing, ease);
 }
 
 .right-sidebar-toggle:hover {
-  background-color: var(--color-action-bg-hover);
+  background-color: var(--color-action-bg);
   color: var(--color-text-primary);
-  border-color: var(--color-text-secondary);
 }
 
 /* Theme toggle container - top right corner */

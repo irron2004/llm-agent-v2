@@ -39,6 +39,61 @@ interface SearchResponse {
   has_next: boolean;
 }
 
+const toSafeText = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => toSafeText(item))
+      .filter(Boolean)
+      .join(", ");
+  }
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
+const toSafeKeywords = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.map((item) => toSafeText(item)).filter(Boolean);
+  }
+  const normalized = toSafeText(value);
+  return normalized ? [normalized] : [];
+};
+
+const toSafeNumber = (value: unknown, fallback = 0): number => {
+  const num = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(num) ? num : fallback;
+};
+
+const normalizeItems = (items: unknown): SearchResult[] => {
+  if (!Array.isArray(items)) return [];
+
+  return items.map((item, index) => {
+    const source = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+    const score = toSafeNumber(source.score, 0);
+    const scoreDisplay = toSafeText(source.score_display) || (score <= 1 ? `${Math.round(score * 100)}%` : score.toFixed(2));
+
+    return {
+      rank: toSafeNumber(source.rank, index + 1),
+      id: toSafeText(source.id),
+      title: toSafeText(source.title) || "Untitled",
+      snippet: toSafeText(source.snippet),
+      score,
+      score_display: scoreDisplay,
+      chunk_summary: toSafeText(source.chunk_summary) || undefined,
+      chunk_keywords: toSafeKeywords(source.chunk_keywords),
+      chapter: toSafeText(source.chapter) || undefined,
+      doc_type: toSafeText(source.doc_type) || undefined,
+      device_name: toSafeText(source.device_name) || undefined,
+      page: source.page === null || source.page === undefined ? undefined : toSafeNumber(source.page),
+    };
+  });
+};
+
 const AVAILABLE_FIELDS: FieldConfig[] = [
   {
     field: "search_text",
@@ -163,10 +218,11 @@ export default function SearchPage() {
         throw new Error(`Search failed: ${response.status} ${errorText}`);
       }
 
-      const data: SearchResponse = await response.json();
-      console.log("[Search] Results:", data.total, "items");
-      setResults(data.items);
-      setTotal(data.total);
+      const data = await response.json() as SearchResponse & { results?: unknown[] };
+      const normalizedItems = normalizeItems(data.items ?? data.results);
+      console.log("[Search] Results:", normalizedItems.length, "items");
+      setResults(normalizedItems);
+      setTotal(toSafeNumber(data.total, normalizedItems.length));
     } catch (error) {
       console.error("[Search] Exception:", error);
       alert(`검색 중 오류가 발생했습니다: ${error}`);

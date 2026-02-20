@@ -169,6 +169,7 @@ export default function ChatPage() {
         : fallbackQueries,
       selectedDevices: payload.selectedDevices ?? [],
       selectedDocTypes: payload.selectedDocTypes ?? [],
+      reason: "manual",
     });
   }, [setPendingRegeneration]);
 
@@ -252,6 +253,7 @@ export default function ChatPage() {
                     onFeedback={submitFeedback}
                     onDetailedFeedback={submitDetailedFeedback}
                     onRegenerate={msg.role === "assistant" ? handleRegenerate : undefined}
+                    onEdit={msg.role === "user" && !isStreaming ? (editedText) => send({ text: editedText }) : undefined}
                     originalQuery={msg.role === "assistant" ? getOriginalQuery(msg.id) : undefined}
                   />
                 ))

@@ -94,6 +94,9 @@ export type AutoParseResult = {
   doc_type?: string | null;
   devices?: string[] | null;
   doc_types?: string[] | null;
+  equip_id?: string | null;
+  equip_ids?: string[] | null;
+  language?: string | null;
   message?: string | null;
 };
 
@@ -111,7 +114,14 @@ export type AgentResponse = {
   auto_parse?: AutoParseResult | null;
   selected_devices?: string[] | null;
   selected_doc_types?: string[] | null;
+  selected_equip_ids?: string[] | null;
   search_queries?: string[] | null;
+};
+
+export type ChatHistoryTurn = {
+  user_text: string;
+  assistant_text: string;
+  doc_ids: string[];
 };
 
 export type AgentRequest = {
@@ -123,6 +133,7 @@ export type AgentRequest = {
   ask_user_after_retrieve?: boolean;
   resume_decision?: unknown;
   auto_parse?: boolean;
+  chat_history?: ChatHistoryTurn[] | null;
   filter_devices?: string[] | null;
   filter_doc_types?: string[] | null;
   search_queries?: string[] | null;

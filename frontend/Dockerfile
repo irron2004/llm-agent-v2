@@ -27,8 +27,12 @@ FROM nginx:alpine
 # Copy built assets
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# nginx config for SPA + API proxy + ingestions
-RUN cat > /etc/nginx/conf.d/default.conf << 'EOF'
+# nginx config template for SPA + API proxy + ingestions
+# NOTE:
+# - default: proxy to compose-internal api service (prod 분리 기본값)
+# - override per-container via env: NGINX_API_PROXY_PASS
+ENV NGINX_API_PROXY_PASS=http://api:8000/api/
+RUN mkdir -p /etc/nginx/templates && cat > /etc/nginx/templates/default.conf.template << 'EOF'
 server {
     listen 9097;
     root /usr/share/nginx/html;
@@ -39,11 +43,9 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
-    # API proxy (api container listens on internal port 8000)
-    # When debugging: proxy to host machine instead of rag-api container
+    # API proxy upstream (injected by envsubst from NGINX_API_PROXY_PASS)
     location /api/ {
-        # Use host.docker.internal for Docker Desktop or host IP for Linux
-        proxy_pass http://10.10.100.45:8001/api/;
+        proxy_pass ${NGINX_API_PROXY_PASS};
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;

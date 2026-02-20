@@ -49,3 +49,25 @@ def test_search_service_passes_doc_types_to_retriever(monkeypatch) -> None:
 
     assert len(retriever.calls) == 1
     assert retriever.calls[0].get("doc_types") == ["sop", "setup"]
+
+
+def test_search_service_passes_equip_ids_to_retriever(monkeypatch) -> None:
+    retriever = _CapturingRetriever()
+    monkeypatch.setattr(SearchService, "_build_retriever", lambda self: retriever)
+
+    service = SearchService(
+        _DummyCorpus(),
+        method="dense",
+        multi_query_enabled=False,
+        rerank_enabled=False,
+    )
+
+    service.search(
+        "equip query",
+        top_k=5,
+        multi_query=False,
+        equip_ids=["EPAG50"],
+    )
+
+    assert len(retriever.calls) == 1
+    assert retriever.calls[0].get("equip_ids") == ["EPAG50"]

@@ -242,16 +242,19 @@ type MessageItemProps = {
   }) => void;
   onDetailedFeedback?: (payload: DetailedFeedbackPayload) => void;
   onRegenerate?: (payload: RegeneratePayload) => void;
+  onEdit?: (editedText: string) => void;
   originalQuery?: string;  // Original user query for regeneration
 };
 
-export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedback, onRegenerate, originalQuery }: MessageItemProps) {
+export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedback, onRegenerate, onEdit, originalQuery }: MessageItemProps) {
   const [copied, setCopied] = useState(false);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [showFilterInfo, setShowFilterInfo] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(message.content);
 
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
@@ -431,8 +434,58 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
         </div>
         <div className="message-body">
           <div className={`message-bubble ${isUser ? "user" : "assistant"}`}>
+            {isAssistant && message.autoParse?.message && (
+              <div className="message-parse-label">
+                {message.autoParse.message}
+              </div>
+            )}
             {isAssistant ? (
               <MarkdownContent content={message.content} />
+            ) : isEditing ? (
+              <div className="message-edit-area">
+                <textarea
+                  className="message-edit-input"
+                  value={editText}
+                  onChange={(e) => setEditText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      const trimmed = editText.trim();
+                      if (trimmed && onEdit) {
+                        onEdit(trimmed);
+                        setIsEditing(false);
+                      }
+                    }
+                    if (e.key === "Escape") {
+                      setEditText(message.content);
+                      setIsEditing(false);
+                    }
+                  }}
+                  autoFocus
+                  rows={Math.min(editText.split("\n").length + 1, 6)}
+                />
+                <div className="message-edit-actions">
+                  <button
+                    className="message-edit-cancel"
+                    onClick={() => { setEditText(message.content); setIsEditing(false); }}
+                  >
+                    취소
+                  </button>
+                  <button
+                    className="message-edit-submit"
+                    onClick={() => {
+                      const trimmed = editText.trim();
+                      if (trimmed && onEdit) {
+                        onEdit(trimmed);
+                        setIsEditing(false);
+                      }
+                    }}
+                    disabled={!editText.trim()}
+                  >
+                    제출
+                  </button>
+                </div>
+              </div>
             ) : (
               <div className="message-text">{message.content}</div>
             )}
@@ -444,6 +497,19 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
               </span>
             )}
           </div>
+
+          {/* Edit button for user messages */}
+          {isUser && !isStreaming && !isEditing && onEdit && (
+            <div className="message-actions">
+              <button
+                className="action-button"
+                onClick={() => { setEditText(message.content); setIsEditing(true); }}
+                title="메시지 수정"
+              >
+                <EditOutlined />
+              </button>
+            </div>
+          )}
 
           {isAssistant && isStreaming && message.currentNode && (
             <div className="node-indicator">
@@ -485,15 +551,30 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
                             ? `${docType}_${doc.id}`
                             : (doc.title || `Document ${idx + 1}`);
 
+                          const meta = (doc.metadata || {}) as Record<string, unknown>;
+                          const chunkSummary = meta.chunk_summary as string | undefined;
+                          const chunkKeywords = meta.chunk_keywords as string[] | undefined;
+                          const metaChapter = meta.chapter as string | undefined;
+                          const metaDocType = meta.doc_type as string | undefined;
+                          const metaDeviceName = meta.device_name as string | undefined;
+
                           return (
                             <div key={doc.id || idx} className="reference-item" style={{ marginBottom: 16 }}>
-                              <div style={{ fontWeight: 600, marginBottom: 4 }}>
-                                {displayTitle}
-                                {pageNumbers.length > 0 && (
-                                  <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, color: "var(--color-text-secondary)" }}>
-                                    {pageNumbers.length === 1
-                                      ? `p.${pageNumbers[0]}`
-                                      : `p.${pageNumbers[0]}-${pageNumbers[pageNumbers.length - 1]}`}
+                              {/* Title + Score (search page 동일) */}
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                                <span style={{ fontWeight: 600 }}>
+                                  {idx + 1}. {displayTitle}
+                                  {pageNumbers.length > 0 && (
+                                    <span style={{ fontWeight: 400, marginLeft: 8, fontSize: 12, color: "var(--color-text-secondary)" }}>
+                                      {pageNumbers.length === 1
+                                        ? `p.${pageNumbers[0]}`
+                                        : `p.${pageNumbers[0]}-${pageNumbers[pageNumbers.length - 1]}`}
+                                    </span>
+                                  )}
+                                </span>
+                                {(doc.score !== null && doc.score !== undefined) && (
+                                  <span style={{ fontSize: 12, color: "var(--color-text-secondary)" }}>
+                                    스코어: {doc.score.toFixed(3)} {doc.score_percent ? `(${doc.score_percent}%)` : ""}
                                   </span>
                                 )}
                               </div>
@@ -555,11 +636,42 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
                                   </div>
                                 )}
                               </div>
-                              {(doc.score !== null && doc.score !== undefined) && (
-                                <div style={{ fontSize: 12, opacity: 0.6 }}>
-                                  score: {doc.score.toFixed(3)} {doc.score_percent ? `(${doc.score_percent}%)` : ""}
+                              {/* 청크 요약 (search page 동일 - 파란 박스) */}
+                              {chunkSummary && (
+                                <div style={{ marginTop: 8, padding: 8, background: "#f0f7ff", borderRadius: 4 }}>
+                                  <span style={{ fontSize: 12, fontWeight: 600, color: "#1890ff" }}>청크 요약: </span>
+                                  <span style={{ fontSize: 12 }}>{chunkSummary}</span>
                                 </div>
                               )}
+                              {/* 키워드 (search page 동일 - 녹색 태그) */}
+                              {chunkKeywords && chunkKeywords.length > 0 && (
+                                <div style={{ marginTop: 8 }}>
+                                  <span style={{ fontSize: 12, fontWeight: 600, color: "#52c41a" }}>키워드: </span>
+                                  {chunkKeywords.map((kw, kwIdx) => (
+                                    <span
+                                      key={kwIdx}
+                                      style={{
+                                        display: "inline-block",
+                                        padding: "2px 8px",
+                                        margin: "0 4px 4px 0",
+                                        background: "#f6ffed",
+                                        border: "1px solid #b7eb8f",
+                                        borderRadius: 4,
+                                        fontSize: 11,
+                                      }}
+                                    >
+                                      {kw}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                              {/* 메타데이터 행 (search page 동일 - ID | Chapter | Doc Type | Device Name) */}
+                              <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 4, alignItems: "center", fontSize: 12, color: "var(--color-text-secondary)" }}>
+                                <span>ID: {doc.id}</span>
+                                {metaChapter && (<><span style={{ margin: "0 4px" }}>|</span><span>챕터: {metaChapter}</span></>)}
+                                {metaDocType && (<><span style={{ margin: "0 4px" }}>|</span><span>타입: {metaDocType}</span></>)}
+                                {metaDeviceName && (<><span style={{ margin: "0 4px" }}>|</span><span>장비: {metaDeviceName}</span></>)}
+                              </div>
                             </div>
                           );
                         })}
@@ -584,20 +696,6 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
             </div>
           )}
 
-          {isAssistant && !isStreaming && message.autoParse?.message && (
-            <div
-              style={{
-                marginTop: 8,
-                padding: "6px 10px",
-                borderRadius: 6,
-                background: "var(--color-bg-secondary)",
-                color: "var(--color-accent-primary)",
-                fontSize: 12,
-              }}
-            >
-              🔍 {message.autoParse.message}
-            </div>
-          )}
 
           {/* Execution logs moved to right sidebar */}
 

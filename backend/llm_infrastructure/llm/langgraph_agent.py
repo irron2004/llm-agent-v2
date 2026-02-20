@@ -10,7 +10,7 @@ import json
 import re
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Optional, Protocol, TypedDict
+from typing import Any, Dict, List, Literal, Optional, Protocol, Set, TypedDict
 
 from langgraph.types import Command, interrupt
 
@@ -55,22 +55,30 @@ class AgentState(TypedDict, total=False):
     auto_parsed_doc_type: Optional[str]  # First parsed doc type from query
     auto_parsed_devices: List[str]
     auto_parsed_doc_types: List[str]
+    auto_parsed_equip_id: Optional[str]  # First parsed equip_id from query
+    auto_parsed_equip_ids: List[str]
     auto_parse_message: Optional[str]  # Message to display (e.g., "SUPRA N장비로 검색합니다")
 
     # Language detection and translation
-    detected_language: Optional[str]  # "ko", "en", "ja" - detected from query
+    detected_language: Optional[str]  # "ko", "en", "ja", "zh" - detected from query
     query_en: Optional[str]  # English version of query (for internal processing)
     query_ko: Optional[str]  # Korean version of query (for retrieval)
 
     # Device selection (HIL)
     available_devices: List[Dict[str, Any]]
     selected_devices: List[str]  # Multiple devices can be selected
+    selected_equip_ids: List[str]
     device_selection_skipped: bool
     available_doc_types: List[Dict[str, Any]]
     selected_doc_types: List[str]
     selected_doc_types_strict: bool
     doc_type_selection_skipped: bool
     selected_doc_ids: List[str]
+
+    # Chat history (follow-up query support)
+    chat_history: List[Dict[str, Any]]  # [{user_text, assistant_text, doc_ids}]
+    needs_history: bool
+    prev_doc_ids: List[str]  # 이전 턴 참조 문서 ID
 
     # Retrieval outputs
     docs: List[RetrievalResult]
@@ -119,10 +127,13 @@ class PromptSpec:
     translate: Optional[PromptTemplate] = None  # Translate query to en/ko
     # Language-specific answer prompts
     setup_ans_en: Optional[PromptTemplate] = None
+    setup_ans_zh: Optional[PromptTemplate] = None
     setup_ans_ja: Optional[PromptTemplate] = None
     ts_ans_en: Optional[PromptTemplate] = None
+    ts_ans_zh: Optional[PromptTemplate] = None
     ts_ans_ja: Optional[PromptTemplate] = None
     general_ans_en: Optional[PromptTemplate] = None
+    general_ans_zh: Optional[PromptTemplate] = None
     general_ans_ja: Optional[PromptTemplate] = None
 
 
@@ -181,10 +192,13 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
 
     # Load language-specific answer prompts (optional)
     setup_ans_en = _try_load_prompt("setup_ans_en", version)
+    setup_ans_zh = _try_load_prompt("setup_ans_zh", version)
     setup_ans_ja = _try_load_prompt("setup_ans_ja", version)
     ts_ans_en = _try_load_prompt("ts_ans_en", version)
+    ts_ans_zh = _try_load_prompt("ts_ans_zh", version)
     ts_ans_ja = _try_load_prompt("ts_ans_ja", version)
     general_ans_en = _try_load_prompt("general_ans_en", version)
+    general_ans_zh = _try_load_prompt("general_ans_zh", version)
     general_ans_ja = _try_load_prompt("general_ans_ja", version)
 
     return PromptSpec(
@@ -203,10 +217,13 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
         auto_parse=auto_parse,
         translate=translate,
         setup_ans_en=setup_ans_en,
+        setup_ans_zh=setup_ans_zh,
         setup_ans_ja=setup_ans_ja,
         ts_ans_en=ts_ans_en,
+        ts_ans_zh=ts_ans_zh,
         ts_ans_ja=ts_ans_ja,
         general_ans_en=general_ans_en,
+        general_ans_zh=general_ans_zh,
         general_ans_ja=general_ans_ja,
     )
 
@@ -233,6 +250,7 @@ class SearchServiceRetriever:
         top_k: int | None = None,
         device_name: str | None = None,
         device_names: List[str] | None = None,
+        equip_ids: List[str] | None = None,
         doc_types: List[str] | None = None,
         **kwargs: Any,
     ) -> List[RetrievalResult]:
@@ -249,6 +267,8 @@ class SearchServiceRetriever:
         # Legacy: device_name for boosting if provided
         elif device_name:
             search_kwargs["device_name"] = device_name
+        if equip_ids:
+            search_kwargs["equip_ids"] = equip_ids
         if doc_types:
             search_kwargs["doc_types"] = doc_types
         return self.search_service.search(query, **search_kwargs)
@@ -259,12 +279,21 @@ class SearchServiceRetriever:
 # -----------------------------
 # 노드 타입별 max_tokens 설정
 MAX_TOKENS_CLASSIFICATION = 256   # 라우팅/분류용 (짧은 응답)
+MAX_TOKENS_JUDGE = 1024          # judge용 (reasoning 토큰 포함 여유분)
 MAX_TOKENS_ANSWER = 4096         # 답변 생성용
 MAX_REF_CHARS_REVIEW = 200       # 검색 결과 리뷰용
 MAX_REF_CHARS_ANSWER = 1200      # 답변 생성용
 RELATED_PAGE_WINDOW = 2          # 인접 페이지 범위 (±N)
 DOC_TYPES_SAME_DOC = {"gcb", "myservice"}
 EXPAND_TOP_K = 20                # 확장 대상 최대 개수 (rerank 상위)
+
+# --- Per-node temperature settings ---
+# 분류/판단 노드: 결정적 (동일 입력 → 동일 출력)
+TEMP_CLASSIFICATION = 0.0   # route, st_gate, judge
+TEMP_TRANSLATION = 0.0      # translate
+# 생성 노드: 약간의 다양성 허용
+TEMP_QUERY_GEN = 0.3        # mq, st_mq, refine_queries
+TEMP_ANSWER = 0.5           # answer
 
 
 def _invoke_llm(llm: BaseLLM, system: str, user: str, **kwargs: Any) -> str:
@@ -696,7 +725,7 @@ def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     route_query = state.get("query_en") or state["query"]
     query = _normalize_query_text(route_query) or str(route_query).strip()
     user = _format_prompt(spec.router.user, {"sys.query": query})
-    route = _parse_route(_invoke_llm(llm, spec.router.system, user))
+    route = _parse_route(_invoke_llm(llm, spec.router.system, user, temperature=TEMP_CLASSIFICATION))
     logger.info("route_node: query=%s..., route=%s", query[:50] if query else None, route)
     return {"route": route}
 
@@ -719,7 +748,7 @@ def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, A
     general_mq_list: List[str] = []
 
     # MQ generation needs more tokens than classification
-    mq_kwargs = {"max_tokens": 4096}
+    mq_kwargs = {"max_tokens": 4096, "temperature": TEMP_QUERY_GEN}
 
     def _generate_mq_bilingual(spec_template) -> tuple[List[str], List[str]]:
         """Generate MQ in both English and Korean."""
@@ -782,7 +811,7 @@ def st_gate_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[s
         "general_mq": "\n".join(general_mq_list),
     }
     user = _format_prompt(spec.st_gate.user, mapping)
-    gate = _parse_gate(_invoke_llm(llm, spec.st_gate.system, user))
+    gate = _parse_gate(_invoke_llm(llm, spec.st_gate.system, user, temperature=TEMP_CLASSIFICATION))
     return {"st_gate": gate}
 
 
@@ -860,7 +889,7 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
             "query": text,
             "target_language": target_name,
         })
-        result = _invoke_llm(llm, spec.translate.system, user)
+        result = _invoke_llm(llm, spec.translate.system, user, temperature=TEMP_TRANSLATION)
         result = _normalize_query_text(result.strip().strip('"').strip("'").strip())
         return result if result else _normalize_query_text(text)
 
@@ -880,7 +909,7 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
             "st_gate": state.get("st_gate", "no_st"),
         }
         user = _format_prompt(spec.st_mq.user, mapping)
-        raw = _invoke_llm(llm, spec.st_mq.system, user)
+        raw = _invoke_llm(llm, spec.st_mq.system, user, temperature=TEMP_QUERY_GEN)
         logger.info("st_mq_node: raw output=%s", raw)
         parsed = _parse_queries(raw)
         queries = [q for q in parsed if not _is_garbage_query(q)]
@@ -954,6 +983,7 @@ def retrieve_node(
         if fallback_query and not _is_garbage_query(fallback_query):
             queries = [fallback_query]
     selected_devices = state.get("selected_devices", [])
+    selected_equip_ids = state.get("selected_equip_ids", [])
     selected_doc_types = state.get("selected_doc_types", [])
     selected_doc_ids = [str(x).strip() for x in state.get("selected_doc_ids", []) if str(x).strip()]
     selected_doc_types_strict = bool(state.get("selected_doc_types_strict"))
@@ -971,6 +1001,9 @@ def retrieve_node(
 
     selected_device_set = {
         _normalize_device_name(d) for d in selected_devices if _normalize_device_name(d)
+    }
+    selected_equip_id_set = {
+        _normalize_equip_id(eid) for eid in selected_equip_ids if _is_valid_equip_id(_normalize_equip_id(eid))
     }
     selected_doc_type_set = {
         _normalize_doc_type(dt) for dt in selected_doc_type_filters if _normalize_doc_type(dt)
@@ -995,12 +1028,21 @@ def retrieve_node(
         device_name = _normalize_device_name(meta.get("device_name"))
         return bool(device_name) and device_name in selected_device_set
 
+    def _matches_equip_id(doc: RetrievalResult) -> bool:
+        if not selected_equip_id_set:
+            return True
+        meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+        equip_id = _normalize_equip_id(meta.get("equip_id"))
+        return bool(equip_id) and equip_id in selected_equip_id_set
+
     def _add_docs(docs_to_add: List[RetrievalResult], *, filter_devices: bool) -> None:
         """Add docs to all_docs, avoiding duplicates and honoring filters."""
         for d in docs_to_add:
             if not _matches_doc_type(d):
                 continue
             if filter_devices and not _matches_device(d):
+                continue
+            if not _matches_equip_id(d):
                 continue
             key = (d.doc_id, hash(d.raw_text or d.content))
             if key not in seen:
@@ -1013,8 +1055,9 @@ def retrieve_node(
     if selected_devices:
         # Strict device filter: selected devices only
         logger.info(
-            "retrieve_node: strict device-filtered search with devices=%s, queries=%d",
+            "retrieve_node: strict device-filtered search with devices=%s equip_ids=%s queries=%d",
             selected_devices,
+            selected_equip_ids,
             len(all_queries),
         )
         for q in all_queries:
@@ -1022,6 +1065,7 @@ def retrieve_node(
                 q,
                 top_k=candidate_k,
                 device_names=selected_devices,
+                equip_ids=selected_equip_ids,
                 doc_types=selected_doc_type_filters,
             )
             _add_docs(device_docs, filter_devices=True)
@@ -1029,11 +1073,16 @@ def retrieve_node(
 
     else:
         # No device selection: search without filter
-        logger.info("retrieve_node: general search (no device filter), queries=%d", len(all_queries))
+        logger.info(
+            "retrieve_node: general search (no device filter), equip_ids=%s, queries=%d",
+            selected_equip_ids,
+            len(all_queries),
+        )
         for q in all_queries:
             docs = retriever.retrieve(
                 q,
                 top_k=candidate_k,
+                equip_ids=selected_equip_ids,
                 doc_types=selected_doc_type_filters,
             )
             _add_docs(docs, filter_devices=False)
@@ -1363,6 +1412,11 @@ def _get_answer_template(
             "ts": spec.ts_ans_en,
             "general": spec.general_ans_en,
         },
+        "zh": {
+            "setup": spec.setup_ans_zh,
+            "ts": spec.ts_ans_zh,
+            "general": spec.general_ans_zh,
+        },
         "ja": {
             "setup": spec.setup_ans_ja,
             "ts": spec.ts_ans_ja,
@@ -1393,19 +1447,30 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
         len(ref_items),
     )
 
-    # Use English query for processing if available
-    query_for_prompt = state.get("query_en") or state["query"]
+    # Use original query for non-English answers to avoid language drift.
+    # (e.g., zh/ja prompts receiving an English-translated query can bias output to English)
+    if detected_language == "en":
+        query_for_prompt = state.get("query_en") or state["query"]
+    else:
+        query_for_prompt = state["query"]
     mapping = {"sys.query": query_for_prompt, "ref_text": ref_text}
 
     # Select language-specific template
     # Korean (ko): use default template
     # English (en): use *_en template if available
     # Japanese (ja): use *_ja template if available
+    # Chinese (zh): use *_zh template if available
     if detected_language == "en":
         templates = {
             "setup": spec.setup_ans_en or spec.setup_ans,
             "ts": spec.ts_ans_en or spec.ts_ans,
             "general": spec.general_ans_en or spec.general_ans,
+        }
+    elif detected_language == "zh":
+        templates = {
+            "setup": spec.setup_ans_zh or spec.setup_ans,
+            "ts": spec.ts_ans_zh or spec.ts_ans,
+            "general": spec.general_ans_zh or spec.general_ans,
         }
     elif detected_language == "ja":
         templates = {
@@ -1424,8 +1489,19 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     logger.info("answer_node: using %s template for route=%s", detected_language, route)
 
     user = _format_prompt(tmpl.user, mapping)
+
+    # Prepend previous conversation context for follow-up queries
+    if state.get("needs_history") and state.get("chat_history"):
+        last = state["chat_history"][-1]
+        prev_context = (
+            f"[Previous Q&A]\n"
+            f"Q: {last.get('user_text', '')}\n"
+            f"A: {last.get('assistant_text') or ''}\n\n"
+        )
+        user = prev_context + user
+
     logger.info("answer_node: user_prompt_chars=%d, system_prompt_chars=%d", len(user), len(tmpl.system))
-    answer, reasoning = _invoke_llm_with_reasoning(llm, tmpl.system, user, max_tokens=MAX_TOKENS_ANSWER)
+    answer, reasoning = _invoke_llm_with_reasoning(llm, tmpl.system, user, max_tokens=MAX_TOKENS_ANSWER, temperature=TEMP_ANSWER)
     logger.info("answer_node: answer_chars=%d, reasoning_chars=%d, answer_preview=%s", len(answer), len(reasoning) if reasoning else 0, answer[:500] if answer else "(empty)")
     return {"answer": answer, "reasoning": reasoning}
 
@@ -1451,12 +1527,15 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
         "JSON 한 줄로 반환: {\"faithful\": bool, \"issues\": [...], \"hint\": \"...\"}"
     )
 
-    raw = _invoke_llm(llm, sys, user)
+    raw = _invoke_llm(llm, sys, user, max_tokens=MAX_TOKENS_JUDGE, temperature=TEMP_CLASSIFICATION)
     try:
-        judge = json.loads(raw)
+        # LLM이 JSON 외 텍스트를 포함할 수 있으므로 추출 시도
+        json_match = re.search(r"\{.*\}", raw, flags=re.S)
+        judge = json.loads(json_match.group(0)) if json_match else json.loads(raw)
         if not isinstance(judge, dict):
             raise ValueError("judge not dict")
     except Exception:
+        logger.warning("judge_node: failed to parse LLM output: %s", raw[:200] if raw else "(empty)")
         judge = {"faithful": False, "issues": ["parse_error"], "hint": "judge JSON parse failed"}
     return {"judge": judge}
 
@@ -1567,7 +1646,7 @@ def refine_queries_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) ->
         f"Previous queries: {json.dumps(prev, ensure_ascii=False)}\n"
         f"Judge hint: {hint}\n"
     )
-    raw_en = _invoke_llm(llm, sys_en, user_en)
+    raw_en = _invoke_llm(llm, sys_en, user_en, temperature=TEMP_QUERY_GEN)
     queries_en = _parse_queries(raw_en)
 
     # Build English queries (3)
@@ -1590,7 +1669,7 @@ def refine_queries_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) ->
                 "query": text,
                 "target_language": "Korean",
             })
-            result = _invoke_llm(llm, spec.translate.system, user)
+            result = _invoke_llm(llm, spec.translate.system, user, temperature=TEMP_TRANSLATION)
             return result.strip().strip('"').strip("'").strip() or text
 
         for q in english_queries:
@@ -1609,8 +1688,8 @@ def refine_queries_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) ->
 
 
 def _parse_auto_parse_result(text: str) -> Dict[str, Any]:
-    """Parse LLM output for auto-parsed devices, doc_types, and language."""
-    result: Dict[str, Any] = {"devices": [], "doc_types": [], "language": None}
+    """Parse LLM output for auto-parsed devices, doc_types, equip_ids, and language."""
+    result: Dict[str, Any] = {"devices": [], "doc_types": [], "equip_ids": [], "language": None}
     t = text.strip()
     if not t:
         return result
@@ -1626,6 +1705,7 @@ def _parse_auto_parse_result(text: str) -> Dict[str, Any]:
             if isinstance(obj, dict):
                 devices = obj.get("devices")
                 doc_types = obj.get("doc_types")
+                equip_ids = obj.get("equip_ids")
                 language = obj.get("language")
 
                 # Backward compat: allow single fields
@@ -1633,6 +1713,8 @@ def _parse_auto_parse_result(text: str) -> Dict[str, Any]:
                     devices = [obj.get("device")]
                 if doc_types is None and "doc_type" in obj:
                     doc_types = [obj.get("doc_type")]
+                if equip_ids is None and "equip_id" in obj:
+                    equip_ids = [obj.get("equip_id")]
 
                 parsed_devices: List[str] = []
                 if isinstance(devices, list):
@@ -1656,20 +1738,152 @@ def _parse_auto_parse_result(text: str) -> Dict[str, Any]:
                     if s and s.lower() != "null":
                         parsed_doc_types.append(s)
 
+                parsed_equip_ids: List[str] = []
+                if isinstance(equip_ids, list):
+                    for eid in equip_ids:
+                        normalized = _normalize_equip_id(eid)
+                        if _is_valid_equip_id(normalized):
+                            parsed_equip_ids.append(normalized)
+                elif equip_ids:
+                    normalized = _normalize_equip_id(equip_ids)
+                    if _is_valid_equip_id(normalized):
+                        parsed_equip_ids.append(normalized)
+
                 # Parse language
                 parsed_language: Optional[str] = None
                 if language:
                     lang_str = str(language).strip().lower()
-                    if lang_str in ("ko", "en", "ja"):
+                    if lang_str in ("ko", "en", "ja", "zh"):
                         parsed_language = lang_str
 
                 result["devices"] = _dedupe_queries(parsed_devices)[:2]
                 result["doc_types"] = _dedupe_queries(parsed_doc_types)[:2]
+                result["equip_ids"] = _dedupe_queries(parsed_equip_ids)[:2]
                 result["language"] = parsed_language
     except Exception:
         pass
 
     return result
+
+
+GARBAGE_EQUIP_IDS = {"", "-", ".", "/", "1", "NA", "N/A"}
+_EQUIP_ID_EXPLICIT_PATTERNS: list[re.Pattern[str]] = [
+    re.compile(
+        r"(?i)\b(?:equip(?:ment)?[\s_-]*id|eq[\s_-]*id|장비[\s_-]*(?:id|번호)|설비[\s_-]*(?:id|번호))\s*(?:is|=|:)?\s*([A-Z0-9][A-Z0-9_-]{2,})"
+    ),
+]
+
+
+def _normalize_equip_id(value: Any) -> str:
+    if value is None:
+        return ""
+    normalized = str(value).strip()
+    normalized = normalized.strip("\"'`[](){}<>")
+    normalized = normalized.rstrip(".,;:!?")
+    normalized = normalized.strip()
+    return normalized.upper()
+
+
+def _is_valid_equip_id(value: str) -> bool:
+    if not value:
+        return False
+    normalized = value.strip().upper()
+    if not normalized or normalized in GARBAGE_EQUIP_IDS:
+        return False
+    if len(normalized) < 4 or len(normalized) > 24:
+        return False
+    if not re.fullmatch(r"[A-Z0-9][A-Z0-9_-]*", normalized):
+        return False
+    if not re.search(r"\d", normalized):
+        return False
+    # Exclude common short error code patterns (e.g., E001, E-1234)
+    if re.fullmatch(r"E-?\d{2,5}", normalized):
+        return False
+    return True
+
+
+def _extract_equip_ids_by_lookup(query: str, known_equip_ids: Set[str]) -> List[str]:
+    """Extract equip_ids from query using lookup against known equip_id set.
+
+    Tokenizes the query and checks each token (and adjacent token combinations)
+    against the known equip_id set for exact matching.
+    """
+    if not query or not known_equip_ids:
+        return []
+
+    # Tokenize: split on whitespace, then strip common punctuation
+    raw_tokens = re.split(r"[\s,;:!?()]+", query.strip())
+    tokens = [t.strip("\"'`[](){}<>.,;:!?").upper() for t in raw_tokens if t.strip()]
+
+    matched: List[str] = []
+
+    # 1) Single-token lookup
+    for token in tokens:
+        if token in known_equip_ids:
+            matched.append(token)
+
+    # 2) Adjacent token combination (e.g., "DES 02" → "DES02", "5 EBP 0701" → "5EBP0701")
+    if len(tokens) >= 2:
+        for i in range(len(tokens) - 1):
+            combined = tokens[i] + tokens[i + 1]
+            if combined in known_equip_ids and combined not in matched:
+                matched.append(combined)
+        # 3-token combination for cases like "5 EBP 0701"
+        for i in range(len(tokens) - 2):
+            combined = tokens[i] + tokens[i + 1] + tokens[i + 2]
+            if combined in known_equip_ids and combined not in matched:
+                matched.append(combined)
+
+    return _dedupe_queries(matched)[:2]
+
+
+def _extract_equip_ids_from_query(
+    query: str,
+    known_equip_ids: Set[str] | None = None,
+) -> List[str]:
+    if not query:
+        return []
+
+    # Lookup-based extraction when known equip_ids are available
+    if known_equip_ids:
+        lookup_results = _extract_equip_ids_by_lookup(query, known_equip_ids)
+        if lookup_results:
+            return lookup_results
+
+    # Regex fallback: explicit cue patterns (equip_id, 장비번호, ...)
+    extracted: List[str] = []
+
+    for pattern in _EQUIP_ID_EXPLICIT_PATTERNS:
+        for match in pattern.findall(query):
+            normalized = _normalize_equip_id(match)
+            if _is_valid_equip_id(normalized):
+                extracted.append(normalized)
+
+    if extracted:
+        return _dedupe_queries(extracted)[:2]
+
+    # Fallback: standalone token query like "EPAG50" or "equip id EPAG50"
+    compact_query = query.strip()
+    standalone_match = re.match(
+        r"(?i)^\s*(?:equip(?:ment)?[\s_-]*id|eq[\s_-]*id|장비[\s_-]*(?:id|번호)|설비[\s_-]*(?:id|번호))?\s*([A-Z0-9][A-Z0-9_-]{2,})\s*$",
+        compact_query,
+    )
+    if standalone_match:
+        normalized = _normalize_equip_id(standalone_match.group(1))
+        if _is_valid_equip_id(normalized):
+            return [normalized]
+
+    # Conservative fallback: if query has exactly one strong candidate token.
+    token_candidates = [
+        _normalize_equip_id(token)
+        for token in re.findall(r"\b[A-Z0-9][A-Z0-9_-]{2,}\b", compact_query.upper())
+    ]
+    valid_candidates = [token for token in token_candidates if _is_valid_equip_id(token)]
+    deduped = _dedupe_queries(valid_candidates)
+    if len(deduped) == 1:
+        return deduped[:1]
+
+    return []
 
 
 def _compact_text(value: str) -> str:
@@ -1744,24 +1958,27 @@ def _detect_language_rule_based(text: str) -> str:
     Detects language based on character scripts:
     - Korean (Hangul): ko
     - Japanese (Hiragana/Katakana): ja
+    - Chinese (CJK ideographs without kana): zh
     - Otherwise: en
 
     Note: Domain terms (device names, technical terms) may be in English
-    even in Korean/Japanese sentences. This function prioritizes
-    Korean/Japanese characters over English.
+    even in Korean/Japanese/Chinese sentences. This function prioritizes
+    CJK scripts over English.
 
     Returns:
-        "ko", "en", or "ja"
+        "ko", "en", "ja", or "zh"
     """
     if not text:
         return "ko"  # Default to Korean
 
     # Count Korean characters (Hangul)
-    korean_chars = len(re.findall(r'[가-힣]', text))
+    korean_chars = len(re.findall(r"[가-힣]", text))
 
     # Count Japanese characters (Hiragana + Katakana)
     # Hiragana: \u3040-\u309f, Katakana: \u30a0-\u30ff
-    japanese_chars = len(re.findall(r'[\u3040-\u309f\u30a0-\u30ff]', text))
+    japanese_chars = len(re.findall(r"[\u3040-\u309f\u30a0-\u30ff]", text))
+    # Count CJK ideographs (Han characters used by Chinese/Japanese)
+    cjk_chars = len(re.findall(r"[\u3400-\u4dbf\u4e00-\u9fff]", text))
 
     # Prioritize Korean if any Korean characters exist
     if korean_chars > 0:
@@ -1771,8 +1988,227 @@ def _detect_language_rule_based(text: str) -> str:
     if japanese_chars > 0:
         return "ja"
 
+    # Chinese: CJK ideographs without Japanese kana are treated as Chinese.
+    # This handles common zh queries like "设备校准步骤".
+    if cjk_chars > 0:
+        return "zh"
+
     # Default to English
     return "en"
+
+
+# -----------------------------
+# 7) Chat history / follow-up detection
+# -----------------------------
+# Rule-based patterns for detecting follow-up queries
+_FOLLOWUP_PATTERNS_KO = re.compile(
+    r"더\s*자세히|아까|방금|위에서|그\s*문서|해당|같은\s*장비|다시|구체적으로"
+    r"|앞서|이전|그거|그것|위\s*내용|추가로|보충|마저",
+    re.IGNORECASE,
+)
+_FOLLOWUP_PATTERNS_EN = re.compile(
+    r"more\s+detail|previous|above|that\s+document|the\s+same|tell\s+me\s+more"
+    r"|elaborate|earlier|you\s+(?:just\s+)?(?:said|mentioned)|could\s+you\s+explain",
+    re.IGNORECASE,
+)
+_SHORT_PRONOUN_KO = re.compile(r"그[거것걸게]|뭐|왜|어떻게")
+_SHORT_PRONOUN_EN = re.compile(r"\b(?:it|that|this|those|these|what|why|how)\b", re.IGNORECASE)
+
+# Short imperative requests without a subject → likely follow-up
+# e.g., "교체 절차를 알려줘", "자세히 설명해줘", "다른 방법 보여줘"
+_IMPERATIVE_ENDINGS_KO = re.compile(
+    r"(?:알려|설명해|보여|가르쳐|말해|안내해|정리해|요약해)\s*(?:줘|줘요|주세요|주십시오|봐|봐요|보세요)|"
+    r"뭐야\??|뭔가요\??|인가요\??$",
+)
+
+# Minimum content-word length for overlap check
+_CONTENT_WORD_RE = re.compile(r"[가-힣]{2,}|[a-zA-Z]{3,}")
+# Korean stop words to exclude from overlap check
+_STOP_WORDS_KO = {
+    "하는", "이런", "저런", "어떤", "있는", "없는", "하고", "그리고", "또는",
+    "대해", "대한", "위한", "통해", "에서", "으로", "부터", "까지", "에게",
+}
+
+
+def _has_topic_overlap(query: str, prev_user: str, prev_assistant: str) -> bool:
+    """Check if current query shares topic words with the previous turn."""
+    current_words = set(_CONTENT_WORD_RE.findall(query.lower())) - _STOP_WORDS_KO
+    if not current_words:
+        return False
+    # Only check first 300 chars of assistant text to avoid noise
+    prev_text = f"{prev_user} {prev_assistant[:300]}".lower()
+    prev_words = set(_CONTENT_WORD_RE.findall(prev_text)) - _STOP_WORDS_KO
+    if not prev_words:
+        return False
+    overlap = current_words & prev_words
+    # If half or more of the current query's content words appear in previous turn
+    return len(overlap) / len(current_words) >= 0.5
+
+
+def _history_check_rule_based(state: AgentState) -> bool:
+    """Fallback rule-based check for follow-up detection."""
+    chat_history = state.get("chat_history") or []
+    if not chat_history:
+        return False
+
+    query = (state.get("query") or "").strip()
+    if not query:
+        return False
+
+    # Pattern matching for Korean / English follow-up cues
+    if _FOLLOWUP_PATTERNS_KO.search(query):
+        return True
+    if _FOLLOWUP_PATTERNS_EN.search(query):
+        return True
+
+    # Short query with pronoun → likely follow-up
+    if len(query) <= 15:
+        if _SHORT_PRONOUN_KO.search(query) or _SHORT_PRONOUN_EN.search(query):
+            return True
+
+    last = chat_history[-1]
+    prev_user = last.get("user_text", "")
+    prev_assistant = last.get("assistant_text", "")
+
+    # Short imperative request without explicit subject → likely follow-up
+    # e.g., "교체 절차를 알려줘" (what to replace? → depends on previous context)
+    if len(query) <= 30 and _IMPERATIVE_ENDINGS_KO.search(query):
+        if _has_topic_overlap(query, prev_user, prev_assistant):
+            return True
+
+    # Vocabulary overlap: short query reusing previous turn's topic words
+    if len(query) <= 25 and _has_topic_overlap(query, prev_user, prev_assistant):
+        return True
+
+    return False
+
+
+def _parse_needs_history_from_text(text: str) -> bool | None:
+    raw = (text or "").strip()
+    if not raw:
+        return None
+
+    # Try JSON first
+    try:
+        obj_match = re.search(r"\{.*\}", raw, flags=re.S)
+        if obj_match:
+            obj = json.loads(obj_match.group(0))
+            if isinstance(obj, dict) and isinstance(obj.get("needs_history"), bool):
+                return bool(obj["needs_history"])
+    except Exception:
+        pass
+
+    lowered = raw.lower()
+    # Common deterministic forms
+    if lowered in {"true", "yes", "need_history", "needs_history"}:
+        return True
+    if lowered in {"false", "no", "no_history", "independent"}:
+        return False
+    if re.search(r"\bneeds_history\s*[:=]\s*true\b", lowered):
+        return True
+    if re.search(r"\bneeds_history\s*[:=]\s*false\b", lowered):
+        return False
+
+    return None
+
+
+def history_check_node(state: AgentState, *, llm: BaseLLM) -> Dict[str, Any]:
+    """LLM-based check: does the current query need previous conversation context?
+
+    Falls back to rule-based logic if parsing/model call fails.
+    """
+    chat_history = state.get("chat_history") or []
+    if not chat_history:
+        return {"needs_history": False}
+
+    query = (state.get("query") or "").strip()
+    if not query:
+        return {"needs_history": False}
+
+    last = chat_history[-1]
+    prev_user = str(last.get("user_text", "") or "")
+    prev_assistant = str(last.get("assistant_text", "") or "")
+
+    system = (
+        "You classify whether the current user query requires previous conversation context.\n"
+        "Return ONE JSON line only: {\"needs_history\": true|false}.\n"
+        "Use true when the query depends on prior Q/A (pronouns, omitted subject, "
+        "references like 'that/above/previous', requests to elaborate/continue).\n"
+        "Use false when the query is self-contained.\n"
+        "If uncertain, return false."
+    )
+    user = (
+        f"[Previous User Query]\n{prev_user}\n\n"
+        f"[Previous Assistant Answer]\n{prev_assistant}\n\n"
+        f"[Current Query]\n{query}\n\n"
+        "Output JSON:"
+    )
+
+    try:
+        raw = _invoke_llm(
+            llm,
+            system,
+            user,
+            max_tokens=MAX_TOKENS_CLASSIFICATION,
+            temperature=TEMP_CLASSIFICATION,
+        )
+        parsed = _parse_needs_history_from_text(raw)
+        if parsed is not None:
+            logger.info(
+                "history_check_node: llm decision needs_history=%s query=%s",
+                parsed,
+                query[:60],
+            )
+            return {"needs_history": parsed}
+        logger.warning("history_check_node: could not parse LLM output, fallback to rules: %s", raw[:120])
+    except Exception as exc:
+        logger.warning("history_check_node: LLM check failed, fallback to rules: %s", exc)
+
+    fallback = _history_check_rule_based(state)
+    logger.info("history_check_node: fallback decision needs_history=%s query=%s", fallback, query[:60])
+    return {"needs_history": fallback}
+
+
+def query_rewrite_node(state: AgentState, *, llm: BaseLLM) -> Dict[str, Any]:
+    """Rewrite a follow-up query into a self-contained question using the previous turn.
+
+    Single LLM call with temperature 0.0 for deterministic output.
+    """
+    chat_history = state.get("chat_history") or []
+    if not chat_history:
+        return {}
+
+    last = chat_history[-1]
+    prev_user = last.get("user_text", "")
+    prev_assistant = last.get("assistant_text") or ""
+    prev_doc_ids = last.get("doc_ids") or []
+    current_query = state.get("query", "")
+
+    system = (
+        "You are a query rewriter. Given the previous Q&A context and the current follow-up question, "
+        "rewrite the current question into a single self-contained question that can be understood without "
+        "any prior context. Keep the same language as the current question. "
+        "Output ONLY the rewritten question, nothing else."
+    )
+    user = (
+        f"[Previous Q&A]\n"
+        f"Q: {prev_user}\n"
+        f"A: {prev_assistant}\n\n"
+        f"[Current follow-up question]\n"
+        f"{current_query}\n\n"
+        f"Rewritten self-contained question:"
+    )
+
+    rewritten = _invoke_llm(llm, system, user, temperature=TEMP_CLASSIFICATION)
+    rewritten = rewritten.strip().strip('"').strip("'").strip()
+    if not rewritten:
+        rewritten = current_query
+
+    logger.info("query_rewrite_node: '%s' → '%s'", current_query[:60], rewritten[:60])
+    return {
+        "query": rewritten,
+        "prev_doc_ids": prev_doc_ids,
+    }
 
 
 def auto_parse_node(
@@ -1782,6 +2218,7 @@ def auto_parse_node(
     spec: PromptSpec,
     device_names: List[str],
     doc_type_names: List[str],
+    equip_id_set: Set[str] | None = None,
 ) -> Dict[str, Any]:
     """Auto-parse device, doc_type, and language from user query using LLM.
 
@@ -1791,6 +2228,7 @@ def auto_parse_node(
         spec: Prompt specification (must have auto_parse template).
         device_names: List of available device names.
         doc_type_names: List of available doc type names.
+        equip_id_set: Optional set of known equip_ids for lookup-based extraction.
 
     Returns:
         State update with auto_parsed_device, auto_parsed_doc_type, detected_language, and auto_parse_message.
@@ -1801,12 +2239,19 @@ def auto_parse_node(
     detected_language = _detect_language_rule_based(query)
     devices = _extract_devices_from_query(device_names, query)
     doc_types = _extract_doc_types_from_query(query)
+    equip_ids = _extract_equip_ids_from_query(query, known_equip_ids=equip_id_set)
 
-    logger.info("auto_parse_node: devices=%s, doc_types=%s, language=%s (rule-based only)", devices, doc_types, detected_language)
+    logger.info(
+        "auto_parse_node: devices=%s, doc_types=%s, equip_ids=%s, language=%s (rule-based only)",
+        devices,
+        doc_types,
+        equip_ids,
+        detected_language,
+    )
 
     # Build display message based on detected language
     # Language display labels
-    lang_labels = {"ko": "kor", "en": "eng", "ja": "jap"}
+    lang_labels = {"ko": "kor", "en": "eng", "ja": "jap", "zh": "zho"}
     lang_label = lang_labels.get(detected_language, "kor")
 
     message_parts: List[str] = []
@@ -1815,6 +2260,8 @@ def auto_parse_node(
             message_parts.append(f"Device: {', '.join(devices)}")
         if doc_types:
             message_parts.append(f"Doc type: {', '.join(doc_types)}")
+        if equip_ids:
+            message_parts.append(f"Equip ID: {', '.join(equip_ids)}")
         message_parts.append(f"lang: {lang_label}")
         auto_parse_message = f"Parsed - {', '.join(message_parts)}"
     elif detected_language == "ja":
@@ -1822,13 +2269,26 @@ def auto_parse_node(
             message_parts.append(f"機器: {', '.join(devices)}")
         if doc_types:
             message_parts.append(f"文書: {', '.join(doc_types)}")
+        if equip_ids:
+            message_parts.append(f"装置ID: {', '.join(equip_ids)}")
         message_parts.append(f"lang: {lang_label}")
         auto_parse_message = f"パース結果 - {', '.join(message_parts)}"
+    elif detected_language == "zh":
+        if devices:
+            message_parts.append(f"设备: {', '.join(devices)}")
+        if doc_types:
+            message_parts.append(f"文档: {', '.join(doc_types)}")
+        if equip_ids:
+            message_parts.append(f"设备ID: {', '.join(equip_ids)}")
+        message_parts.append(f"lang: {lang_label}")
+        auto_parse_message = f"解析结果 - {', '.join(message_parts)}"
     else:  # ko (default)
         if devices:
             message_parts.append(f"장비: {', '.join(devices)}")
         if doc_types:
             message_parts.append(f"문서: {', '.join(doc_types)}")
+        if equip_ids:
+            message_parts.append(f"장비ID: {', '.join(equip_ids)}")
         message_parts.append(f"lang: {lang_label}")
         auto_parse_message = f"파싱 결과 - {', '.join(message_parts)}"
 
@@ -1836,38 +2296,38 @@ def auto_parse_node(
     # STRICT: Only one device allowed
     selected_devices = devices[:1]
     selected_doc_types = doc_types[:2]
+    selected_equip_ids = equip_ids[:1]
 
-    # 언어는 항상 반환 (다른 파싱 결과가 없어도)
-    result: Dict[str, Any] = {
+    # 언어는 항상 반환하고, 파싱 이벤트도 항상 발행한다.
+    # (장비/문서 미감지 케이스에서도 상단 배너 표시를 위해 필요)
+    return {
         "detected_language": detected_language,
+        "auto_parsed_device": devices[0] if devices else None,
+        "auto_parsed_doc_type": doc_types[0] if doc_types else None,
+        "auto_parsed_devices": devices,
+        "auto_parsed_doc_types": doc_types,
+        "auto_parsed_equip_id": equip_ids[0] if equip_ids else None,
+        "auto_parsed_equip_ids": equip_ids,
+        "auto_parse_message": auto_parse_message,
+        "selected_devices": selected_devices,
+        "selected_doc_types": selected_doc_types,
+        "selected_equip_ids": selected_equip_ids,
+        "device_selection_skipped": not bool(devices),
+        "doc_type_selection_skipped": not bool(doc_types),
+        "_events": [
+            {
+                "type": "auto_parse",
+                "device": devices[0] if devices else None,
+                "doc_type": doc_types[0] if doc_types else None,
+                "devices": devices,
+                "doc_types": doc_types,
+                "equip_id": equip_ids[0] if equip_ids else None,
+                "equip_ids": equip_ids,
+                "language": detected_language,
+                "message": auto_parse_message,
+            }
+        ],
     }
-
-    # 파싱 결과가 있으면 추가
-    if devices or doc_types:
-        result.update({
-            "auto_parsed_device": devices[0] if devices else None,
-            "auto_parsed_doc_type": doc_types[0] if doc_types else None,
-            "auto_parsed_devices": devices,
-            "auto_parsed_doc_types": doc_types,
-            "auto_parse_message": auto_parse_message,
-            "selected_devices": selected_devices,
-            "selected_doc_types": selected_doc_types,
-            "device_selection_skipped": not bool(devices),
-            "doc_type_selection_skipped": not bool(doc_types),
-            "_events": [
-                {
-                    "type": "auto_parse",
-                    "device": devices[0] if devices else None,
-                    "doc_type": doc_types[0] if doc_types else None,
-                    "devices": devices,
-                    "doc_types": doc_types,
-                    "language": detected_language,
-                    "message": auto_parse_message,
-                }
-            ] if auto_parse_message else [],
-        })
-
-    return result
 
 
 def translate_node(
@@ -1880,7 +2340,7 @@ def translate_node(
 
     - If detected_language is 'en': query_en = query, translate to Korean
     - If detected_language is 'ko': query_ko = query, translate to English
-    - Otherwise (ja, etc.): translate to both
+    - Otherwise (ja, zh, etc.): translate to both
     """
     query = state["query"]
     detected_language = state.get("detected_language", "ko")
@@ -1901,7 +2361,7 @@ def translate_node(
             "query": text,
             "target_language": target_name,
         })
-        result = _invoke_llm(llm, system, user)
+        result = _invoke_llm(llm, system, user, temperature=TEMP_TRANSLATION)
         # Clean up result (remove quotes, extra whitespace)
         result = result.strip().strip('"').strip("'").strip()
         return result if result else text
@@ -1918,7 +2378,7 @@ def translate_node(
         query_en = _translate(query, "en")
         logger.info("translate_node: ko->en: %s", query_en)
     else:
-        # Japanese or other - translate to both
+        # Japanese/Chinese/other - translate to both
         query_en = _translate(query, "en")
         query_ko = _translate(query, "ko")
         logger.info("translate_node: %s->en: %s", detected_language, query_en)
@@ -2126,4 +2586,6 @@ __all__ = [
     "human_review_node",
     "device_selection_node",
     "auto_parse_node",
+    "history_check_node",
+    "query_rewrite_node",
 ]

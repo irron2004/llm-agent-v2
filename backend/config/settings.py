@@ -502,6 +502,10 @@ class APISettings(BaseSettings):
         default=5,
         description="Number of rotated log files to keep"
     )
+    enable_legacy_compat_routes: bool = Field(
+        default=False,
+        description="Enable legacy compatibility endpoints (e.g. /api/search/chat-pipeline)",
+    )
 
 
 class SummarizationSettings(BaseSettings):

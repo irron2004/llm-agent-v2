@@ -1,12 +1,13 @@
 """Search Service API (검색 결과 + 페이지네이션)."""
 
 import inspect
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from backend.api.dependencies import get_search_service
+from backend.config.settings import api_settings
 from backend.services.search_service import SearchService
 
 router = APIRouter(prefix="/search", tags=["Search Service"])
@@ -58,6 +59,35 @@ class SearchResponse(BaseModel):
     has_next: bool
     multi_query_used: bool = Field(default=False, description="Whether multi-query expansion was used")
     reranked: bool = Field(default=False, description="Whether results were reranked")
+
+
+class LegacyChatPipelineRequest(BaseModel):
+    """Backward-compatible request for old frontend search pipeline."""
+
+    query: Optional[str] = None
+    message: Optional[str] = None
+    q: Optional[str] = None
+
+    page: int = Field(default=1, ge=1)
+    size: int = Field(default=20, ge=1, le=100)
+    top_k: Optional[int] = Field(default=None, ge=1, le=200)
+
+    multi_query: Optional[bool] = None
+    multi_query_n: Optional[int] = Field(default=None, ge=1, le=10)
+    rerank: Optional[bool] = None
+    rerank_top_k: Optional[int] = Field(default=None, ge=1, le=100)
+
+    field_weights: Optional[str] = None
+    dense_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    sparse_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    use_rrf: Optional[bool] = None
+    rrf_k: Optional[int] = Field(default=None, ge=1, le=100)
+
+    device_name: Optional[str] = None
+    device_names: Optional[List[str]] = None
+    selected_devices: Optional[List[str]] = None
+    doc_types: Optional[List[str]] = None
+    selected_doc_types: Optional[List[str]] = None
 
 
 @router.get("", response_model=SearchResponse)
@@ -175,6 +205,98 @@ async def search(
             multi_query_used=was_multi_query,
             reranked=was_reranked,
         )
+
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+@router.post("/chat-pipeline")
+async def search_chat_pipeline_legacy(
+    req: LegacyChatPipelineRequest,
+    search_service: SearchService = Depends(get_search_service),
+):
+    """Legacy compatibility endpoint for older frontend bundles.
+
+    - Old FE path: POST /api/search/chat-pipeline
+    - New FE path: GET  /api/search
+    """
+    if not api_settings.enable_legacy_compat_routes:
+        raise HTTPException(status_code=404, detail="Not Found")
+
+    query = ""
+    for candidate in (req.query, req.message, req.q):
+        if isinstance(candidate, str) and candidate.strip():
+            query = candidate.strip()
+            break
+
+    if not query:
+        raise HTTPException(status_code=400, detail="query (or message/q) is required")
+
+    try:
+        page = req.page
+        size = req.size
+        top_k = req.top_k or (page * size + size)
+        effective_rerank_top_k = req.rerank_top_k if req.rerank_top_k is not None else top_k
+
+        text_fields = None
+        if req.field_weights:
+            text_fields = [f.strip() for f in req.field_weights.split(",") if f.strip()]
+
+        doc_types = req.doc_types or req.selected_doc_types
+        device_names = req.device_names or req.selected_devices
+
+        search_kwargs: Dict[str, Any] = {
+            "top_k": top_k,
+            "multi_query": req.multi_query,
+            "multi_query_n": req.multi_query_n,
+            "rerank": req.rerank,
+            "rerank_top_k": effective_rerank_top_k,
+        }
+
+        if device_names:
+            search_kwargs["device_names"] = device_names
+        elif req.device_name:
+            search_kwargs["device_name"] = req.device_name
+
+        if doc_types:
+            search_kwargs["doc_types"] = doc_types
+
+        if text_fields is not None:
+            signature = inspect.signature(search_service.search)
+            if "text_fields" in signature.parameters:
+                search_kwargs["text_fields"] = text_fields
+
+        if req.dense_weight is not None:
+            search_kwargs["dense_weight"] = req.dense_weight
+        if req.sparse_weight is not None:
+            search_kwargs["sparse_weight"] = req.sparse_weight
+        if req.use_rrf is not None:
+            search_kwargs["use_rrf"] = req.use_rrf
+        if req.rrf_k is not None:
+            search_kwargs["rrf_k"] = req.rrf_k
+
+        results = search_service.search(query, **search_kwargs)
+
+        start_idx = (page - 1) * size
+        end_idx = start_idx + size
+        page_results = results[start_idx:end_idx]
+        items = _to_search_items(page_results, start_idx, query)
+        total = len(results)
+        has_next = end_idx < total
+
+        # Include both `items` and `results` for compatibility with old/new FE payloads.
+        return {
+            "query": query,
+            "clean_query": query,
+            "items": items,
+            "results": [item.model_dump() for item in items],
+            "total": total,
+            "page": page,
+            "size": size,
+            "has_next": has_next,
+            "multi_query_used": False,
+            "reranked": False,
+        }
 
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc

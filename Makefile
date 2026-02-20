@@ -1,4 +1,4 @@
-.PHONY: clean clean-pyc clean-test clean-build help run-api stop-api up up-vllm build-up logs logs-api logs-es logs-vllm logs-tei
+.PHONY: clean clean-pyc clean-test clean-build help run-api stop-api up prod-up dev-up up-prod up-dev up-vllm build-up logs logs-api logs-es logs-vllm logs-tei
 
 ROOT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 PYTHON ?= $(shell if [ -x "$(ROOT_DIR).venv/bin/python" ]; then echo "$(ROOT_DIR).venv/bin/python"; else echo python3; fi)
@@ -22,6 +22,10 @@ help:
 	@echo "run-api      - start FastAPI dev server (uvicorn) in background"
 	@echo "stop-api     - stop FastAPI dev server started via run-api"
 	@echo "up           - docker compose up -d (api + ES, uses external vLLM)"
+	@echo "prod-up      - docker compose --profile prod up -d"
+	@echo "dev-up       - docker compose --profile dev up -d"
+	@echo "up-prod      - alias of prod-up"
+	@echo "up-dev       - alias of dev-up"
 	@echo "up-vllm      - docker compose up -d with vLLM (--profile with-vllm)"
 	@echo "build-up     - docker compose build && up -d (rebuild and start)"
 	@echo "logs         - tail docker logs for core services"
@@ -64,6 +68,18 @@ up:
 	@echo "To run vLLM with docker compose:"
 	@echo "  $(DOCKER_COMPOSE) --profile with-vllm up -d"
 	@echo ""
+
+prod-up:
+	$(DOCKER_COMPOSE) --env-file .env --env-file .env.prod --profile prod down
+	$(DOCKER_COMPOSE) --env-file .env --env-file .env.prod --profile prod up -d --build
+
+dev-up:
+	$(DOCKER_COMPOSE) --env-file .env --env-file .env.dev --profile dev down
+	$(DOCKER_COMPOSE) --env-file .env --env-file .env.dev --profile dev up -d --build
+
+up-prod: prod-up
+
+up-dev: dev-up
 
 up-vllm:
 	$(DOCKER_COMPOSE) --profile with-vllm up -d

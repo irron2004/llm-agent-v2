@@ -215,6 +215,7 @@ class EsSearchService:
         project_id: str | None = None,
         doc_type: str | None = None,
         doc_types: list[str] | None = None,
+        equip_ids: list[str] | None = None,
         lang: str | None = None,
         text_fields: list[str] | None = None,
         dense_weight: float | None = None,
@@ -233,6 +234,7 @@ class EsSearchService:
             tenant_id: Optional tenant filter.
             project_id: Optional project filter.
             doc_type: Optional document type filter.
+            equip_ids: Optional equip_id filters (OR logic).
             lang: Optional language filter.
             text_fields: Optional list of text fields with weights (e.g. ["search_text^1.0", "chunk_summary^0.7"])
             dense_weight: Optional dense (vector) weight for hybrid search (overrides default)
@@ -282,6 +284,7 @@ class EsSearchService:
                     project_id=project_id,
                     doc_type=doc_type,
                     doc_types=doc_types,
+                    equip_ids=equip_ids,
                     lang=lang,
                     device_name=device_name,
                     device_boost_weight=device_boost_weight,

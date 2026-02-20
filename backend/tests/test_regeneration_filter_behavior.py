@@ -50,6 +50,22 @@ def test_build_state_overrides_sets_detected_language_when_overrides_exist() -> 
     assert overrides["detected_language"] == "ko"
 
 
+def test_build_state_overrides_sets_detected_language_chinese_when_overrides_exist() -> None:
+    req = AgentRequest(message="请问SUPRA N设备如何校准？", filter_devices=["SUPRA V"])
+    overrides = _build_state_overrides(req)
+
+    assert overrides["selected_devices"] == ["SUPRA V"]
+    assert overrides["detected_language"] == "zh"
+
+
+def test_build_state_overrides_sets_selected_equip_ids() -> None:
+    req = AgentRequest(message="EPAG50 문서 찾아줘", filter_equip_ids=[" epag50 ", "EPAG50", "epag51"])
+    overrides = _build_state_overrides(req)
+
+    assert overrides["selected_equip_ids"] == ["EPAG50", "EPAG51"]
+    assert overrides["detected_language"] == "ko"
+
+
 def test_retrieve_node_strict_doc_type_excludes_group_variants() -> None:
     retriever = MixedDocTypeRetriever()
     state = {

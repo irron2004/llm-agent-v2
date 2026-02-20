@@ -211,6 +211,21 @@ services:
       - ./.env                    # 프로젝트 개별(선택)
 ```
 
+### Docker profile 분리 실행 (prod/dev)
+`docker-compose.yml`은 `prod`/`dev` 프로파일을 지원합니다.
+
+```bash
+# prod 스택 (frontend:9097, api:8001)
+docker compose --env-file .env --env-file .env.prod --profile prod up -d
+
+# dev 스택 (frontend:9098, api:8011)
+docker compose --env-file .env --env-file .env.dev --profile dev up -d
+```
+
+- prod 프론트는 `api` 서비스로 프록시됩니다.
+- dev 프론트는 `api-dev` 서비스로 프록시됩니다.
+- 레거시 호환 라우트(`/api/search/chat-pipeline` 등)는 dev에서만 활성화하도록 권장합니다.
+
 ### Docker 로그 파일 저장
 - API 컨테이너는 `docker-compose.yml`에서 `API_LOG_TO_FILE=true`, `API_LOG_FILE_PATH=/data/logs/api/api.log`로 설정되어 `./data/logs/api/`에 로그를 남깁니다.
 - 전체 컨테이너 로그를 파일로 저장하려면 아래 스크립트를 사용하세요.

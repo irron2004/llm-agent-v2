@@ -139,6 +139,11 @@ def _build_state_overrides(req: "AgentRequest") -> Dict[str, Any]:
             overrides["selected_doc_types"] = expand_doc_type_selection(doc_types)
             overrides["selected_doc_types_strict"] = True
 
+    if req.filter_equip_ids is not None:
+        equip_ids = [str(e).strip().upper() for e in req.filter_equip_ids if str(e).strip()]
+        if equip_ids:
+            overrides["selected_equip_ids"] = list(dict.fromkeys(equip_ids))
+
     if req.search_queries is not None:
         queries = [str(q).strip() for q in req.search_queries if str(q).strip()]
         if queries:
@@ -208,6 +213,13 @@ def _get_auto_parse_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent
 # =============================================================================
 # Request/Response Models
 # =============================================================================
+class ChatHistoryTurn(BaseModel):
+    """이전 대화 턴 (후속 질문 지원용)."""
+    user_text: str = Field(..., description="이전 사용자 질문")
+    assistant_text: str = Field(..., description="이전 답변")
+    doc_ids: List[str] = Field(default_factory=list, description="이전 참조 문서 ID")
+
+
 class AgentRequest(BaseModel):
     message: str = Field(..., description="사용자 질문")
     top_k: int = Field(DEFAULT_FINAL_TOP_K, ge=1, le=50, description="검색 상위 문서 수")
@@ -217,9 +229,12 @@ class AgentRequest(BaseModel):
     ask_user_after_retrieve: bool = Field(False, description="검색 후 사용자 확인")
     resume_decision: Optional[Any] = Field(None, description="interrupt 재개 응답")
     auto_parse: bool = Field(True, description="자동 장비/문서종류 파싱 (기본값: True)")
+    # 대화 이력 (후속 질문 지원)
+    chat_history: Optional[List[ChatHistoryTurn]] = Field(None, description="이전 대화 이력 (최근 1턴)")
     # 재생성 시 사용할 필터 오버라이드
     filter_devices: Optional[List[str]] = Field(None, description="장비 필터 오버라이드")
     filter_doc_types: Optional[List[str]] = Field(None, description="문서종류 필터 오버라이드")
+    filter_equip_ids: Optional[List[str]] = Field(None, description="equip_id 필터 오버라이드")
     search_queries: Optional[List[str]] = Field(None, description="검색 쿼리 오버라이드 (MQ 수정)")
     selected_doc_ids: Optional[List[str]] = Field(None, description="사용할 문서 ID 선택 (재생성)")
 
@@ -251,7 +266,9 @@ class AutoParseResult(BaseModel):
     doc_type: Optional[str] = Field(None, description="파싱된 문서종류")
     devices: Optional[List[str]] = Field(None, description="파싱된 장비명 목록")
     doc_types: Optional[List[str]] = Field(None, description="파싱된 문서종류 목록")
-    language: Optional[str] = Field(None, description="감지된 언어 (ko, en, ja)")
+    equip_id: Optional[str] = Field(None, description="파싱된 equip_id")
+    equip_ids: Optional[List[str]] = Field(None, description="파싱된 equip_id 목록")
+    language: Optional[str] = Field(None, description="감지된 언어 (ko, en, ja, zh)")
     message: Optional[str] = Field(None, description="사용자에게 표시할 메시지")
 
 
@@ -272,9 +289,10 @@ class AgentResponse(BaseModel):
     # Filter info for regeneration
     selected_devices: Optional[List[str]] = Field(None, description="사용된 장비 필터")
     selected_doc_types: Optional[List[str]] = Field(None, description="사용된 문서종류 필터")
+    selected_equip_ids: Optional[List[str]] = Field(None, description="사용된 equip_id 필터")
     search_queries: Optional[List[str]] = Field(None, description="사용된 검색 쿼리 (MQ)")
     # Language detection
-    detected_language: Optional[str] = Field(None, description="감지된 언어 (ko, en, ja)")
+    detected_language: Optional[str] = Field(None, description="감지된 언어 (ko, en, ja, zh)")
 
 
 def _to_expanded_docs(answer_ref_json: List[Dict[str, Any]] | None) -> List[ExpandedDoc] | None:
@@ -389,11 +407,17 @@ async def run_agent(
     state_overrides = _build_state_overrides(req)
     has_overrides = bool(state_overrides)
 
+    # Build chat_history state (separate from overrides to avoid triggering regeneration path)
+    chat_state: Dict[str, Any] = {}
+    if req.chat_history:
+        chat_state["chat_history"] = [h.model_dump() for h in req.chat_history]
+
     try:
         # Auto-parse 모드 (기본값: True), skip when overrides are provided
         if req.auto_parse and not is_resume and not req.ask_user_after_retrieve and not has_overrides:
             agent = _get_auto_parse_agent(llm, search_service, prompt_spec)
-            result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid)
+            result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid,
+                               state_overrides=chat_state or None)
         elif has_overrides and not is_resume:
             # Regeneration with filter/query/doc overrides
             agent = LangGraphRAGAgent(
@@ -463,12 +487,23 @@ async def run_agent(
 
     # Extract auto_parse results
     auto_parse_result = None
-    if result.get("auto_parsed_device") or result.get("auto_parsed_doc_type") or result.get("auto_parsed_devices") or result.get("auto_parsed_doc_types") or result.get("auto_parse_message") or result.get("detected_language"):
+    if (
+        result.get("auto_parsed_device")
+        or result.get("auto_parsed_doc_type")
+        or result.get("auto_parsed_devices")
+        or result.get("auto_parsed_doc_types")
+        or result.get("auto_parsed_equip_id")
+        or result.get("auto_parsed_equip_ids")
+        or result.get("auto_parse_message")
+        or result.get("detected_language")
+    ):
         auto_parse_result = AutoParseResult(
             device=result.get("auto_parsed_device"),
             doc_type=result.get("auto_parsed_doc_type"),
             devices=result.get("auto_parsed_devices"),
             doc_types=result.get("auto_parsed_doc_types"),
+            equip_id=result.get("auto_parsed_equip_id"),
+            equip_ids=result.get("auto_parsed_equip_ids"),
             language=result.get("detected_language"),
             message=result.get("auto_parse_message"),
         )
@@ -499,6 +534,7 @@ async def run_agent(
             auto_parse=auto_parse_result,
             selected_devices=result.get("selected_devices"),
             selected_doc_types=result.get("selected_doc_types"),
+            selected_equip_ids=result.get("selected_equip_ids"),
             search_queries=result.get("search_queries"),
             detected_language=result.get("detected_language"),
         )
@@ -522,6 +558,7 @@ async def run_agent(
         auto_parse=auto_parse_result,
         selected_devices=result.get("selected_devices"),
         selected_doc_types=result.get("selected_doc_types"),
+        selected_equip_ids=result.get("selected_equip_ids"),
         search_queries=result.get("search_queries"),
         detected_language=result.get("detected_language"),
     )
@@ -561,13 +598,19 @@ async def run_agent_stream(
     def _close() -> None:
         loop.call_soon_threadsafe(queue.put_nowait, None)
 
+    # Build chat_history state (separate from overrides to avoid triggering regeneration path)
+    chat_state_stream: Dict[str, Any] = {}
+    if req.chat_history:
+        chat_state_stream["chat_history"] = [h.model_dump() for h in req.chat_history]
+
     def _worker() -> None:
         try:
             # Auto-parse 모드 (기본값: True), skip when overrides are provided
             if req.auto_parse and not is_resume and not req.ask_user_after_retrieve and not has_overrides:
                 agent = _get_auto_parse_agent(llm, search_service, prompt_spec)
                 agent._event_sink = _enqueue  # type: ignore[attr-defined]
-                result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid)
+                result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid,
+                                   state_overrides=chat_state_stream or None)
             elif has_overrides and not is_resume:
                 # Regeneration with filter/query/doc overrides
                 agent = LangGraphRAGAgent(
@@ -635,12 +678,23 @@ async def run_agent_stream(
 
             # Extract auto_parse results
             auto_parse_result = None
-            if result.get("auto_parsed_device") or result.get("auto_parsed_doc_type") or result.get("auto_parsed_devices") or result.get("auto_parsed_doc_types") or result.get("auto_parse_message") or result.get("detected_language"):
+            if (
+                result.get("auto_parsed_device")
+                or result.get("auto_parsed_doc_type")
+                or result.get("auto_parsed_devices")
+                or result.get("auto_parsed_doc_types")
+                or result.get("auto_parsed_equip_id")
+                or result.get("auto_parsed_equip_ids")
+                or result.get("auto_parse_message")
+                or result.get("detected_language")
+            ):
                 auto_parse_result = AutoParseResult(
                     device=result.get("auto_parsed_device"),
                     doc_type=result.get("auto_parsed_doc_type"),
                     devices=result.get("auto_parsed_devices"),
                     doc_types=result.get("auto_parsed_doc_types"),
+                    equip_id=result.get("auto_parsed_equip_id"),
+                    equip_ids=result.get("auto_parsed_equip_ids"),
                     language=result.get("detected_language"),
                     message=result.get("auto_parse_message"),
                 )
@@ -675,6 +729,7 @@ async def run_agent_stream(
                     auto_parse=auto_parse_result,
                     selected_devices=result.get("selected_devices"),
                     selected_doc_types=result.get("selected_doc_types"),
+                    selected_equip_ids=result.get("selected_equip_ids"),
                     search_queries=result.get("search_queries"),
                     detected_language=result.get("detected_language"),
                 )
@@ -698,6 +753,7 @@ async def run_agent_stream(
                     auto_parse=auto_parse_result,
                     selected_devices=result.get("selected_devices"),
                     selected_doc_types=result.get("selected_doc_types"),
+                    selected_equip_ids=result.get("selected_equip_ids"),
                     search_queries=result.get("search_queries"),
                     detected_language=result.get("detected_language"),
                 )

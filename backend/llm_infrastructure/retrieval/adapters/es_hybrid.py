@@ -119,6 +119,7 @@ class EsHybridRetriever(BaseRetriever):
         project_id: str | None = None,
         doc_type: str | None = None,
         doc_types: list[str] | None = None,
+        equip_ids: list[str] | None = None,
         lang: str | None = None,
         device_name: str | None = None,
         device_names: list[str] | None = None,
@@ -133,6 +134,7 @@ class EsHybridRetriever(BaseRetriever):
             tenant_id: Optional tenant filter.
             project_id: Optional project filter.
             doc_type: Optional document type filter.
+            equip_ids: Optional list of equip_id to filter (OR logic).
             lang: Optional language filter.
             device_name: Optional single device_name to boost (legacy, for backward compat).
             device_names: Optional list of device names to filter (OR logic).
@@ -163,6 +165,7 @@ class EsHybridRetriever(BaseRetriever):
             project_id=project_id,
             doc_type=doc_type,
             doc_types=doc_types,
+            equip_ids=equip_ids,
             lang=lang,
             device_names=device_names,
         )
@@ -243,6 +246,7 @@ class EsDenseRetriever(BaseRetriever):
         project_id: str | None = None,
         doc_type: str | None = None,
         doc_types: list[str] | None = None,
+        equip_ids: list[str] | None = None,
         lang: str | None = None,
         **kwargs: Any,
     ) -> list[RetrievalResult]:
@@ -268,6 +272,7 @@ class EsDenseRetriever(BaseRetriever):
             project_id=project_id,
             doc_type=doc_type,
             doc_types=doc_types,
+            equip_ids=equip_ids,
             lang=lang,
         )
 

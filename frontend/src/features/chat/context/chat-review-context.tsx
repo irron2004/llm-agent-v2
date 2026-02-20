@@ -16,6 +16,7 @@ export interface PendingRegeneration {
   searchQueries: string[];
   selectedDevices: string[];
   selectedDocTypes: string[];
+  reason?: "manual" | "missing_device_parse";
 }
 
 interface ChatReviewContextValue {

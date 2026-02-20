@@ -11,7 +11,7 @@ import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 from backend.domain.doc_type_mapping import group_doc_type_buckets, group_doc_type_items
 
@@ -69,24 +69,32 @@ def _load_catalog_from_file(path: Path) -> Optional[Dict[str, Any]]:
         devices = data.get("devices") or []
         doc_types = data.get("doc_types") or []
         vis = data.get("vis") or data.get("visible_devices") or []
+        equip_ids = data.get("equip_ids") or []
         if not isinstance(devices, list) or not isinstance(doc_types, list) or not isinstance(vis, list):
             return None
-        return {"devices": devices, "doc_types": doc_types, "vis": vis}
+        return {"devices": devices, "doc_types": doc_types, "vis": vis, "equip_ids": equip_ids}
     except Exception:
         logger.exception("Failed to load device catalog file: %s", path)
         return None
 
 
-def _save_catalog_to_file(path: Path, devices: List[Dict[str, Any]], doc_types: List[Dict[str, Any]]) -> None:
+def _save_catalog_to_file(
+    path: Path,
+    devices: List[Dict[str, Any]],
+    doc_types: List[Dict[str, Any]],
+    equip_ids: List[str] | None = None,
+) -> None:
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         visible_devices = _compute_visible_devices(devices)
-        payload = {
+        payload: Dict[str, Any] = {
             "devices": devices,
             "doc_types": doc_types,
             "vis": visible_devices,
             "updated_at": datetime.now(timezone.utc).isoformat(),
         }
+        if equip_ids is not None:
+            payload["equip_ids"] = sorted(equip_ids)
         path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception:
         logger.exception("Failed to save device catalog file: %s", path)
@@ -103,6 +111,7 @@ class DeviceCache:
             cls._instance._devices: List[Dict[str, Any]] = []
             cls._instance._doc_types: List[Dict[str, Any]] = []
             cls._instance._visible_devices: List[str] = []
+            cls._instance._equip_ids: Set[str] = set()
             cls._instance._initialized = False
         return cls._instance
 
@@ -132,6 +141,11 @@ class DeviceCache:
         return [d.get("name", "") for d in self._doc_types if d.get("name")]
 
     @property
+    def equip_id_set(self) -> Set[str]:
+        """Get cached set of equip_ids (normalized/uppercase)."""
+        return self._equip_ids
+
+    @property
     def is_initialized(self) -> bool:
         """Check if cache has been initialized."""
         return self._initialized
@@ -151,12 +165,15 @@ class DeviceCache:
             self._devices = local_catalog.get("devices", [])
             self._doc_types = group_doc_type_items(local_catalog.get("doc_types", []))
             self._visible_devices = local_catalog.get("vis", []) or _compute_visible_devices(self._devices)
+            raw_equip_ids = local_catalog.get("equip_ids", [])
+            self._equip_ids = {str(eid).strip().upper() for eid in raw_equip_ids if str(eid).strip()}
             self._initialized = True
             logger.info(
-                "Device catalog loaded from file: %s (devices=%d, doc_types=%d)",
+                "Device catalog loaded from file: %s (devices=%d, doc_types=%d, equip_ids=%d)",
                 _CATALOG_PATH,
                 len(self._devices),
                 len(self._doc_types),
+                len(self._equip_ids),
             )
             return True
 
@@ -192,6 +209,12 @@ class DeviceCache:
                             "unique_docs": _unique_doc_count_agg("doc_id")
                         }
                     },
+                    "equip_ids": {
+                        "terms": {
+                            "field": "equip_id",
+                            "size": 5000,
+                        }
+                    },
                 }
             }
 
@@ -199,6 +222,7 @@ class DeviceCache:
 
             device_buckets = result.get("aggregations", {}).get("devices", {}).get("buckets", [])
             doc_type_buckets = result.get("aggregations", {}).get("doc_types", {}).get("buckets", [])
+            equip_id_buckets = result.get("aggregations", {}).get("equip_ids", {}).get("buckets", [])
 
             self._devices = [
                 {
@@ -211,12 +235,18 @@ class DeviceCache:
 
             self._doc_types = group_doc_type_buckets(doc_type_buckets, use_unique_docs=True)
 
+            self._equip_ids = {
+                str(bucket["key"]).strip().upper()
+                for bucket in equip_id_buckets
+                if str(bucket.get("key", "")).strip()
+            }
+
             self._visible_devices = _compute_visible_devices(self._devices)
             self._initialized = True
-            _save_catalog_to_file(_CATALOG_PATH, self._devices, self._doc_types)
+            _save_catalog_to_file(_CATALOG_PATH, self._devices, self._doc_types, list(self._equip_ids))
             logger.info(
                 f"Device cache initialized: {len(self._devices)} devices, "
-                f"{len(self._doc_types)} doc types"
+                f"{len(self._doc_types)} doc types, {len(self._equip_ids)} equip_ids"
             )
             return True
 

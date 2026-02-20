@@ -28,7 +28,8 @@ ES 인덱스 `rag_chunks_dev_v2`의 GCB 문서에 `Equip_ID` 필드를 추가하
 
 - 파일명: `GCB_{GCB_number}.txt`
 - 1번째 줄: 헤더 (GCB 번호, Status, Model)
-- `**Title**:` 행에서 Title 추출 가능
+- `**Title**:` 행에서 Title 
+- 추출 가능
 
 ### 2.2 JSON 구조
 

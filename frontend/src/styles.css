@@ -250,6 +250,26 @@ a:hover {
   min-height: 0;
 }
 
+.chat-top-parse-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background-color: var(--color-bg-elevated);
+}
+
+.chat-top-parse-text {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-primary);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .chat-messages {
   flex: 1;
   overflow-y: auto;
@@ -304,6 +324,17 @@ a:hover {
 .message-avatar.user {
   background-color: var(--color-text-secondary);
   color: white;
+}
+
+.message-parse-label {
+  margin-bottom: 6px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: var(--color-accent-primary);
+  background: var(--color-bg-secondary);
+  border-radius: var(--radius-sm);
+  line-height: 1.4;
+  display: inline-block;
 }
 
 .message-body {
@@ -593,6 +624,70 @@ a:hover {
 .action-button.regenerate-button:hover {
   background-color: var(--color-accent-hover);
   filter: brightness(1.1);
+}
+
+/* Message edit area */
+.message-edit-area {
+  width: 100%;
+}
+
+.message-edit-input {
+  width: 100%;
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.message-edit-input:focus {
+  border-color: var(--color-accent-primary);
+}
+
+.message-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-xs);
+  margin-top: var(--spacing-xs);
+}
+
+.message-edit-cancel,
+.message-edit-submit {
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.message-edit-cancel {
+  background: var(--color-action-bg);
+  color: var(--color-text-secondary);
+}
+
+.message-edit-cancel:hover {
+  background: var(--color-action-bg-hover);
+}
+
+.message-edit-submit {
+  background: var(--color-accent-primary);
+  color: white;
+}
+
+.message-edit-submit:hover {
+  background: var(--color-accent-hover);
+  filter: brightness(1.1);
+}
+
+.message-edit-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Filter info display */

@@ -25,10 +25,12 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     auto_parse_node,
     device_selection_node,
     expand_related_docs_node,
+    history_check_node,
     human_review_node,
     judge_node,
     load_prompt_spec,
     mq_node,
+    query_rewrite_node,
     refine_queries_node,
     retrieve_node,
     retry_bump_node,
@@ -94,14 +96,17 @@ class LangGraphRAGAgent:
         # Use full device_names list for better LLM parsing accuracy
         self._device_names: list[str] = []
         self._doc_type_names: list[str] = []
+        self._equip_id_set: set[str] = set()
         if auto_parse_enabled:
             cache = ensure_device_cache_initialized(search_service)
             self._device_names = cache.device_names  # 전체 장비 목록 사용 (LLM 파싱용)
             self._doc_type_names = cache.doc_type_names
+            self._equip_id_set = cache.equip_id_set
             logger.info(
-                "Auto-parse enabled with %d devices, %d doc types",
+                "Auto-parse enabled with %d devices, %d doc types, %d equip_ids",
                 len(self._device_names),
                 len(self._doc_type_names),
+                len(self._equip_id_set),
             )
 
         self._graph = self._build_graph(mode)
@@ -209,11 +214,14 @@ class LangGraphRAGAgent:
             if result:
                 device = result.get("auto_parsed_device")
                 doc_type = result.get("auto_parsed_doc_type")
+                equip_id = result.get("auto_parsed_equip_id")
                 if device:
                     details_parts.append(f"장비: {device}")
                 if doc_type:
                     details_parts.append(f"문서: {doc_type}")
-                if not device and not doc_type:
+                if equip_id:
+                    details_parts.append(f"장비ID: {equip_id}")
+                if not device and not doc_type and not equip_id:
                     details_parts.append("파싱 결과 없음")
 
         elif name == "translate":
@@ -286,6 +294,18 @@ class LangGraphRAGAgent:
             if attempts:
                 details_parts.append(f"attempt {attempts}")
 
+        elif name == "history_check":
+            if result:
+                needs = result.get("needs_history", False)
+                details_parts.append("후속 질문" if needs else "독립 질문")
+
+        elif name == "query_rewrite":
+            if result:
+                rewritten = result.get("query", "")
+                if rewritten:
+                    preview = rewritten[:60] + "..." if len(rewritten) > 60 else rewritten
+                    details_parts.append(f"→ {preview}")
+
         return " | ".join(details_parts) if details_parts else ""
 
     def _build_graph(self, mode: str):
@@ -344,6 +364,7 @@ class LangGraphRAGAgent:
                         spec=self.spec,
                         device_names=self._device_names,
                         doc_type_names=self._doc_type_names,
+                        equip_id_set=self._equip_id_set,
                     ),
                 ),
             )
@@ -359,9 +380,30 @@ class LangGraphRAGAgent:
                     ),
                 ),
             )
-            # Flow: START → auto_parse → translate → route → mq
+            # Chat history nodes: history_check → (conditional) → query_rewrite
+            builder.add_node(
+                "history_check",
+                self._wrap_node(
+                    "history_check",
+                    functools.partial(history_check_node, llm=self.llm),
+                ),
+            )
+            builder.add_node(
+                "query_rewrite",
+                self._wrap_node(
+                    "query_rewrite",
+                    functools.partial(query_rewrite_node, llm=self.llm),
+                ),
+            )
+            # Flow: START → auto_parse → history_check → [query_rewrite] → translate → route → mq
             builder.add_edge(START, "auto_parse")
-            builder.add_edge("auto_parse", "translate")
+            builder.add_edge("auto_parse", "history_check")
+            builder.add_conditional_edges(
+                "history_check",
+                lambda s: "query_rewrite" if s.get("needs_history") else "translate",
+                {"query_rewrite": "query_rewrite", "translate": "translate"},
+            )
+            builder.add_edge("query_rewrite", "translate")
             builder.add_edge("translate", "route")
             builder.add_edge("route", "mq")
         # Device selection node (optional HIL) - legacy mode

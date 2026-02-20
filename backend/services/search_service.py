@@ -238,6 +238,7 @@ class SearchService:
         rerank_top_k: Optional[int] = None,
         device_name: Optional[str] = None,
         device_names: Optional[list[str]] = None,
+        equip_ids: Optional[list[str]] = None,
         doc_types: Optional[list[str]] = None,
     ) -> list[RetrievalResult]:
         """Search for relevant documents with optional multi-query expansion and reranking.
@@ -253,6 +254,7 @@ class SearchService:
             rerank_top_k: Number of results after reranking (None = use service setting)
             device_name: Optional single device_name to boost (legacy)
             device_names: Optional list of device names to filter (OR logic)
+            equip_ids: Optional list of equip_id to filter (OR logic)
 
         Returns:
             List of retrieval results
@@ -274,6 +276,8 @@ class SearchService:
             retriever_kwargs["device_names"] = device_names
         elif device_name:
             retriever_kwargs["device_name"] = device_name
+        if equip_ids:
+            retriever_kwargs["equip_ids"] = equip_ids
         if doc_types:
             retriever_kwargs["doc_types"] = doc_types
 
@@ -319,6 +323,16 @@ class SearchService:
                 return bool(doc_type) and doc_type in normalized
 
             results = [doc for doc in results if _matches_doc_type(doc)]
+
+        if equip_ids:
+            normalized_eids = {str(eid).strip().upper() for eid in equip_ids if str(eid).strip()}
+
+            def _matches_equip_id(doc: RetrievalResult) -> bool:
+                meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+                equip_id = str(meta.get("equip_id", "")).strip().upper()
+                return bool(equip_id) and equip_id in normalized_eids
+
+            results = [doc for doc in results if _matches_equip_id(doc)]
 
         # Limit to final top_k
         return results[:final_top_k]

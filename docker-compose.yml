@@ -23,6 +23,7 @@ services:
       - SEARCH_ES_HOST=http://elasticsearch:9200
       - API_LOG_TO_FILE=true
       - API_LOG_FILE_PATH=/data/logs/api/api.log
+      - API_ENABLE_LEGACY_COMPAT_ROUTES=${API_ENABLE_LEGACY_COMPAT_ROUTES:-false}
 
     volumes:
       # Code hot-reload (development): mount backend source into /app/backend
@@ -48,6 +49,42 @@ services:
     networks:
       - rag_net
     restart: unless-stopped
+    profiles:
+      - prod
+
+  api-dev:
+    container_name: rag-api-dev
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      - HF_HOME=/data/hf_cache
+      - TRANSFORMERS_CACHE=/data/hf_cache
+      - SEARCH_ES_HOST=http://elasticsearch:9200
+      - API_LOG_TO_FILE=true
+      - API_LOG_FILE_PATH=/data/logs/api/api.log
+      - API_ENABLE_LEGACY_COMPAT_ROUTES=${API_ENABLE_LEGACY_COMPAT_ROUTES_DEV:-true}
+
+    volumes:
+      - ./backend:/app/backend
+      - ./scripts:/app/scripts
+      - ./data/ingestions:/data/ingestions
+      - ./data/vector_store:/data/vector_store
+      - /home/llm-share/hf:/data/hf_cache
+      - /home/llm-share/datasets/pe_agent_data:/data/pe_agent_data
+      - ./data/logs/api-dev:/data/logs/api
+    ports:
+      - "${API_DEV_PORT:-8011}:8000"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - rag_net
+    restart: unless-stopped
+    profiles:
+      - dev
 
   # ---------------------------------------------------------------------------
   # Elasticsearch (Vector + BM25 search)
@@ -242,6 +279,10 @@ services:
         VITE_DEFAULT_INGESTION_RUN: ${VITE_DEFAULT_INGESTION_RUN:-}
     env_file:
       - .env
+    environment:
+      # prod 기본값: 같은 compose 네트워크의 api 서비스로 라우팅
+      # dev 분리 시 예: NGINX_API_PROXY_PASS=http://rag-api-dev:8000/api/
+      NGINX_API_PROXY_PASS: ${NGINX_API_PROXY_PASS:-http://api:8000/api/}
     volumes:
       # Ingestion data (shared with backend)
       - ./data/ingestions:/data/ingestions
@@ -253,6 +294,35 @@ services:
     networks:
       - rag_net
     restart: unless-stopped
+    profiles:
+      - prod
+
+  frontend-dev:
+    container_name: rag-frontend-dev
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE: ""
+        VITE_CHAT_PATH: ${VITE_CHAT_PATH:-/api/agent/run}
+        VITE_INGESTIONS_BASE: ${VITE_INGESTIONS_BASE:-/data/ingestions}
+        VITE_DEFAULT_INGESTION_RUN: ${VITE_DEFAULT_INGESTION_RUN:-}
+    env_file:
+      - .env
+    environment:
+      NGINX_API_PROXY_PASS: ${NGINX_API_PROXY_PASS_DEV:-http://api-dev:8000/api/}
+    volumes:
+      - ./data/ingestions:/data/ingestions
+    ports:
+      - "${FRONTEND_DEV_PORT:-9098}:9097"
+    depends_on:
+      api-dev:
+        condition: service_started
+    networks:
+      - rag_net
+    restart: unless-stopped
+    profiles:
+      - dev
 
 # =============================================================================
 # Networks & Volumes

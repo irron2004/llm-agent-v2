@@ -14,6 +14,18 @@ import type { DeviceInfo, DocTypeInfo, RetrievedDoc } from "../../features/chat/
 import { ImagePreviewModal, ImagePreviewItem } from "../image-preview-modal";
 import "./layout.css";
 
+function sanitizeRegenerationQuery(query: string): string {
+  let normalized = query.trim();
+  if (!normalized) return "";
+
+  normalized = normalized.replace(/^(?:\[\s*regenerate with[^\]]*\]\s*)+/gi, "").trim();
+  normalized = normalized.replace(/^(?:regenerate with\b[^:\n]*[:\-]?\s*)+/gi, "").trim();
+  normalized = normalized.replace(/^(?:재검색\s*(?:조건|필터)?\s*[:\-]?\s*)+/g, "").trim();
+
+  if (/^[.\s…·•\-_~=]+$/.test(normalized)) return "";
+  return normalized;
+}
+
 export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -79,8 +91,10 @@ export default function Layout() {
     }
     if (pendingRegeneration) {
       return {
-        title: "답변 재생성",
-        subtitle: "필터/문서 선택 후 재검색",
+        title: pendingRegeneration.reason === "missing_device_parse" ? "장비 추가 검색" : "답변 재생성",
+        subtitle: pendingRegeneration.reason === "missing_device_parse"
+          ? "장비를 추가로 선택해 재검색할 수 있습니다."
+          : "필터/문서 선택 후 재검색",
       };
     }
     if (pendingReview) {
@@ -242,18 +256,6 @@ function ReviewPanelContent({
   // 이미지 미리보기 모달 상태
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
-
-  const sanitizeRegenerationQuery = useCallback((query: string): string => {
-    let normalized = query.trim();
-    if (!normalized) return "";
-
-    normalized = normalized.replace(/^(?:\[\s*regenerate with[^\]]*\]\s*)+/gi, "").trim();
-    normalized = normalized.replace(/^(?:regenerate with\b[^:\n]*[:\-]?\s*)+/gi, "").trim();
-    normalized = normalized.replace(/^(?:재검색\s*(?:조건|필터)?\s*[:\-]?\s*)+/g, "").trim();
-
-    if (/^[.\s…·•\-_~=]+$/.test(normalized)) return "";
-    return normalized;
-  }, []);
 
   // 이미지 URL이 유효한지 확인하는 헬퍼 함수
   const hasValidImageUrl = (url: string | null | undefined): url is string => {
@@ -561,6 +563,7 @@ function RegeneratePanelContent({
     searchQueries: string[];
     selectedDevices: string[];
     selectedDocTypes: string[];
+    reason?: "manual" | "missing_device_parse";
   };
   submitRegeneration: (payload: {
     originalQuery: string;
@@ -804,6 +807,22 @@ function RegeneratePanelContent({
 
   return (
     <div className="review-panel-sidebar">
+      {pendingRegeneration.reason === "missing_device_parse" && (
+        <div
+          style={{
+            fontSize: 13,
+            lineHeight: 1.5,
+            color: "var(--color-text-secondary)",
+            padding: "10px 12px",
+            borderRadius: 8,
+            border: "1px solid var(--color-border)",
+            background: "var(--color-bg-secondary)",
+          }}
+        >
+          장비를 자동 파싱하지 못했습니다. 장비/문서를 선택해 추가 검색하시겠습니까?
+        </div>
+      )}
+
       <div className="review-queries">
         <div className="review-queries-header">
           <span className="review-queries-label">최종 검색어 (MQ)</span>

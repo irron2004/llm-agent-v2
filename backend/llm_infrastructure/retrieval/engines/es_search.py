@@ -337,6 +337,7 @@ class EsSearchEngine:
             "lang",
             "tags",
             "device_name",
+            "equip_id",
             "title",
         ]
 
@@ -422,6 +423,7 @@ class EsSearchEngine:
         project_id: str | None = None,
         doc_type: str | None = None,
         doc_types: list[str] | None = None,
+        equip_ids: list[str] | None = None,
         lang: str | None = None,
         device_names: list[str] | None = None,
     ) -> dict[str, Any] | None:
@@ -431,6 +433,7 @@ class EsSearchEngine:
             tenant_id: Filter by tenant.
             project_id: Filter by project.
             doc_type: Filter by document type.
+            equip_ids: Filter by equip_id values (OR logic).
             lang: Filter by language.
             device_names: Filter by device names (OR logic - match any).
 
@@ -484,6 +487,10 @@ class EsSearchEngine:
             terms.append(_term_or_keyword("lang", lang))
         if device_names:
             terms.append(_terms_or_keyword("device_name", device_names))
+        if equip_ids:
+            normalized_eids = [str(eid).strip().upper() for eid in equip_ids if str(eid).strip()]
+            if normalized_eids:
+                terms.append(_terms_or_keyword("equip_id", normalized_eids))
 
         if not terms:
             return None
