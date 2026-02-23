@@ -108,8 +108,8 @@
 /* Right sidebar expand button (when collapsed) */
 .right-sidebar-toggle {
   position: fixed;
-  right: var(--spacing-lg);
-  top: var(--spacing-lg);
+  right: calc(var(--spacing-md) + 40px);
+  top: var(--spacing-md);
   width: 28px;
   height: 28px;
   padding: 0;

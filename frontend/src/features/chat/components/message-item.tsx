@@ -109,6 +109,15 @@ function extractSearchQueriesFromRawAnswer(rawAnswer?: string): string[] {
   }
 }
 
+type ParsedRawAnswer = {
+  query?: unknown;
+  suggest_additional_device_search?: unknown;
+  auto_parse?: {
+    device?: unknown;
+    devices?: unknown;
+  } | null;
+};
+
 // 개별 참고 문서 아이템 - 이미지 로드 상태를 자체 관리
 type ReferenceItemProps = {
   doc: RetrievedDoc;
@@ -260,7 +269,29 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
   const isAssistant = message.role === "assistant";
   const hasFeedback = Boolean(message.feedback?.accuracy || message.feedback?.rating);
   const canFeedback = Boolean(message.sessionId && message.turnId);
-  const regenerateQuery = (originalQuery || message.originalQuery || "").trim();
+  const parsedRawAnswer = useMemo<ParsedRawAnswer | null>(() => {
+    if (!message.rawAnswer) return null;
+    try {
+      const parsed = JSON.parse(message.rawAnswer);
+      return typeof parsed === "object" && parsed !== null ? (parsed as ParsedRawAnswer) : null;
+    } catch {
+      return null;
+    }
+  }, [message.rawAnswer]);
+
+  const queryFromRawAnswer = useMemo(() => {
+    const q = parsedRawAnswer?.query;
+    return typeof q === "string" ? q.trim() : "";
+  }, [parsedRawAnswer]);
+
+  const shouldSuggestDeviceSearch = useMemo(() => {
+    if (typeof message.suggestAdditionalDeviceSearch === "boolean") {
+      return message.suggestAdditionalDeviceSearch;
+    }
+    return parsedRawAnswer?.suggest_additional_device_search === true;
+  }, [message.suggestAdditionalDeviceSearch, parsedRawAnswer]);
+
+  const regenerateQuery = (originalQuery || message.originalQuery || queryFromRawAnswer || "").trim();
   const effectiveSearchQueries = useMemo(() => {
     const direct = Array.isArray(message.searchQueries)
       ? message.searchQueries.map((q) => (typeof q === "string" ? q.trim() : "")).filter((q) => q.length > 0)
@@ -282,7 +313,8 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
     message.selectedDevices?.length ||
     message.selectedDocTypes?.length ||
     effectiveSearchQueries.length ||
-    message.autoParse
+    message.autoParse ||
+    shouldSuggestDeviceSearch
   );
 
   const handleRegenerate = () => {
@@ -680,7 +712,7 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
                   },
                 ]}
               />
-              {onRegenerate && regenerateQuery && (
+              {onRegenerate && regenerateQuery && !shouldSuggestDeviceSearch && (
                 <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
                   <button
                     className="action-button regenerate-button"
@@ -695,7 +727,6 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
               )}
             </div>
           )}
-
 
           {/* Execution logs moved to right sidebar */}
 

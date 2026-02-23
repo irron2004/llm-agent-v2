@@ -77,6 +77,13 @@ type PendingInterrupt = {
 const APPROVE_TOKENS = ["true", "yes", "y", "ok", "okay", "승인", "확인", "approve"];
 const REJECT_TOKENS = ["false", "no", "n", "거절", "reject", "decline"];
 
+const isEffectiveParsedDevice = (value: string): boolean => {
+  const normalized = value.replace(/[\s\-_.\/]+/g, "").trim().toUpperCase();
+  if (!normalized) return false;
+  if (/^[A-Z]+$/.test(normalized) && normalized.length <= 4) return false;
+  return true;
+};
+
 const resolveDecision = (text: string): boolean | string => {
   const trimmed = text.trim();
   const lowered = trimmed.toLowerCase();
@@ -179,6 +186,14 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   const currentUserTextRef = useRef<string>("");
   const sessionTitleRef = useRef<string | null>(null);
   const turnCountRef = useRef(0);
+  const streamedAutoParseRef = useRef<Record<string, {
+    device?: string | null;
+    devices?: string[] | null;
+    doc_type?: string | null;
+    doc_types?: string[] | null;
+    language?: string | null;
+    message?: string | null;
+  }>>({});
   const onSessionChangeRef = useRef(onSessionChange);
   const onTurnSavedRef = useRef(onTurnSaved);
   onSessionChangeRef.current = onSessionChange;
@@ -326,43 +341,55 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         searchQueries: effectiveSearchQueries.length > 0 ? effectiveSearchQueries : null,
       }));
 
-      // If auto-parse could not detect device/equip_id, proactively open
+      // If auto-parse could not detect a device, proactively open
       // the regeneration panel so user can run an additional device-filtered search.
-      const autoParseInfo = res.auto_parse as (Record<string, unknown> & {
+      const streamedAutoParse = streamedAutoParseRef.current[assistantId];
+      const autoParseInfo = (res.auto_parse ?? streamedAutoParse) as (Record<string, unknown> & {
         device?: string | null;
         devices?: string[] | null;
         equip_id?: string | null;
         equip_ids?: string[] | null;
       }) | null | undefined;
-      const hasAutoParseResult = Boolean(autoParseInfo);
+      const responseDetectedLanguage = typeof res.detected_language === "string";
+      const hasAutoParseResult = Boolean(autoParseInfo) || responseDetectedLanguage;
       const parsedDevices = Array.isArray(autoParseInfo?.devices)
         ? autoParseInfo.devices.map((d) => String(d).trim()).filter((d) => d.length > 0)
         : [];
       const parsedDevice = typeof autoParseInfo?.device === "string" ? autoParseInfo.device.trim() : "";
-      const parsedEquipIds = Array.isArray(autoParseInfo?.equip_ids)
-        ? autoParseInfo.equip_ids.map((eid) => String(eid).trim()).filter((eid) => eid.length > 0)
-        : [];
-      const parsedEquipId = typeof autoParseInfo?.equip_id === "string" ? autoParseInfo.equip_id.trim() : "";
-
-      const selectedDevicesFromResponse = Array.isArray(res.selected_devices)
-        ? res.selected_devices.filter((d): d is string => typeof d === "string" && d.trim().length > 0)
-        : [];
-      const selectedEquipIdsFromResponse = Array.isArray(res.selected_equip_ids)
-        ? res.selected_equip_ids
-            .filter((eid: unknown): eid is string => typeof eid === "string" && eid.trim().length > 0)
-        : [];
+      const effectiveParsedDevices = parsedDevices.filter((d) => isEffectiveParsedDevice(d));
+      const hasEffectiveParsedDevice = parsedDevice.length > 0 && isEffectiveParsedDevice(parsedDevice);
       const hasParsedDeviceSignal =
-        parsedDevices.length > 0 ||
-        parsedDevice.length > 0 ||
-        parsedEquipIds.length > 0 ||
-        parsedEquipId.length > 0 ||
-        selectedDevicesFromResponse.length > 0 ||
-        selectedEquipIdsFromResponse.length > 0;
+        effectiveParsedDevices.length > 0 ||
+        hasEffectiveParsedDevice;
       const docsForRegeneration = (res.all_retrieved_docs && res.all_retrieved_docs.length > 0)
         ? res.all_retrieved_docs
         : (res.retrieved_docs || []);
 
-      if (hasAutoParseResult && !hasParsedDeviceSignal && docsForRegeneration.length > 0) {
+      const fallbackSuggest = hasAutoParseResult && !hasParsedDeviceSignal;
+      const shouldSuggestAdditionalDeviceSearch = typeof res.suggest_additional_device_search === "boolean"
+        ? (res.suggest_additional_device_search || fallbackSuggest)
+        : fallbackSuggest;
+
+      console.log("[useChatSession] device suggestion debug:", {
+        autoParseInfo,
+        responseDetectedLanguage,
+        hasAutoParseResult,
+        parsedDevices,
+        parsedDevice,
+        effectiveParsedDevices,
+        hasParsedDeviceSignal,
+        fallbackSuggest,
+        backendFlag: res.suggest_additional_device_search,
+        shouldSuggestAdditionalDeviceSearch,
+        docsCount: docsForRegeneration.length,
+      });
+
+      updateMessage(assistantId, (m) => ({
+        ...m,
+        suggestAdditionalDeviceSearch: shouldSuggestAdditionalDeviceSearch,
+      }));
+
+      if (shouldSuggestAdditionalDeviceSearch) {
         setPendingRegeneration({
           messageId: assistantId,
           originalQuery: res.query || fallbackQuestion,
@@ -597,6 +624,14 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
                   selectedDevices: parsedDevices.length > 0 ? parsedDevices : m.selectedDevices ?? null,
                   selectedDocTypes: parsedDocTypes.length > 0 ? parsedDocTypes : m.selectedDocTypes ?? null,
                 }));
+                streamedAutoParseRef.current[assistantId] = {
+                  device: parsedDevice,
+                  devices: parsedDevices,
+                  doc_type: parsedDocType,
+                  doc_types: parsedDocTypes,
+                  language: parseLanguage,
+                  message: messageText,
+                };
                 return;
               }
 
@@ -740,6 +775,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     setMessages([]);
     setError(null);
     setPendingInterrupt(null);
+    streamedAutoParseRef.current = {};
     clearLogs();
     setCompletedRetrievedDocs(null);
     // Generate new session ID for next chat

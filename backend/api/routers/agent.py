@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -20,7 +21,7 @@ from backend.api.dependencies import (
     get_search_service,
 )
 from backend.domain.doc_type_mapping import expand_doc_type_selection, group_doc_type_buckets
-from backend.llm_infrastructure.llm.langgraph_agent import _detect_language_rule_based
+from backend.llm_infrastructure.llm.langgraph_agent import ParsedQuery, _detect_language_rule_based
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
 from backend.services.agents.langgraph_rag_agent import LangGraphRAGAgent
 from backend.services.search_service import SearchService
@@ -126,29 +127,37 @@ def _create_device_fetcher(search_service):
 
 def _build_state_overrides(req: "AgentRequest") -> Dict[str, Any]:
     overrides: Dict[str, Any] = {}
+    pq_fields: Dict[str, Any] = {}
 
     if req.filter_devices is not None:
         devices = [str(d).strip() for d in req.filter_devices if str(d).strip()]
         if devices:
             overrides["selected_devices"] = devices
+            pq_fields["selected_devices"] = devices
 
     if req.filter_doc_types is not None:
         doc_types = [str(d).strip() for d in req.filter_doc_types if str(d).strip()]
         if doc_types:
             # FE는 그룹명("sop","ts" 등)을 보내므로 ES 실제값으로 확장 후 strict 적용
-            overrides["selected_doc_types"] = expand_doc_type_selection(doc_types)
+            expanded = expand_doc_type_selection(doc_types)
+            overrides["selected_doc_types"] = expanded
             overrides["selected_doc_types_strict"] = True
+            pq_fields["selected_doc_types"] = expanded
+            pq_fields["doc_types_strict"] = True
 
     if req.filter_equip_ids is not None:
         equip_ids = [str(e).strip().upper() for e in req.filter_equip_ids if str(e).strip()]
         if equip_ids:
-            overrides["selected_equip_ids"] = list(dict.fromkeys(equip_ids))
+            deduped = list(dict.fromkeys(equip_ids))
+            overrides["selected_equip_ids"] = deduped
+            pq_fields["selected_equip_ids"] = deduped
 
     if req.search_queries is not None:
         queries = [str(q).strip() for q in req.search_queries if str(q).strip()]
         if queries:
             overrides["search_queries"] = queries
             overrides["skip_mq"] = True
+            pq_fields["search_queries"] = queries
 
     if req.selected_doc_ids is not None:
         doc_ids = [str(d).strip() for d in req.selected_doc_ids if str(d).strip()]
@@ -158,7 +167,10 @@ def _build_state_overrides(req: "AgentRequest") -> Dict[str, Any]:
     # Override/regeneration 경로는 auto_parse 노드를 건너뛰므로
     # 답변 언어 템플릿 선택을 위해 최소 언어 감지를 보정한다.
     if overrides:
-        overrides["detected_language"] = _detect_language_rule_based(req.message or "")
+        detected_lang = _detect_language_rule_based(req.message or "")
+        overrides["detected_language"] = detected_lang
+        pq_fields["detected_language"] = detected_lang
+        overrides["parsed_query"] = pq_fields
 
     return overrides
 
@@ -293,6 +305,11 @@ class AgentResponse(BaseModel):
     search_queries: Optional[List[str]] = Field(None, description="사용된 검색 쿼리 (MQ)")
     # Language detection
     detected_language: Optional[str] = Field(None, description="감지된 언어 (ko, en, ja, zh)")
+    # Auto-parse 후속 UX
+    suggest_additional_device_search: bool = Field(
+        False,
+        description="auto_parse에서 device를 찾지 못해 추가 장비 검색을 제안해야 하는지 여부",
+    )
 
 
 def _to_expanded_docs(answer_ref_json: List[Dict[str, Any]] | None) -> List[ExpandedDoc] | None:
@@ -316,6 +333,106 @@ def _select_display_docs(result: Dict[str, Any]) -> List[RetrievalResult]:
     if "display_docs" in result:
         return result.get("display_docs") or []
     return result.get("docs", []) or []
+
+
+def _to_str_list(value: Any) -> List[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(v).strip() for v in value if str(v).strip()]
+    s = str(value).strip()
+    return [s] if s else []
+
+
+def _is_effective_parsed_device(value: str) -> bool:
+    token = re.sub(r"[\s\-_./]+", "", str(value or "").strip().upper())
+    if not token:
+        return False
+    # Short alphabetic tokens are often component labels rather than equipment models.
+    if token.isalpha() and len(token) <= 4:
+        return False
+    return True
+
+
+def _extract_auto_parse_result(result: Dict[str, Any]) -> Optional[AutoParseResult]:
+    """result dict에서 AutoParseResult를 추출한다. ParsedQuery 우선, 기존 필드 fallback."""
+    pq_raw = result.get("parsed_query")
+    if pq_raw:
+        pq = ParsedQuery(**pq_raw)
+        return AutoParseResult(
+            device=pq.device_names[0] if pq.device_names else None,
+            doc_type=pq.doc_types[0] if pq.doc_types else None,
+            devices=pq.device_names or None,
+            doc_types=pq.doc_types or None,
+            equip_id=pq.equip_ids[0] if pq.equip_ids else None,
+            equip_ids=pq.equip_ids or None,
+            language=pq.detected_language,
+            message=pq.message,
+        )
+
+    # 기존 fallback
+    if (
+        result.get("auto_parsed_device")
+        or result.get("auto_parsed_doc_type")
+        or result.get("auto_parsed_devices")
+        or result.get("auto_parsed_doc_types")
+        or result.get("auto_parsed_equip_id")
+        or result.get("auto_parsed_equip_ids")
+        or result.get("auto_parse_message")
+        or result.get("detected_language")
+    ):
+        return AutoParseResult(
+            device=result.get("auto_parsed_device"),
+            doc_type=result.get("auto_parsed_doc_type"),
+            devices=result.get("auto_parsed_devices"),
+            doc_types=result.get("auto_parsed_doc_types"),
+            equip_id=result.get("auto_parsed_equip_id"),
+            equip_ids=result.get("auto_parsed_equip_ids"),
+            language=result.get("detected_language"),
+            message=result.get("auto_parse_message"),
+        )
+
+    return None
+
+
+def _should_suggest_additional_device_search(
+    result: Dict[str, Any],
+    auto_parse_result: Optional[AutoParseResult],
+) -> bool:
+    """Suggest additional device search when auto-parse ran but parsed no device."""
+    # ParsedQuery 우선 참조
+    pq_raw = result.get("parsed_query")
+    if pq_raw:
+        pq = ParsedQuery(**pq_raw)
+        effective = [d for d in pq.device_names if _is_effective_parsed_device(d)]
+        return not effective and pq.detected_language is not None
+
+    # 기존 fallback 로직
+    auto_parse_ran = auto_parse_result is not None or any(
+        key in result
+        for key in (
+            "auto_parsed_device",
+            "auto_parsed_devices",
+            "auto_parsed_doc_type",
+            "auto_parsed_doc_types",
+            "auto_parsed_equip_id",
+            "auto_parsed_equip_ids",
+            "auto_parse_message",
+            "detected_language",
+            "device_selection_skipped",
+        )
+    )
+    if not auto_parse_ran:
+        return False
+
+    parsed_devices = (
+        _to_str_list(result.get("auto_parsed_devices"))
+        or _to_str_list(auto_parse_result.devices if auto_parse_result else None)
+        or _to_str_list(result.get("auto_parsed_device"))
+        or _to_str_list(auto_parse_result.device if auto_parse_result else None)
+    )
+    effective_devices = [d for d in parsed_devices if _is_effective_parsed_device(d)]
+    return not effective_devices
 
 
 def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
@@ -486,27 +603,8 @@ async def run_agent(
         raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     # Extract auto_parse results
-    auto_parse_result = None
-    if (
-        result.get("auto_parsed_device")
-        or result.get("auto_parsed_doc_type")
-        or result.get("auto_parsed_devices")
-        or result.get("auto_parsed_doc_types")
-        or result.get("auto_parsed_equip_id")
-        or result.get("auto_parsed_equip_ids")
-        or result.get("auto_parse_message")
-        or result.get("detected_language")
-    ):
-        auto_parse_result = AutoParseResult(
-            device=result.get("auto_parsed_device"),
-            doc_type=result.get("auto_parsed_doc_type"),
-            devices=result.get("auto_parsed_devices"),
-            doc_types=result.get("auto_parsed_doc_types"),
-            equip_id=result.get("auto_parsed_equip_id"),
-            equip_ids=result.get("auto_parsed_equip_ids"),
-            language=result.get("detected_language"),
-            message=result.get("auto_parse_message"),
-        )
+    auto_parse_result = _extract_auto_parse_result(result)
+    suggest_additional_device_search = _should_suggest_additional_device_search(result, auto_parse_result)
 
     # Interrupt 체크
     interrupt_info = result.get("__interrupt__")
@@ -537,6 +635,7 @@ async def run_agent(
             selected_equip_ids=result.get("selected_equip_ids"),
             search_queries=result.get("search_queries"),
             detected_language=result.get("detected_language"),
+            suggest_additional_device_search=suggest_additional_device_search,
         )
 
     # 정상 완료
@@ -561,6 +660,7 @@ async def run_agent(
         selected_equip_ids=result.get("selected_equip_ids"),
         search_queries=result.get("search_queries"),
         detected_language=result.get("detected_language"),
+        suggest_additional_device_search=suggest_additional_device_search,
     )
 
 
@@ -677,27 +777,8 @@ async def run_agent_stream(
                 )
 
             # Extract auto_parse results
-            auto_parse_result = None
-            if (
-                result.get("auto_parsed_device")
-                or result.get("auto_parsed_doc_type")
-                or result.get("auto_parsed_devices")
-                or result.get("auto_parsed_doc_types")
-                or result.get("auto_parsed_equip_id")
-                or result.get("auto_parsed_equip_ids")
-                or result.get("auto_parse_message")
-                or result.get("detected_language")
-            ):
-                auto_parse_result = AutoParseResult(
-                    device=result.get("auto_parsed_device"),
-                    doc_type=result.get("auto_parsed_doc_type"),
-                    devices=result.get("auto_parsed_devices"),
-                    doc_types=result.get("auto_parsed_doc_types"),
-                    equip_id=result.get("auto_parsed_equip_id"),
-                    equip_ids=result.get("auto_parsed_equip_ids"),
-                    language=result.get("detected_language"),
-                    message=result.get("auto_parse_message"),
-                )
+            auto_parse_result = _extract_auto_parse_result(result)
+            suggest_additional_device_search = _should_suggest_additional_device_search(result, auto_parse_result)
 
             interrupt_info = result.get("__interrupt__")
             logger.info(f"[agent stream] result keys: {list(result.keys())}")
@@ -732,6 +813,7 @@ async def run_agent_stream(
                     selected_equip_ids=result.get("selected_equip_ids"),
                     search_queries=result.get("search_queries"),
                     detected_language=result.get("detected_language"),
+                    suggest_additional_device_search=suggest_additional_device_search,
                 )
             else:
                 resp = AgentResponse(
@@ -756,6 +838,7 @@ async def run_agent_stream(
                     selected_equip_ids=result.get("selected_equip_ids"),
                     search_queries=result.get("search_queries"),
                     detected_language=result.get("detected_language"),
+                    suggest_additional_device_search=suggest_additional_device_search,
                 )
 
             _enqueue({"type": "final", "result": resp.model_dump()})

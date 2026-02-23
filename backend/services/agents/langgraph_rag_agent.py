@@ -212,9 +212,10 @@ class LangGraphRAGAgent:
 
         elif name == "auto_parse":
             if result:
-                device = result.get("auto_parsed_device")
-                doc_type = result.get("auto_parsed_doc_type")
-                equip_id = result.get("auto_parsed_equip_id")
+                pq = result.get("parsed_query", {})
+                device = (pq.get("device_names") or [None])[0]
+                doc_type = (pq.get("doc_types") or [None])[0]
+                equip_id = (pq.get("equip_ids") or [None])[0]
                 if device:
                     details_parts.append(f"장비: {device}")
                 if doc_type:

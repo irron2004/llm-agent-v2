@@ -99,8 +99,9 @@ export function ChatReviewProvider({ children }: { children: ReactNode }) {
 
   const setPendingRegeneration = useCallback((regen: PendingRegeneration | null) => {
     setPendingRegenerationState(regen);
-    if (regen) {
+    if (regen && regen.reason !== "missing_device_parse") {
       // Reset review-related selections when regeneration panel opens
+      // missing_device_parse는 비차단 제안이므로 completedRetrievedDocs를 유지
       setPendingReviewState(null);
       setCompletedRetrievedDocsState(null);
     }

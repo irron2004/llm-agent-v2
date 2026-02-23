@@ -34,6 +34,7 @@ export type Message = {
   selectedDevices?: string[] | null;
   selectedDocTypes?: string[] | null;
   searchQueries?: string[] | null;
+  suggestAdditionalDeviceSearch?: boolean;
 };
 
 export type DeviceInfo = {
@@ -116,6 +117,8 @@ export type AgentResponse = {
   selected_doc_types?: string[] | null;
   selected_equip_ids?: string[] | null;
   search_queries?: string[] | null;
+  detected_language?: string | null;
+  suggest_additional_device_search?: boolean;
 };
 
 export type ChatHistoryTurn = {

@@ -30,6 +30,7 @@ export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
+  const lastAutoOpenedRegenerationKeyRef = useRef<string | null>(null);
   const location = useLocation();
   const isChatPage = location.pathname === "/";
 
@@ -54,11 +55,16 @@ export default function Layout() {
     setPendingRegeneration,
   } = useChatReview();
 
+  const visiblePendingRegeneration =
+    pendingRegeneration && pendingRegeneration.reason !== "missing_device_parse"
+      ? pendingRegeneration
+      : null;
+
   // Show right sidebar when there are logs, pending review, or completed retrieved docs
   const shouldShowRightSidebar = isChatPage && (
     logs.length > 0 ||
     pendingReview !== null ||
-    pendingRegeneration !== null ||
+    visiblePendingRegeneration !== null ||
     (completedRetrievedDocs !== null && completedRetrievedDocs.length > 0)
   );
 
@@ -79,22 +85,30 @@ export default function Layout() {
     setIsRightSidebarCollapsed((prev) => !prev);
   }, []);
 
+  useEffect(() => {
+    if (!visiblePendingRegeneration) return;
+    const key = `${visiblePendingRegeneration.messageId}:${visiblePendingRegeneration.reason ?? "manual"}`;
+    if (lastAutoOpenedRegenerationKeyRef.current === key) return;
+    lastAutoOpenedRegenerationKeyRef.current = key;
+    setIsRightSidebarCollapsed(false);
+  }, [visiblePendingRegeneration?.messageId, visiblePendingRegeneration?.reason]);
+
   // Determine right sidebar title and content based on state
-  // Priority: streaming (show logs) > regeneration > review > docs > logs
+  // Priority: regeneration > streaming (show logs) > review > docs > logs
   const rightSidebarContent = useMemo(() => {
+    if (visiblePendingRegeneration) {
+      return {
+        title: visiblePendingRegeneration.reason === "missing_device_parse" ? "장비 추가 검색" : "답변 재생성",
+        subtitle: visiblePendingRegeneration.reason === "missing_device_parse"
+          ? "장비를 추가로 선택해 재검색할 수 있습니다."
+          : "필터/문서 선택 후 재검색",
+      };
+    }
     // 새 요청 스트리밍 중이면 로그 표시
     if (isStreaming && logs.length > 0) {
       return {
         title: "실행 로그",
         subtitle: `${logs.length}개 항목`,
-      };
-    }
-    if (pendingRegeneration) {
-      return {
-        title: pendingRegeneration.reason === "missing_device_parse" ? "장비 추가 검색" : "답변 재생성",
-        subtitle: pendingRegeneration.reason === "missing_device_parse"
-          ? "장비를 추가로 선택해 재검색할 수 있습니다."
-          : "필터/문서 선택 후 재검색",
       };
     }
     if (pendingReview) {
@@ -113,7 +127,7 @@ export default function Layout() {
       title: "실행 로그",
       subtitle: `${logs.length}개 항목`,
     };
-  }, [isStreaming, pendingRegeneration, pendingReview, completedRetrievedDocs, logs.length]);
+  }, [isStreaming, visiblePendingRegeneration, pendingReview, completedRetrievedDocs, logs.length]);
 
   return (
     <div
@@ -166,15 +180,14 @@ export default function Layout() {
           title={rightSidebarContent.title}
           subtitle={rightSidebarContent.subtitle}
         >
-          {/* 스트리밍 중이면 로그 표시 (최우선) */}
-          {isStreaming && logs.length > 0 ? (
-            <ChatLogsContent logs={logs} />
-          ) : pendingRegeneration ? (
+          {visiblePendingRegeneration ? (
             <RegeneratePanelContent
-              pendingRegeneration={pendingRegeneration}
+              pendingRegeneration={visiblePendingRegeneration}
               submitRegeneration={submitRegeneration}
               onClose={() => setPendingRegeneration(null)}
             />
+          ) : isStreaming && logs.length > 0 ? (
+            <ChatLogsContent logs={logs} />
           ) : pendingReview ? (
             <ReviewPanelContent
               pendingReview={pendingReview}

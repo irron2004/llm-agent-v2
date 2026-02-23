@@ -38,3 +38,18 @@ def test_auto_parse_node_extracts_equip_id_from_query() -> None:
     assert result["selected_equip_ids"] == ["EPAG50"]
     assert "EPAG50" in result["auto_parse_message"]
     assert result["_events"][0]["equip_id"] == "EPAG50"
+
+
+def test_auto_parse_node_ignores_short_component_like_device_labels() -> None:
+    state = {"query": "how to replacement apc position"}
+
+    result = auto_parse_node(
+        state,
+        llm=None,  # type: ignore[arg-type]
+        spec=None,  # type: ignore[arg-type]
+        device_names=["APC", "SUPRA N", "ALL", "etc"],
+        doc_type_names=["myservice", "ts", "gcb", "sop", "setup"],
+    )
+
+    assert result["auto_parsed_device"] is None
+    assert result["auto_parsed_devices"] == []

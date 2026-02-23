@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Protocol, Set, TypedDict
 
 from langgraph.types import Command, interrupt
+from pydantic import BaseModel
 
 from backend.domain.doc_type_mapping import DOC_TYPE_GROUPS, expand_doc_type_selection, normalize_doc_type
 from backend.llm_infrastructure.llm.base import BaseLLM
@@ -30,9 +31,40 @@ Route = Literal["setup", "ts", "general"]
 Gate = Literal["need_st", "no_st"]
 
 
+class ParsedQuery(BaseModel):
+    """사용자 쿼리에서 파싱된 구조화된 검색 조건.
+
+    파이프라인 노드들이 점진적으로 필드를 채운다.
+    """
+
+    # 필터 (auto_parse_node에서 채움)
+    device_names: list[str] = []          # ES: device_name
+    equip_ids: list[str] = []             # ES: equip_id
+    doc_types: list[str] = []             # ES: doc_type
+    detected_language: str | None = None  # "ko", "en", "ja", "zh"
+
+    # 라우팅 (route_node에서 채움)
+    route: str | None = None              # "setup", "ts", "general"
+
+    # 검색 쿼리 (st_mq_node에서 채움)
+    search_queries: list[str] = []
+
+    # 선택 필터 (auto_parse 또는 사용자 선택)
+    selected_devices: list[str] = []
+    selected_equip_ids: list[str] = []
+    selected_doc_types: list[str] = []
+    doc_types_strict: bool = False
+
+    # 메타 (UI 표시용)
+    message: str | None = None
+    device_selection_skipped: bool = False
+    doc_type_selection_skipped: bool = False
+
+
 class AgentState(TypedDict, total=False):
     query: str
     route: Route
+    parsed_query: dict  # ParsedQuery.model_dump() — TypedDict은 Pydantic 객체 불가
 
     # Multi-query outputs (parsed lists)
     setup_mq_list: List[str]
@@ -557,6 +589,11 @@ def results_to_ref_json(
         metadata: Dict[str, Any] = {}
         if truncated:
             metadata["truncated"] = True
+        if isinstance(d.metadata, dict):
+            for key in ("device_name", "equip_id"):
+                val = d.metadata.get(key)
+                if val and str(val).strip():
+                    metadata[key] = str(val).strip()
 
         ref.append(
             {
@@ -585,7 +622,21 @@ def ref_json_to_text(ref_json: List[Dict[str, Any]]) -> str:
         doc_id = str(r.get("doc_id", "")).strip()
         content = str(r.get("content", "")).strip()
         content = " ".join(content.split())
-        lines.append(f"[{rank}] {doc_id}: {content}")
+
+        # 장비 메타데이터 태그 추가
+        meta = r.get("metadata") or {}
+        device = meta.get("device_name", "")
+        equip = meta.get("equip_id", "")
+        if device and equip:
+            tag = f" ({device} / {equip})"
+        elif device:
+            tag = f" ({device})"
+        elif equip:
+            tag = f" ({equip})"
+        else:
+            tag = ""
+
+        lines.append(f"[{rank}] {doc_id}{tag}: {content}")
     return "\n".join(lines)
 
 
@@ -727,7 +778,12 @@ def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     user = _format_prompt(spec.router.user, {"sys.query": query})
     route = _parse_route(_invoke_llm(llm, spec.router.system, user, temperature=TEMP_CLASSIFICATION))
     logger.info("route_node: query=%s..., route=%s", query[:50] if query else None, route)
-    return {"route": route}
+
+    # parsed_query 업데이트
+    pq_dict = dict(state.get("parsed_query") or {})
+    pq_dict["route"] = route
+
+    return {"route": route, "parsed_query": pq_dict}
 
 
 def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
@@ -954,7 +1010,12 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
 
     merged = english_queries + korean_queries
     logger.info("st_mq_node: final search_queries (bilingual)=%s", merged)
-    return {"search_queries": merged}
+
+    # parsed_query 업데이트
+    pq_dict = dict(state.get("parsed_query") or {})
+    pq_dict["search_queries"] = merged
+
+    return {"search_queries": merged, "parsed_query": pq_dict}
 
 
 def retrieve_node(
@@ -982,11 +1043,20 @@ def retrieve_node(
         fallback_query = _normalize_query_text(state.get("query_en") or state["query"])
         if fallback_query and not _is_garbage_query(fallback_query):
             queries = [fallback_query]
-    selected_devices = state.get("selected_devices", [])
-    selected_equip_ids = state.get("selected_equip_ids", [])
-    selected_doc_types = state.get("selected_doc_types", [])
+    # ParsedQuery 우선, 없으면 기존 필드 fallback
+    pq_raw = state.get("parsed_query")
+    if pq_raw:
+        pq = ParsedQuery(**pq_raw)
+        selected_devices = pq.selected_devices
+        selected_equip_ids = pq.selected_equip_ids
+        selected_doc_types = pq.selected_doc_types
+        selected_doc_types_strict = pq.doc_types_strict
+    else:
+        selected_devices = state.get("selected_devices", [])
+        selected_equip_ids = state.get("selected_equip_ids", [])
+        selected_doc_types = state.get("selected_doc_types", [])
+        selected_doc_types_strict = bool(state.get("selected_doc_types_strict"))
     selected_doc_ids = [str(x).strip() for x in state.get("selected_doc_ids", []) if str(x).strip()]
-    selected_doc_types_strict = bool(state.get("selected_doc_types_strict"))
     if selected_doc_types_strict:
         selected_doc_type_filters = _dedupe_queries(
             [str(dt).strip() for dt in selected_doc_types if _normalize_doc_type(str(dt))]
@@ -1916,11 +1986,28 @@ def _filter_devices_by_query(
 def _extract_devices_from_query(device_names: List[str], query: str) -> List[str]:
     if not device_names or not query:
         return []
+
+    def _is_valid_device_candidate(name: str) -> bool:
+        cleaned = str(name).strip()
+        if not cleaned:
+            return False
+        compact = _compact_text(cleaned)
+        if compact in {"all", "etc"}:
+            return False
+        token = re.sub(r"[\s\-_./]+", "", cleaned)
+        # Short alphabetic tokens (e.g., APC, ALL) are typically component/noise labels,
+        # not equipment models. Ignore them for auto-parse to reduce false positives.
+        if token.isalpha() and len(token) <= 4:
+            return False
+        return True
+
     query_compact = _compact_text(query)
     matches: List[str] = []
     for name in device_names:
         cleaned = str(name).strip()
         if not cleaned:
+            continue
+        if not _is_valid_device_candidate(cleaned):
             continue
         if _compact_text(cleaned) and _compact_text(cleaned) in query_compact:
             matches.append(cleaned)
@@ -2298,9 +2385,25 @@ def auto_parse_node(
     selected_doc_types = doc_types[:2]
     selected_equip_ids = equip_ids[:1]
 
+    # ParsedQuery 생성
+    pq = ParsedQuery(
+        device_names=devices,
+        equip_ids=equip_ids,
+        doc_types=doc_types,
+        detected_language=detected_language,
+        selected_devices=selected_devices,
+        selected_equip_ids=selected_equip_ids,
+        selected_doc_types=selected_doc_types,
+        message=auto_parse_message,
+        device_selection_skipped=not bool(devices),
+        doc_type_selection_skipped=not bool(doc_types),
+    )
+
     # 언어는 항상 반환하고, 파싱 이벤트도 항상 발행한다.
     # (장비/문서 미감지 케이스에서도 상단 배너 표시를 위해 필요)
     return {
+        "parsed_query": pq.model_dump(),
+        # 하위 호환 필드 (기존 코드가 참조하므로 유지)
         "detected_language": detected_language,
         "auto_parsed_device": devices[0] if devices else None,
         "auto_parsed_doc_type": doc_types[0] if doc_types else None,
@@ -2457,6 +2560,10 @@ def device_selection_node(
     if not available_devices and not available_doc_types:
         # No selection options available, skip selection
         logger.info("device_selection_node: no devices/doc_types available, skipping")
+        pq_dict = dict(state.get("parsed_query") or {})
+        pq_dict.update(selected_devices=[], device_selection_skipped=True,
+                        selected_doc_types=[], doc_types_strict=False,
+                        doc_type_selection_skipped=True)
         return Command(
             goto="mq",
             update={
@@ -2467,6 +2574,7 @@ def device_selection_node(
                 "selected_doc_types": [],
                 "selected_doc_types_strict": False,
                 "doc_type_selection_skipped": True,
+                "parsed_query": pq_dict,
             }
         )
 
@@ -2491,6 +2599,10 @@ def device_selection_node(
 
     # User skipped device selection
     if decision is None or decision == "" or decision == "skip":
+        pq_dict = dict(state.get("parsed_query") or {})
+        pq_dict.update(selected_devices=[], device_selection_skipped=True,
+                        selected_doc_types=[], doc_types_strict=False,
+                        doc_type_selection_skipped=True)
         return Command(
             goto="mq",
             update={
@@ -2501,6 +2613,7 @@ def device_selection_node(
                 "selected_doc_types": [],
                 "selected_doc_types_strict": False,
                 "doc_type_selection_skipped": True,
+                "parsed_query": pq_dict,
             }
         )
 
@@ -2546,6 +2659,14 @@ def device_selection_node(
     if selected_doc_types:
         logger.info(f"device_selection_node: validated selected_doc_types={selected_doc_types}")
 
+    pq_dict = dict(state.get("parsed_query") or {})
+    pq_dict.update(
+        selected_devices=selected_devices,
+        device_selection_skipped=len(selected_devices) == 0,
+        selected_doc_types=selected_doc_types,
+        doc_types_strict=len(selected_doc_types) > 0,
+        doc_type_selection_skipped=len(selected_doc_types) == 0,
+    )
     return Command(
         goto="mq",
         update={
@@ -2556,12 +2677,14 @@ def device_selection_node(
             "selected_doc_types": selected_doc_types,
             "selected_doc_types_strict": len(selected_doc_types) > 0,
             "doc_type_selection_skipped": len(selected_doc_types) == 0,
+            "parsed_query": pq_dict,
         }
     )
 
 
 __all__ = [
     "AgentState",
+    "ParsedQuery",
     "Route",
     "Gate",
     "PromptSpec",

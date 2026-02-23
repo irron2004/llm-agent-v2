@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useChatSession } from "../hooks/use-chat-session";
 import { useChatHistoryContext } from "../context/chat-history-context";
@@ -12,6 +12,7 @@ import {
   DeviceSelectionPanel,
 } from "../components";
 import type { RegeneratePayload } from "../components/message-item";
+import { fetchDeviceCatalog } from "../api";
 import { Alert, Spin } from "antd";
 
 export default function ChatPage() {
@@ -21,11 +22,17 @@ export default function ChatPage() {
   const { refresh: refreshHistory } = useChatHistoryContext();
   const {
     setPendingReview,
+    pendingRegeneration,
     setIsStreaming,
     registerSubmitHandlers,
     setPendingRegeneration,
     registerRegenerationHandlers,
   } = useChatReview();
+  const [suggestedDevices, setSuggestedDevices] = useState<Array<{ name: string; doc_count: number }>>([]);
+  const [isLoadingSuggestedDevices, setIsLoadingSuggestedDevices] = useState(false);
+  const [suggestedDeviceError, setSuggestedDeviceError] = useState<string | null>(null);
+  const [showSuggestedDevicePanel, setShowSuggestedDevicePanel] = useState(false);
+  const [lastSelectedDevice, setLastSelectedDevice] = useState<string | null>(null);
 
   // Callback when a turn is saved
   const handleTurnSaved = useCallback(() => {
@@ -66,6 +73,53 @@ export default function ChatPage() {
   useEffect(() => {
     registerSubmitHandlers({ submitReview, submitSearchQueries });
   }, [submitReview, submitSearchQueries, registerSubmitHandlers]);
+
+  // Reset showSuggestedDevicePanel when pendingRegeneration changes
+  useEffect(() => {
+    setShowSuggestedDevicePanel(false);
+  }, [pendingRegeneration?.messageId, pendingRegeneration?.reason]);
+
+  // 이전에 기기를 선택한 적이 있으면 패널 표시 없이 무시
+  useEffect(() => {
+    if (
+      pendingRegeneration?.reason === "missing_device_parse" &&
+      lastSelectedDevice
+    ) {
+      setPendingRegeneration(null);
+    }
+  }, [pendingRegeneration?.messageId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    let active = true;
+    const shouldLoadCatalog =
+      pendingRegeneration?.reason === "missing_device_parse" &&
+      showSuggestedDevicePanel;
+    if (!shouldLoadCatalog) {
+      setSuggestedDevices([]);
+      setSuggestedDeviceError(null);
+      setIsLoadingSuggestedDevices(false);
+      return () => { active = false; };
+    }
+
+    setIsLoadingSuggestedDevices(true);
+    setSuggestedDeviceError(null);
+    fetchDeviceCatalog()
+      .then((res) => {
+        if (!active) return;
+        setSuggestedDevices(Array.isArray(res.devices) ? res.devices : []);
+      })
+      .catch(() => {
+        if (!active) return;
+        setSuggestedDevices([]);
+        setSuggestedDeviceError("장비 목록을 불러오지 못했습니다.");
+      })
+      .finally(() => {
+        if (!active) return;
+        setIsLoadingSuggestedDevices(false);
+      });
+
+    return () => { active = false; };
+  }, [pendingRegeneration?.reason, pendingRegeneration?.messageId, showSuggestedDevicePanel]);
 
   const sanitizeRegenerationQuery = useCallback((query: string): string => {
     let normalized = query.trim();
@@ -153,7 +207,67 @@ export default function ChatPage() {
     };
   }, [reset, setPendingRegeneration]);
 
+  const handleDeviceSelect = (deviceIndex: number) => {
+    if (!pendingRegeneration) return;
+    const deviceName = suggestedDevices[deviceIndex].name;
+    const originalQuery = pendingRegeneration.originalQuery;
+    const displayText = `[${deviceName}] ${originalQuery}`;
+    const searchQueries =
+      pendingRegeneration.searchQueries?.length > 0
+        ? pendingRegeneration.searchQueries
+        : [originalQuery].filter((q) => q?.trim());
+
+    setLastSelectedDevice(deviceName);
+    setPendingRegeneration(null);
+    send({
+      text: displayText,
+      overrides: {
+        filterDevices: [deviceName],
+        searchQueries,
+        autoParse: false,
+      },
+    });
+  };
+
   const handleSend = async (text: string) => {
+    if (
+      pendingRegeneration?.reason === "missing_device_parse" &&
+      !lastSelectedDevice
+    ) {
+      const trimmed = text.trim();
+
+      // 1단계: 확인 다이얼로그 (1. 예 / 2. 아니오)
+      if (!showSuggestedDevicePanel) {
+        if (trimmed === "1") {
+          setShowSuggestedDevicePanel(true);
+          return;
+        }
+        if (trimmed === "2") {
+          setPendingRegeneration(null);
+          return;
+        }
+        // 그 외 입력 → 무시
+        return;
+      }
+
+      // 2단계: 기기 번호 선택
+      if (suggestedDevices.length > 0 && !isLoadingSuggestedDevices) {
+        const num = parseInt(trimmed, 10);
+
+        if (num === 0) {
+          setPendingRegeneration(null);
+          return;
+        }
+
+        if (!isNaN(num) && num >= 1 && num <= suggestedDevices.length) {
+          handleDeviceSelect(num - 1);
+          return;
+        }
+      }
+      // 유효하지 않은 입력 → 무시
+      return;
+    }
+
     await send({ text });
   };
 
@@ -261,7 +375,111 @@ export default function ChatPage() {
             </MessageList>
           )}
 
-          {/* Device selection panel */}
+          {/* Device selection panel for missing_device_parse */}
+          {pendingRegeneration?.reason === "missing_device_parse" && !lastSelectedDevice && (
+            <div
+              style={{
+                margin: "16px 0 8px",
+                padding: "12px 16px",
+                borderRadius: 8,
+                border: "1px solid var(--color-border)",
+                background: "var(--color-bg-secondary)",
+                maxWidth: 480,
+              }}
+            >
+              {/* 1단계: 확인 다이얼로그 */}
+              {!showSuggestedDevicePanel && (
+                <>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+                    장비를 자동으로 파싱하지 못했습니다. 기기를 검색하시겠습니까?
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button
+                      className="action-button regenerate-button"
+                      onClick={() => setShowSuggestedDevicePanel(true)}
+                      type="button"
+                    >
+                      1. 예
+                    </button>
+                    <button
+                      className="action-button"
+                      onClick={() => setPendingRegeneration(null)}
+                      type="button"
+                    >
+                      2. 아니오
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {/* 2단계: 기기 목록 */}
+              {showSuggestedDevicePanel && isLoadingSuggestedDevices && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Spin size="small" />
+                  <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>
+                    장비 목록을 불러오는 중입니다...
+                  </span>
+                </div>
+              )}
+              {showSuggestedDevicePanel && !isLoadingSuggestedDevices && suggestedDeviceError && (
+                <Alert type="warning" showIcon message={suggestedDeviceError} />
+              )}
+              {showSuggestedDevicePanel && !isLoadingSuggestedDevices && !suggestedDeviceError && suggestedDevices.length > 0 && (
+                <>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+                    아래에서 장비 번호를 입력해 주세요.
+                  </div>
+                  <div
+                    style={{
+                      maxHeight: 300,
+                      overflowY: "auto",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 4,
+                    }}
+                  >
+                    {suggestedDevices.map((device, idx) => (
+                      <div
+                        key={device.name}
+                        style={{
+                          fontSize: 13,
+                          padding: "4px 8px",
+                          borderRadius: 4,
+                          cursor: "pointer",
+                          transition: "background-color 0.15s ease",
+                        }}
+                        onMouseEnter={(e) =>
+                          (e.currentTarget.style.backgroundColor = "var(--color-action-bg)")
+                        }
+                        onMouseLeave={(e) =>
+                          (e.currentTarget.style.backgroundColor = "transparent")
+                        }
+                        onClick={() => handleDeviceSelect(idx)}
+                      >
+                        <span style={{ fontWeight: 600, color: "var(--color-accent-primary)" }}>
+                          {idx + 1}.
+                        </span>{" "}
+                        {device.name}
+                        <span style={{ color: "var(--color-text-secondary)", marginLeft: 8, fontSize: 12 }}>
+                          ({device.doc_count.toLocaleString()} 문서)
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <div
+                    style={{
+                      marginTop: 8,
+                      fontSize: 12,
+                      color: "var(--color-text-secondary)",
+                    }}
+                  >
+                    번호를 입력하거나 클릭하여 선택하세요. (0: 취소)
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {pendingDeviceSelection && (
             (pendingDeviceSelection.devices && pendingDeviceSelection.devices.length > 0) ||
             (pendingDeviceSelection.docTypes && pendingDeviceSelection.docTypes.length > 0)

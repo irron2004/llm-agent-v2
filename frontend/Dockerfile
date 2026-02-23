@@ -38,6 +38,13 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # Prevent stale SPA shell from browser cache.
+    location ~* \.html$ {
+        add_header Cache-Control "no-cache, no-store, must-revalidate";
+        add_header Pragma "no-cache";
+        add_header Expires "0";
+    }
+
     # SPA fallback
     location / {
         try_files $uri $uri/ /index.html;
