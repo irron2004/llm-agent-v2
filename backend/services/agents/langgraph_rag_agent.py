@@ -9,7 +9,8 @@ from __future__ import annotations
 import functools
 import logging
 import time
-from typing import Any, Callable, Dict, Optional
+import uuid
+from typing import Any, Callable, Dict, Optional, cast
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
@@ -167,15 +168,17 @@ class LangGraphRAGAgent:
 
             logger.info("[langgraph] %s (%s) %s", name, elapsed_str, details)
 
-            self._emit_event({
-                "type": "log",
-                "level": "info",
-                "node": name,
-                "ts": time.time(),
-                "elapsed_ms": round(elapsed, 1),
-                "details": details,
-                "message": f"{name} ({elapsed_str})" + (f" - {details}" if details else ""),
-            })
+            self._emit_event(
+                {
+                    "type": "log",
+                    "level": "info",
+                    "node": name,
+                    "ts": time.time(),
+                    "elapsed_ms": round(elapsed, 1),
+                    "details": details,
+                    "message": f"{name} ({elapsed_str})" + (f" - {details}" if details else ""),
+                }
+            )
 
             if extra_events:
                 for evt in extra_events:
@@ -201,7 +204,9 @@ class LangGraphRAGAgent:
 
         return _wrapped
 
-    def _build_node_details(self, name: str, state: AgentState, result: Dict[str, Any] | None) -> str:
+    def _build_node_details(
+        self, name: str, state: AgentState, result: Dict[str, Any] | None
+    ) -> str:
         """Build human-readable details for each node type."""
         details_parts = []
 
@@ -313,31 +318,33 @@ class LangGraphRAGAgent:
         builder = StateGraph(AgentState)
 
         # Common nodes
-        builder.add_node("route", self._wrap_node("route", functools.partial(route_node, llm=self.llm, spec=self.spec)))
-        builder.add_node("mq", self._wrap_node("mq", functools.partial(mq_node, llm=self.llm, spec=self.spec)))
-        builder.add_node("st_gate", self._wrap_node("st_gate", functools.partial(st_gate_node, llm=self.llm, spec=self.spec)))
-        builder.add_node("st_mq", self._wrap_node("st_mq", functools.partial(st_mq_node, llm=self.llm, spec=self.spec)))
         builder.add_node(
-            "retrieve",
-            self._wrap_node("retrieve", functools.partial(
-                retrieve_node,
-                retriever=self.retriever,
-                reranker=self.reranker,
-                retrieval_top_k=self.retrieval_top_k,
-                final_top_k=self.top_k,
-            )),
+            "route",
+            self._wrap_node("route", functools.partial(route_node, llm=self.llm, spec=self.spec)),
         )
+        builder.add_node(
+            "mq", self._wrap_node("mq", functools.partial(mq_node, llm=self.llm, spec=self.spec))
+        )
+        builder.add_node(
+            "st_gate",
+            self._wrap_node(
+                "st_gate", functools.partial(st_gate_node, llm=self.llm, spec=self.spec)
+            ),
+        )
+        builder.add_node(
+            "st_mq",
+            self._wrap_node("st_mq", functools.partial(st_mq_node, llm=self.llm, spec=self.spec)),
+        )
+        retrieve_fn = functools.partial(
+            retrieve_node,
+            retriever=self.retriever,
+            reranker=self.reranker,
+            retrieval_top_k=self.retrieval_top_k,
+            final_top_k=self.top_k,
+        )
+        builder.add_node("retrieve", self._wrap_node("retrieve", retrieve_fn))
         # retry 경로용 retrieve: ask_user 없이 바로 answer로 연결
-        builder.add_node(
-            "retrieve_retry",
-            self._wrap_node("retrieve_retry", functools.partial(
-                retrieve_node,
-                retriever=self.retriever,
-                reranker=self.reranker,
-                retrieval_top_k=self.retrieval_top_k,
-                final_top_k=self.top_k,
-            )),
-        )
+        builder.add_node("retrieve_retry", self._wrap_node("retrieve_retry", retrieve_fn))
         builder.add_node(
             "expand_related",
             self._wrap_node(
@@ -349,8 +356,14 @@ class LangGraphRAGAgent:
                 ),
             ),
         )
-        builder.add_node("answer", self._wrap_node("answer", functools.partial(answer_node, llm=self.llm, spec=self.spec)))
-        builder.add_node("judge", self._wrap_node("judge", functools.partial(judge_node, llm=self.llm, spec=self.spec)))
+        builder.add_node(
+            "answer",
+            self._wrap_node("answer", functools.partial(answer_node, llm=self.llm, spec=self.spec)),
+        )
+        builder.add_node(
+            "judge",
+            self._wrap_node("judge", functools.partial(judge_node, llm=self.llm, spec=self.spec)),
+        )
 
         # Auto-parse mode: auto_parse → translate → route → mq
         # This ensures route receives translated query (query_en)
@@ -432,7 +445,9 @@ class LangGraphRAGAgent:
         if self.ask_user_after_retrieve:
             builder.add_node("ask_user", self._wrap_node("ask_user", ask_user_after_retrieve_node))
             # refine_and_retrieve: 사용자 피드백 후 다시 retrieve로
-            builder.add_node("refine_and_retrieve", self._wrap_node("refine_and_retrieve", lambda s: {}))
+            builder.add_node(
+                "refine_and_retrieve", self._wrap_node("refine_and_retrieve", lambda s: {})
+            )
 
             builder.add_edge("retrieve", "ask_user")
             # ask_user_after_retrieve_node는 Command를 반환하므로 conditional edge 불필요
@@ -450,16 +465,29 @@ class LangGraphRAGAgent:
 
         if mode == "base":
             builder.add_edge("judge", END)
-            return builder.compile(checkpointer=self.checkpointer if self.ask_user_after_retrieve else None)
+            return builder.compile(
+                checkpointer=self.checkpointer if self.ask_user_after_retrieve else None
+            )
 
         # verified: add retry/human with different strategies
         # retry_expand: 1st retry - use more docs (20→40)
         builder.add_node("retry_expand", self._wrap_node("retry_expand", retry_expand_node))
         # retry_bump + refine_queries: 2nd retry - refine queries and re-retrieve
         builder.add_node("retry_bump", self._wrap_node("retry_bump", retry_bump_node))
-        builder.add_node("refine_queries", self._wrap_node("refine_queries", functools.partial(refine_queries_node, llm=self.llm, spec=self.spec)))
+        builder.add_node(
+            "refine_queries",
+            self._wrap_node(
+                "refine_queries",
+                functools.partial(refine_queries_node, llm=self.llm, spec=self.spec),
+            ),
+        )
         # retry_mq: 3rd+ retry - regenerate MQ from scratch
-        builder.add_node("retry_mq", self._wrap_node("retry_mq", functools.partial(retry_mq_node, llm=self.llm, spec=self.spec)))
+        builder.add_node(
+            "retry_mq",
+            self._wrap_node(
+                "retry_mq", functools.partial(retry_mq_node, llm=self.llm, spec=self.spec)
+            ),
+        )
         builder.add_node("human_review", self._wrap_node("human_review", human_review_node))
         # 호환성을 위해 'retry' 별칭을 두고 바로 retry_bump로 연결
         builder.add_node("retry", self._wrap_node("retry", lambda s: {}))
@@ -509,9 +537,6 @@ class LangGraphRAGAgent:
         **kwargs: Any,
     ) -> Dict[str, Any]:
         """그래프 실행. kwargs는 LangGraph invoke config로 전달 가능."""
-
-        import uuid
-
         tid = thread_id or str(uuid.uuid4())
         # HIL 비활성화 모드에서는 human_review 건너뛰기
         skip_human = not self.ask_user_after_retrieve and not self.ask_device_selection
@@ -533,7 +558,7 @@ class LangGraphRAGAgent:
             "recursion_limit": 100,
         }
 
-        return self._graph.invoke(state, config=config)
+        return self._graph.invoke(state, config=cast(Any, config))
 
 
 __all__ = ["LangGraphRAGAgent"]

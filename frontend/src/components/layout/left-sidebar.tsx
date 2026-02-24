@@ -51,6 +51,11 @@ export default function LeftSidebar({
       label: "Search",
     },
     {
+      key: "/search-es",
+      icon: <SearchOutlined />,
+      label: "Search ES",
+    },
+    {
       key: "/retrieval-test",
       icon: <ExperimentOutlined />,
       label: "Retrieval Test",
@@ -90,7 +95,6 @@ export default function LeftSidebar({
   };
 
   const handleHistoryClick = (id: string) => {
-    console.log("[Sidebar] Clicking on session:", id);
     // Navigate to chat page with session parameter
     navigate(`/?session=${id}`);
     onClose();

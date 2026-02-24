@@ -19,6 +19,7 @@ Usage:
 
 from __future__ import annotations
 
+import copy
 import logging
 from typing import Any, Optional
 
@@ -135,9 +136,7 @@ class EsSearchService:
         embedder_dims = embedder_instance.get_dimension()
         config_dims = search_settings.es_embedding_dims
 
-        logger.info(
-            f"Dimension check: embedder={embedder_dims}, config={config_dims}"
-        )
+        logger.info(f"Dimension check: embedder={embedder_dims}, config={config_dims}")
 
         if embedder_dims != config_dims:
             raise ValueError(
@@ -152,6 +151,7 @@ class EsSearchService:
         # Optional: Validate against actual ES index if it exists
         try:
             from backend.llm_infrastructure.elasticsearch import EsIndexManager
+
             manager = EsIndexManager(
                 es_client=es_client,
                 env=search_settings.es_env,
@@ -251,32 +251,12 @@ class EsSearchService:
         k = top_k or self.top_k
 
         try:
-            # If custom text_fields are provided, temporarily override the engine's text_fields
-            original_text_fields = None
-            if text_fields is not None and self.es_engine is not None:
-                original_text_fields = self.es_engine.text_fields
-                self.es_engine.text_fields = text_fields
+            has_override = any(
+                value is not None
+                for value in (text_fields, dense_weight, sparse_weight, use_rrf, rrf_k)
+            )
 
-            # If custom hybrid weights are provided, temporarily override retriever's weights
-            original_dense_weight = None
-            original_sparse_weight = None
-            original_use_rrf = None
-            original_rrf_k = None
-
-            if dense_weight is not None:
-                original_dense_weight = self.retriever.dense_weight
-                self.retriever.dense_weight = dense_weight
-            if sparse_weight is not None:
-                original_sparse_weight = self.retriever.sparse_weight
-                self.retriever.sparse_weight = sparse_weight
-            if use_rrf is not None:
-                original_use_rrf = self.retriever.use_rrf
-                self.retriever.use_rrf = use_rrf
-            if rrf_k is not None:
-                original_rrf_k = self.retriever.rrf_k
-                self.retriever.rrf_k = rrf_k
-
-            try:
+            if not has_override:
                 return self.retriever.retrieve(
                     query=query,
                     top_k=k,
@@ -290,20 +270,36 @@ class EsSearchService:
                     device_boost_weight=device_boost_weight,
                     **kwargs,
                 )
-            finally:
-                # Restore original text_fields
-                if original_text_fields is not None and self.es_engine is not None:
-                    self.es_engine.text_fields = original_text_fields
 
-                # Restore original hybrid weights
-                if original_dense_weight is not None:
-                    self.retriever.dense_weight = original_dense_weight
-                if original_sparse_weight is not None:
-                    self.retriever.sparse_weight = original_sparse_weight
-                if original_use_rrf is not None:
-                    self.retriever.use_rrf = original_use_rrf
-                if original_rrf_k is not None:
-                    self.retriever.rrf_k = original_rrf_k
+            engine_clone = copy.copy(self.es_engine) if self.es_engine is not None else None
+            retriever_clone = copy.copy(self.retriever)
+
+            if engine_clone is not None:
+                retriever_clone.es_engine = engine_clone
+            if engine_clone is not None and text_fields is not None:
+                engine_clone.text_fields = list(text_fields)
+            if dense_weight is not None:
+                retriever_clone.dense_weight = dense_weight
+            if sparse_weight is not None:
+                retriever_clone.sparse_weight = sparse_weight
+            if use_rrf is not None:
+                retriever_clone.use_rrf = use_rrf
+            if rrf_k is not None:
+                retriever_clone.rrf_k = rrf_k
+
+            return retriever_clone.retrieve(
+                query=query,
+                top_k=k,
+                tenant_id=tenant_id,
+                project_id=project_id,
+                doc_type=doc_type,
+                doc_types=doc_types,
+                equip_ids=equip_ids,
+                lang=lang,
+                device_name=device_name,
+                device_boost_weight=device_boost_weight,
+                **kwargs,
+            )
 
         except Exception as exc:
             index = self.es_engine.index_name if self.es_engine is not None else "<unknown>"

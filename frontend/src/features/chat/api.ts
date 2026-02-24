@@ -21,8 +21,40 @@ import {
 export async function sendChatMessage(
   payload: AgentRequest
 ): Promise<AgentResponse> {
+  const { runPath } = resolveChatPaths(env.chatPath);
   // Agent endpoint returns JSON (non-SSE)
-  return apiClient.post<AgentResponse>(env.chatPath || "/api/agent/run", payload);
+  return apiClient.post<AgentResponse>(runPath, payload);
+}
+
+export function resolveChatPaths(chatPath: string | undefined): {
+  runPath: string;
+  streamPath: string;
+  canStream: boolean;
+} {
+  const configuredPath = chatPath?.trim() || "/api/agent/run";
+
+  if (configuredPath.endsWith("/stream")) {
+    const runPath = configuredPath.slice(0, -"/stream".length) || "/api/agent/run";
+    return {
+      runPath,
+      streamPath: configuredPath,
+      canStream: true,
+    };
+  }
+
+  if (configuredPath.endsWith("/run")) {
+    return {
+      runPath: configuredPath,
+      streamPath: `${configuredPath}/stream`,
+      canStream: true,
+    };
+  }
+
+  return {
+    runPath: configuredPath,
+    streamPath: `${configuredPath}/stream`,
+    canStream: false,
+  };
 }
 
 export async function fetchDeviceCatalog(): Promise<DeviceCatalogResponse> {

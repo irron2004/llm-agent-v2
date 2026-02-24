@@ -14,17 +14,22 @@ export interface FieldConfig {
 }
 
 export interface SearchConfig {
-  denseWeight: number;
-  sparseWeight: number;
-  useRrf: boolean; // RRF 사용 시 가중치 무시됨
-  rrfK: number; // RRF constant
+  // Canonical config - size maps to final_top_k
+  size: number;
+  deterministic: boolean;
   rerank: boolean;
-  rerankModel: string;
-  rerankTopK: number;
-  multiQuery: boolean;
-  multiQueryN: number;
-  fieldWeights: FieldConfig[];
-  size: number; // 검색 결과 개수
+  autoParse: boolean;
+  skipMq: boolean;
+  // Legacy/removed fields kept for backward compatibility but ignored
+  denseWeight?: number;
+  sparseWeight?: number;
+  useRrf?: boolean;
+  rrfK?: number;
+  rerankModel?: string;
+  rerankTopK?: number;
+  multiQuery?: boolean;
+  multiQueryN?: number;
+  fieldWeights?: FieldConfig[];
 }
 
 export interface SearchResult {

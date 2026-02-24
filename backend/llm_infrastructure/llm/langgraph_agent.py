@@ -9,13 +9,18 @@ from __future__ import annotations
 import json
 import re
 import logging
+import hashlib
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Protocol, Set, TypedDict
 
 from langgraph.types import Command, interrupt
 from pydantic import BaseModel
 
-from backend.domain.doc_type_mapping import DOC_TYPE_GROUPS, expand_doc_type_selection, normalize_doc_type
+from backend.domain.doc_type_mapping import (
+    DOC_TYPE_GROUPS,
+    expand_doc_type_selection,
+    normalize_doc_type,
+)
 from backend.llm_infrastructure.llm.base import BaseLLM
 from backend.llm_infrastructure.llm.prompt_loader import PromptTemplate, load_prompt_template
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
@@ -38,13 +43,13 @@ class ParsedQuery(BaseModel):
     """
 
     # 필터 (auto_parse_node에서 채움)
-    device_names: list[str] = []          # ES: device_name
-    equip_ids: list[str] = []             # ES: equip_id
-    doc_types: list[str] = []             # ES: doc_type
+    device_names: list[str] = []  # ES: device_name
+    equip_ids: list[str] = []  # ES: equip_id
+    doc_types: list[str] = []  # ES: doc_type
     detected_language: str | None = None  # "ko", "en", "ja", "zh"
 
     # 라우팅 (route_node에서 채움)
-    route: str | None = None              # "setup", "ts", "general"
+    route: str | None = None  # "setup", "ts", "general"
 
     # 검색 쿼리 (st_mq_node에서 채움)
     search_queries: list[str] = []
@@ -264,8 +269,7 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
 # 3) Interfaces
 # -----------------------------
 class Retriever(Protocol):
-    def retrieve(self, query: str, *, top_k: int = 8) -> List[RetrievalResult]:
-        ...
+    def retrieve(self, query: str, *, top_k: int = 8) -> List[RetrievalResult]: ...
 
 
 class SearchServiceRetriever:
@@ -310,22 +314,22 @@ class SearchServiceRetriever:
 # 4) LLM helpers
 # -----------------------------
 # 노드 타입별 max_tokens 설정
-MAX_TOKENS_CLASSIFICATION = 256   # 라우팅/분류용 (짧은 응답)
-MAX_TOKENS_JUDGE = 1024          # judge용 (reasoning 토큰 포함 여유분)
-MAX_TOKENS_ANSWER = 4096         # 답변 생성용
-MAX_REF_CHARS_REVIEW = 200       # 검색 결과 리뷰용
-MAX_REF_CHARS_ANSWER = 1200      # 답변 생성용
-RELATED_PAGE_WINDOW = 2          # 인접 페이지 범위 (±N)
+MAX_TOKENS_CLASSIFICATION = 256  # 라우팅/분류용 (짧은 응답)
+MAX_TOKENS_JUDGE = 1024  # judge용 (reasoning 토큰 포함 여유분)
+MAX_TOKENS_ANSWER = 4096  # 답변 생성용
+MAX_REF_CHARS_REVIEW = 200  # 검색 결과 리뷰용
+MAX_REF_CHARS_ANSWER = 1200  # 답변 생성용
+RELATED_PAGE_WINDOW = 2  # 인접 페이지 범위 (±N)
 DOC_TYPES_SAME_DOC = {"gcb", "myservice"}
-EXPAND_TOP_K = 20                # 확장 대상 최대 개수 (rerank 상위)
+EXPAND_TOP_K = 20  # 확장 대상 최대 개수 (rerank 상위)
 
 # --- Per-node temperature settings ---
 # 분류/판단 노드: 결정적 (동일 입력 → 동일 출력)
-TEMP_CLASSIFICATION = 0.0   # route, st_gate, judge
-TEMP_TRANSLATION = 0.0      # translate
+TEMP_CLASSIFICATION = 0.0  # route, st_gate, judge
+TEMP_TRANSLATION = 0.0  # translate
 # 생성 노드: 약간의 다양성 허용
-TEMP_QUERY_GEN = 0.3        # mq, st_mq, refine_queries
-TEMP_ANSWER = 0.5           # answer
+TEMP_QUERY_GEN = 0.3  # mq, st_mq, refine_queries
+TEMP_ANSWER = 0.5  # answer
 
 
 def _invoke_llm(llm: BaseLLM, system: str, user: str, **kwargs: Any) -> str:
@@ -336,14 +340,21 @@ def _invoke_llm(llm: BaseLLM, system: str, user: str, **kwargs: Any) -> str:
     # max_tokens 기본값: 분류용 (answer_node에서는 명시적으로 더 큰 값 전달)
     if "max_tokens" not in kwargs:
         kwargs["max_tokens"] = MAX_TOKENS_CLASSIFICATION
-    logger.debug("_invoke_llm: max_tokens=%s, system_len=%d, user_len=%d", kwargs.get("max_tokens"), len(system), len(user))
+    logger.debug(
+        "_invoke_llm: max_tokens=%s, system_len=%d, user_len=%d",
+        kwargs.get("max_tokens"),
+        len(system),
+        len(user),
+    )
     out = llm.generate(messages, **kwargs)
     result = out.text.strip()
     logger.debug("_invoke_llm: output_len=%d", len(result))
     return result
 
 
-def _invoke_llm_with_reasoning(llm: BaseLLM, system: str, user: str, **kwargs: Any) -> tuple[str, str | None]:
+def _invoke_llm_with_reasoning(
+    llm: BaseLLM, system: str, user: str, **kwargs: Any
+) -> tuple[str, str | None]:
     """Invoke LLM and return both text and reasoning content."""
     messages: List[dict[str, str]] = []
     if system:
@@ -354,7 +365,11 @@ def _invoke_llm_with_reasoning(llm: BaseLLM, system: str, user: str, **kwargs: A
     out = llm.generate(messages, **kwargs)
     text = out.text.strip()
     reasoning = out.reasoning
-    logger.debug("_invoke_llm_with_reasoning: output_len=%d, reasoning_len=%d", len(text), len(reasoning) if reasoning else 0)
+    logger.debug(
+        "_invoke_llm_with_reasoning: output_len=%d, reasoning_len=%d",
+        len(text),
+        len(reasoning) if reasoning else 0,
+    )
     return text, reasoning
 
 
@@ -389,9 +404,15 @@ def _strip_regeneration_prefixes(text: str) -> str:
     normalized = str(text).strip()
     if not normalized:
         return ""
-    normalized = re.sub(r"^(?:\[\s*regenerate with[^\]]*\]\s*)+", "", normalized, flags=re.I).strip()
-    normalized = re.sub(r"^(?:regenerate with\b[^:\n]*[:\-]?\s*)+", "", normalized, flags=re.I).strip()
-    normalized = re.sub(r"^(?:재검색\s*(?:조건|필터)?\s*[:\-]?\s*)+", "", normalized, flags=re.I).strip()
+    normalized = re.sub(
+        r"^(?:\[\s*regenerate with[^\]]*\]\s*)+", "", normalized, flags=re.I
+    ).strip()
+    normalized = re.sub(
+        r"^(?:regenerate with\b[^:\n]*[:\-]?\s*)+", "", normalized, flags=re.I
+    ).strip()
+    normalized = re.sub(
+        r"^(?:재검색\s*(?:조건|필터)?\s*[:\-]?\s*)+", "", normalized, flags=re.I
+    ).strip()
     return normalized
 
 
@@ -494,18 +515,36 @@ def _parse_queries(text: str) -> List[str]:
 
     def _is_meta_line(line: str) -> bool:
         lower = line.lower()
-        if any(pattern in lower for pattern in [
-            "given original", "they want", "from mq:", "we need", "could be:",
-            "example output", "example input", "output only", "no explanations",
-            "query generation", "output format",
-        ]):
+        if any(
+            pattern in lower
+            for pattern in [
+                "given original",
+                "they want",
+                "from mq:",
+                "we need",
+                "could be:",
+                "example output",
+                "example input",
+                "output only",
+                "no explanations",
+                "query generation",
+                "output format",
+            ]
+        ):
             return True
         if lower.startswith(("output:", "example:", "format:", "input:")):
             return True
         # Filter out prompt template labels that may leak into output
-        if any(label in lower for label in [
-            "setup_mq:", "ts_mq:", "general_mq:", "gate:", "질문:",
-        ]):
+        if any(
+            label in lower
+            for label in [
+                "setup_mq:",
+                "ts_mq:",
+                "general_mq:",
+                "gate:",
+                "질문:",
+            ]
+        ):
             return True
         return False
 
@@ -540,7 +579,8 @@ def _parse_queries(text: str) -> List[str]:
                     filtered = [
                         cleaned
                         for part in split_items
-                        if (cleaned := _normalize_query_text(part)) and not _looks_like_placeholder_query(cleaned)
+                        if (cleaned := _normalize_query_text(part))
+                        and not _looks_like_placeholder_query(cleaned)
                     ]
                 break
 
@@ -776,7 +816,9 @@ def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     route_query = state.get("query_en") or state["query"]
     query = _normalize_query_text(route_query) or str(route_query).strip()
     user = _format_prompt(spec.router.user, {"sys.query": query})
-    route = _parse_route(_invoke_llm(llm, spec.router.system, user, temperature=TEMP_CLASSIFICATION))
+    route = _parse_route(
+        _invoke_llm(llm, spec.router.system, user, temperature=TEMP_CLASSIFICATION)
+    )
     logger.info("route_node: query=%s..., route=%s", query[:50] if query else None, route)
 
     # parsed_query 업데이트
@@ -791,9 +833,11 @@ def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, A
     # Generate MQ in both English and Korean for bilingual retrieval
     query_en = state.get("query_en") or state["query"]
     query_ko = state.get("query_ko") or state["query"]
-    logger.info("mq_node: bilingual - EN=%s..., KO=%s...",
-                query_en[:40] if query_en else None,
-                query_ko[:40] if query_ko else None)
+    logger.info(
+        "mq_node: bilingual - EN=%s..., KO=%s...",
+        query_en[:40] if query_en else None,
+        query_ko[:40] if query_ko else None,
+    )
 
     if state.get("skip_mq") and state.get("search_queries"):
         logger.info("mq_node: search_queries override provided, skipping MQ generation")
@@ -816,7 +860,10 @@ def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, A
         logger.info("mq_node(%s/en): %d queries: %s", route, len(mq_en), mq_en)
 
         # Korean MQ - add explicit Korean language instruction
-        system_ko = spec_template.system + "\n\n**중요: 모든 검색어를 반드시 한국어로 생성하세요. Generate all queries in Korean.**"
+        system_ko = (
+            spec_template.system
+            + "\n\n**중요: 모든 검색어를 반드시 한국어로 생성하세요. Generate all queries in Korean.**"
+        )
         user_ko = _format_prompt(spec_template.user, {"sys.query": query_ko})
         raw_ko = _invoke_llm(llm, system_ko, user_ko, **mq_kwargs)
         mq_ko = _parse_queries(raw_ko)
@@ -837,9 +884,12 @@ def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, A
 
     logger.info(
         "mq_node: total - setup(en=%d,ko=%d), ts(en=%d,ko=%d), general(en=%d,ko=%d)",
-        len(setup_mq_list), len(setup_mq_ko_list),
-        len(ts_mq_list), len(ts_mq_ko_list),
-        len(general_mq_list), len(general_mq_ko_list),
+        len(setup_mq_list),
+        len(setup_mq_ko_list),
+        len(ts_mq_list),
+        len(ts_mq_ko_list),
+        len(general_mq_list),
+        len(general_mq_ko_list),
     )
 
     return {
@@ -881,8 +931,13 @@ def _is_garbage_query(q: str) -> bool:
         return True
     # Filter out prompt label leaks
     garbage_patterns = [
-        "setup_mq:", "ts_mq:", "general_mq:", "gate:",
-        "질문:", "queries:", "search_queries:",
+        "setup_mq:",
+        "ts_mq:",
+        "general_mq:",
+        "gate:",
+        "질문:",
+        "queries:",
+        "search_queries:",
         "[regenerate with",
     ]
     for pat in garbage_patterns:
@@ -941,10 +996,13 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
         if spec.translate is None:
             return text
         target_name = {"en": "English", "ko": "Korean"}.get(target_lang, target_lang)
-        user = _format_prompt(spec.translate.user, {
-            "query": text,
-            "target_language": target_name,
-        })
+        user = _format_prompt(
+            spec.translate.user,
+            {
+                "query": text,
+                "target_language": target_name,
+            },
+        )
         result = _invoke_llm(llm, spec.translate.system, user, temperature=TEMP_TRANSLATION)
         result = _normalize_query_text(result.strip().strip('"').strip("'").strip())
         return result if result else _normalize_query_text(text)
@@ -985,7 +1043,11 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
             if len(english_queries) >= 3:
                 break
             translated = _translate(q, "en")
-            if translated and not _contains_korean(translated) and not _is_garbage_query(translated):
+            if (
+                translated
+                and not _contains_korean(translated)
+                and not _is_garbage_query(translated)
+            ):
                 _fill_to_n(english_queries, [translated], 3)
 
     korean_queries: List[str] = []
@@ -1073,7 +1135,9 @@ def retrieve_node(
         _normalize_device_name(d) for d in selected_devices if _normalize_device_name(d)
     }
     selected_equip_id_set = {
-        _normalize_equip_id(eid) for eid in selected_equip_ids if _is_valid_equip_id(_normalize_equip_id(eid))
+        _normalize_equip_id(eid)
+        for eid in selected_equip_ids
+        if _is_valid_equip_id(_normalize_equip_id(eid))
     }
     selected_doc_type_set = {
         _normalize_doc_type(dt) for dt in selected_doc_type_filters if _normalize_doc_type(dt)
@@ -1083,6 +1147,92 @@ def retrieve_node(
 
     all_docs: List[RetrievalResult] = []
     seen: set = set()
+
+    def _normalize_meta_value(value: Any) -> str:
+        return str(value).strip()
+
+    def _stable_dedupe_key(doc: RetrievalResult) -> tuple[Any, ...]:
+        meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+        doc_id = _normalize_meta_value(doc.doc_id)
+
+        chunk_id = _normalize_meta_value(meta.get("chunk_id"))
+        if chunk_id:
+            return (doc_id, chunk_id)
+
+        page = _normalize_meta_value(meta.get("page"))
+        if page:
+            return (doc_id, page)
+
+        page_start = _normalize_meta_value(meta.get("page_start"))
+        if page_start:
+            return (doc_id, page_start)
+
+        text = (doc.raw_text or doc.content or "").strip()
+        if text:
+            text_digest = hashlib.sha1(text.encode("utf-8")).hexdigest()
+            return (doc_id, text_digest)
+
+        return (doc_id,)
+
+    def _stable_tie_break_key(doc: RetrievalResult) -> tuple[float, str, int, int, int, str]:
+        def _parse_int_like(value: Any) -> int | None:
+            if isinstance(value, bool):
+                return None
+            if isinstance(value, int):
+                return value
+            if isinstance(value, str):
+                stripped = value.strip()
+                if stripped.isdigit():
+                    return int(stripped)
+            return None
+
+        meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+        doc_id = _normalize_meta_value(doc.doc_id)
+
+        chunk_id = _normalize_meta_value(meta.get("chunk_id"))
+        if chunk_id:
+            secondary_rank = 0
+            secondary_value = chunk_id
+            secondary_numeric_rank = 1
+            secondary_numeric_value = 0
+        else:
+            page = _normalize_meta_value(meta.get("page"))
+            if page:
+                secondary_rank = 1
+                secondary_value = page
+                parsed_page = _parse_int_like(meta.get("page"))
+                if parsed_page is None:
+                    secondary_numeric_rank = 1
+                    secondary_numeric_value = 0
+                else:
+                    secondary_numeric_rank = 0
+                    secondary_numeric_value = parsed_page
+            else:
+                page_start = _normalize_meta_value(meta.get("page_start"))
+                if page_start:
+                    secondary_rank = 2
+                    secondary_value = page_start
+                    parsed_page_start = _parse_int_like(meta.get("page_start"))
+                    if parsed_page_start is None:
+                        secondary_numeric_rank = 1
+                        secondary_numeric_value = 0
+                    else:
+                        secondary_numeric_rank = 0
+                        secondary_numeric_value = parsed_page_start
+                else:
+                    secondary_rank = 3
+                    secondary_value = ""
+                    secondary_numeric_rank = 1
+                    secondary_numeric_value = 0
+
+        return (
+            -float(doc.score),
+            doc_id,
+            secondary_rank,
+            secondary_numeric_rank,
+            secondary_numeric_value,
+            secondary_value,
+        )
 
     def _matches_doc_type(doc: RetrievalResult) -> bool:
         if not selected_doc_type_set:
@@ -1114,7 +1264,7 @@ def retrieve_node(
                 continue
             if not _matches_equip_id(d):
                 continue
-            key = (d.doc_id, hash(d.raw_text or d.content))
+            key = _stable_dedupe_key(d)
             if key not in seen:
                 seen.add(key)
                 all_docs.append(d)
@@ -1163,23 +1313,31 @@ def retrieve_node(
         all_docs = [d for d in all_docs if str(d.doc_id) in set(selected_doc_ids)]
         logger.info("retrieve_node: filtered by selected_doc_ids %d -> %d", before, len(all_docs))
     if len(all_docs) > candidate_k:
-        all_docs = sorted(all_docs, key=lambda d: d.score, reverse=True)[:candidate_k]
+        all_docs = sorted(all_docs, key=_stable_tie_break_key)[:candidate_k]
 
     # Store all_docs before reranking for regeneration (up to retrieval_top_k)
     # Sort by score and take top retrieval_top_k for regeneration options
-    all_docs_for_regen = sorted(all_docs, key=lambda d: d.score, reverse=True)[:retrieval_top_k]
+    all_docs_for_regen = sorted(all_docs, key=_stable_tie_break_key)[:retrieval_top_k]
 
     # Rerank if reranker is available
     # Use English query for reranking - cross-encoder models often work better with English
     rerank_query = query_en if query_en else original_query
     if reranker is not None and all_docs:
-        logger.info("retrieve_node: reranking %d docs to top %d (using query_en)", len(all_docs), final_top_k)
+        logger.info(
+            "retrieve_node: reranking %d docs to top %d (using query_en)",
+            len(all_docs),
+            final_top_k,
+        )
         docs = reranker.rerank(rerank_query, all_docs, top_k=final_top_k)
     else:
         # No reranker: just take top final_top_k by score
-        docs = sorted(all_docs, key=lambda d: d.score, reverse=True)[:final_top_k]
+        docs = sorted(all_docs, key=_stable_tie_break_key)[:final_top_k]
 
-    logger.info("retrieve_node: returning %d docs (all_docs_for_regen: %d)", len(docs), len(all_docs_for_regen))
+    logger.info(
+        "retrieve_node: returning %d docs (all_docs_for_regen: %d)",
+        len(docs),
+        len(all_docs_for_regen),
+    )
     return {
         "docs": docs,
         "ref_json": results_to_ref_json(docs),
@@ -1302,7 +1460,7 @@ def expand_related_docs_node(
     )
     logger.info(summary)
 
-    display_docs = _merge_display_docs(expanded_docs[:min(total_docs, max_expand)])
+    display_docs = _merge_display_docs(expanded_docs[: min(total_docs, max_expand)])
     return {
         "docs": expanded_docs,
         "display_docs": display_docs,
@@ -1315,7 +1473,9 @@ def expand_related_docs_node(
     }
 
 
-def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["expand_related", "refine_and_retrieve"]]:
+def ask_user_after_retrieve_node(
+    state: AgentState,
+) -> Command[Literal["expand_related", "refine_and_retrieve"]]:
     """Retrieval 후 사용자에게 검색 결과를 보여주고 피드백을 받는 노드.
 
     사용자 응답:
@@ -1352,11 +1512,7 @@ def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["expand_r
             modified_queries = decision.get("search_queries", [])
 
             if isinstance(modified_queries, list) and len(modified_queries) > 0:
-                valid_queries = [
-                    str(q).strip()
-                    for q in modified_queries
-                    if str(q).strip()
-                ]
+                valid_queries = [str(q).strip() for q in modified_queries if str(q).strip()]
 
                 if valid_queries:
                     return Command(
@@ -1365,7 +1521,7 @@ def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["expand_r
                             "retrieval_confirmed": False,
                             "user_feedback": f"Modified queries: {', '.join(valid_queries)}",
                             "search_queries": valid_queries[:5],
-                        }
+                        },
                     )
                 else:
                     # Empty queries - fall back to refine_and_retrieve
@@ -1374,7 +1530,7 @@ def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["expand_r
                         update={
                             "retrieval_confirmed": False,
                             "user_feedback": "Empty queries provided",
-                        }
+                        },
                     )
 
         # 사용자가 특정 문서를 선택한 경우: 선택 문서만으로 answer 진행
@@ -1407,9 +1563,7 @@ def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["expand_r
 
             if selected_rank_list:
                 rank_set = set(selected_rank_list)
-                selected_docs.extend([
-                    d for idx, d in enumerate(docs, start=1) if idx in rank_set
-                ])
+                selected_docs.extend([d for idx, d in enumerate(docs, start=1) if idx in rank_set])
 
             # Deduplicate while preserving order
             seen_keys = set()
@@ -1435,8 +1589,7 @@ def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["expand_r
     # 승인: True 또는 빈 문자열
     if decision is True or decision == "":
         return Command(
-            goto="expand_related",
-            update={"retrieval_confirmed": True, "user_feedback": None}
+            goto="expand_related", update={"retrieval_confirmed": True, "user_feedback": None}
         )
 
     # 피드백 제공: 문자열로 키워드/피드백 입력
@@ -1452,13 +1605,12 @@ def ask_user_after_retrieve_node(state: AgentState) -> Command[Literal["expand_r
                 "retrieval_confirmed": False,
                 "user_feedback": feedback,
                 "search_queries": new_queries[:5],
-            }
+            },
         )
 
     # 거절: False
     return Command(
-        goto="refine_and_retrieve",
-        update={"retrieval_confirmed": False, "user_feedback": None}
+        goto="refine_and_retrieve", update={"retrieval_confirmed": False, "user_feedback": None}
     )
 
 
@@ -1570,9 +1722,18 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
         )
         user = prev_context + user
 
-    logger.info("answer_node: user_prompt_chars=%d, system_prompt_chars=%d", len(user), len(tmpl.system))
-    answer, reasoning = _invoke_llm_with_reasoning(llm, tmpl.system, user, max_tokens=MAX_TOKENS_ANSWER, temperature=TEMP_ANSWER)
-    logger.info("answer_node: answer_chars=%d, reasoning_chars=%d, answer_preview=%s", len(answer), len(reasoning) if reasoning else 0, answer[:500] if answer else "(empty)")
+    logger.info(
+        "answer_node: user_prompt_chars=%d, system_prompt_chars=%d", len(user), len(tmpl.system)
+    )
+    answer, reasoning = _invoke_llm_with_reasoning(
+        llm, tmpl.system, user, max_tokens=MAX_TOKENS_ANSWER, temperature=TEMP_ANSWER
+    )
+    logger.info(
+        "answer_node: answer_chars=%d, reasoning_chars=%d, answer_preview=%s",
+        len(answer),
+        len(reasoning) if reasoning else 0,
+        answer[:500] if answer else "(empty)",
+    )
     return {"answer": answer, "reasoning": reasoning}
 
 
@@ -1594,7 +1755,7 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
         f"질문: {query_for_judge}\n"
         f"답안: {state.get('answer', '')}\n"
         f"증거(REFS): {ref_text}\n"
-        "JSON 한 줄로 반환: {\"faithful\": bool, \"issues\": [...], \"hint\": \"...\"}"
+        'JSON 한 줄로 반환: {"faithful": bool, "issues": [...], "hint": "..."}'
     )
 
     raw = _invoke_llm(llm, sys, user, max_tokens=MAX_TOKENS_JUDGE, temperature=TEMP_CLASSIFICATION)
@@ -1605,12 +1766,16 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
         if not isinstance(judge, dict):
             raise ValueError("judge not dict")
     except Exception:
-        logger.warning("judge_node: failed to parse LLM output: %s", raw[:200] if raw else "(empty)")
+        logger.warning(
+            "judge_node: failed to parse LLM output: %s", raw[:200] if raw else "(empty)"
+        )
         judge = {"faithful": False, "issues": ["parse_error"], "hint": "judge JSON parse failed"}
     return {"judge": judge}
 
 
-def should_retry(state: AgentState) -> Literal["done", "retry", "retry_expand", "retry_mq", "human"]:
+def should_retry(
+    state: AgentState,
+) -> Literal["done", "retry", "retry_expand", "retry_mq", "human"]:
     """Determine retry strategy based on attempt count.
 
     Retry strategies:
@@ -1709,7 +1874,7 @@ def refine_queries_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) ->
         "Role: Search Query Refiner\n"
         "Given the original question, existing queries, and judge hint, generate 3 improved search queries.\n"
         "**IMPORTANT: Generate all queries in English.**\n"
-        "Output: {\"queries\":[...]} in one line only."
+        'Output: {"queries":[...]} in one line only.'
     )
     user_en = (
         f"Original question: {query_en}\n"
@@ -1734,11 +1899,15 @@ def refine_queries_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) ->
 
     # If not enough Korean queries, translate from English
     if len(korean_queries) < 3 and spec.translate is not None:
+
         def _translate(text: str) -> str:
-            user = _format_prompt(spec.translate.user, {
-                "query": text,
-                "target_language": "Korean",
-            })
+            user = _format_prompt(
+                spec.translate.user,
+                {
+                    "query": text,
+                    "target_language": "Korean",
+                },
+            )
             result = _invoke_llm(llm, spec.translate.system, user, temperature=TEMP_TRANSLATION)
             return result.strip().strip('"').strip("'").strip() or text
 
@@ -1753,7 +1922,11 @@ def refine_queries_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) ->
         korean_queries = korean_queries[:3]
 
     merged = english_queries + korean_queries
-    logger.info("refine_queries_node: bilingual queries EN=%d, KO=%d", len(english_queries), len(korean_queries))
+    logger.info(
+        "refine_queries_node: bilingual queries EN=%d, KO=%d",
+        len(english_queries),
+        len(korean_queries),
+    )
     return {"search_queries": merged}
 
 
@@ -1969,7 +2142,9 @@ def _filter_devices_by_query(
 ) -> List[str]:
     if not devices or not device_names:
         return []
-    device_map = {str(name).strip().lower(): str(name).strip() for name in device_names if str(name).strip()}
+    device_map = {
+        str(name).strip().lower(): str(name).strip() for name in device_names if str(name).strip()
+    }
     query_compact = _compact_text(query)
     filtered: List[str] = []
     for d in devices:
@@ -2112,8 +2287,24 @@ _IMPERATIVE_ENDINGS_KO = re.compile(
 _CONTENT_WORD_RE = re.compile(r"[가-힣]{2,}|[a-zA-Z]{3,}")
 # Korean stop words to exclude from overlap check
 _STOP_WORDS_KO = {
-    "하는", "이런", "저런", "어떤", "있는", "없는", "하고", "그리고", "또는",
-    "대해", "대한", "위한", "통해", "에서", "으로", "부터", "까지", "에게",
+    "하는",
+    "이런",
+    "저런",
+    "어떤",
+    "있는",
+    "없는",
+    "하고",
+    "그리고",
+    "또는",
+    "대해",
+    "대한",
+    "위한",
+    "통해",
+    "에서",
+    "으로",
+    "부터",
+    "까지",
+    "에게",
 }
 
 
@@ -2218,7 +2409,7 @@ def history_check_node(state: AgentState, *, llm: BaseLLM) -> Dict[str, Any]:
 
     system = (
         "You classify whether the current user query requires previous conversation context.\n"
-        "Return ONE JSON line only: {\"needs_history\": true|false}.\n"
+        'Return ONE JSON line only: {"needs_history": true|false}.\n'
         "Use true when the query depends on prior Q/A (pronouns, omitted subject, "
         "references like 'that/above/previous', requests to elaborate/continue).\n"
         "Use false when the query is self-contained.\n"
@@ -2247,12 +2438,16 @@ def history_check_node(state: AgentState, *, llm: BaseLLM) -> Dict[str, Any]:
                 query[:60],
             )
             return {"needs_history": parsed}
-        logger.warning("history_check_node: could not parse LLM output, fallback to rules: %s", raw[:120])
+        logger.warning(
+            "history_check_node: could not parse LLM output, fallback to rules: %s", raw[:120]
+        )
     except Exception as exc:
         logger.warning("history_check_node: LLM check failed, fallback to rules: %s", exc)
 
     fallback = _history_check_rule_based(state)
-    logger.info("history_check_node: fallback decision needs_history=%s query=%s", fallback, query[:60])
+    logger.info(
+        "history_check_node: fallback decision needs_history=%s query=%s", fallback, query[:60]
+    )
     return {"needs_history": fallback}
 
 
@@ -2460,10 +2655,13 @@ def translate_node(
         """Translate text to target language using LLM."""
         target_name = {"en": "English", "ko": "Korean"}.get(target_lang, target_lang)
         system = spec.translate.system
-        user = _format_prompt(spec.translate.user, {
-            "query": text,
-            "target_language": target_name,
-        })
+        user = _format_prompt(
+            spec.translate.user,
+            {
+                "query": text,
+                "target_language": target_name,
+            },
+        )
         result = _invoke_llm(llm, system, user, temperature=TEMP_TRANSLATION)
         # Clean up result (remove quotes, extra whitespace)
         result = result.strip().strip('"').strip("'").strip()
@@ -2509,9 +2707,7 @@ def human_review_node(state: AgentState) -> Command[Literal["done", "retry"]]:
         "judge": state.get("judge", {}),
         "answer": state.get("answer", ""),
         "retrieved_refs_preview": state.get("ref_json", [])[:3],
-        "instruction": (
-            "승인(true) / 거절(false) / 문자열로 답변을 덮어쓰기."
-        ),
+        "instruction": ("승인(true) / 거절(false) / 문자열로 답변을 덮어쓰기."),
     }
     decision = interrupt(payload)
 
@@ -2561,9 +2757,13 @@ def device_selection_node(
         # No selection options available, skip selection
         logger.info("device_selection_node: no devices/doc_types available, skipping")
         pq_dict = dict(state.get("parsed_query") or {})
-        pq_dict.update(selected_devices=[], device_selection_skipped=True,
-                        selected_doc_types=[], doc_types_strict=False,
-                        doc_type_selection_skipped=True)
+        pq_dict.update(
+            selected_devices=[],
+            device_selection_skipped=True,
+            selected_doc_types=[],
+            doc_types_strict=False,
+            doc_type_selection_skipped=True,
+        )
         return Command(
             goto="mq",
             update={
@@ -2575,7 +2775,7 @@ def device_selection_node(
                 "selected_doc_types_strict": False,
                 "doc_type_selection_skipped": True,
                 "parsed_query": pq_dict,
-            }
+            },
         )
 
     payload = {
@@ -2600,9 +2800,13 @@ def device_selection_node(
     # User skipped device selection
     if decision is None or decision == "" or decision == "skip":
         pq_dict = dict(state.get("parsed_query") or {})
-        pq_dict.update(selected_devices=[], device_selection_skipped=True,
-                        selected_doc_types=[], doc_types_strict=False,
-                        doc_type_selection_skipped=True)
+        pq_dict.update(
+            selected_devices=[],
+            device_selection_skipped=True,
+            selected_doc_types=[],
+            doc_types_strict=False,
+            doc_type_selection_skipped=True,
+        )
         return Command(
             goto="mq",
             update={
@@ -2614,7 +2818,7 @@ def device_selection_node(
                 "selected_doc_types_strict": False,
                 "doc_type_selection_skipped": True,
                 "parsed_query": pq_dict,
-            }
+            },
         )
 
     # Parse selected devices (can be single string, list, or dict with selected_devices)
@@ -2678,7 +2882,7 @@ def device_selection_node(
             "selected_doc_types_strict": len(selected_doc_types) > 0,
             "doc_type_selection_skipped": len(selected_doc_types) == 0,
             "parsed_query": pq_dict,
-        }
+        },
     )
 
 

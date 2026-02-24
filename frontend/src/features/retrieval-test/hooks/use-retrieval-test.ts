@@ -8,56 +8,32 @@ import {
 } from "../types";
 import { calculateMetrics } from "./use-metrics-calculation";
 
-interface SearchResponse {
-  query: string;
-  items: SearchResult[];
-  total: number;
-  page: number;
-  size: number;
-  has_next: boolean;
+interface RetrievalDoc {
+  rank: number;
+  doc_id: string;
+  title?: string | null;
+  snippet?: string | null;
+  score?: number | null;
+  metadata?: Record<string, unknown>;
+  page?: number;
+}
+
+interface RetrievalResponse {
+  run_id: string;
+  effective_config: Record<string, unknown>;
+  effective_config_hash: string;
+  warnings?: string[];
+  steps: Record<string, unknown>;
+  docs: RetrievalDoc[];
 }
 
 function getDefaultConfig(): SearchConfig {
   return {
-    denseWeight: 0.7,
-    sparseWeight: 0.3,
-    useRrf: true, // RRF 기본 활성화 (가중치 무시)
-    rrfK: 60, // RRF constant
-    rerank: false,
-    rerankModel: "cross-encoder/ms-marco-MiniLM-L-6-v2",
-    rerankTopK: 10,
-    multiQuery: false,
-    multiQueryN: 3,
     size: 20,
-    fieldWeights: [
-      {
-        field: "search_text",
-        label: "본문 텍스트",
-        enabled: true,
-        weight: 1.0,
-      },
-      {
-        field: "chunk_summary",
-        label: "청크 요약",
-        enabled: true,
-        weight: 0.7,
-      },
-      {
-        field: "chunk_keywords.text",
-        label: "키워드",
-        enabled: true,
-        weight: 0.8,
-      },
-      {
-        field: "content",
-        label: "원본 콘텐츠",
-        enabled: false,
-        weight: 0.6,
-      },
-      // Note: chapter, doc_description, device_name, doc_type are not searchable
-      // chapter/device_name/doc_type are keyword fields (not text-searchable)
-      // doc_description has index: false in ES mapping
-    ],
+    deterministic: true,
+    rerank: false,
+    autoParse: true,
+    skipMq: false,
   };
 }
 
@@ -69,63 +45,74 @@ export function useRetrievalTest() {
   const [results, setResults] = useState<RetrievalTestResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastRunId, setLastRunId] = useState<string | null>(null);
 
   const runSingleTest = useCallback(
-    async (question: TestQuestion) => {
+    async (question: TestQuestion, replayRunId?: string) => {
       setLoading(true);
       setError(null);
 
       try {
-        const fieldWeights = config.fieldWeights
-          .filter((f) => f.enabled)
-          .map((f) => `${f.field}^${f.weight.toFixed(1)}`)
-          .join(",");
+        const url = buildUrl("/api/retrieval/run");
 
-        const params = new URLSearchParams({
-          q: question.question,
-          field_weights: fieldWeights,
-          size: config.size.toString(),
-          use_rrf: config.useRrf.toString(),
+        const payload: Record<string, unknown> = {
+          query: question.question,
+          steps: ["retrieve"],
+          deterministic: config.deterministic,
+          final_top_k: config.size,
+          rerank_enabled: config.rerank,
+          auto_parse: config.autoParse,
+          skip_mq: config.skipMq,
+        };
+
+        if (replayRunId) {
+          payload.replay_run_id = replayRunId;
+        }
+
+        const response = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
         });
-
-        // 가중치는 RRF 비활성화 시에만 전달
-        if (!config.useRrf) {
-          params.append("dense_weight", config.denseWeight.toString());
-          params.append("sparse_weight", config.sparseWeight.toString());
-        } else {
-          params.append("rrf_k", config.rrfK.toString());
-        }
-
-        if (config.multiQuery) {
-          params.append("multi_query", "true");
-          params.append("multi_query_n", config.multiQueryN.toString());
-        }
-
-        if (config.rerank) {
-          params.append("rerank", "true");
-          params.append("rerank_top_k", config.rerankTopK.toString());
-        }
-
-        const url = buildUrl(`/api/search?${params.toString()}`);
-        console.log("[RetrievalTest] API Request URL:", url);
-        console.log("[RetrievalTest] Config:", { size: config.size, denseWeight: config.denseWeight, sparseWeight: config.sparseWeight });
-        const response = await fetch(url);
 
         if (!response.ok) {
           throw new Error(`Search failed: ${response.status}`);
         }
 
-        const data: SearchResponse = await response.json();
+        const data: RetrievalResponse = await response.json();
 
+        // Store run_id for replay functionality
+        setLastRunId(data.run_id);
+
+        // Convert canonical docs to SearchResult format for display and metrics
+        // Use the actual returned docs count (up to final_top_k) for metrics evaluation
+        const searchResults: SearchResult[] = data.docs.map((doc, index) => {
+          const score = typeof doc.score === "number" ? doc.score : null;
+          return {
+            rank: index + 1,
+            id: doc.doc_id, // Canonical uses doc_id, map to id for compatibility
+            title: doc.title ?? "Untitled",
+            snippet: doc.snippet ?? "",
+            score: score ?? 0,
+            score_display: score === null ? "N/A" : score.toFixed(4),
+            page: doc.page,
+          };
+        });
+
+        // Evaluate metrics using the canonical doc_ids
+        // Use the size from config (final_top_k) as the evaluation cutoff
+        const docsToEvaluate = searchResults.slice(0, config.size);
         const metrics = calculateMetrics(
-          data.items,
+          docsToEvaluate,
           question.groundTruthDocIds
         );
 
         const result: RetrievalTestResult = {
           questionId: question.id,
           question: question.question,
-          searchResults: data.items,
+          searchResults,
           groundTruthDocIds: question.groundTruthDocIds,
           metrics,
           config: { ...config },
@@ -170,6 +157,16 @@ export function useRetrievalTest() {
     [runSingleTest]
   );
 
+  const replayLastRun = useCallback(
+    async (question: TestQuestion) => {
+      if (!lastRunId) {
+        throw new Error("No previous run to replay");
+      }
+      return runSingleTest(question, lastRunId);
+    },
+    [lastRunId, runSingleTest]
+  );
+
   const updateConfig = useCallback((updates: Partial<SearchConfig>) => {
     setConfig((prev) => ({ ...prev, ...updates }));
   }, []);
@@ -189,6 +186,8 @@ export function useRetrievalTest() {
     error,
     runSingleTest,
     runBatchTest,
+    replayLastRun,
+    lastRunId,
     clearResults,
   };
 }

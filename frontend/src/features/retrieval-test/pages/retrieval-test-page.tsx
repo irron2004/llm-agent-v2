@@ -21,6 +21,8 @@ export default function RetrievalTestPage() {
     runSingleTest,
     runBatchTest,
     clearResults,
+    replayLastRun,
+    lastRunId,
   } = useRetrievalTest();
 
   const { aggregated } = useMetricsCalculation(results);
@@ -116,7 +118,13 @@ export default function RetrievalTestPage() {
             </Space>
           </Card>
 
-          <SearchConfigPanel config={config} onChange={updateConfig} />
+          <SearchConfigPanel 
+            config={config} 
+            onChange={updateConfig}
+            onReplay={() => selectedQuestion && replayLastRun(selectedQuestion)}
+            lastRunId={lastRunId}
+            disabled={loading || !selectedQuestion}
+          />
         </Col>
 
         <Col xs={24} lg={16}>

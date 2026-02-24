@@ -9,7 +9,7 @@ import re
 import uuid
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
@@ -36,17 +36,16 @@ DEFAULT_FINAL_TOP_K = 20
 # =============================================================================
 # 전역 상태: HIL(Human-in-the-Loop) 지원 및 Auto-Parse 모드
 # =============================================================================
-# 핵심: interrupt/resume가 동작하려면 동일한 graph 인스턴스와 checkpointer 필요
+# 핵심: interrupt/resume가 동작하려면 동일한 checkpointer(thread_id 기준 상태 공유) 필요
 _checkpointer: MemorySaver = MemorySaver()
-_hil_agent: Optional[LangGraphRAGAgent] = None
-_auto_parse_agent: Optional[LangGraphRAGAgent] = None
 
 
 def _create_device_fetcher(search_service):
     """Create a device/doc_type fetcher function using ES aggregation."""
+
     def _fetch_devices() -> Dict[str, Any] | list[Dict[str, Any]]:
         # Check if ES engine is available
-        if not hasattr(search_service, 'es_engine') or search_service.es_engine is None:
+        if not hasattr(search_service, "es_engine") or search_service.es_engine is None:
             logger.warning("ES engine not available for device fetching")
             return []
 
@@ -78,7 +77,7 @@ def _create_device_fetcher(search_service):
                                 }
                             }
                         }
-                    }
+                    },
                 },
                 "doc_types": {
                     "terms": {
@@ -102,17 +101,22 @@ def _create_device_fetcher(search_service):
                                 }
                             }
                         }
-                    }
+                    },
                 },
-            }
+            },
         }
 
         try:
             result = es.search(index=index, body=agg_query)
             device_buckets = result.get("aggregations", {}).get("devices", {}).get("buckets", [])
-            doc_type_buckets = result.get("aggregations", {}).get("doc_types", {}).get("buckets", [])
+            doc_type_buckets = (
+                result.get("aggregations", {}).get("doc_types", {}).get("buckets", [])
+            )
             devices = [
-                {"name": bucket["key"], "doc_count": bucket.get("unique_docs", {}).get("value", bucket["doc_count"])}
+                {
+                    "name": bucket["key"],
+                    "doc_count": bucket.get("unique_docs", {}).get("value", bucket["doc_count"]),
+                }
                 for bucket in device_buckets
                 if bucket.get("key")
             ]
@@ -174,52 +178,52 @@ def _build_state_overrides(req: "AgentRequest") -> Dict[str, Any]:
 
     return overrides
 
-def _get_hil_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent:
-    """HIL용 싱글톤 에이전트. 동일한 graph 인스턴스로 interrupt/resume 보장."""
-    global _hil_agent
-    if _hil_agent is None:
-        logger.info(
-            "Creating HIL agent singleton with top_k=%d retrieval_top_k=%d",
-            DEFAULT_FINAL_TOP_K,
-            DEFAULT_RETRIEVAL_TOP_K,
-        )
-        _hil_agent = LangGraphRAGAgent(
-            llm=llm,
-            search_service=search_service,
-            prompt_spec=prompt_spec,
-            top_k=DEFAULT_FINAL_TOP_K,
-            retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
-            mode="verified",
-            ask_user_after_retrieve=True,
-            ask_device_selection=True,
-            device_fetcher=_create_device_fetcher(search_service),
-            checkpointer=_checkpointer,
-        )
-    return _hil_agent
+
+def _new_hil_agent(
+    llm,
+    search_service,
+    prompt_spec,
+    *,
+    event_sink=None,
+) -> LangGraphRAGAgent:
+    """HIL용 요청 단위 에이전트. checkpointer를 공유해 interrupt/resume를 유지한다."""
+    return LangGraphRAGAgent(
+        llm=llm,
+        search_service=search_service,
+        prompt_spec=prompt_spec,
+        top_k=DEFAULT_FINAL_TOP_K,
+        retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
+        mode="verified",
+        ask_user_after_retrieve=True,
+        ask_device_selection=True,
+        device_fetcher=_create_device_fetcher(search_service),
+        checkpointer=_checkpointer,
+        event_sink=event_sink,
+    )
 
 
-def _get_auto_parse_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent:
-    """Auto-parse용 싱글톤 에이전트. 장비/문서종류를 자동으로 파싱."""
-    global _auto_parse_agent
-    if _auto_parse_agent is None:
-        logger.info(
-            "Creating Auto-parse agent singleton with top_k=%d retrieval_top_k=%d",
-            DEFAULT_FINAL_TOP_K,
-            DEFAULT_RETRIEVAL_TOP_K,
-        )
-        _auto_parse_agent = LangGraphRAGAgent(
-            llm=llm,
-            search_service=search_service,
-            prompt_spec=prompt_spec,
-            top_k=DEFAULT_FINAL_TOP_K,
-            retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
-            mode="verified",
-            ask_user_after_retrieve=False,  # 문서 선택 UI 비활성화
-            ask_device_selection=False,      # 기기 선택 UI 비활성화
-            auto_parse_enabled=True,         # 자동 파싱 활성화
-            checkpointer=_checkpointer,
-        )
-    return _auto_parse_agent
+def _new_auto_parse_agent(
+    llm,
+    search_service,
+    prompt_spec,
+    *,
+    top_k: int,
+    event_sink=None,
+) -> LangGraphRAGAgent:
+    """Auto-parse용 요청 단위 에이전트."""
+    return LangGraphRAGAgent(
+        llm=llm,
+        search_service=search_service,
+        prompt_spec=prompt_spec,
+        top_k=top_k,
+        retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
+        mode="verified",
+        ask_user_after_retrieve=False,  # 문서 선택 UI 비활성화
+        ask_device_selection=False,  # 기기 선택 UI 비활성화
+        auto_parse_enabled=True,  # 자동 파싱 활성화
+        checkpointer=_checkpointer,
+        event_sink=event_sink,
+    )
 
 
 # =============================================================================
@@ -227,6 +231,7 @@ def _get_auto_parse_agent(llm, search_service, prompt_spec) -> LangGraphRAGAgent
 # =============================================================================
 class ChatHistoryTurn(BaseModel):
     """이전 대화 턴 (후속 질문 지원용)."""
+
     user_text: str = Field(..., description="이전 사용자 질문")
     assistant_text: str = Field(..., description="이전 답변")
     doc_ids: List[str] = Field(default_factory=list, description="이전 참조 문서 ID")
@@ -242,7 +247,9 @@ class AgentRequest(BaseModel):
     resume_decision: Optional[Any] = Field(None, description="interrupt 재개 응답")
     auto_parse: bool = Field(True, description="자동 장비/문서종류 파싱 (기본값: True)")
     # 대화 이력 (후속 질문 지원)
-    chat_history: Optional[List[ChatHistoryTurn]] = Field(None, description="이전 대화 이력 (최근 1턴)")
+    chat_history: Optional[List[ChatHistoryTurn]] = Field(
+        None, description="이전 대화 이력 (최근 1턴)"
+    )
     # 재생성 시 사용할 필터 오버라이드
     filter_devices: Optional[List[str]] = Field(None, description="장비 필터 오버라이드")
     filter_doc_types: Optional[List[str]] = Field(None, description="문서종류 필터 오버라이드")
@@ -266,6 +273,7 @@ class RetrievedDoc(BaseModel):
 
 class ExpandedDoc(BaseModel):
     """확장된 문서 정보 (답변 생성에 사용된 컨텍스트)"""
+
     rank: int
     doc_id: str
     content: str  # 확장된 전체 내용
@@ -274,6 +282,7 @@ class ExpandedDoc(BaseModel):
 
 class AutoParseResult(BaseModel):
     """자동 파싱 결과"""
+
     device: Optional[str] = Field(None, description="파싱된 장비명")
     doc_type: Optional[str] = Field(None, description="파싱된 문서종류")
     devices: Optional[List[str]] = Field(None, description="파싱된 장비명 목록")
@@ -290,8 +299,12 @@ class AgentResponse(BaseModel):
     reasoning: Optional[str] = Field(None, description="LLM reasoning 과정 (reasoning 모델인 경우)")
     judge: Dict[str, Any]
     retrieved_docs: List[RetrievedDoc]
-    all_retrieved_docs: Optional[List[RetrievedDoc]] = Field(None, description="전체 검색 문서 (재생성용, 최대 retrieval_top_k개)")
-    expanded_docs: Optional[List[ExpandedDoc]] = Field(None, description="확장된 문서 (답변 생성용)")
+    all_retrieved_docs: Optional[List[RetrievedDoc]] = Field(
+        None, description="전체 검색 문서 (재생성용, 최대 retrieval_top_k개)"
+    )
+    expanded_docs: Optional[List[ExpandedDoc]] = Field(
+        None, description="확장된 문서 (답변 생성용)"
+    )
     metadata: Dict[str, Any] = Field(default_factory=dict)
     interrupted: bool = Field(False)
     interrupt_payload: Optional[Dict[str, Any]] = Field(None)
@@ -312,6 +325,33 @@ class AgentResponse(BaseModel):
     )
 
 
+class TraceContext(BaseModel):
+    trace_id: str
+    traceparent: Optional[str] = None
+    tracestate: Optional[str] = None
+
+
+_TRACEPARENT_PATTERN = re.compile(r"^[\da-f]{2}-[\da-f]{32}-[\da-f]{16}-[\da-f]{2}$", re.IGNORECASE)
+
+
+def _resolve_trace_context(traceparent: Optional[str], tracestate: Optional[str]) -> TraceContext:
+    cleaned_traceparent = (traceparent or "").strip()
+    if not _TRACEPARENT_PATTERN.match(cleaned_traceparent):
+        return TraceContext(trace_id=uuid.uuid4().hex)
+
+    segments = cleaned_traceparent.split("-")
+    trace_id_segment, parent_id_segment = segments[1], segments[2]
+    if int(trace_id_segment, 16) == 0 or int(parent_id_segment, 16) == 0:
+        return TraceContext(trace_id=uuid.uuid4().hex)
+
+    cleaned_tracestate = (tracestate or "").strip() or None
+    return TraceContext(
+        trace_id=uuid.uuid4().hex,
+        traceparent=cleaned_traceparent,
+        tracestate=cleaned_tracestate,
+    )
+
+
 def _to_expanded_docs(answer_ref_json: List[Dict[str, Any]] | None) -> List[ExpandedDoc] | None:
     """answer_ref_json을 ExpandedDoc 리스트로 변환."""
     if not answer_ref_json:
@@ -319,12 +359,14 @@ def _to_expanded_docs(answer_ref_json: List[Dict[str, Any]] | None) -> List[Expa
     docs: List[ExpandedDoc] = []
     for ref in answer_ref_json:
         content = ref.get("content", "")
-        docs.append(ExpandedDoc(
-            rank=ref.get("rank", 0),
-            doc_id=ref.get("doc_id", ""),
-            content=content,
-            content_length=len(content),
-        ))
+        docs.append(
+            ExpandedDoc(
+                rank=ref.get("rank", 0),
+                doc_id=ref.get("doc_id", ""),
+                content=content,
+                content_length=len(content),
+            )
+        )
     return docs if docs else None
 
 
@@ -481,27 +523,45 @@ def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
             expanded_pages = [page]
 
         if expanded_pages and doc_id:
-            expanded_page_urls = [
-                f"/api/assets/docs/{doc_id}/pages/{p}" for p in expanded_pages
-            ]
+            expanded_page_urls = [f"/api/assets/docs/{doc_id}/pages/{p}" for p in expanded_pages]
             if page is None:
                 page = expanded_pages[0]
             if not page_image_url:
                 page_image_url = expanded_page_urls[0]
 
-        docs.append(RetrievedDoc(
-            id=doc_id,
-            title=title,
-            snippet=snippet,
-            score=score,
-            score_percent=score_percent,
-            metadata=metadata,
-            page=page,
-            page_image_url=page_image_url,
-            expanded_pages=expanded_pages,
-            expanded_page_urls=expanded_page_urls,
-        ))
+        docs.append(
+            RetrievedDoc(
+                id=doc_id,
+                title=title,
+                snippet=snippet,
+                score=score,
+                score_percent=score_percent,
+                metadata=metadata,
+                page=page,
+                page_image_url=page_image_url,
+                expanded_pages=expanded_pages,
+                expanded_page_urls=expanded_page_urls,
+            )
+        )
     return docs
+
+
+def _build_response_metadata(result: Dict[str, Any]) -> Dict[str, Any]:
+    metadata: Dict[str, Any] = {
+        "route": result.get("route"),
+        "st_gate": result.get("st_gate"),
+        "search_queries": result.get("search_queries", []),
+        "selected_device": result.get("selected_device"),
+    }
+    human_action = result.get("human_action")
+    if isinstance(human_action, dict):
+        run_id = human_action.get("canonical_run_id")
+        config_hash = human_action.get("canonical_effective_config_hash")
+        if run_id:
+            metadata["run_id"] = run_id
+        if config_hash:
+            metadata["effective_config_hash"] = config_hash
+    return metadata
 
 
 # =============================================================================
@@ -510,6 +570,8 @@ def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
 @router.post("/run", response_model=AgentResponse)
 async def run_agent(
     req: AgentRequest,
+    traceparent: Optional[str] = Header(default=None),
+    tracestate: Optional[str] = Header(default=None),
     search_service: SearchService = Depends(get_search_service),
     llm=Depends(get_default_llm),
     prompt_spec=Depends(get_prompt_spec_cached),
@@ -520,6 +582,7 @@ async def run_agent(
 
     tid = req.thread_id or str(uuid.uuid4())
     is_resume = req.resume_decision is not None and req.thread_id is not None
+    trace_context = _resolve_trace_context(traceparent, tracestate)
 
     state_overrides = _build_state_overrides(req)
     has_overrides = bool(state_overrides)
@@ -531,10 +594,25 @@ async def run_agent(
 
     try:
         # Auto-parse 모드 (기본값: True), skip when overrides are provided
-        if req.auto_parse and not is_resume and not req.ask_user_after_retrieve and not has_overrides:
-            agent = _get_auto_parse_agent(llm, search_service, prompt_spec)
-            result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid,
-                               state_overrides=chat_state or None)
+        if (
+            req.auto_parse
+            and not is_resume
+            and not req.ask_user_after_retrieve
+            and not has_overrides
+        ):
+            agent = _new_auto_parse_agent(
+                llm,
+                search_service,
+                prompt_spec,
+                top_k=req.top_k,
+            )
+            result = agent.run(
+                req.message,
+                attempts=0,
+                max_attempts=req.max_attempts,
+                thread_id=tid,
+                state_overrides=chat_state or None,
+            )
         elif has_overrides and not is_resume:
             # Regeneration with filter/query/doc overrides
             agent = LangGraphRAGAgent(
@@ -556,7 +634,11 @@ async def run_agent(
             )
         # HIL 모드 (ask_user 또는 resume)
         elif req.ask_user_after_retrieve or is_resume:
-            agent = _get_hil_agent(llm, search_service, prompt_spec)
+            agent = _new_hil_agent(
+                llm,
+                search_service,
+                prompt_spec,
+            )
             config = {"configurable": {"thread_id": tid}}
 
             if is_resume:
@@ -567,7 +649,7 @@ async def run_agent(
                 if state is None or not state.values:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"No checkpoint for thread_id={tid}. Server may have restarted."
+                        detail=f"No checkpoint for thread_id={tid}. Server may have restarted.",
                     )
 
                 logger.info(f"[resume] next={state.next}, keys={list(state.values.keys())}")
@@ -604,7 +686,9 @@ async def run_agent(
 
     # Extract auto_parse results
     auto_parse_result = _extract_auto_parse_result(result)
-    suggest_additional_device_search = _should_suggest_additional_device_search(result, auto_parse_result)
+    suggest_additional_device_search = _should_suggest_additional_device_search(
+        result, auto_parse_result
+    )
 
     # Interrupt 체크
     interrupt_info = result.get("__interrupt__")
@@ -616,15 +700,14 @@ async def run_agent(
         return AgentResponse(
             query=req.message,
             answer=result.get("answer", "") or "",
+            reasoning=result.get("reasoning"),
             judge=result.get("judge", {}) or {},
             retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
             all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
             expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
             metadata={
-                "route": result.get("route"),
-                "st_gate": result.get("st_gate"),
-                "search_queries": result.get("search_queries", []),
-                "selected_device": result.get("selected_device"),
+                **_build_response_metadata(result),
+                "trace": trace_context.model_dump(exclude_none=True),
             },
             interrupted=True,
             interrupt_payload=payload,
@@ -642,17 +725,17 @@ async def run_agent(
     return AgentResponse(
         query=req.message,
         answer=result.get("answer", ""),
+        reasoning=result.get("reasoning"),
         judge=result.get("judge", {}),
         retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
         all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
         expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
         metadata={
-            "route": result.get("route"),
-            "st_gate": result.get("st_gate"),
-            "search_queries": result.get("search_queries", []),
-            "selected_device": result.get("selected_device"),
+            **_build_response_metadata(result),
+            "trace": trace_context.model_dump(exclude_none=True),
         },
         interrupted=False,
+        interrupt_payload=None,
         thread_id=tid,
         auto_parse=auto_parse_result,
         selected_devices=result.get("selected_devices"),
@@ -668,6 +751,8 @@ async def run_agent(
 async def run_agent_stream(
     req: AgentRequest,
     request: Request,
+    traceparent: Optional[str] = Header(default=None),
+    tracestate: Optional[str] = Header(default=None),
     search_service: SearchService = Depends(get_search_service),
     llm=Depends(get_default_llm),
     prompt_spec=Depends(get_prompt_spec_cached),
@@ -678,6 +763,8 @@ async def run_agent_stream(
 
     tid = req.thread_id or str(uuid.uuid4())
     is_resume = req.resume_decision is not None and req.thread_id is not None
+    trace_context = _resolve_trace_context(traceparent, tracestate)
+    trace_payload = trace_context.model_dump(exclude_none=True)
 
     state_overrides = _build_state_overrides(req)
     has_overrides = bool(state_overrides)
@@ -706,11 +793,26 @@ async def run_agent_stream(
     def _worker() -> None:
         try:
             # Auto-parse 모드 (기본값: True), skip when overrides are provided
-            if req.auto_parse and not is_resume and not req.ask_user_after_retrieve and not has_overrides:
-                agent = _get_auto_parse_agent(llm, search_service, prompt_spec)
-                agent._event_sink = _enqueue  # type: ignore[attr-defined]
-                result = agent.run(req.message, attempts=0, max_attempts=req.max_attempts, thread_id=tid,
-                                   state_overrides=chat_state_stream or None)
+            if (
+                req.auto_parse
+                and not is_resume
+                and not req.ask_user_after_retrieve
+                and not has_overrides
+            ):
+                agent = _new_auto_parse_agent(
+                    llm,
+                    search_service,
+                    prompt_spec,
+                    top_k=req.top_k,
+                    event_sink=_enqueue,
+                )
+                result = agent.run(
+                    req.message,
+                    attempts=0,
+                    max_attempts=req.max_attempts,
+                    thread_id=tid,
+                    state_overrides=chat_state_stream or None,
+                )
             elif has_overrides and not is_resume:
                 # Regeneration with filter/query/doc overrides
                 agent = LangGraphRAGAgent(
@@ -732,20 +834,24 @@ async def run_agent_stream(
                     state_overrides=state_overrides or None,
                 )
             elif req.ask_user_after_retrieve or is_resume:
-                # NOTE: HIL resume requires shared graph/checkpointer; reuse singleton.
-                agent = _get_hil_agent(llm, search_service, prompt_spec)
-                # Attach per-request sink (best-effort; concurrent streams may interleave).
-                agent._event_sink = _enqueue  # type: ignore[attr-defined]
+                agent = _new_hil_agent(
+                    llm,
+                    search_service,
+                    prompt_spec,
+                    event_sink=_enqueue,
+                )
                 config = {"configurable": {"thread_id": tid}}
 
                 if is_resume:
                     state = agent._graph.get_state(config)
                     if state is None or not state.values:
-                        _enqueue({
-                            "type": "error",
-                            "status": 400,
-                            "detail": f"No checkpoint for thread_id={tid}. Server may have restarted.",
-                        })
+                        _enqueue(
+                            {
+                                "type": "error",
+                                "status": 400,
+                                "detail": f"No checkpoint for thread_id={tid}. Server may have restarted.",
+                            }
+                        )
                         return
                     result = agent._graph.invoke(Command(resume=req.resume_decision), config)
                 else:
@@ -778,7 +884,9 @@ async def run_agent_stream(
 
             # Extract auto_parse results
             auto_parse_result = _extract_auto_parse_result(result)
-            suggest_additional_device_search = _should_suggest_additional_device_search(result, auto_parse_result)
+            suggest_additional_device_search = _should_suggest_additional_device_search(
+                result, auto_parse_result
+            )
 
             interrupt_info = result.get("__interrupt__")
             logger.info(f"[agent stream] result keys: {list(result.keys())}")
@@ -788,7 +896,9 @@ async def run_agent_stream(
             if interrupt_info:
                 payload = None
                 if len(interrupt_info) > 0:
-                    payload = interrupt_info[0].value if hasattr(interrupt_info[0], "value") else None
+                    payload = (
+                        interrupt_info[0].value if hasattr(interrupt_info[0], "value") else None
+                    )
 
                 resp = AgentResponse(
                     query=req.message,
@@ -796,13 +906,13 @@ async def run_agent_stream(
                     reasoning=result.get("reasoning"),
                     judge=result.get("judge", {}) or {},
                     retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
-                    all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
+                    all_retrieved_docs=_to_retrieved_docs(
+                        result.get("all_docs") or result.get("docs", [])
+                    ),
                     expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
                     metadata={
-                        "route": result.get("route"),
-                        "st_gate": result.get("st_gate"),
-                        "search_queries": result.get("search_queries", []),
-                        "selected_device": result.get("selected_device"),
+                        **_build_response_metadata(result),
+                        "trace": trace_payload,
                     },
                     interrupted=True,
                     interrupt_payload=payload,
@@ -822,15 +932,16 @@ async def run_agent_stream(
                     reasoning=result.get("reasoning"),
                     judge=result.get("judge", {}),
                     retrieved_docs=_to_retrieved_docs(_select_display_docs(result)),
-                    all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
+                    all_retrieved_docs=_to_retrieved_docs(
+                        result.get("all_docs") or result.get("docs", [])
+                    ),
                     expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
                     metadata={
-                        "route": result.get("route"),
-                        "st_gate": result.get("st_gate"),
-                        "search_queries": result.get("search_queries", []),
-                        "selected_device": result.get("selected_device"),
+                        **_build_response_metadata(result),
+                        "trace": trace_payload,
                     },
                     interrupted=False,
+                    interrupt_payload=None,
                     thread_id=tid,
                     auto_parse=auto_parse_result,
                     selected_devices=result.get("selected_devices"),
@@ -854,7 +965,9 @@ async def run_agent_stream(
 
     async def _gen():
         # Initial handshake event
-        yield f"data: {json.dumps({'type': 'open', 'thread_id': tid}, ensure_ascii=False)}\n\n"
+        yield (
+            f"data: {json.dumps({'type': 'open', 'thread_id': tid, 'trace': trace_payload}, ensure_ascii=False)}\n\n"
+        )
 
         while True:
             if await request.is_disconnected():

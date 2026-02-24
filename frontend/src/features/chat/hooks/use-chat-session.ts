@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { nanoid } from "nanoid";
-import { sendChatMessage, saveTurn, fetchSession, saveFeedback, saveDetailedFeedback, getDetailedFeedback } from "../api";
+import { sendChatMessage, saveTurn, fetchSession, saveFeedback, saveDetailedFeedback, getDetailedFeedback, resolveChatPaths } from "../api";
 import {
   AgentResponse,
   Message,
@@ -10,6 +10,7 @@ import {
   MessageFeedback,
   FeedbackRating,
   TurnResponse,
+  AgentRequest,
 } from "../types";
 import { connectSse } from "../../../lib/sse";
 import { env } from "../../../config/env";
@@ -97,6 +98,24 @@ const resolveInterruptKind = (payload?: Record<string, unknown> | null): Interru
   if (payload?.type === "retrieval_review") return "retrieval_review";
   if (payload?.type === "human_review") return "human_review";
   return "unknown";
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === "object" && value !== null;
+};
+
+// Type guard for AgentResponse - checks required fields
+const isAgentResponseLike = (value: unknown): value is AgentResponse => {
+  if (!isRecord(value)) return false;
+  return typeof value.query === "string" && typeof value.answer === "string";
+};
+
+const toStringArray = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 };
 
 const buildInterruptPrompt = (kind: InterruptKind, instruction?: string) => {
@@ -221,9 +240,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
   const handleAgentResponse = useCallback(
     (res: AgentResponse, assistantId: string, fallbackQuestion: string) => {
-      const metadataQueries = Array.isArray((res.metadata as any)?.search_queries)
-        ? (res.metadata as any).search_queries.filter((q: unknown): q is string => typeof q === "string" && q.trim().length > 0)
-        : [];
+      const metadataQueries = toStringArray(res.metadata?.search_queries);
       const responseQueries = Array.isArray(res.search_queries)
         ? res.search_queries.filter((q: unknown): q is string => typeof q === "string" && q.trim().length > 0)
         : [];
@@ -259,16 +276,22 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
         // Extract devices/doc types for device_selection interrupt
         const devices: DeviceInfo[] = Array.isArray(payload?.devices)
-          ? payload.devices.map((d: any) => ({
-              name: typeof d?.name === "string" ? d.name : "",
-              doc_count: typeof d?.doc_count === "number" ? d.doc_count : 0,
-            })).filter((d: DeviceInfo) => d.name)
+          ? payload.devices.map((device) => {
+              const source = isRecord(device) ? device : null;
+              return {
+                name: typeof source?.name === "string" ? source.name : "",
+                doc_count: typeof source?.doc_count === "number" ? source.doc_count : 0,
+              };
+            }).filter((d: DeviceInfo) => d.name)
           : [];
         const docTypes: DocTypeInfo[] = Array.isArray(payload?.doc_types)
-          ? payload.doc_types.map((d: any) => ({
-              name: typeof d?.name === "string" ? d.name : "",
-              doc_count: typeof d?.doc_count === "number" ? d.doc_count : 0,
-            })).filter((d: DocTypeInfo) => d.name)
+          ? payload.doc_types.map((docType) => {
+              const source = isRecord(docType) ? docType : null;
+              return {
+                name: typeof source?.name === "string" ? source.name : "",
+                doc_count: typeof source?.doc_count === "number" ? source.doc_count : 0,
+              };
+            }).filter((d: DocTypeInfo) => d.name)
           : [];
 
         if (threadId) {
@@ -310,8 +333,6 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           : null;
 
       if (docsToShow) {
-        console.log("[useChatSession] Setting completedRetrievedDocs:", docsToShow);
-        console.log("[useChatSession] First doc page_image_url:", docsToShow[0]?.page_image_url);
         setCompletedRetrievedDocs(docsToShow);
       } else {
         setCompletedRetrievedDocs(null);
@@ -369,20 +390,6 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       const shouldSuggestAdditionalDeviceSearch = typeof res.suggest_additional_device_search === "boolean"
         ? (res.suggest_additional_device_search || fallbackSuggest)
         : fallbackSuggest;
-
-      console.log("[useChatSession] device suggestion debug:", {
-        autoParseInfo,
-        responseDetectedLanguage,
-        hasAutoParseResult,
-        parsedDevices,
-        parsedDevice,
-        effectiveParsedDevices,
-        hasParsedDeviceSignal,
-        fallbackSuggest,
-        backendFlag: res.suggest_additional_device_search,
-        shouldSuggestAdditionalDeviceSearch,
-        docsCount: docsForRegeneration.length,
-      });
 
       updateMessage(assistantId, (m) => ({
         ...m,
@@ -513,7 +520,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         }
 
         const autoParseEnabled = overrides?.autoParse ?? !Boolean(overrides);
-        const payload = {
+        const payload: AgentRequest = {
           message: requestMessage,
           auto_parse: autoParseEnabled,  // 자동 파싱 모드 활성화 (기본값)
           ask_user_after_retrieve: false,  // 문서 선택 UI 비활성화
@@ -533,7 +540,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
               }
             : {}),
         };
-        const canStream = env.chatPath.endsWith("/run");
+        const { canStream, streamPath } = resolveChatPaths(env.chatPath);
         if (!canStream) {
           const res = await sendChatMessage(payload);
           handleAgentResponse(res, assistantId, requestMessage);
@@ -545,18 +552,23 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
         await connectSse(
           {
-            path: `${env.chatPath}/stream`,
+            path: streamPath,
             body: payload,
             signal: controller.signal,
           },
           {
             onMessage: (data) => {
-              let evt: any;
+              let evt: Record<string, unknown> | null = null;
               try {
-                evt = JSON.parse(data);
+                const parsed = JSON.parse(data) as unknown;
+                if (isRecord(parsed)) {
+                  evt = parsed;
+                }
               } catch {
                 return;
               }
+
+              if (!evt) return;
 
               if (evt?.type === "log") {
                 const logMessage = typeof evt?.message === "string" ? evt.message : "";
@@ -592,10 +604,10 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
                 const parsedDevice = typeof evt?.device === "string" ? evt.device : null;
                 const parsedDocType = typeof evt?.doc_type === "string" ? evt.doc_type : null;
                 const parsedDevices = Array.isArray(evt?.devices)
-                  ? evt.devices.map((d: any) => String(d)).filter((d: string) => d.trim())
+                  ? evt.devices.map((device) => String(device)).filter((d: string) => d.trim())
                   : (parsedDevice ? [parsedDevice] : []);
                 const parsedDocTypes = Array.isArray(evt?.doc_types)
-                  ? evt.doc_types.map((d: any) => String(d)).filter((d: string) => d.trim())
+                  ? evt.doc_types.map((docType) => String(docType)).filter((d: string) => d.trim())
                   : (parsedDocType ? [parsedDocType] : []);
 
                 if (!parseMessage && parsedDevices.length === 0 && parsedDocTypes.length === 0 && !parseLanguage) {
@@ -648,7 +660,11 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
               if (evt?.type === "final" && evt?.result) {
                 const res = evt.result;
-                handleAgentResponse(res, assistantId, requestMessage);
+                if (isAgentResponseLike(res)) {
+                  handleAgentResponse(res, assistantId, requestMessage);
+                } else {
+                  setError("응답 형식이 올바르지 않습니다.");
+                }
                 return;
               }
             },
@@ -908,14 +924,12 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   // Load an existing session from the backend
   const loadSession = useCallback(
     async (targetSessionId: string) => {
-      console.log("[loadSession] Loading session:", targetSessionId);
       stop();
       setError(null);
       setIsLoadingSession(true);
 
       try {
         const session = await fetchSession(targetSessionId);
-        console.log("[loadSession] Session loaded:", session);
 
         // Convert turns to messages
         const loadedMessages: Message[] = [];
