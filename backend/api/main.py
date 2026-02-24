@@ -6,7 +6,8 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.api.routers import agent, assets, chat, conversations, devices, feedback, health, ingestions, preprocessing, query_expansion, rerank, retrieval, retrieval_evaluation, search, summarization
+from backend.api.routers import agent, assets, conversations, feedback, health, ingestions, retrieval, search
+# from backend.api.routers import chat, devices, preprocessing, query_expansion, rerank, retrieval_evaluation, summarization  # FE 미사용 — 문제 없으면 삭제 예정
 from backend.api.dependencies import set_search_service
 from backend.config.settings import api_settings, search_settings
 from backend.services.es_search_service import EsSearchService
@@ -95,20 +96,21 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health.router)
-    app.include_router(preprocessing.router)
     app.include_router(agent.router, prefix="/api")
     app.include_router(assets.router, prefix="/api")
-    app.include_router(chat.router, prefix="/api")
     app.include_router(search.router, prefix="/api")
-    app.include_router(rerank.router, prefix="/api")
-    app.include_router(query_expansion.router, prefix="/api")
-    app.include_router(summarization.router, prefix="/api")
     app.include_router(ingestions.router, prefix="/api")
-    app.include_router(devices.router, prefix="/api")
     app.include_router(conversations.router, prefix="/api")
     app.include_router(feedback.router, prefix="/api")
     app.include_router(retrieval.router, prefix="/api")
-    app.include_router(retrieval_evaluation.router, prefix="/api")
+    # FE 미사용 — 문제 없으면 삭제 예정
+    # app.include_router(chat.router, prefix="/api")  # VITE_CHAT_PATH=/api/agent/run 으로 대체됨
+    # app.include_router(preprocessing.router)
+    # app.include_router(rerank.router, prefix="/api")
+    # app.include_router(query_expansion.router, prefix="/api")
+    # app.include_router(summarization.router, prefix="/api")
+    # app.include_router(devices.router, prefix="/api")
+    # app.include_router(retrieval_evaluation.router, prefix="/api")
 
     @app.on_event("startup")
     async def startup_search_service():
