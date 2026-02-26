@@ -214,6 +214,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     message?: string | null;
   }>>({});
   const onSessionChangeRef = useRef(onSessionChange);
+  const threadIdRef = useRef<string | null>(null);
   const onTurnSavedRef = useRef(onTurnSaved);
   onSessionChangeRef.current = onSessionChange;
   onTurnSavedRef.current = onTurnSaved;
@@ -245,6 +246,12 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         ? res.search_queries.filter((q: unknown): q is string => typeof q === "string" && q.trim().length > 0)
         : [];
       const effectiveSearchQueries = metadataQueries.length > 0 ? metadataQueries : responseQueries;
+
+      // Always capture thread_id from every response (interrupted or not)
+      const tid = typeof res.thread_id === "string" ? res.thread_id.trim() : "";
+      if (tid) {
+        threadIdRef.current = tid;
+      }
 
       if (res.interrupted) {
         const threadId = res.thread_id ?? "";
@@ -539,6 +546,9 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
                 ask_user_after_retrieve: true,  // resume은 HIL 모드
               }
             : {}),
+          ...(!isResume && threadIdRef.current
+            ? { thread_id: threadIdRef.current }
+            : {}),
         };
         const { canStream, streamPath } = resolveChatPaths(env.chatPath);
         if (!canStream) {
@@ -801,6 +811,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     currentUserTextRef.current = "";
     sessionTitleRef.current = null;
     turnCountRef.current = 0;
+    threadIdRef.current = null;
   }, [stop, clearLogs, setCompletedRetrievedDocs]);
 
   const submitFeedback = useCallback(

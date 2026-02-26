@@ -147,4 +147,47 @@ describe("chat request payload", () => {
       })
     );
   });
+
+  it("persists thread_id across turns", async () => {
+    env.chatPath = "/api/agent";
+
+    // First request: response includes thread_id
+    const responseWithThreadId = {
+      ...mockAgentResponse,
+      thread_id: "thread-123",
+    };
+    postSpy.mockResolvedValueOnce(responseWithThreadId as any);
+
+    const { result } = renderHook(() => useChatSession(), { wrapper });
+
+    // First send
+    await act(async () => {
+      await result.current.send({ text: "first request" });
+    });
+
+    await waitFor(() => {
+      expect(postSpy).toHaveBeenCalledWith(
+        "/api/agent",
+        expect.objectContaining({
+          message: "first request",
+        })
+      );
+    });
+
+    // Second request: should include thread_id from previous response
+    await act(async () => {
+      await result.current.send({ text: "second request" });
+    });
+
+    await waitFor(() => {
+      expect(postSpy).toHaveBeenLastCalledWith(
+        "/api/agent",
+        expect.objectContaining({
+          message: "second request",
+          thread_id: "thread-123",
+        })
+      );
+    });
+  });
+
 });
