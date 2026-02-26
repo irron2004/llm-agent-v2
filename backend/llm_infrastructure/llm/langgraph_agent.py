@@ -2519,12 +2519,23 @@ def auto_parse_node(
 
     # 규칙 기반만 사용 (LLM 호출 없음 - 속도 최적화)
     detected_language = _detect_language_rule_based(query)
-    devices = _extract_devices_from_query(device_names, query)
-    doc_types = _extract_doc_types_from_query(query)
-    equip_ids = _extract_equip_ids_from_query(query, known_equip_ids=equip_id_set)
+    detected_devices = _extract_devices_from_query(device_names, query)
+    detected_doc_types = _extract_doc_types_from_query(query)
+    detected_equip_ids = _extract_equip_ids_from_query(query, known_equip_ids=equip_id_set)
+
+    prev_devices = list(state.get("selected_devices") or [])
+    prev_doc_types = list(state.get("selected_doc_types") or [])
+    prev_equip_ids = list(state.get("selected_equip_ids") or [])
+
+    devices = detected_devices if detected_devices else prev_devices
+    doc_types = detected_doc_types if detected_doc_types else prev_doc_types
+    equip_ids = detected_equip_ids if detected_equip_ids else prev_equip_ids
 
     logger.info(
-        "auto_parse_node: devices=%s, doc_types=%s, equip_ids=%s, language=%s (rule-based only)",
+        "auto_parse_node: detected_devices=%s, detected_doc_types=%s, detected_equip_ids=%s, effective_devices=%s, effective_doc_types=%s, effective_equip_ids=%s, language=%s (rule-based only)",
+        detected_devices,
+        detected_doc_types,
+        detected_equip_ids,
         devices,
         doc_types,
         equip_ids,
@@ -2590,8 +2601,8 @@ def auto_parse_node(
         selected_equip_ids=selected_equip_ids,
         selected_doc_types=selected_doc_types,
         message=auto_parse_message,
-        device_selection_skipped=not bool(devices),
-        doc_type_selection_skipped=not bool(doc_types),
+        device_selection_skipped=len(selected_devices) == 0,
+        doc_type_selection_skipped=len(selected_doc_types) == 0,
     )
 
     # 언어는 항상 반환하고, 파싱 이벤트도 항상 발행한다.
@@ -2610,8 +2621,8 @@ def auto_parse_node(
         "selected_devices": selected_devices,
         "selected_doc_types": selected_doc_types,
         "selected_equip_ids": selected_equip_ids,
-        "device_selection_skipped": not bool(devices),
-        "doc_type_selection_skipped": not bool(doc_types),
+        "device_selection_skipped": len(selected_devices) == 0,
+        "doc_type_selection_skipped": len(selected_doc_types) == 0,
         "_events": [
             {
                 "type": "auto_parse",
