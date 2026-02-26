@@ -62,9 +62,10 @@ def test_agent_run_autoparse_honors_request_top_k(
         prompt_spec: Any,
         *,
         top_k: int,
+        use_canonical_retrieval: bool = False,
         event_sink: Any = None,
     ) -> _FakeAutoParseAgent:
-        del llm, search_service, prompt_spec, event_sink
+        del llm, search_service, prompt_spec, use_canonical_retrieval, event_sink
         return _FakeAutoParseAgent(top_k=top_k)
 
     monkeypatch.setattr(

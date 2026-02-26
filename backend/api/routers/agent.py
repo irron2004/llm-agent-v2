@@ -184,6 +184,7 @@ def _new_hil_agent(
     search_service,
     prompt_spec,
     *,
+    use_canonical_retrieval: bool = False,
     event_sink=None,
 ) -> LangGraphRAGAgent:
     """HIL용 요청 단위 에이전트. checkpointer를 공유해 interrupt/resume를 유지한다."""
@@ -196,6 +197,7 @@ def _new_hil_agent(
         mode="verified",
         ask_user_after_retrieve=True,
         ask_device_selection=True,
+        use_canonical_retrieval=use_canonical_retrieval,
         device_fetcher=_create_device_fetcher(search_service),
         checkpointer=_checkpointer,
         event_sink=event_sink,
@@ -208,6 +210,7 @@ def _new_auto_parse_agent(
     prompt_spec,
     *,
     top_k: int,
+    use_canonical_retrieval: bool = False,
     event_sink=None,
 ) -> LangGraphRAGAgent:
     """Auto-parse용 요청 단위 에이전트."""
@@ -221,6 +224,7 @@ def _new_auto_parse_agent(
         ask_user_after_retrieve=False,  # 문서 선택 UI 비활성화
         ask_device_selection=False,  # 기기 선택 UI 비활성화
         auto_parse_enabled=True,  # 자동 파싱 활성화
+        use_canonical_retrieval=use_canonical_retrieval,
         checkpointer=_checkpointer,
         event_sink=event_sink,
     )
@@ -256,6 +260,10 @@ class AgentRequest(BaseModel):
     filter_equip_ids: Optional[List[str]] = Field(None, description="equip_id 필터 오버라이드")
     search_queries: Optional[List[str]] = Field(None, description="검색 쿼리 오버라이드 (MQ 수정)")
     selected_doc_ids: Optional[List[str]] = Field(None, description="사용할 문서 ID 선택 (재생성)")
+    use_canonical_retrieval: bool = Field(
+        False,
+        description="검색 단계에서 canonical retrieval pipeline 사용 여부 (기본값: False)",
+    )
 
 
 class RetrievedDoc(BaseModel):
@@ -554,13 +562,15 @@ def _build_response_metadata(result: Dict[str, Any]) -> Dict[str, Any]:
         "selected_device": result.get("selected_device"),
     }
     human_action = result.get("human_action")
+    run_id = result.get("canonical_run_id")
+    config_hash = result.get("canonical_effective_config_hash")
     if isinstance(human_action, dict):
-        run_id = human_action.get("canonical_run_id")
-        config_hash = human_action.get("canonical_effective_config_hash")
-        if run_id:
-            metadata["run_id"] = run_id
-        if config_hash:
-            metadata["effective_config_hash"] = config_hash
+        run_id = run_id or human_action.get("canonical_run_id")
+        config_hash = config_hash or human_action.get("canonical_effective_config_hash")
+    if run_id:
+        metadata["run_id"] = run_id
+    if config_hash:
+        metadata["effective_config_hash"] = config_hash
     return metadata
 
 
@@ -605,6 +615,7 @@ async def run_agent(
                 search_service,
                 prompt_spec,
                 top_k=req.top_k,
+                use_canonical_retrieval=req.use_canonical_retrieval,
             )
             result = agent.run(
                 req.message,
@@ -623,6 +634,7 @@ async def run_agent(
                 retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
                 mode=req.mode,
                 ask_user_after_retrieve=False,
+                use_canonical_retrieval=req.use_canonical_retrieval,
                 checkpointer=None,
             )
             result = agent.run(
@@ -638,6 +650,7 @@ async def run_agent(
                 llm,
                 search_service,
                 prompt_spec,
+                use_canonical_retrieval=req.use_canonical_retrieval,
             )
             config = {"configurable": {"thread_id": tid}}
 
@@ -672,6 +685,7 @@ async def run_agent(
                 retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
                 mode=req.mode,
                 ask_user_after_retrieve=False,
+                use_canonical_retrieval=req.use_canonical_retrieval,
                 checkpointer=None,
             )
             result = agent.run(
@@ -804,6 +818,7 @@ async def run_agent_stream(
                     search_service,
                     prompt_spec,
                     top_k=req.top_k,
+                    use_canonical_retrieval=req.use_canonical_retrieval,
                     event_sink=_enqueue,
                 )
                 result = agent.run(
@@ -823,6 +838,7 @@ async def run_agent_stream(
                     retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
                     mode=req.mode,
                     ask_user_after_retrieve=False,
+                    use_canonical_retrieval=req.use_canonical_retrieval,
                     checkpointer=None,
                     event_sink=_enqueue,
                 )
@@ -838,6 +854,7 @@ async def run_agent_stream(
                     llm,
                     search_service,
                     prompt_spec,
+                    use_canonical_retrieval=req.use_canonical_retrieval,
                     event_sink=_enqueue,
                 )
                 config = {"configurable": {"thread_id": tid}}
@@ -871,6 +888,7 @@ async def run_agent_stream(
                     retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
                     mode=req.mode,
                     ask_user_after_retrieve=False,
+                    use_canonical_retrieval=req.use_canonical_retrieval,
                     checkpointer=None,
                     event_sink=_enqueue,
                 )

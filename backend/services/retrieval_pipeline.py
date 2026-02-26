@@ -211,8 +211,16 @@ def run_retrieval_pipeline(
             update = st_mq_node(state, llm=llm, spec=spec)
         elif step == "retrieve":
             if deterministic:
-                stable_query = _clean_query(state.get("query_en") or state.get("query"))
-                mutable_state["search_queries"] = [stable_query] if stable_query else []
+                current_search_queries = state.get("search_queries")
+                has_explicit_non_empty_search_queries = isinstance(
+                    current_search_queries, list
+                ) and any(
+                    isinstance(search_query, str) and search_query.strip()
+                    for search_query in current_search_queries
+                )
+                if not has_explicit_non_empty_search_queries:
+                    stable_query = _clean_query(state.get("query_en") or state.get("query"))
+                    mutable_state["search_queries"] = [stable_query] if stable_query else []
 
             update = retrieve_node(
                 state,

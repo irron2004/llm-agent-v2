@@ -146,6 +146,24 @@ def test_retrieval_pipeline_deterministic_bypasses_mq_and_stable_queries() -> No
     assert all(not msg.startswith("ST_MQ:") for msg in llm.user_messages)
 
 
+def test_retrieval_pipeline_deterministic_preserves_explicit_search_queries() -> None:
+    llm = SpyLLM()
+    retriever = SpyRetriever()
+
+    result = run_retrieval_pipeline(
+        query="pump pressure alarm",
+        llm=llm,
+        spec=_make_spec(),
+        retriever=retriever,
+        steps=["retrieve"],
+        deterministic=True,
+        rerank_enabled=False,
+        state_overrides={"search_queries": ["q1", "q2"]},
+    )
+
+    assert result["state"]["search_queries"] == ["q1", "q2"]
+
+
 def test_retrieval_pipeline_propagates_effective_config_and_disables_rerank() -> None:
     llm = SpyLLM()
     retriever = SpyRetriever()

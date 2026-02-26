@@ -43,6 +43,11 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     st_mq_node,
     translate_node,
 )
+from backend.services.retrieval_effective_config import (
+    effective_config_hash,
+    resolve_effective_config,
+)
+from backend.services.retrieval_pipeline import run_retrieval_pipeline
 from backend.services.search_service import SearchService
 from backend.services.device_cache import ensure_device_cache_initialized
 
@@ -72,6 +77,7 @@ class LangGraphRAGAgent:
         ask_user_after_retrieve: bool = False,
         ask_device_selection: bool = False,
         auto_parse_enabled: bool = False,  # Auto-parse device/doc_type from query
+        use_canonical_retrieval: bool = False,
         device_fetcher: Callable[[], Dict[str, Any] | list[Dict[str, Any]]] | None = None,
         event_sink: Callable[[Dict[str, Any]], None] | None = None,
     ) -> None:
@@ -89,6 +95,7 @@ class LangGraphRAGAgent:
         self.ask_user_after_retrieve = ask_user_after_retrieve
         self.ask_device_selection = ask_device_selection
         self.auto_parse_enabled = auto_parse_enabled
+        self.use_canonical_retrieval = use_canonical_retrieval
         self.device_fetcher = device_fetcher
         self.checkpointer = checkpointer or MemorySaver()
         self._event_sink = event_sink
@@ -314,6 +321,96 @@ class LangGraphRAGAgent:
 
         return " | ".join(details_parts) if details_parts else ""
 
+    def _collect_canonical_state_overrides(self, state: AgentState) -> Dict[str, Any] | None:
+        keys = (
+            "parsed_query",
+            "selected_devices",
+            "selected_doc_types",
+            "selected_doc_types_strict",
+            "selected_equip_ids",
+            "selected_doc_ids",
+            "search_queries",
+            "skip_mq",
+            "query_en",
+            "query_ko",
+            "detected_language",
+        )
+        overrides: Dict[str, Any] = {}
+        for key in keys:
+            if key in state and state.get(key) is not None:
+                overrides[key] = state.get(key)
+        return overrides or None
+
+    def _canonical_retrieve_node(self, state: AgentState) -> Dict[str, Any]:
+        query = str(state.get("query") or "")
+        reranker_available = self.reranker is not None and hasattr(self.reranker, "rerank")
+
+        effective_config = resolve_effective_config(
+            query,
+            ["retrieve"],
+            False,
+            True,
+            final_top_k=self.top_k,
+            retrieval_top_k=self.retrieval_top_k,
+            auto_parse=self.auto_parse_enabled,
+            skip_mq=True,
+            reranker_available=reranker_available,
+        )
+        policies = cast(dict[str, Any], effective_config.get("policies", {}))
+        defaults = cast(dict[str, Any], effective_config.get("defaults", {}))
+
+        pipeline_result = run_retrieval_pipeline(
+            query=query,
+            llm=self.llm,
+            spec=self.spec,
+            retriever=self.retriever,
+            reranker=self.reranker,
+            rerank_enabled=bool(policies.get("rerank_enabled", True)),
+            retrieval_top_k=int(defaults.get("retrieval_top_k", self.retrieval_top_k)),
+            final_top_k=int(defaults.get("final_top_k", self.top_k)),
+            steps=["retrieve"],
+            deterministic=True,
+            auto_parse_enabled=False,
+            state_overrides=self._collect_canonical_state_overrides(state),
+            effective_config=effective_config,
+        )
+
+        canonical_state = cast(dict[str, Any], pipeline_result.get("state", {}))
+        executed_steps = cast(list[str], pipeline_result.get("executed_steps", []))
+        effective_config_payload = dict(effective_config)
+        effective_config_payload["executed_steps"] = executed_steps
+
+        canonical_run_id = uuid.uuid4().hex
+        canonical_hash = effective_config_hash(effective_config_payload)
+
+        update: Dict[str, Any] = {
+            "docs": list(canonical_state.get("docs") or []),
+            "all_docs": list(canonical_state.get("all_docs") or []),
+            "ref_json": list(canonical_state.get("ref_json") or []),
+            "search_queries": list(canonical_state.get("search_queries") or []),
+            "canonical_run_id": canonical_run_id,
+            "canonical_effective_config_hash": canonical_hash,
+        }
+        human_action = state.get("human_action")
+        merged_human_action: Dict[str, Any] = (
+            dict(human_action) if isinstance(human_action, dict) else {}
+        )
+        merged_human_action["canonical_run_id"] = canonical_run_id
+        merged_human_action["canonical_effective_config_hash"] = canonical_hash
+        update["human_action"] = merged_human_action
+        return update
+
+    def _retrieve_node(self, state: AgentState) -> Dict[str, Any]:
+        if self.use_canonical_retrieval:
+            return self._canonical_retrieve_node(state)
+        return retrieve_node(
+            state,
+            retriever=self.retriever,
+            reranker=self.reranker,
+            retrieval_top_k=self.retrieval_top_k,
+            final_top_k=self.top_k,
+        )
+
     def _build_graph(self, mode: str):
         builder = StateGraph(AgentState)
 
@@ -335,13 +432,7 @@ class LangGraphRAGAgent:
             "st_mq",
             self._wrap_node("st_mq", functools.partial(st_mq_node, llm=self.llm, spec=self.spec)),
         )
-        retrieve_fn = functools.partial(
-            retrieve_node,
-            retriever=self.retriever,
-            reranker=self.reranker,
-            retrieval_top_k=self.retrieval_top_k,
-            final_top_k=self.top_k,
-        )
+        retrieve_fn = self._retrieve_node
         builder.add_node("retrieve", self._wrap_node("retrieve", retrieve_fn))
         # retry 경로용 retrieve: ask_user 없이 바로 answer로 연결
         builder.add_node("retrieve_retry", self._wrap_node("retrieve_retry", retrieve_fn))
