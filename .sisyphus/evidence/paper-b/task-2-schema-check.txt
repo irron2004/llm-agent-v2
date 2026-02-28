@@ -1,0 +1,16 @@
+21:## Corpus Schema (JSONL)
+35:## Query Schema (JSONL)
+25:- `doc_id` (string): MUST start with `DOC_`.
+44:- `expected_doc_ids` (array[string]): list of relevant `doc_id` values.
+49:- `expected_doc_ids` MUST refer to doc_ids that exist in `corpus.jsonl`.
+72:Rule L1 (doc_id token leakage)
+73:- A query MUST NOT contain any doc_id token patterns.
+77:- Let `gold_doc_content` be the concatenation of the contents of the docs referenced by `expected_doc_ids`.
+44:- `expected_doc_ids` (array[string]): list of relevant `doc_id` values.
+49:- `expected_doc_ids` MUST refer to doc_ids that exist in `corpus.jsonl`.
+77:- Let `gold_doc_content` be the concatenation of the contents of the docs referenced by `expected_doc_ids`.
+51:## Fixed Dataset Sizes
+53:- Total documents: 120
+59:- Paraphrase groups: 60
+60:- Queries per group: 4
+61:- Total query records: 240

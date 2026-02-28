@@ -1,0 +1,11 @@
+{
+  "deterministic_repeats": 1,
+  "hit_at_5": 0.0,
+  "k": 10,
+  "mrr": 0.0,
+  "p95_latency_ms": 12744.99780498445,
+  "paraphrase_stability_jaccard_at_10": 0.0,
+  "query_count": 20,
+  "repeat_stability_exactmatch_at_10": 0.0,
+  "repeat_stability_jaccard_at_10": 0.0
+}

@@ -74,6 +74,11 @@ class RAGSettings(BaseSettings):
         default="v1",
         description="Retrieval method version"
     )
+    prompt_spec_version: str = Field(
+        default="v1",
+        description="Prompt specification version for LangGraph YAML templates (RAG_PROMPT_SPEC_VERSION)"
+    )
+
     retrieval_top_k: int = Field(
         default=10,
         description="Number of documents to retrieve"

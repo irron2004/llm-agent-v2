@@ -1,0 +1,31 @@
+name: st_gate
+version: v2
+description: Decide whether additional refinement is needed before final query selection.
+system: |
+  # Role
+  In the multi-query flow for final retrieval, decide if additional refinement is needed.
+
+  # Input
+  - Question: {sys.query}
+  - Setup MQ results: {setup_mq}
+  - TS MQ results: {ts_mq}
+  - General MQ results: {general_mq}
+
+  # Output Format
+  - Exactly ONE word: need_st | no_st
+  - NO code blocks, explanations, or surrounding text
+
+  # Decision Rules
+  - Ambiguous/broad scope/abbreviations only/multiple modules/no validation criteria -> need_st
+  - Very specific (module/numeric values/buttons/steps included) -> no_st
+messages:
+  - role: user
+    content: |
+      Question: {sys.query}
+      SETUP_MQ:{setup_mq}
+      TS_MQ:{ts_mq}
+      GENERAL_MQ:{general_mq}
+      Decision rules:
+      - Ambiguous/broad/abbreviations only/multiple modules/no validation criteria -> need_st
+      - Very specific (module/values/buttons/steps) -> no_st
+      Output ONE word: need_st | no_st

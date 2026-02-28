@@ -1,0 +1,11 @@
+usage: generate_paper_b_assets.py [-h] [--evidence-root EVIDENCE_ROOT]
+                                  [--assets-dir ASSETS_DIR]
+                                  [--queries QUERIES]
+
+Generate Paper B table/figures
+
+options:
+  -h, --help            show this help message and exit
+  --evidence-root EVIDENCE_ROOT
+  --assets-dir ASSETS_DIR
+  --queries QUERIES

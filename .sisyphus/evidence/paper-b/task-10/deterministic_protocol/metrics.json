@@ -1,0 +1,17 @@
+{
+  "baseline_deterministic": false,
+  "baseline_mode_name": "nondeterministic_baseline",
+  "deterministic_repeats": 3,
+  "hit_at_10": 0.9375,
+  "hit_at_5": 0.6875,
+  "include_baseline": false,
+  "k": 10,
+  "mrr": 0.4722883597883598,
+  "p95_latency_ms": 1395.2370584011078,
+  "paraphrase_stability_jaccard_at_10": 0.7299956987456988,
+  "primary_deterministic": true,
+  "primary_mode_name": "deterministic_protocol",
+  "query_count": 48,
+  "repeat_stability_exactmatch_at_10": 1.0,
+  "repeat_stability_jaccard_at_10": 1.0
+}

@@ -1,0 +1,5 @@
+103:## What Paper B Must NOT Do
+104:- No “multi-agent novelty” claims.
+105:- No hierarchy/scope constraints as contributions (that is Paper A).
+106:- No numeric/condition validator contributions (Paper D).
+107:- No reranking as a variable (keep rerank disabled for Paper B main results).

@@ -1,0 +1,10 @@
+{
+  "chunks_indexed": 120,
+  "corpus_path": "data/synth_benchmarks/stability_bench_v1/corpus.jsonl",
+  "docs_processed": 120,
+  "failures": [],
+  "failures_count": 0,
+  "generated_at": "2026-02-27T20:12:07.045745+00:00",
+  "index": "rag_synth_synth_current",
+  "refreshed": true
+}

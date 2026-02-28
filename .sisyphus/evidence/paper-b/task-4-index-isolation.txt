@@ -1,0 +1,6 @@
+## rag_synth_synth_current
+{"rag_synth_synth_v1":{"aliases":{"rag_synth_synth_current":{}}}}
+## rag_chunks_dev_current
+{"rag_chunks_dev_v2":{"aliases":{"rag_chunks_dev_current":{}}}}
+## rag_chunks_prod_current
+{"error":"alias [rag_chunks_prod_current] missing","status":404}

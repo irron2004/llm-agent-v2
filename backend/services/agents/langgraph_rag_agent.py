@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, Optional, cast
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 
+from backend.config.settings import rag_settings
 from backend.llm_infrastructure.llm.base import BaseLLM
 from backend.llm_infrastructure.llm.langgraph_agent import (
     AgentState,
@@ -85,7 +86,7 @@ class LangGraphRAGAgent:
         self.search_service = search_service
         # Use the provided retrieval_top_k for initial retrieval
         self.retriever: Retriever = SearchServiceRetriever(search_service, top_k=retrieval_top_k)
-        self.spec = prompt_spec or load_prompt_spec()
+        self.spec = prompt_spec or load_prompt_spec(version=rag_settings.prompt_spec_version)
         self.top_k = top_k  # Final top_k after rerank
         self.retrieval_top_k = retrieval_top_k  # Initial retrieval top_k
         self.reranker = search_service.reranker  # Use reranker from search_service

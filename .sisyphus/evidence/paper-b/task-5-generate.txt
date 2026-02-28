@@ -1,0 +1,3 @@
+Wrote corpus: data/synth_benchmarks/stability_bench_v1/corpus.jsonl
+Wrote queries: data/synth_benchmarks/stability_bench_v1/queries.jsonl
+Wrote manifest: data/synth_benchmarks/stability_bench_v1/manifest.json

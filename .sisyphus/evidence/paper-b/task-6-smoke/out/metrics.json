@@ -1,0 +1,10 @@
+{
+  "hit@5": 0.0,
+  "hit@10": 1.0,
+  "MRR": 0.1125,
+  "RepeatJaccard@10": 1.0,
+  "RepeatExactMatch@10": 1.0,
+  "ParaphraseJaccard@10": 0.8181818181818182,
+  "ParaphraseExactMatch@10": 0.0,
+  "p95_latency_ms": 1125.0017816200852
+}

@@ -175,7 +175,7 @@ def get_default_llm() -> BaseLLM:
 @lru_cache
 def get_prompt_spec_cached():
     """Cache된 LangGraph 프롬프트 스펙."""
-    return load_prompt_spec()
+    return load_prompt_spec(version=rag_settings.prompt_spec_version)
 
 
 @lru_cache

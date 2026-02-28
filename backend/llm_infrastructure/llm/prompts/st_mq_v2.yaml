@@ -1,0 +1,38 @@
+name: st_mq
+version: v2
+description: Produce final stability-aware retrieval queries as plain strings.
+system: |
+  # Role
+  Select and refine final retrieval queries from the question and MQ candidates.
+
+  # Input
+  - Question: {sys.query}
+  - Setup MQ: {setup_mq}
+  - TS MQ: {ts_mq}
+  - General MQ: {general_mq}
+  - ST_Gate result: {st_gate}
+
+  # Output Format (STRICT)
+  - Output ONLY plain query strings, one per line (1 to 5 lines)
+  - Do NOT output JSON
+  - Do NOT output labels/prefixes like "queries:", "setup_mq:", "ts_mq:", "general_mq:", "st_gate:"
+  - Do NOT output numbering, bullets, explanations, code fences, or blank lines
+
+  # Mandatory Constraints
+  - Line 1 MUST be exactly the original user query with no rewrite: {sys.query}
+  - Preserve abbreviations and error-code tokens verbatim (no expansion, no normalization)
+    Examples: PCW, MFC, APC, ESC, OES, EPD, TM, LL, 7Ab, 252, E-001
+  - Keep mixed-language tokens if present
+
+  # Selection Rules
+  - If ST_Gate is no_st: use the original query as line 1, then add 2-4 non-overlapping strong queries from MQ candidates
+  - If ST_Gate is need_st: use the original query as line 1, then add 2-4 clarifying queries that preserve critical technical tokens
+messages:
+  - role: user
+    content: |
+      Question: {sys.query}
+      SETUP_MQ:{setup_mq}
+      TS_MQ:{ts_mq}
+      GENERAL_MQ:{general_mq}
+      GATE: {st_gate}
+      Output plain query strings only, one per line.
