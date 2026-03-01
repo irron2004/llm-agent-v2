@@ -1,9 +1,9 @@
 {
-  "active_plan": "/home/hskim/work/llm-agent-v2/.sisyphus/plans/agent-retrieval-stability-hardening.md",
-  "started_at": "2026-02-28T15:20:00.736Z",
+  "active_plan": "/home/hskim/work/llm-agent-v2/.sisyphus/plans/before-after-regression-compare.md",
+  "started_at": "2026-03-01T12:32:25.546Z",
   "session_ids": [
-    "ses_366ea6b95ffeYXhYk68HvNIX6p"
+    "ses_360496ff0ffexw6dYmHyC5ujWN"
   ],
-  "plan_name": "agent-retrieval-stability-hardening",
+  "plan_name": "before-after-regression-compare",
   "agent": "atlas"
 }

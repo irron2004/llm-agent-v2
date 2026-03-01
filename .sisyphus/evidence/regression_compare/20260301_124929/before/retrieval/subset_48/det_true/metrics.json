@@ -1,0 +1,18 @@
+{
+  "hit@5": 0.7291666666666666,
+  "hit@10": 0.9583333333333334,
+  "MRR": 0.476984126984127,
+  "RepeatJaccard@10": 1.0,
+  "RepeatExactMatch@10": 0.9861111111111112,
+  "ParaphraseJaccard@10": 0.7611693861693861,
+  "ParaphraseExactMatch@10": 0.05555555555555555,
+  "p95_latency_ms": 1410.136110149324,
+  "hit_at_5": 0.7291666666666666,
+  "hit_at_10": 0.9583333333333334,
+  "mrr": 0.476984126984127,
+  "repeat_stability_jaccard_at_10": 1.0,
+  "paraphrase_stability_jaccard_at_10": 0.7611693861693861,
+  "query_count": 48,
+  "deterministic_repeats": 10,
+  "primary_mode_name": "subset_48_det_true"
+}

@@ -1,0 +1,6 @@
+Environment: synth
+Alias: rag_synth_synth_current -> rag_synth_synth_v2
+
+Indices (2):
+  - rag_synth_synth_v1
+  - rag_synth_synth_v2 *

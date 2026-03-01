@@ -1,0 +1,3 @@
+/home/hskim/work/llm-agent-v2                                     c04fa25 [86ewk6385-1차-PE-피드백-v2]
+/home/hskim/work/llm-agent-v2/.sisyphus/worktrees/after-c04fa25   c04fa25 (detached HEAD)
+/home/hskim/work/llm-agent-v2/.sisyphus/worktrees/before-73ca832  73ca832 (detached HEAD)
