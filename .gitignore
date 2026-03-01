@@ -61,4 +61,6 @@ logs/
 data/
 .npm-cache/
 papers/
+!docs/papers/
+!docs/papers/**
 docs/refactoring_analysis_report.md

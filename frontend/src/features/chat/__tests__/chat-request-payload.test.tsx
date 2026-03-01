@@ -190,4 +190,81 @@ describe("chat request payload", () => {
     });
   });
 
+  it("saves turn with retrieval_meta when agent response has metadata", async () => {
+    env.chatPath = "/api/agent";
+
+    // Mock response that includes retrieval metadata
+    const responseWithMetadata = {
+      ...mockAgentResponse,
+      metadata: {
+        mq_mode: "fallback",
+        mq_used: true,
+        mq_reason: "initial_query",
+        route: "search->rerank->generate",
+        st_gate: "passed",
+        attempts: 1,
+        retry_strategy: "none",
+      },
+      search_queries: ["pump alarm", "chamber pressure"],
+    };
+    postSpy.mockResolvedValueOnce(responseWithMetadata as any);
+
+    const saveTurnSpy = vi.spyOn(chatApi, "saveTurn").mockResolvedValue(mockTurnResponse as any);
+
+    const { result } = renderHook(() => useChatSession(), { wrapper });
+
+    await act(async () => {
+      await result.current.send({ text: "test request with metadata" });
+    });
+
+    await waitFor(() => {
+      expect(saveTurnSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          user_text: "test request with metadata",
+          assistant_text: "answer",
+          retrieval_meta: {
+            mq_mode: "fallback",
+            mq_used: true,
+            mq_reason: "initial_query",
+            route: "search->rerank->generate",
+            st_gate: "passed",
+            attempts: 1,
+            retry_strategy: "none",
+            search_queries: ["pump alarm", "chamber pressure"],
+          },
+        })
+      );
+    });
+  });
+
+  it("omits retrieval_meta when agent response has no metadata", async () => {
+    env.chatPath = "/api/agent";
+
+    // Mock response without metadata
+    postSpy.mockResolvedValueOnce(mockAgentResponse as any);
+
+    const saveTurnSpy = vi.spyOn(chatApi, "saveTurn").mockResolvedValue(mockTurnResponse as any);
+
+    const { result } = renderHook(() => useChatSession(), { wrapper });
+
+    await act(async () => {
+      await result.current.send({ text: "test request without metadata" });
+    });
+
+    await waitFor(() => {
+      expect(saveTurnSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.objectContaining({
+          user_text: "test request without metadata",
+          assistant_text: "answer",
+        })
+      );
+    });
+
+    // Verify retrieval_meta is not present in the call
+    const saveTurnCall = saveTurnSpy.mock.calls[0];
+    const payload = saveTurnCall[1];
+    expect(payload).not.toHaveProperty("retrieval_meta");
+  });
 });

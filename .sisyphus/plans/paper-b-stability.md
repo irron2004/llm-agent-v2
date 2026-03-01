@@ -58,19 +58,19 @@
   - Reproducibility checklist + runbook
 
 ### Definition of Done (verifiable)
-- [ ] Synthetic benchmark generation is deterministic given a seed and produces identical hashes:
+- [x] Synthetic benchmark generation is deterministic given a seed and produces identical hashes:
   - Command: `python scripts/paper_b/generate_synth_benchmark.py --seed 123 --out data/synth_benchmarks/stability_bench_v1`
   - Evidence: `data/synth_benchmarks/stability_bench_v1/manifest.json` contains corpus/query hashes.
-- [ ] Synthetic corpus ingests into a dedicated ES index prefix without touching production indices.
-- [ ] Paper-B evaluation script runs end-to-end and writes:
+- [x] Synthetic corpus ingests into a dedicated ES index prefix without touching production indices.
+- [x] Paper-B evaluation script runs end-to-end and writes:
   - `hit@k`, `MRR`, `Stability@k (repeat)`, `Stability@k (paraphrase)`, `p95_latency_ms`
   - Evidence: `.sisyphus/evidence/paper-b/metrics.json` + `.sisyphus/evidence/paper-b/results.jsonl`
-- [ ] Deterministic ordering guarantees are validated by existing tests:
+- [x] Deterministic ordering guarantees are validated by existing tests:
   - Command: `pytest backend/tests/test_retrieve_node_deterministic.py`
   - Command: `pytest backend/tests/test_retrieval_pipeline.py`
-- [ ] Reindex-tier experiment is executed and results are captured:
+- [x] Reindex-tier experiment is executed and results are captured:
   - Evidence: `.sisyphus/evidence/paper-b/reindex_stability_report.md`
-- [ ] Paper draft exists with filled Results + Discussion + Limitations sections and references the released benchmark.
+- [x] Paper draft exists with filled Results + Discussion + Limitations sections and references the released benchmark.
 
   Notes (executor-facing):
   - Router-local endpoints are defined as `/retrieval/run` and `/retrieval/runs/{run_id}` in `backend/api/routers/retrieval.py`.

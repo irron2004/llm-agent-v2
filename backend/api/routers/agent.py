@@ -7,7 +7,7 @@ import json
 import logging
 import re
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from fastapi.responses import StreamingResponse
@@ -20,6 +20,7 @@ from backend.api.dependencies import (
     get_prompt_spec_cached,
     get_search_service,
 )
+from backend.config.settings import agent_settings
 from backend.domain.doc_type_mapping import expand_doc_type_selection, group_doc_type_buckets
 from backend.llm_infrastructure.llm.langgraph_agent import ParsedQuery, _detect_language_rule_based
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
@@ -32,6 +33,9 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_RETRIEVAL_TOP_K = 50
 DEFAULT_FINAL_TOP_K = 20
+MAX_SEARCH_QUERY_METADATA_ITEMS = 5
+MAX_SEARCH_QUERY_METADATA_CHARS = 120
+MAX_INDEX_METADATA_CHARS = 120
 
 # =============================================================================
 # 전역 상태: HIL(Human-in-the-Loop) 지원 및 Auto-Parse 모드
@@ -260,6 +264,10 @@ class AgentRequest(BaseModel):
     filter_equip_ids: Optional[List[str]] = Field(None, description="equip_id 필터 오버라이드")
     search_queries: Optional[List[str]] = Field(None, description="검색 쿼리 오버라이드 (MQ 수정)")
     selected_doc_ids: Optional[List[str]] = Field(None, description="사용할 문서 ID 선택 (재생성)")
+    mq_mode: Optional[Literal["off", "fallback", "on"]] = Field(
+        None,
+        description="MQ retrieval mode override (off, fallback, on)",
+    )
     use_canonical_retrieval: bool = Field(
         False,
         description="검색 단계에서 canonical retrieval pipeline 사용 여부 (기본값: False)",
@@ -554,13 +562,84 @@ def _to_retrieved_docs(results: List[RetrievalResult]) -> List[RetrievedDoc]:
     return docs
 
 
-def _build_response_metadata(result: Dict[str, Any]) -> Dict[str, Any]:
+def _sanitize_search_queries_raw(result: Dict[str, Any]) -> Optional[List[str]]:
+    raw_keys = [
+        "search_queries_raw",
+        "raw_search_queries",
+        "general_mq_list",
+        "setup_mq_list",
+        "ts_mq_list",
+        "general_mq_ko_list",
+        "setup_mq_ko_list",
+        "ts_mq_ko_list",
+    ]
+    merged: List[str] = []
+    for key in raw_keys:
+        merged.extend(_to_str_list(result.get(key)))
+
+    if not merged:
+        return None
+
+    cleaned: List[str] = []
+    seen: set[str] = set()
+    for query in merged:
+        clipped = query.strip()[:MAX_SEARCH_QUERY_METADATA_CHARS]
+        if not clipped:
+            continue
+        dedupe_key = re.sub(r"\s+", " ", clipped).strip().casefold()
+        if not dedupe_key or dedupe_key in seen:
+            continue
+        seen.add(dedupe_key)
+        cleaned.append(clipped)
+        if len(cleaned) >= MAX_SEARCH_QUERY_METADATA_ITEMS:
+            break
+
+    return cleaned or None
+
+
+def _resolve_index_name(search_service: SearchService) -> Optional[str]:
+    es_engine = getattr(search_service, "es_engine", None)
+    if es_engine is None:
+        return None
+    index_name = getattr(es_engine, "index_name", None)
+    if index_name is None:
+        return None
+    safe = re.sub(r"[^\w.:-]+", "_", str(index_name).strip())
+    if not safe:
+        return None
+    return safe[:MAX_INDEX_METADATA_CHARS]
+
+
+def _build_response_metadata(
+    result: Dict[str, Any],
+    mq_mode: str,
+    max_attempts: int,
+    final_search_queries: List[str],
+    index_name: Optional[str],
+) -> Dict[str, Any]:
     metadata: Dict[str, Any] = {
         "route": result.get("route"),
         "st_gate": result.get("st_gate"),
-        "search_queries": result.get("search_queries", []),
+        "search_queries": final_search_queries,
+        "search_queries_final": final_search_queries,
         "selected_device": result.get("selected_device"),
+        "mq_mode": mq_mode,
+        "mq_used": bool(result.get("mq_used", False)),
+        "mq_reason": result.get("mq_reason"),
+        "attempts": int(result.get("attempts", 0) or 0),
+        "max_attempts": int(max_attempts),
+        "retry_strategy": result.get("retry_strategy"),
+        "guardrail_dropped_numeric": int(result.get("guardrail_dropped_numeric", 0) or 0),
+        "guardrail_dropped_anchor": int(result.get("guardrail_dropped_anchor", 0) or 0),
+        "guardrail_final_count": int(
+            result.get("guardrail_final_count", len(final_search_queries)) or 0
+        ),
     }
+    search_queries_raw = _sanitize_search_queries_raw(result)
+    if search_queries_raw:
+        metadata["search_queries_raw"] = search_queries_raw
+    if index_name:
+        metadata["index_name"] = index_name
     human_action = result.get("human_action")
     run_id = result.get("canonical_run_id")
     config_hash = result.get("canonical_effective_config_hash")
@@ -593,12 +672,15 @@ async def run_agent(
     tid = req.thread_id or str(uuid.uuid4())
     is_resume = req.resume_decision is not None and req.thread_id is not None
     trace_context = _resolve_trace_context(traceparent, tracestate)
+    effective_mq_mode = req.mq_mode or agent_settings.mq_mode_default
 
     state_overrides = _build_state_overrides(req)
     has_overrides = bool(state_overrides)
+    state_overrides["mq_mode"] = effective_mq_mode
 
     # Build chat_history state (separate from overrides to avoid triggering regeneration path)
     chat_state: Dict[str, Any] = {}
+    chat_state["mq_mode"] = effective_mq_mode
     if req.chat_history:
         chat_state["chat_history"] = [h.model_dump() for h in req.chat_history]
 
@@ -703,6 +785,8 @@ async def run_agent(
     suggest_additional_device_search = _should_suggest_additional_device_search(
         result, auto_parse_result
     )
+    final_search_queries = _to_str_list(result.get("search_queries"))
+    index_name = _resolve_index_name(search_service)
 
     # Interrupt 체크
     interrupt_info = result.get("__interrupt__")
@@ -720,7 +804,13 @@ async def run_agent(
             all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
             expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
             metadata={
-                **_build_response_metadata(result),
+                **_build_response_metadata(
+                    result,
+                    effective_mq_mode,
+                    req.max_attempts,
+                    final_search_queries,
+                    index_name,
+                ),
                 "trace": trace_context.model_dump(exclude_none=True),
             },
             interrupted=True,
@@ -730,7 +820,7 @@ async def run_agent(
             selected_devices=result.get("selected_devices"),
             selected_doc_types=result.get("selected_doc_types"),
             selected_equip_ids=result.get("selected_equip_ids"),
-            search_queries=result.get("search_queries"),
+            search_queries=final_search_queries,
             detected_language=result.get("detected_language"),
             suggest_additional_device_search=suggest_additional_device_search,
         )
@@ -745,7 +835,13 @@ async def run_agent(
         all_retrieved_docs=_to_retrieved_docs(result.get("all_docs") or result.get("docs", [])),
         expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
         metadata={
-            **_build_response_metadata(result),
+            **_build_response_metadata(
+                result,
+                effective_mq_mode,
+                req.max_attempts,
+                final_search_queries,
+                index_name,
+            ),
             "trace": trace_context.model_dump(exclude_none=True),
         },
         interrupted=False,
@@ -755,7 +851,7 @@ async def run_agent(
         selected_devices=result.get("selected_devices"),
         selected_doc_types=result.get("selected_doc_types"),
         selected_equip_ids=result.get("selected_equip_ids"),
-        search_queries=result.get("search_queries"),
+        search_queries=final_search_queries,
         detected_language=result.get("detected_language"),
         suggest_additional_device_search=suggest_additional_device_search,
     )
@@ -779,9 +875,12 @@ async def run_agent_stream(
     is_resume = req.resume_decision is not None and req.thread_id is not None
     trace_context = _resolve_trace_context(traceparent, tracestate)
     trace_payload = trace_context.model_dump(exclude_none=True)
+    effective_mq_mode = req.mq_mode or agent_settings.mq_mode_default
+    index_name = _resolve_index_name(search_service)
 
     state_overrides = _build_state_overrides(req)
     has_overrides = bool(state_overrides)
+    state_overrides["mq_mode"] = effective_mq_mode
 
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=256)
@@ -801,6 +900,7 @@ async def run_agent_stream(
 
     # Build chat_history state (separate from overrides to avoid triggering regeneration path)
     chat_state_stream: Dict[str, Any] = {}
+    chat_state_stream["mq_mode"] = effective_mq_mode
     if req.chat_history:
         chat_state_stream["chat_history"] = [h.model_dump() for h in req.chat_history]
 
@@ -899,18 +999,13 @@ async def run_agent_stream(
                     thread_id=tid,
                     state_overrides=state_overrides or None,
                 )
-
             # Extract auto_parse results
             auto_parse_result = _extract_auto_parse_result(result)
             suggest_additional_device_search = _should_suggest_additional_device_search(
                 result, auto_parse_result
             )
-
+            final_search_queries = _to_str_list(result.get("search_queries"))
             interrupt_info = result.get("__interrupt__")
-            logger.info(f"[agent stream] result keys: {list(result.keys())}")
-            logger.info(f"[agent stream] search_queries: {result.get('search_queries')}")
-            logger.info(f"[agent stream] all_docs count: {len(result.get('all_docs', []))}")
-            logger.info(f"[agent stream] interrupt_info: {interrupt_info}")
             if interrupt_info:
                 payload = None
                 if len(interrupt_info) > 0:
@@ -929,7 +1024,13 @@ async def run_agent_stream(
                     ),
                     expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
                     metadata={
-                        **_build_response_metadata(result),
+                        **_build_response_metadata(
+                            result,
+                            effective_mq_mode,
+                            req.max_attempts,
+                            final_search_queries,
+                            index_name,
+                        ),
                         "trace": trace_payload,
                     },
                     interrupted=True,
@@ -939,7 +1040,7 @@ async def run_agent_stream(
                     selected_devices=result.get("selected_devices"),
                     selected_doc_types=result.get("selected_doc_types"),
                     selected_equip_ids=result.get("selected_equip_ids"),
-                    search_queries=result.get("search_queries"),
+                    search_queries=final_search_queries,
                     detected_language=result.get("detected_language"),
                     suggest_additional_device_search=suggest_additional_device_search,
                 )
@@ -955,7 +1056,13 @@ async def run_agent_stream(
                     ),
                     expanded_docs=_to_expanded_docs(result.get("answer_ref_json")),
                     metadata={
-                        **_build_response_metadata(result),
+                        **_build_response_metadata(
+                            result,
+                            effective_mq_mode,
+                            req.max_attempts,
+                            final_search_queries,
+                            index_name,
+                        ),
                         "trace": trace_payload,
                     },
                     interrupted=False,
@@ -965,7 +1072,7 @@ async def run_agent_stream(
                     selected_devices=result.get("selected_devices"),
                     selected_doc_types=result.get("selected_doc_types"),
                     selected_equip_ids=result.get("selected_equip_ids"),
-                    search_queries=result.get("search_queries"),
+                    search_queries=final_search_queries,
                     detected_language=result.get("detected_language"),
                     suggest_additional_device_search=suggest_additional_device_search,
                 )

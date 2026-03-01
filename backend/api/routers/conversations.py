@@ -7,7 +7,7 @@ Provides endpoints for:
 - Deleting sessions
 """
 
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -17,6 +17,7 @@ from backend.services.chat_history_service import (
     ChatTurn,
     DocRef,
     SessionSummary,
+    sanitize_retrieval_meta,
 )
 
 router = APIRouter(prefix="/conversations", tags=["Conversations"])
@@ -28,10 +29,12 @@ _chat_history_service: ChatHistoryService | None = None
 def get_chat_history_service() -> ChatHistoryService:
     """Get the chat history service instance."""
     global _chat_history_service
-    if _chat_history_service is None:
-        _chat_history_service = ChatHistoryService.from_settings()
-        _chat_history_service.ensure_index()
-    return _chat_history_service
+    service = _chat_history_service
+    if service is None:
+        service = ChatHistoryService.from_settings()
+        service.ensure_index()
+        _chat_history_service = service
+    return service
 
 
 # ─── Request/Response Models ───
@@ -39,6 +42,7 @@ def get_chat_history_service() -> ChatHistoryService:
 
 class DocRefModel(BaseModel):
     """Document reference in assistant response."""
+
     slot: int = Field(..., description="User-visible document number (1, 2, 3...)")
     doc_id: str = Field(..., description="Document ID")
     title: str = Field(..., description="Document title")
@@ -50,14 +54,20 @@ class DocRefModel(BaseModel):
 
 class TurnRequest(BaseModel):
     """Request to save a conversation turn."""
+
     user_text: str = Field(..., description="User's question/message")
     assistant_text: str = Field(..., description="Assistant's response")
     doc_refs: List[DocRefModel] = Field(default_factory=list, description="Referenced documents")
     title: Optional[str] = Field(None, description="Session title (set on first turn)")
+    retrieval_meta: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Optional retrieval debug metadata",
+    )
 
 
 class TurnResponse(BaseModel):
     """Response for a saved turn."""
+
     session_id: str
     turn_id: int
     user_text: str
@@ -68,16 +78,19 @@ class TurnResponse(BaseModel):
     feedback_rating: Optional[str] = None
     feedback_reason: Optional[str] = None
     feedback_ts: Optional[str] = None
+    retrieval_meta: Optional[Dict[str, Any]] = None
 
 
 class FeedbackRequest(BaseModel):
     """Request to save satisfaction feedback."""
+
     rating: str = Field(..., description="Satisfaction rating: up/down")
     reason: Optional[str] = Field(None, description="Reason for dissatisfaction")
 
 
 class SessionListItem(BaseModel):
     """Session summary for listing."""
+
     id: str = Field(..., alias="session_id")
     title: str
     preview: str
@@ -91,6 +104,7 @@ class SessionListItem(BaseModel):
 
 class SessionDetail(BaseModel):
     """Full session detail with turns."""
+
     session_id: str
     title: str
     turns: List[TurnResponse]
@@ -99,6 +113,7 @@ class SessionDetail(BaseModel):
 
 class SessionListResponse(BaseModel):
     """Response for session list."""
+
     sessions: List[SessionListItem]
     total: int
 
@@ -174,6 +189,7 @@ async def get_session(
                 feedback_rating=t.feedback_rating,
                 feedback_reason=t.feedback_reason,
                 feedback_ts=t.feedback_ts.isoformat() if t.feedback_ts else None,
+                retrieval_meta=t.retrieval_meta,
             )
             for t in turns
         ],
@@ -209,6 +225,7 @@ async def save_turn(
     ]
 
     # Create and save turn
+    sanitized_retrieval_meta = sanitize_retrieval_meta(req.retrieval_meta)
     turn = ChatTurn(
         session_id=session_id,
         turn_id=turn_id,
@@ -216,6 +233,7 @@ async def save_turn(
         assistant_text=req.assistant_text,
         doc_refs=doc_refs,
         title=req.title if turn_id == 1 else None,  # Only set title on first turn
+        retrieval_meta=sanitized_retrieval_meta,
     )
     service.save_turn(turn)
 
@@ -230,6 +248,7 @@ async def save_turn(
         feedback_rating=turn.feedback_rating,
         feedback_reason=turn.feedback_reason,
         feedback_ts=turn.feedback_ts.isoformat() if turn.feedback_ts else None,
+        retrieval_meta=sanitized_retrieval_meta,
     )
 
 
@@ -281,6 +300,7 @@ async def save_feedback(
         feedback_rating=updated.feedback_rating,
         feedback_reason=updated.feedback_reason,
         feedback_ts=updated.feedback_ts.isoformat() if updated.feedback_ts else None,
+        retrieval_meta=updated.retrieval_meta,
     )
 
 

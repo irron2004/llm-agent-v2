@@ -113,6 +113,6 @@ All reported numbers must be reproducible from the synthetic benchmark release:
 - retrieval config hash and API request payloads
 
 ## References (internal)
-- Working draft: `docs/paper/paper_b_stability_aware_retrieval.md`
-- Shared protocol: `docs/paper/paper_common_protocol.md`
+- Working draft: `docs/papers/90_legacy/paper_b_stability_aware_retrieval.md`
+- Shared protocol: `docs/papers/10_common_protocol/paper_common_protocol.md`
 - Stability audit harness reference: `scripts/evaluation/retrieval_stability_audit.py`

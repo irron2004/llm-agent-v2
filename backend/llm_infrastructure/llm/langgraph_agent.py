@@ -82,6 +82,12 @@ class AgentState(TypedDict, total=False):
     st_gate: Gate
     search_queries: List[str]
     skip_mq: bool
+    mq_mode: str
+    mq_used: bool
+    mq_reason: Optional[str]
+    guardrail_dropped_numeric: int
+    guardrail_dropped_anchor: int
+    guardrail_final_count: int
 
     # Retry strategy configuration
     expand_top_k: int  # Number of docs to expand (default: 20, retry: 40)
@@ -330,6 +336,19 @@ TEMP_TRANSLATION = 0.0  # translate
 # 생성 노드: 약간의 다양성 허용
 TEMP_QUERY_GEN = 0.3  # mq, st_mq, refine_queries
 TEMP_ANSWER = 0.5  # answer
+
+
+def resolve_querygen_temperature(state: AgentState, *, mq_invoked: bool = False) -> float:
+    mq_mode = str(state.get("mq_mode") or "on").strip().lower()
+    attempts = int(state.get("attempts", 0) or 0)
+
+    if mq_mode == "on":
+        return TEMP_QUERY_GEN
+    if mq_mode == "fallback" and mq_invoked:
+        return TEMP_CLASSIFICATION
+    if mq_mode in {"off", "fallback"} and attempts < 2:
+        return TEMP_CLASSIFICATION
+    return TEMP_QUERY_GEN
 
 
 def _invoke_llm(llm: BaseLLM, system: str, user: str, **kwargs: Any) -> str:
@@ -602,6 +621,108 @@ def _dedupe_queries(queries: List[str]) -> List[str]:
     return deduped[:5]
 
 
+_UNIT_LIKE_PATTERN = re.compile(
+    r"(?i)(?:\b(?:psi|bar|pa|kpa|mpa|nm|mm|cm|um|v|kv|a|ma|w|kw|rpm|degc)\b|%|°c)"
+)
+
+
+def _query_dedupe_key(query: str) -> str:
+    return " ".join(str(query).split()).strip().lower()
+
+
+def _anchor_tokens(text: str) -> List[str]:
+    tokens = re.split(r"[\s\W_]+", text or "", flags=re.UNICODE)
+    anchors: List[str] = []
+    seen: set[str] = set()
+    for token in tokens:
+        tok = token.strip()
+        if len(tok) < 2:
+            continue
+        if not re.search(r"[A-Za-z가-힣]", tok):
+            continue
+        lowered = tok.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        anchors.append(tok)
+    return anchors
+
+
+def validate_search_queries(state: AgentState, candidates: List[str]) -> Dict[str, Any]:
+    original_query = str(state.get("query") or "").strip()
+    stable_query = _normalize_query_text(state.get("query_en") or state.get("query") or "")
+
+    normalized_candidates: List[str] = []
+    for candidate in candidates:
+        cleaned = _normalize_query_text(candidate)
+        if not cleaned or _is_garbage_query(cleaned):
+            continue
+        normalized_candidates.append(cleaned)
+
+    with_original = ([original_query] if original_query else []) + normalized_candidates
+
+    deduped: List[str] = []
+    seen_keys: set[str] = set()
+    for query in with_original:
+        key = _query_dedupe_key(query)
+        if not key or key in seen_keys:
+            continue
+        seen_keys.add(key)
+        deduped.append(query)
+
+    original_key = _query_dedupe_key(original_query)
+    has_user_digits = bool(re.search(r"\d", original_query))
+    user_digit_substrings = set(re.findall(r"\d+", original_query)) if has_user_digits else set()
+    anchors = _anchor_tokens(original_query)
+
+    dropped_numeric = 0
+    dropped_anchor = 0
+    filtered: List[str] = []
+
+    for query in deduped:
+        key = _query_dedupe_key(query)
+        if original_key and key == original_key:
+            filtered.append(query)
+            continue
+
+        if has_user_digits:
+            candidate_digits = re.findall(r"\d+", query)
+            if any(digit not in user_digit_substrings for digit in candidate_digits):
+                dropped_numeric += 1
+                continue
+        else:
+            if re.search(r"\d", query) or _UNIT_LIKE_PATTERN.search(query):
+                dropped_numeric += 1
+                continue
+
+        matched = sum(1 for anchor in anchors if anchor.lower() in query.lower())
+        recall = matched / (len(anchors) or 1)
+        if recall < 0.6:
+            dropped_anchor += 1
+            continue
+
+        filtered.append(query)
+
+    if original_query:
+        if not filtered or _query_dedupe_key(filtered[0]) != original_key:
+            filtered = [original_query] + [
+                q for q in filtered if _query_dedupe_key(q) != original_key
+            ]
+
+    filtered = filtered[:5]
+
+    if not filtered:
+        fallback = stable_query or original_query
+        filtered = [fallback] if fallback else []
+
+    return {
+        "search_queries": filtered,
+        "guardrail_dropped_numeric": int(dropped_numeric),
+        "guardrail_dropped_anchor": int(dropped_anchor),
+        "guardrail_final_count": int(len(filtered)),
+    }
+
+
 # -----------------------------
 # 5) Retrieval helpers
 # -----------------------------
@@ -848,7 +969,10 @@ def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, A
     general_mq_list: List[str] = []
 
     # MQ generation needs more tokens than classification
-    mq_kwargs = {"max_tokens": 4096, "temperature": TEMP_QUERY_GEN}
+    mq_kwargs = {
+        "max_tokens": 4096,
+        "temperature": resolve_querygen_temperature(state, mq_invoked=True),
+    }
 
     def _generate_mq_bilingual(spec_template) -> tuple[List[str], List[str]]:
         """Generate MQ in both English and Korean."""
@@ -893,6 +1017,7 @@ def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, A
     )
 
     return {
+        "mq_used": True,
         "setup_mq_list": setup_mq_list,
         "ts_mq_list": ts_mq_list,
         "general_mq_list": general_mq_list,
@@ -1007,7 +1132,8 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
         result = _normalize_query_text(result.strip().strip('"').strip("'").strip())
         return result if result else _normalize_query_text(text)
 
-    if state.get("skip_mq") and state.get("search_queries"):
+    used_existing_queries = bool(state.get("skip_mq") and state.get("search_queries"))
+    if used_existing_queries:
         queries = [
             cleaned
             for q in state.get("search_queries", [])
@@ -1023,7 +1149,12 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
             "st_gate": state.get("st_gate", "no_st"),
         }
         user = _format_prompt(spec.st_mq.user, mapping)
-        raw = _invoke_llm(llm, spec.st_mq.system, user, temperature=TEMP_QUERY_GEN)
+        raw = _invoke_llm(
+            llm,
+            spec.st_mq.system,
+            user,
+            temperature=resolve_querygen_temperature(state, mq_invoked=True),
+        )
         logger.info("st_mq_node: raw output=%s", raw)
         parsed = _parse_queries(raw)
         queries = [q for q in parsed if not _is_garbage_query(q)]
@@ -1071,13 +1202,30 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     korean_queries = korean_queries[:3]
 
     merged = english_queries + korean_queries
-    logger.info("st_mq_node: final search_queries (bilingual)=%s", merged)
+    guardrail_result = (
+        {
+            "search_queries": merged,
+            "guardrail_dropped_numeric": 0,
+            "guardrail_dropped_anchor": 0,
+            "guardrail_final_count": len(merged),
+        }
+        if used_existing_queries
+        else validate_search_queries(state, merged)
+    )
+    final_queries = guardrail_result["search_queries"]
+    logger.info("st_mq_node: final search_queries (bilingual/guardrailed)=%s", final_queries)
 
     # parsed_query 업데이트
     pq_dict = dict(state.get("parsed_query") or {})
-    pq_dict["search_queries"] = merged
+    pq_dict["search_queries"] = final_queries
 
-    return {"search_queries": merged, "parsed_query": pq_dict}
+    return {
+        "search_queries": final_queries,
+        "parsed_query": pq_dict,
+        "guardrail_dropped_numeric": int(guardrail_result["guardrail_dropped_numeric"]),
+        "guardrail_dropped_anchor": int(guardrail_result["guardrail_dropped_anchor"]),
+        "guardrail_final_count": int(guardrail_result["guardrail_final_count"]),
+    }
 
 
 def retrieve_node(
@@ -1338,10 +1486,16 @@ def retrieve_node(
         len(docs),
         len(all_docs_for_regen),
     )
+    mq_mode = str(state.get("mq_mode") or "")
+    empty_retrieval_fallback = (
+        mq_mode == "fallback" and not bool(state.get("mq_used", False)) and len(docs) == 0
+    )
+
     return {
         "docs": docs,
         "ref_json": results_to_ref_json(docs),
         "all_docs": all_docs_for_regen,  # 재생성용 전체 문서 (최대 retrieval_top_k개)
+        "mq_reason": "empty_retrieval" if empty_retrieval_fallback else state.get("mq_reason"),
     }
 
 
@@ -1770,6 +1924,20 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
             "judge_node: failed to parse LLM output: %s", raw[:200] if raw else "(empty)"
         )
         judge = {"faithful": False, "issues": ["parse_error"], "hint": "judge JSON parse failed"}
+    attempts = int(state.get("attempts", 0) or 0)
+    max_attempts = int(state.get("max_attempts", 0) or 0)
+    faithful = bool(judge.get("faithful", False))
+    if not faithful and attempts >= max_attempts:
+        issues = judge.get("issues")
+        if not isinstance(issues, list):
+            issues = []
+        if "max_attempts_reached" not in issues:
+            issues.append("max_attempts_reached")
+        judge = {
+            "faithful": False,
+            "issues": issues,
+            "hint": "Reached max_attempts without a faithful answer; stopping retries.",
+        }
     return {"judge": judge}
 
 
@@ -1790,29 +1958,41 @@ def should_retry(
     if faithful:
         return "done"
 
-    attempts = state.get("attempts", 0)
-    max_attempts = state.get("max_attempts", 0)
+    attempts = int(state.get("attempts", 0) or 0)
+    max_attempts = int(state.get("max_attempts", 0) or 0)
+    mq_mode = str(state.get("mq_mode") or "fallback")
+    mq_reason = state.get("mq_reason")
 
-    if attempts < max_attempts:
-        if attempts == 0:
-            # 1st retry: expand more docs (20→40)
-            return "retry_expand"
-        elif attempts == 1:
-            # 2nd retry: refine queries
-            return "retry"
-        else:
-            # 3rd+ retry: regenerate MQ from scratch
-            return "retry_mq"
-
-    # HIL 비활성화 모드 (auto_parse 등)에서는 human_review 건너뛰기
-    if state.get("_skip_human_review"):
+    # Hard ceiling: always terminate gracefully once max attempts is reached.
+    if attempts >= max_attempts:
         return "done"
-    return "human"
+
+    if mq_mode == "off":
+        if attempts == 0:
+            return "retry_expand"
+        return "retry"
+
+    if mq_mode == "fallback":
+        if mq_reason == "empty_retrieval" or attempts >= 2:
+            return "retry_mq"
+        if attempts == 0:
+            return "retry_expand"
+        return "retry"
+
+    # mq_mode == "on"
+    if attempts == 0:
+        return "retry_expand"
+    if attempts == 1:
+        return "retry"
+    return "retry_mq"
 
 
 def retry_bump_node(state: AgentState) -> Dict[str, Any]:
     """Increment attempt counter."""
-    return {"attempts": int(state.get("attempts", 0)) + 1}
+    return {
+        "attempts": int(state.get("attempts", 0)) + 1,
+        "retry_strategy": "refine_queries",
+    }
 
 
 def retry_expand_node(state: AgentState) -> Dict[str, Any]:
@@ -1841,6 +2021,12 @@ def retry_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[
     # Clear previous MQ lists to force regeneration
     return {
         "attempts": attempts,
+        "mq_used": True,
+        "mq_reason": (
+            "empty_retrieval"
+            if state.get("mq_reason") == "empty_retrieval"
+            else "unfaithful_after_deterministic_retries"
+        ),
         "retry_strategy": "regenerate_mq",
         "setup_mq_list": [],
         "ts_mq_list": [],
@@ -1881,7 +2067,12 @@ def refine_queries_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) ->
         f"Previous queries: {json.dumps(prev, ensure_ascii=False)}\n"
         f"Judge hint: {hint}\n"
     )
-    raw_en = _invoke_llm(llm, sys_en, user_en, temperature=TEMP_QUERY_GEN)
+    raw_en = _invoke_llm(
+        llm,
+        sys_en,
+        user_en,
+        temperature=resolve_querygen_temperature(state, mq_invoked=False),
+    )
     queries_en = _parse_queries(raw_en)
 
     # Build English queries (3)
@@ -1922,12 +2113,19 @@ def refine_queries_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) ->
         korean_queries = korean_queries[:3]
 
     merged = english_queries + korean_queries
+    guardrail_result = validate_search_queries(state, merged)
+    final_queries = guardrail_result["search_queries"]
     logger.info(
         "refine_queries_node: bilingual queries EN=%d, KO=%d",
         len(english_queries),
         len(korean_queries),
     )
-    return {"search_queries": merged}
+    return {
+        "search_queries": final_queries,
+        "guardrail_dropped_numeric": int(guardrail_result["guardrail_dropped_numeric"]),
+        "guardrail_dropped_anchor": int(guardrail_result["guardrail_dropped_anchor"]),
+        "guardrail_final_count": int(guardrail_result["guardrail_final_count"]),
+    }
 
 
 def _parse_auto_parse_result(text: str) -> Dict[str, Any]:
@@ -2736,7 +2934,7 @@ def device_selection_node(
     state: AgentState,
     *,
     device_fetcher: Optional[Any] = None,
-) -> Command[Literal["mq"]]:
+) -> Command[Literal["mq", "prepare_retrieve"]]:
     """Device selection node - interrupts to let user select devices (multiple).
 
     Args:
@@ -2745,8 +2943,20 @@ def device_selection_node(
             Devices/doc types should have 'name' and 'doc_count'.
 
     Returns:
-        Command to proceed to 'mq' node with selected devices.
+        Command to proceed to 'mq' or 'prepare_retrieve' with selected devices.
     """
+
+    def _next_goto() -> Literal["mq", "prepare_retrieve"]:
+        mq_mode = state.get("mq_mode")
+        attempts = state.get("attempts", 0)
+        if mq_mode == "off":
+            return "prepare_retrieve"
+        if mq_mode == "fallback" and attempts == 0:
+            return "prepare_retrieve"
+        return "mq"
+
+    goto_target = _next_goto()
+
     # Fetch available devices if fetcher provided
     available_devices: List[Dict[str, Any]] = []
     available_doc_types: List[Dict[str, Any]] = []
@@ -2776,7 +2986,7 @@ def device_selection_node(
             doc_type_selection_skipped=True,
         )
         return Command(
-            goto="mq",
+            goto=goto_target,
             update={
                 "available_devices": [],
                 "selected_devices": [],
@@ -2819,7 +3029,7 @@ def device_selection_node(
             doc_type_selection_skipped=True,
         )
         return Command(
-            goto="mq",
+            goto=goto_target,
             update={
                 "available_devices": available_devices,
                 "selected_devices": [],
@@ -2883,7 +3093,7 @@ def device_selection_node(
         doc_type_selection_skipped=len(selected_doc_types) == 0,
     )
     return Command(
-        goto="mq",
+        goto=goto_target,
         update={
             "available_devices": available_devices,
             "selected_devices": selected_devices,

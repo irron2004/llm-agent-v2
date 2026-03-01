@@ -280,7 +280,7 @@ def get_index_meta(
     Returns:
         Index _meta definition
     """
-    meta = {
+    meta: dict[str, Any] = {
         "pipeline": {
             "embedding_model": embedding_model,
             "chunking": {
@@ -391,6 +391,10 @@ def get_chat_turns_mapping() -> dict[str, Any]:
                         "type": "float",
                     },
                 },
+            },
+            "retrieval_meta": {
+                "type": "object",
+                "enabled": False,
             },
             # ===================================================================
             # Session Metadata

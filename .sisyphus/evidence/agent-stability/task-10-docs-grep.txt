@@ -1,0 +1,4 @@
+270:### 13.1 mq_mode 계약
+279:- `search_queries`, `doc_refs`, `doc_ids`는 `mq_mode=fallback`(기본) 또는 `mq_mode=off`에서 결정적으로 재현
+286:- (예) 저장하는 키 후보: `mq_mode`, `mq_used`, `mq_reason`, `route`, `st_gate`, `attempts`, `max_attempts`, `retry_strategy`, `search_queries`
+292:| `mq_mode` | String, `off|fallback|on` (기본값: `fallback`) |

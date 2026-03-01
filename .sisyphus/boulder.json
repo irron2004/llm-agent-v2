@@ -1,12 +1,9 @@
 {
-  "active_plan": "/home/hskim/work/llm-agent-v2/.sisyphus/plans/paper-b-stability.md",
-  "started_at": "2026-02-27T22:43:34.362Z",
+  "active_plan": "/home/hskim/work/llm-agent-v2/.sisyphus/plans/agent-retrieval-stability-hardening.md",
+  "started_at": "2026-02-28T15:20:00.736Z",
   "session_ids": [
-    "ses_360496ff0ffexw6dYmHyC5ujWN",
-    "ses_366ea6b95ffeYXhYk68HvNIX6p",
-    "ses_35fed3bf0ffefRBDusQXuwP6gK",
-    "ses_35febea8dffe0XfhFcKScJ0422"
+    "ses_366ea6b95ffeYXhYk68HvNIX6p"
   ],
-  "plan_name": "paper-b-stability",
+  "plan_name": "agent-retrieval-stability-hardening",
   "agent": "atlas"
 }

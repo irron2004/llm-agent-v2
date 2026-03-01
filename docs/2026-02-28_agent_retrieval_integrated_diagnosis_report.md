@@ -262,3 +262,49 @@
 
 이번 재검증으로, 과거 보고서의 핵심 문제는 “과거 이슈”가 아니라 **현재 진행형**임이 확인됐다.  
 다음 단계는 문서 보강이 아니라, **운영 기본 경로의 결정성 확보 + MQ/Retry guardrail + 계측 로그 강화**를 즉시 적용하는 것이다.
+
+---
+
+## 13) After Fix (운영 안정성 정책)
+
+### 13.1 mq_mode 계약
+
+| 값 | 동작 | 기본값 |
+|---|---|---|
+| `off` | MQ 완전 비활성화, 첫 통과에서 search_queries만 사용 | - |
+| `fallback` | 첫 통과 MQ bypass, empty retrieval 또는 deterministic retry 이후 MQ 시도 | **예** |
+| `on` | MQ 항상 활성화 (기존 동작) | - |
+
+**안정 보장 범위:**
+- `search_queries`, `doc_refs`, `doc_ids`는 `mq_mode=fallback`(기본) 또는 `mq_mode=off`에서 결정적으로 재현
+- 답변 텍스트 자체는 LLM 생성으므로 완전한 결정성 없음 (temperature, sampling 등)
+
+### 13.2 Conversations persistence
+
+- `retrieval_meta`는 각 턴마다 비인덱스드(blob, `enabled:false`)로 저장
+- 저장 전 정리: 문자열 256자 truncation, `search_queries*`는 최대 5개/각 120자, 이메일/전화번호 redaction, 전체 8KB cap(초과 시 `{ "truncated": true, ... }`)
+VJ|- `retrieval_meta`는 각 턴마다 비인덱스드 blob으로 저장
+JK|- FE 현재 전송 필드: `mq_mode`, `mq_used`, `mq_reason`, `route`, `st_gate`, `attempts`, `retry_strategy`, `search_queries`
+SR|- 크기 제한: 8KB cap (초과 시 truncation)
+
+### 13.3 응답 메타데이터 키 ( `/api/agent/run`, `/api/agent/run/stream` final payload)
+
+| 키 | 설명 |
+|---|---|
+| `mq_mode` | String, `off|fallback|on` (기본값: `fallback`) |
+| `mq_used` | Boolean, MQ 실행 여부 |
+| `mq_reason` | String\|null, MQ 실행 사유 (`"empty_retrieval"`, `"unfaithful_after_deterministic_retries"` 등) |
+| `attempts` | Integer, retry 시도 횟수 |
+| `max_attempts` | Integer, 최대 retry 횟수 |
+| `retry_strategy` | String\|null, 적용된 retry 전략 |
+| `guardrail_dropped_numeric` | Integer, 숫자/단위 injection으로 제거된 query 수 |
+| `guardrail_dropped_anchor` | Integer, anchor recall 미달로 제거된 query 수 |
+| `guardrail_final_count` | Integer, 최종 search_queries 개수 |
+| `search_queries_final` | List[String], 최종 사용된 search_queries |
+| `search_queries_raw` | List[String] (optional), 원본 후보 query 일부(축약/중복 제거) |
+QT|| `search_queries_final` | List[String], 최종 사용된 search_queries |
+ZP|| `search_queries_raw` | List[String] (optional), 원본 후보 query 일부(축약/중복 제거) |
+QQ|| `search_queries` | List[String] (레거시), 검색 쿼리 목록 |
+ZZ|| `index_name` | String (optional), 검색 인덱스 힌트 |
+
+**한계:** 전체 응답 텍스트의 결정성은 보장하지 않음. 안정성 범위는 검색 결과(`search_queries`, `doc_refs`)에 한정.

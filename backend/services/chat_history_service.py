@@ -20,6 +20,8 @@ Usage:
 from __future__ import annotations
 
 import logging
+import json
+import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Optional
@@ -38,10 +40,89 @@ logger = logging.getLogger(__name__)
 CHAT_TURNS_INDEX_PREFIX = "chat_turns"
 CHAT_TURNS_SCHEMA_VERSION = "v1"
 
+_MAX_RETRIEVAL_META_BYTES = 8 * 1024
+_MAX_STRING_LENGTH = 256
+_MAX_SEARCH_QUERIES = 5
+_MAX_SEARCH_QUERY_LENGTH = 120
+_EMAIL_PATTERN = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
+_PHONE_PATTERN = re.compile(
+    r"(?<!\w)(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?){2,3}\d{3,4}(?!\w)"
+)
+
+
+def _redact_pii(value: str) -> str:
+    redacted = _EMAIL_PATTERN.sub("[REDACTED]", value)
+    return _PHONE_PATTERN.sub("[REDACTED]", redacted)
+
+
+def _sanitize_search_queries(values: list[Any]) -> list[str]:
+    sanitized: list[str] = []
+    for item in values[:_MAX_SEARCH_QUERIES]:
+        text = _redact_pii(item if isinstance(item, str) else str(item))
+        sanitized.append(text[:_MAX_SEARCH_QUERY_LENGTH])
+    return sanitized
+
+
+def _sanitize_retrieval_meta_value(value: Any, *, path: tuple[str, ...]) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: _sanitize_retrieval_meta_value(value[key], path=(*path, key))
+            for key in sorted(k for k in value.keys() if isinstance(k, str))
+        }
+    if isinstance(value, list):
+        if path and path[-1].lower().startswith("search_queries"):
+            return _sanitize_search_queries(value)
+        return [_sanitize_retrieval_meta_value(item, path=path) for item in value]
+    if isinstance(value, str):
+        return _redact_pii(value)[:_MAX_STRING_LENGTH]
+    return value
+
+
+def _serialized_size_bytes(value: dict[str, Any]) -> int:
+    serialized = json.dumps(value, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+    return len(serialized.encode("utf-8"))
+
+
+def sanitize_retrieval_meta(retrieval_meta: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(retrieval_meta, dict):
+        return None
+
+    sanitized = _sanitize_retrieval_meta_value(retrieval_meta, path=())
+    if not isinstance(sanitized, dict):
+        return None
+    if _serialized_size_bytes(sanitized) <= _MAX_RETRIEVAL_META_BYTES:
+        return sanitized
+
+    fallback: dict[str, Any] = {"truncated": True}
+    safe_subset: dict[str, Any] = {}
+    for key in (
+        "search_queries",
+        "search_queries_final",
+        "search_queries_raw",
+        "route",
+        "st_gate",
+        "mq_mode",
+        "mq_reason",
+        "attempts",
+        "retry_strategy",
+    ):
+        if key not in sanitized:
+            continue
+        safe_subset[key] = sanitized[key]
+        candidate = {"truncated": True, "safe_subset": safe_subset}
+        if _serialized_size_bytes(candidate) > _MAX_RETRIEVAL_META_BYTES:
+            safe_subset.pop(key, None)
+            break
+
+    if safe_subset:
+        fallback["safe_subset"] = safe_subset
+    return fallback
+
 
 @dataclass
 class DocRef:
     """Reference to a document shown in assistant response."""
+
     slot: int  # User-visible number (1, 2, 3...)
     doc_id: str
     title: str
@@ -77,6 +158,7 @@ class DocRef:
 @dataclass
 class ChatTurn:
     """A single conversation turn (user + assistant)."""
+
     session_id: str
     turn_id: int
     user_text: str
@@ -87,6 +169,7 @@ class ChatTurn:
     feedback_rating: Optional[str] = None  # "up" | "down"
     feedback_reason: Optional[str] = None
     feedback_ts: Optional[datetime] = None
+    retrieval_meta: dict[str, Any] | None = None
     ts: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -104,6 +187,7 @@ class ChatTurn:
             "feedback_rating": self.feedback_rating,
             "feedback_reason": self.feedback_reason,
             "feedback_ts": self.feedback_ts.isoformat() if self.feedback_ts else None,
+            "retrieval_meta": self.retrieval_meta,
             "ts": (self.ts or datetime.utcnow()).isoformat(),
             "schema_version": CHAT_TURNS_SCHEMA_VERSION,
             "created_at": self.created_at.isoformat() if self.created_at else now,
@@ -123,16 +207,24 @@ class ChatTurn:
             summary=data.get("summary"),
             feedback_rating=data.get("feedback_rating"),
             feedback_reason=data.get("feedback_reason"),
-            feedback_ts=datetime.fromisoformat(data["feedback_ts"]) if data.get("feedback_ts") else None,
+            feedback_ts=datetime.fromisoformat(data["feedback_ts"])
+            if data.get("feedback_ts")
+            else None,
+            retrieval_meta=sanitize_retrieval_meta(data.get("retrieval_meta")),
             ts=datetime.fromisoformat(data["ts"]) if data.get("ts") else None,
-            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
-            updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None,
+            created_at=datetime.fromisoformat(data["created_at"])
+            if data.get("created_at")
+            else None,
+            updated_at=datetime.fromisoformat(data["updated_at"])
+            if data.get("updated_at")
+            else None,
         )
 
 
 @dataclass
 class SessionSummary:
     """Summary of a chat session for listing."""
+
     session_id: str
     title: str
     preview: str  # First user message or summary
@@ -200,6 +292,24 @@ class ChatHistoryService:
         """
         # Check if alias exists
         if self.es.indices.exists_alias(name=self.index):
+            aliases = self.es.indices.get_alias(name=self.index)
+            target_mapping = {
+                "properties": {
+                    "retrieval_meta": {
+                        "type": "object",
+                        "enabled": False,
+                    }
+                }
+            }
+            for concrete_index in aliases:
+                mapping = self.es.indices.get_mapping(index=concrete_index)
+                properties = (
+                    mapping.get(concrete_index, {}).get("mappings", {}).get("properties", {})
+                )
+                if "retrieval_meta" in properties:
+                    continue
+                self.es.indices.put_mapping(index=concrete_index, body=target_mapping)
+                logger.info(f"Added retrieval_meta mapping to {concrete_index}")
             return True
 
         # Create versioned index
@@ -232,6 +342,7 @@ class ChatHistoryService:
         Returns:
             Document ID of the saved turn.
         """
+        turn.retrieval_meta = sanitize_retrieval_meta(turn.retrieval_meta)
         doc_id = f"{turn.session_id}:{turn.turn_id}"
         self.es.index(
             index=self.index,
@@ -318,7 +429,9 @@ class ChatHistoryService:
             return None
         return self.get_turn(session_id, turn_id)
 
-    def list_sessions(self, limit: int = 50, offset: int = 0, include_hidden: bool = False) -> list[SessionSummary]:
+    def list_sessions(
+        self, limit: int = 50, offset: int = 0, include_hidden: bool = False
+    ) -> list[SessionSummary]:
         """List recent chat sessions.
 
         Args:
@@ -333,15 +446,17 @@ class ChatHistoryService:
         filter_clause = []
         if not include_hidden:
             # Exclude hidden sessions: is_hidden must be false or missing
-            filter_clause.append({
-                "bool": {
-                    "should": [
-                        {"term": {"is_hidden": False}},
-                        {"bool": {"must_not": {"exists": {"field": "is_hidden"}}}},
-                    ],
-                    "minimum_should_match": 1,
+            filter_clause.append(
+                {
+                    "bool": {
+                        "should": [
+                            {"term": {"is_hidden": False}},
+                            {"bool": {"must_not": {"exists": {"field": "is_hidden"}}}},
+                        ],
+                        "minimum_should_match": 1,
+                    }
                 }
-            })
+            )
 
         # Aggregate by session_id, get latest turn per session
         query: dict[str, Any] = {
@@ -377,25 +492,35 @@ class ChatHistoryService:
             buckets = result.get("aggregations", {}).get("sessions", {}).get("buckets", [])
 
             sessions = []
-            for bucket in buckets[offset:offset + limit]:
+            for bucket in buckets[offset : offset + limit]:
                 session_id = bucket["key"]
                 turn_count = int(bucket["turn_count"]["value"])
                 latest_ts = bucket["latest_ts"]["value_as_string"]
                 earliest_ts = bucket["earliest_ts"]["value_as_string"]
 
                 # Get first turn data
-                first_hit = bucket["first_turn"]["hits"]["hits"][0]["_source"] if bucket["first_turn"]["hits"]["hits"] else {}
+                first_hit = (
+                    bucket["first_turn"]["hits"]["hits"][0]["_source"]
+                    if bucket["first_turn"]["hits"]["hits"]
+                    else {}
+                )
                 title = first_hit.get("title") or first_hit.get("user_text", "")[:50]
                 preview = first_hit.get("user_text", "")[:100]
 
-                sessions.append(SessionSummary(
-                    session_id=session_id,
-                    title=title,
-                    preview=preview,
-                    turn_count=turn_count,
-                    created_at=datetime.fromisoformat(earliest_ts.replace("Z", "+00:00")) if earliest_ts else datetime.utcnow(),
-                    updated_at=datetime.fromisoformat(latest_ts.replace("Z", "+00:00")) if latest_ts else datetime.utcnow(),
-                ))
+                sessions.append(
+                    SessionSummary(
+                        session_id=session_id,
+                        title=title,
+                        preview=preview,
+                        turn_count=turn_count,
+                        created_at=datetime.fromisoformat(earliest_ts.replace("Z", "+00:00"))
+                        if earliest_ts
+                        else datetime.utcnow(),
+                        updated_at=datetime.fromisoformat(latest_ts.replace("Z", "+00:00"))
+                        if latest_ts
+                        else datetime.utcnow(),
+                    )
+                )
 
             return sessions
         except Exception as e:

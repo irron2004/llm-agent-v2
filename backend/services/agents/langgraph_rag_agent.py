@@ -412,6 +412,17 @@ class LangGraphRAGAgent:
             final_top_k=self.top_k,
         )
 
+    def _prepare_retrieve_node(self, state: AgentState) -> Dict[str, Any]:
+        stable_query = " ".join((state.get("query_en") or state.get("query") or "").split()).strip()
+        update: Dict[str, Any] = {
+            "skip_mq": True,
+            "mq_used": False,
+            "mq_reason": None,
+        }
+        if stable_query:
+            update["search_queries"] = [stable_query]
+        return update
+
     def _build_graph(self, mode: str):
         builder = StateGraph(AgentState)
 
@@ -432,6 +443,10 @@ class LangGraphRAGAgent:
         builder.add_node(
             "st_mq",
             self._wrap_node("st_mq", functools.partial(st_mq_node, llm=self.llm, spec=self.spec)),
+        )
+        builder.add_node(
+            "prepare_retrieve",
+            self._wrap_node("prepare_retrieve", self._prepare_retrieve_node),
         )
         retrieve_fn = self._retrieve_node
         builder.add_node("retrieve", self._wrap_node("retrieve", retrieve_fn))
@@ -457,7 +472,17 @@ class LangGraphRAGAgent:
             self._wrap_node("judge", functools.partial(judge_node, llm=self.llm, spec=self.spec)),
         )
 
-        # Auto-parse mode: auto_parse → translate → route → mq
+        def _route_after_node(state: AgentState) -> str:
+            mq_mode = state.get("mq_mode")
+            if mq_mode == "on":
+                return "mq"
+            if mq_mode == "off":
+                return "prepare_retrieve"
+            if state.get("attempts", 0) == 0:
+                return "prepare_retrieve"
+            return "mq"
+
+        # Auto-parse mode: auto_parse → translate → route → (mq | prepare_retrieve)
         # This ensures route receives translated query (query_en)
         if self.auto_parse_enabled:
             builder.add_node(
@@ -511,7 +536,11 @@ class LangGraphRAGAgent:
             )
             builder.add_edge("query_rewrite", "translate")
             builder.add_edge("translate", "route")
-            builder.add_edge("route", "mq")
+            builder.add_conditional_edges(
+                "route",
+                _route_after_node,
+                {"mq": "mq", "prepare_retrieve": "prepare_retrieve"},
+            )
         # Device selection node (optional HIL) - legacy mode
         elif self.ask_device_selection:
             builder.add_node(
@@ -523,15 +552,20 @@ class LangGraphRAGAgent:
             )
             builder.add_edge(START, "route")
             builder.add_edge("route", "device_selection")
-            # device_selection_node returns Command(goto="mq"), so no explicit edge needed
+            # device_selection_node returns Command(goto="mq"|"prepare_retrieve"), so no explicit edge needed
         else:
-            # Default flow: START → route → mq
+            # Default flow: START → route → (mq | prepare_retrieve)
             builder.add_edge(START, "route")
-            builder.add_edge("route", "mq")
+            builder.add_conditional_edges(
+                "route",
+                _route_after_node,
+                {"mq": "mq", "prepare_retrieve": "prepare_retrieve"},
+            )
 
         builder.add_edge("mq", "st_gate")
         builder.add_edge("st_gate", "st_mq")
         builder.add_edge("st_mq", "retrieve")
+        builder.add_edge("prepare_retrieve", "retrieve")
 
         # ask_user_after_retrieve 옵션: retrieve 후 사용자 확인
         if self.ask_user_after_retrieve:

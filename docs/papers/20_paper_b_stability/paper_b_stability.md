@@ -263,7 +263,7 @@ To regenerate tables and figures:
 ```bash
 python scripts/paper_b/generate_paper_b_assets.py \
   --evidence-root .sisyphus/evidence/paper-b/task-10 \
-  --assets-dir docs/paper/paper_b_assets \
+  --assets-dir docs/papers/20_paper_b_stability/paper_b_assets \
   --queries .sisyphus/evidence/paper-b/task-10/queries_subset.jsonl
 ```
 
@@ -274,7 +274,7 @@ Dataset location: `data/synth_benchmarks/stability_bench_v1/`
 
 ## References
 
-- Paper B Stability Spec: `docs/paper/paper_b_stability_spec.md`
-- Synthetic Benchmark Spec: `docs/paper/synth_benchmark_stability_v1.md`
-- Synthetic Benchmark Runbook: `docs/paper/paper_b_synth_runbook.md`
+- Paper B Stability Spec: `docs/papers/20_paper_b_stability/paper_b_stability_spec.md`
+- Synthetic Benchmark Spec: `docs/papers/10_common_protocol/synth_benchmark_stability_v1.md`
+- Synthetic Benchmark Runbook: `docs/papers/20_paper_b_stability/paper_b_synth_runbook.md`
 - Evidence: `.sisyphus/evidence/paper-b/`

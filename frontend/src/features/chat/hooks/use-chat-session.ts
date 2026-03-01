@@ -438,6 +438,18 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         assistant_text: assistantText,
         doc_refs: docRefs,
         title,
+        ...(res.metadata ? {
+          retrieval_meta: {
+            mq_mode: res.metadata.mq_mode,
+            mq_used: res.metadata.mq_used,
+            mq_reason: res.metadata.mq_reason,
+            route: res.metadata.route,
+            st_gate: res.metadata.st_gate,
+            attempts: res.metadata.attempts,
+            retry_strategy: res.metadata.retry_strategy,
+            search_queries: effectiveSearchQueries,
+          },
+        } : {}),
       }).then((turn) => {
         updateMessage(assistantId, (m) => ({
           ...m,

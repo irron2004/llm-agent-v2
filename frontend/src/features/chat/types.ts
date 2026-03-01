@@ -172,6 +172,7 @@ export type TurnResponse = {
   feedback_rating?: FeedbackRating | null;
   feedback_reason?: string | null;
   feedback_ts?: string | null;
+  retrieval_meta?: Record<string, unknown>;
 };
 
 export type SessionListItem = {
@@ -200,6 +201,7 @@ export type SaveTurnRequest = {
   assistant_text: string;
   doc_refs: DocRefResponse[];
   title?: string | null;
+  retrieval_meta?: Record<string, unknown>;
 };
 
 // --- Detailed Feedback Types (for feedback index) ---

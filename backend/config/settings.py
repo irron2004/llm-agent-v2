@@ -9,6 +9,7 @@ Configuration is loaded from:
 from pydantic import AliasChoices, Field
 from .settings_vlm import vlm_settings  # noqa: F401  (optional VLM settings import)
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Literal
 
 
 class RAGSettings(BaseSettings):
@@ -639,6 +640,23 @@ class SearchSettings(BaseSettings):
     )
 
 
+
+class AgentSettings(BaseSettings):
+    """Agent settings."""
+
+    model_config = SettingsConfigDict(
+        env_prefix="AGENT_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    mq_mode_default: Literal["off", "fallback", "on"] = Field(
+        default="fallback",
+        description="Default mq_mode when request does not provide one",
+    )
+
 # Global settings instances
 rag_settings = RAGSettings()
 vllm_settings = VLLMSettings()
@@ -651,6 +669,7 @@ search_settings = SearchSettings()
 ingest_settings = IngestSettings()
 summarization_settings = SummarizationSettings()
 minio_settings = MinioSettings()
+agent_settings = AgentSettings()
 
 
 __all__ = [
@@ -676,4 +695,6 @@ __all__ = [
     "search_settings",
     "MinioSettings",
     "minio_settings",
+    "AgentSettings",
+    "agent_settings",
 ]
