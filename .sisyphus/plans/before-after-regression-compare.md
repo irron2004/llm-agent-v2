@@ -343,7 +343,7 @@ Wave 4: Diff + report generation
 
   **Commit**: NO
 
-- [ ] 5. Run retrieval evaluation on the before SHA (subset_48 + full_240)
+- [x] 5. Run retrieval evaluation on the before SHA (subset_48 + full_240)
 
   **What to do**:
   - Start a local API from the before worktree on a dedicated port (e.g., `18111`) with env:
@@ -454,7 +454,7 @@ Wave 4: Diff + report generation
 
   **Commit**: NO
 
-- [ ] 6. Run agent evaluation on the before SHA (subset_48)
+- [x] 6. Run agent evaluation on the before SHA (subset_48)
 
   **What to do**:
   - Implement a new runner script (recommended location): `scripts/evaluation/run_agent_regression.py`.

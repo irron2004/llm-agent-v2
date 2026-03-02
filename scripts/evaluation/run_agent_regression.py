@@ -8,9 +8,10 @@ import sys
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, cast
+from typing import cast
 
 
 DEFAULT_API_BASE_URL = "http://localhost:8011"
@@ -138,8 +139,6 @@ def _post_json(
 
 def _iter_sse_events(response: http.client.HTTPResponse) -> Iterable[dict[str, object]]:
     for raw_line in response:
-        if not isinstance(raw_line, (bytes, bytearray)):
-            continue
         line = raw_line.decode("utf-8", errors="replace").strip("\r\n")
         if not line:
             continue
@@ -300,7 +299,7 @@ def main() -> int:
                 }
             except Exception as exc:
                 run_record["error"] = {"phase": "run", "detail": str(exc)}
-                err_fp.write(json.dumps(run_record, ensure_ascii=False) + "\n")
+                _ = err_fp.write(json.dumps(run_record, ensure_ascii=False) + "\n")
                 err_fp.flush()
                 continue
 
@@ -324,7 +323,7 @@ def main() -> int:
                         enriched["group_id"] = row.group_id
                         enriched["query"] = row.query
                         sanitized = _sanitize_stream_event_for_evidence(enriched)
-                        stream_fp.write(
+                        _ = stream_fp.write(
                             json.dumps(sanitized, ensure_ascii=False) + "\n"
                         )
                         stream_fp.flush()
@@ -366,11 +365,11 @@ def main() -> int:
                 }
             except Exception as exc:
                 run_record["error"] = {"phase": "stream", "detail": str(exc)}
-                err_fp.write(json.dumps(run_record, ensure_ascii=False) + "\n")
+                _ = err_fp.write(json.dumps(run_record, ensure_ascii=False) + "\n")
                 err_fp.flush()
                 continue
 
-            run_fp.write(json.dumps(run_record, ensure_ascii=False) + "\n")
+            _ = run_fp.write(json.dumps(run_record, ensure_ascii=False) + "\n")
             run_fp.flush()
 
     print(f"Wrote agent run rows: {run_out}")

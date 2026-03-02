@@ -2,13 +2,20 @@
 
 - 상세 보고서: [2026-03-01_sop_golden_set_accuracy_report.md](/home/hskim/work/llm-agent-v2/docs/2026-03-01_sop_golden_set_accuracy_report.md)
 
-요약 지표:
+요약 지표(페이지 포함 기준 우선):
+
+- page-hit@1: `53/79 = 67.1%`
+- page-hit@3: `57/79 = 72.2%`
+- page-hit@5: `58/79 = 73.4%`
+- page-hit@10: `61/79 = 77.2%`
+- page-hit@20: `61/79 = 77.2%`
+
+보조 지표(문서만 기준):
 
 - hit@5: `76/79 = 96.2%`
 - hit@10: `79/79 = 100.0%`
 - hit@20: `79/79 = 100.0%`
 - rank=1: `71/79 = 89.9%`
-- 정답 페이지 포함: `61/79 = 77.2%`
 
 핵심 이슈:
 

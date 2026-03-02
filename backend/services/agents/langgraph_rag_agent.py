@@ -413,14 +413,21 @@ class LangGraphRAGAgent:
         )
 
     def _prepare_retrieve_node(self, state: AgentState) -> Dict[str, Any]:
-        stable_query = " ".join((state.get("query_en") or state.get("query") or "").split()).strip()
+        stable_query_en = " ".join((state.get("query_en") or state.get("query") or "").split()).strip()
+        stable_query_ko = " ".join((state.get("query_ko") or state.get("query") or "").split()).strip()
         update: Dict[str, Any] = {
             "skip_mq": True,
             "mq_used": False,
             "mq_reason": None,
         }
-        if stable_query:
-            update["search_queries"] = [stable_query]
+        # Bilingual: include both EN and KO for BM25 coverage
+        queries = []
+        if stable_query_en:
+            queries.append(stable_query_en)
+        if stable_query_ko and stable_query_ko != stable_query_en:
+            queries.append(stable_query_ko)
+        if queries:
+            update["search_queries"] = queries
         return update
 
     def _build_graph(self, mode: str):

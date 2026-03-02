@@ -1,5 +1,7 @@
 # Decisions
 
+- 2026-03-01: Skipped `full_240 det_false` retrieval runs (before/after) per user choice (option 2). Kept: subset_48 (det_true + det_false) and full_240 det_true.
+
 
 ## Task 1: Create regression run workspace manifest
 
