@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Literal, Optional, Protocol, Set, TypedDict
 from langgraph.types import Command, interrupt
 from pydantic import BaseModel
 
+from backend.config.settings import agent_settings
 from backend.domain.doc_type_mapping import (
     DOC_TYPE_GROUPS,
     expand_doc_type_selection,
@@ -24,6 +25,10 @@ from backend.domain.doc_type_mapping import (
 from backend.llm_infrastructure.llm.base import BaseLLM
 from backend.llm_infrastructure.llm.prompt_loader import PromptTemplate, load_prompt_template
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
+from backend.llm_infrastructure.retrieval.rrf import (
+    merge_retrieval_result_lists_rrf,
+    merge_retrieval_results_rrf,
+)
 from backend.services.search_service import SearchService
 
 logger = logging.getLogger(__name__)
@@ -1459,12 +1464,115 @@ def retrieve_node(
             _add_docs(docs, filter_devices=False)
 
     logger.info("retrieve_node: collected %d unique docs before rerank", len(all_docs))
+
+    sop_variants = {normalize_doc_type(v) for v in DOC_TYPE_GROUPS.get("SOP", [])}
+    selected_doc_types_normalized = {
+        normalize_doc_type(dt) for dt in selected_doc_types if normalize_doc_type(dt)
+    }
+    sop_only_predicate = bool(
+        state.get("sop_intent") is True
+        or bool(selected_doc_types_normalized.intersection(sop_variants))
+    )
+
+    def _apply_early_page_penalty(docs: List[RetrievalResult]) -> List[RetrievalResult]:
+        penalty_max_page = int(agent_settings.early_page_penalty_max_page)
+        penalty_factor = float(agent_settings.early_page_penalty_factor)
+        penalized_docs: List[RetrievalResult] = []
+        for doc in docs:
+            metadata = doc.metadata if isinstance(doc.metadata, dict) else {}
+            page = _extract_page_value(metadata)
+            if page is not None and page <= penalty_max_page:
+                penalized_docs.append(
+                    RetrievalResult(
+                        doc_id=doc.doc_id,
+                        content=doc.content,
+                        score=float(doc.score) * penalty_factor,
+                        metadata=doc.metadata,
+                        raw_text=doc.raw_text,
+                    )
+                )
+            else:
+                penalized_docs.append(doc)
+        return sorted(penalized_docs, key=_stable_tie_break_key)
+
+    if agent_settings.early_page_penalty_enabled and sop_only_predicate and all_docs:
+        all_docs = _apply_early_page_penalty(all_docs)
+
     if selected_doc_ids:
         before = len(all_docs)
-        all_docs = [d for d in all_docs if str(d.doc_id) in set(selected_doc_ids)]
+        selected_doc_id_set = set(selected_doc_ids)
+        all_docs = [d for d in all_docs if str(d.doc_id) in selected_doc_id_set]
         logger.info("retrieve_node: filtered by selected_doc_ids %d -> %d", before, len(all_docs))
-    if len(all_docs) > candidate_k:
-        all_docs = sorted(all_docs, key=_stable_tie_break_key)[:candidate_k]
+
+    if sop_only_predicate and all_docs:
+        soft_boost_factor = float(agent_settings.sop_soft_boost_factor)
+        boosted_docs: List[RetrievalResult] = []
+        for doc in all_docs:
+            metadata = doc.metadata if isinstance(doc.metadata, dict) else {}
+            if _normalize_doc_type(metadata.get("doc_type")) == "sop":
+                boosted_docs.append(
+                    RetrievalResult(
+                        doc_id=doc.doc_id,
+                        content=doc.content,
+                        score=float(doc.score) * soft_boost_factor,
+                        metadata=doc.metadata,
+                        raw_text=doc.raw_text,
+                    )
+                )
+            else:
+                boosted_docs.append(doc)
+        all_docs = boosted_docs
+
+    stage1_ranked_docs = sorted(all_docs, key=_stable_tie_break_key)[:candidate_k]
+
+    stage2_enabled = bool(agent_settings.second_stage_doc_retrieve_enabled)
+    stage2_doc_ids: List[str] = []
+    if stage2_enabled:
+        if selected_doc_ids:
+            stage2_doc_ids = list(selected_doc_ids)
+        else:
+            seen_doc_ids: set[str] = set()
+            for doc in stage1_ranked_docs:
+                doc_id = str(doc.doc_id).strip()
+                if not doc_id or doc_id in seen_doc_ids:
+                    continue
+                seen_doc_ids.add(doc_id)
+                stage2_doc_ids.append(doc_id)
+        max_doc_ids = max(0, int(agent_settings.second_stage_max_doc_ids))
+        if max_doc_ids:
+            stage2_doc_ids = stage2_doc_ids[:max_doc_ids]
+        else:
+            stage2_doc_ids = []
+
+    stage2_docs: List[RetrievalResult] = []
+    if stage2_enabled and stage2_doc_ids and all_queries:
+        stage2_top_k = max(1, int(agent_settings.second_stage_top_k))
+        stage2_result_lists: List[List[RetrievalResult]] = []
+        for doc_id in stage2_doc_ids:
+            for q in all_queries:
+                stage2_kwargs: Dict[str, Any] = {
+                    "top_k": stage2_top_k,
+                    "equip_ids": selected_equip_ids,
+                    "doc_types": selected_doc_type_filters,
+                    "doc_ids": [doc_id],
+                }
+                if selected_devices:
+                    stage2_kwargs["device_names"] = selected_devices
+                per_call_results = retriever.retrieve(q, **stage2_kwargs)
+                if (
+                    agent_settings.early_page_penalty_enabled
+                    and sop_only_predicate
+                    and per_call_results
+                ):
+                    per_call_results = _apply_early_page_penalty(per_call_results)
+                stage2_result_lists.append(per_call_results)
+        stage2_docs = merge_retrieval_result_lists_rrf(stage2_result_lists, k=60)
+
+    all_docs = (
+        merge_retrieval_results_rrf(stage1_ranked_docs, stage2_docs, k=60)
+        if stage2_docs
+        else stage1_ranked_docs
+    )
 
     # Store all_docs before reranking for regeneration (up to retrieval_top_k)
     # Sort by score and take top retrieval_top_k for regeneration options
@@ -1499,6 +1607,10 @@ def retrieve_node(
         "ref_json": results_to_ref_json(docs),
         "all_docs": all_docs_for_regen,  # 재생성용 전체 문서 (최대 retrieval_top_k개)
         "mq_reason": "empty_retrieval" if empty_retrieval_fallback else state.get("mq_reason"),
+        "retrieval_stage2": {
+            "enabled": stage2_enabled,
+            "doc_ids": stage2_doc_ids,
+        },
     }
 
 

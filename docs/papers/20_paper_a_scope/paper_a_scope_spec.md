@@ -1,4 +1,4 @@
-# Paper A 실험 정의서 v0.2
+# Paper A 실험 정의서 v0.3
 
 ## Hierarchy-aware Scope Routing (G) + Family Scope + Shared Doc Policy + Matryoshka Router
 
@@ -27,6 +27,37 @@ d ∈ D_shared  OR  device(d) ∈ S(q)
 ```
 
 > 해석: "공용 문서는 항상 허용", 그 외 문서는 스코프(device/equip) 안에 있어야 허용
+
+### 1.2 Scope Level (문서별 스코프 적용 수준)
+
+장비 계층은 `device_name → equip_id` 2-level. 모든 문서에 동일한 필터 강도를 적용하면
+recall 손실이 크므로, **문서별 `scope_level`을 부여**하여 필터 강도를 분리:
+
+| scope_level | 의미 | 필터 적용 | 대상 doc_type |
+|-------------|------|-----------|---------------|
+| `shared` | 공용 문서 (모든 장비에서 허용) | 필터 없음 | D_shared로 판정된 SOP/TS |
+| `device` | device_name까지만 유의미 | `device_name ∈ S(q)` | SOP, setup_manual, TS (대부분) |
+| `equip` | equip_id까지 유의미 | `equip_id = parsed.equip_id` | 정비이력, 로그, 설비별 기록 |
+
+**doc_type → scope_level 기본 매핑**:
+
+* `sop_pdf`, `sop_pptx`, `setup_manual`, `ts` → `device`
+* `myservice`, `gcb` (로그/이력) → `equip`
+* D_shared 판정 문서 → `shared` (doc_type 무관하게 override)
+
+> **설계 원칙**: equip_id는 의미(semantics)가 아닌 식별자(identifier)이므로
+> 임베딩 모델로 "추정"하지 않고, 파서가 잡으면 사용 / 못 잡으면 device level로 fallback.
+
+### 1.3 질의 스코프 결정 규칙
+
+| 파싱 결과 | 질의 성격 | 스코프 결정 |
+|-----------|-----------|------------|
+| equip_id 있음 | — | Hard(equip): `scope_level=equip` 문서는 equip_id 필터, 나머지는 device 필터 |
+| device_name만 있음 | — | Hard(device): device_name 필터 |
+| 둘 다 없음 + SOP/절차 성격 | 절차 질의 | Router → Family 확장 (device level) |
+| 둘 다 없음 + 이력/로그 성격 | 인스턴스 질의 | equip_id 요구(되묻기) 또는 세션 컨텍스트에서 추출 |
+
+> **Family 확장은 SOP/TS(절차 문서)에만 적용**. 로그/이력에 family 확장 시 노이즈 증가.
 
 ---
 
@@ -67,6 +98,11 @@ w(a,b) = |Topics(a) ∩ Topics(b)| / |Topics(a) ∪ Topics(b)|   (Jaccard)
 > 코퍼스 현실: 5개 주요 family(SUPRA/INTEGER/PRECIA/GENEVA/OMNIS)가 자연스럽게 형성될 것으로 예상.
 > SUPRA family 내 9개 변형 간 intra-family 유사도가 높을 것.
 
+**Family 확장 적용 범위 제한**:
+* Family 확장은 **절차 문서(`scope_level=device`)에만 적용**.
+* 로그/이력(`scope_level=equip`)에 family 확장 시 타 설비 데이터 혼입 → 노이즈 증가.
+* 즉: 절차 문서는 family로 recall 보존, 로그/이력은 equip_id로 정밀 필터.
+
 ### 2.3 Matryoshka Router 준비(장비 후보 Top-M 선택용)
 
 목표: **질의에 장비명이 없거나 모호할 때도 device 후보를 싸게 뽑기**
@@ -87,30 +123,40 @@ function ANSWER(q):
   parsed = AUTO_PARSE(q)  # device_name?, equip_id?, intent?
 
   # 2) Decide scope S(q)
-  if parsed.device_name or parsed.equip_id:
-      S = {parsed.device_name}  (or equip-specific scope)
-      mode = "HARD"
+  if parsed.equip_id:
+      S_device = {parsed.device_name}
+      S_equip  = {parsed.equip_id}
+      mode = "HARD_EQUIP"
+  elif parsed.device_name:
+      S_device = {parsed.device_name}
+      S_equip  = None  # equip 필터 없음
+      mode = "HARD_DEVICE"
   else:
       # 2-1) Matryoshka router: get Top-M device candidates
       C = ROUTE_BY_MATRYOSHKA(q, dim=128, topM=3)
-      # 2-2) Family expansion
-      S = C ∪ UNION(Family(c) for c in C)
+      # 2-2) Family expansion (절차 문서에만 적용)
+      S_device = C ∪ UNION(Family(c) for c in C)
+      S_equip  = None
       mode = "ROUTED_FAMILY"
 
-  # 3) Retrieve under scope with shared allowance
+  # 3) Retrieve under scope with scope_level-aware filtering
   candidates = HYBRID_RRF_RETRIEVE(
       q,
-      filter = (device_name in S OR is_shared==true)
-               AND (equip_id if available),
+      filter = BUILD_SCOPE_FILTER(S_device, S_equip),
       topN = 60
   )
+  # BUILD_SCOPE_FILTER 로직:
+  #   scope_level=shared  → 항상 허용
+  #   scope_level=device  → device_name ∈ S_device
+  #   scope_level=equip   → S_equip이면 equip_id ∈ S_equip,
+  #                          없으면 device_name ∈ S_device (fallback)
 
   # 4) Rerank (optional, baseline/ablation)
   ranked = CROSS_ENCODER_RERANK(q, candidates)  # topK output
 
   # 5) Generate (RAG)
   answer = LLM_GENERATE_WITH_CITATIONS(q, top_docs=ranked[1..K])
-  return answer, ranked, mode, S
+  return answer, ranked, mode, S_device, S_equip
 ```
 
 ### 코드베이스 매핑
@@ -121,6 +167,8 @@ function ANSWER(q):
 | `ROUTE_BY_MATRYOSHKA(q)` | — | — | **새로 구현 필요** |
 | `Family(device)` | — | — | **새로 구축 필요** (오프라인) |
 | `is_shared` 필터 | — | ES mapping에 필드 없음 | **필드 추가 필요** |
+| `scope_level` 필터 | — | ES mapping에 필드 없음 | **필드 추가 필요** |
+| `BUILD_SCOPE_FILTER` | — | — | **새로 구현 필요** (scope_level 기반 multi-level filter) |
 | `HYBRID_RRF_RETRIEVE` | `EsHybridRetriever.retrieve()` | `es_hybrid.py:115` | 있음 |
 | `device_name in S` 필터 | `build_filter(device_names=)` | `es_search.py:517` | 있음 |
 | `CROSS_ENCODER_RERANK` | reranker in `retrieve_node` | `langgraph_agent.py:1243` | 있음 |
@@ -130,6 +178,7 @@ function ANSWER(q):
 | 준비물 | 데이터 소스 | 구현 방법 |
 |---|---|---|
 | D_shared 판정 | topic × device_name 분포 분석 | 스크립트로 집계 → `is_shared` 필드 업데이트 |
+| scope_level 부여 | doc_type + D_shared 판정 결과 | 스크립트로 `scope_level` 필드 산출 → ES 매핑 추가 |
 | Family graph | device 쌍별 공유 topic Jaccard | 스크립트로 그래프 구축 → JSON/config 저장 |
 | Device prototype index | device별 대표 텍스트 생성 → Matryoshka 임베딩 | 별도 ES 인덱스 또는 in-memory FAISS |
 
@@ -158,6 +207,15 @@ CE@k = 1[∃ i <= k : d_i is out-of-scope and not shared]
 ```
 
 * Shared 임계치 T 민감도 분석 → Appendix
+
+**Appendix 후보: Equip-level Contamination** (데이터 충분성 확인 후 결정)
+
+| 메트릭 | 정의 | 적용 조건 |
+|--------|------|-----------|
+| **Equip-Cont@k** | top-k 중 equip_id가 허용 밖인 비율 | 질의가 equip-target일 때만 |
+
+> Device-Cont@k(본문)와 Equip-Cont@k(Appendix)를 분리 보고하면 계층형 정책의 효과를 더 명확하게 증명.
+> 단, 현재 코퍼스에서 equip-level 문서(myservice/gcb)가 충분한지 먼저 확인 필요.
 
 ### 4.2 Retrieval quality (리콜 손실 방지)
 
@@ -220,6 +278,7 @@ CiteCont = #(out-of-scope citations) / #(all citations)
 ## 8) 논문 기여 문장 템플릿
 
 * "우리는 반도체 유지보수 RAG에서 **Hierarchy-aware scope routing**과 **shared/family 허용 정책**을 통해 contamination을 줄이면서도 recall을 유지하는 방법을 제안한다."
+* "장비 타입(`device_name`)과 설비 인스턴스(`equip_id`) 2-level 계층에 따라 **문서별 scope level(shared/device/equip)**을 분리 적용하여, 절차 문서는 family 확장으로 recall을 보존하고 로그/이력은 equip_id로 정밀 필터링한다."
 * "특히 **Matryoshka 저차원 라우터**를 통해 스코프 후보를 효율적으로 생성하여 대규모 로그 코퍼스에서도 실용적 latency로 동작함을 보였다."
 
 ---
@@ -297,6 +356,13 @@ CiteCont = #(out-of-scope citations) / #(all citations)
 - 2단계(여력 시): 문서 chunk 임베딩도 교체
 - 필수: 현재 embedding 모델 MRL 지원 확인
 
+### D7. Scope Level 계층화 — **문서별 scope_level 3단 분류**
+- `shared` / `device` / `equip` 3단 분류를 doc_type 기반으로 부여
+- SOP/Manual/TS → `device`, 로그/이력(myservice/gcb) → `equip`, D_shared → `shared`
+- equip_id는 "추정" 대상이 아닌 "확인" 대상 (파서가 잡으면 사용, 못 잡으면 device fallback)
+- Family 확장은 절차 문서에만 적용, 로그/이력에는 미적용
+- Equip-Cont@k는 데이터 충분성 확인 후 Appendix 후보로 결정
+
 ---
 
 ## 10-추가) 초기 실험 파라미터 고정값 (v0.2)
@@ -332,7 +398,9 @@ CiteCont = #(out-of-scope citations) / #(all citations)
 
 1. 현재 embedding 모델의 MRL 지원 여부 확인
 2. ES 인덱스 실제 chunk 수 vs 파싱 문서 578건 차이
-3. doc_id 공유 vs topic 공유: family 구축 기준 최종 확정
+3. ~~doc_id 공유 vs topic 공유: family 구축 기준 최종 확정~~ → D3에서 topic 기반 확정
+4. equip_id null 비율 (doc_type별) — equip-level 실험 실현 가능성 판단
+5. 현재 코퍼스에 myservice/gcb(로그/이력) 문서가 몇 건인지 확인
 
 ---
 
@@ -340,6 +408,9 @@ CiteCont = #(out-of-scope citations) / #(all citations)
 
 - [ ] A-Set v0 확정: Explicit / Masked / Ambiguous 분할 파일 생성
 - [ ] Shared 판정 스크립트 작성 및 `is_shared` 메타 산출
+- [ ] scope_level 부여 규칙 고정 (doc_type → scope_level 매핑 + D_shared override)
+- [ ] equip_id null 비율 집계 (doc_type별) — equip-level 실험 가능성 판단
 - [ ] Family(device) 그래프 1차 구축 (Jaccard 임계치 실험 포함)
 - [ ] Router baseline 확정 (auto-parse only vs Matryoshka top-M)
 - [ ] 평가 리포트 템플릿 확정 (`Cont raw/adjusted/shared`, `DocHit`, `PageHit`, latency)
+- [ ] (조건부) Equip-Cont@k 포함 여부 결정 — equip-level 데이터 충분성 확인 후

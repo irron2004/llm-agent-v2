@@ -617,12 +617,25 @@ def _build_response_metadata(
     final_search_queries: List[str],
     index_name: Optional[str],
 ) -> Dict[str, Any]:
+    retrieval_stage2_raw = result.get("retrieval_stage2")
+    retrieval_stage2_doc_ids: List[str] = []
+    retrieval_stage2_enabled = False
+    if isinstance(retrieval_stage2_raw, dict):
+        retrieval_stage2_enabled = bool(retrieval_stage2_raw.get("enabled", False))
+        doc_ids = retrieval_stage2_raw.get("doc_ids")
+        if isinstance(doc_ids, list):
+            retrieval_stage2_doc_ids = [str(x).strip() for x in doc_ids if str(x).strip()]
+
     metadata: Dict[str, Any] = {
         "route": result.get("route"),
         "st_gate": result.get("st_gate"),
         "search_queries": final_search_queries,
         "search_queries_final": final_search_queries,
         "selected_device": result.get("selected_device"),
+        "retrieval_stage2": {
+            "enabled": retrieval_stage2_enabled,
+            "doc_ids": retrieval_stage2_doc_ids,
+        },
         "mq_mode": mq_mode,
         "mq_used": bool(result.get("mq_used", False)),
         "mq_reason": result.get("mq_reason"),
