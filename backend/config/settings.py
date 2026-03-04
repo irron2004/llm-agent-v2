@@ -531,6 +531,12 @@ class AgentSettings(BaseSettings):
     early_page_penalty_factor: float = 0.3
     second_stage_max_doc_ids: int = 1
     second_stage_top_k: int = 50
+    sop_soft_boost_factor: float = Field(
+        default=1.30,
+        gt=0.0,
+        le=5.0,
+        description="Score multiplier for SOP docs when SOP intent detected (1.0 = no boost)",
+    )
 
 
 # Global settings instances
