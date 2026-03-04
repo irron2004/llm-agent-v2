@@ -386,7 +386,7 @@ CiteCont = #(out-of-scope citations) / #(all citations)
 |------|-----|--------|
 | 총 문서 | 578건 | |
 | 고유 device | 21종 (실질 6종 주요) | router Top-M의 선택적 가치 제한적 |
-| 고유 topic | 366종 | |
+| 고유 topic | 418종 | |
 | SOP 비율 | 87.7% (pdf+pptx) | SOP 중심 코퍼스 |
 | 2개+ 장비 공유 topic | **77개 (21%)** | family/shared 정책 필요성 확인 |
 | 3개+ 장비 공유 topic | **29개 (7.9%)** | shared 후보 존재 확인 |
@@ -414,3 +414,78 @@ CiteCont = #(out-of-scope citations) / #(all citations)
 - [ ] Router baseline 확정 (auto-parse only vs Matryoshka top-M)
 - [ ] 평가 리포트 템플릿 확정 (`Cont raw/adjusted/shared`, `DocHit`, `PageHit`, latency)
 - [ ] (조건부) Equip-Cont@k 포함 여부 결정 — equip-level 데이터 충분성 확인 후
+
+---
+
+## 12) 평가 코드 구현 청사진 (retrieval-only 주 실험)
+
+### 12.1 입력 스키마 (`queries.jsonl`)
+
+각 질의는 아래 필드를 기본으로 사용:
+
+```json
+{
+  "qid": "A-0001",
+  "query": "apc position 교체 방법 알려줘",
+  "split": "explicit|implicit|ambiguous",
+  "target_device": "SUPRA XP",
+  "target_equip": "EPAG50",
+  "gold_doc_ids": ["DOC-123"],
+  "gold_passages": ["DOC-123#p14"]
+}
+```
+
+필수 필드: `qid`, `query`, `split`  
+선택 필드: `target_device`, `target_equip`, `gold_doc_ids`, `gold_passages`
+
+### 12.2 코퍼스 메타 전처리 출력
+
+평가 전에 아래 구조를 생성:
+
+- `doc_meta[doc_id] = {device_name, equip_id, doc_type, is_shared, scope_level}`
+- `family_map[device_name] = {device_name...}`
+- `shared_threshold_T` (예: 3)
+
+### 12.3 평가 스크립트 함수 구조
+
+핵심 함수 시그니처(권장):
+
+- `build_allowed_scope(query_row, parse_result, family_map, policy_cfg)`
+- `is_out_of_scope(hit, allowed_scope, doc_meta)`
+- `compute_metrics_per_query(hits, query_row, allowed_scope, doc_meta, k_list)`
+- `run_system(system_id, query_rows, policy_cfg, backend_cfg)`
+- `aggregate_metrics(per_query_rows, by=["all","split","doc_type"])`
+- `run_paired_bootstrap(per_query_rows, metric_name, a_id, b_id, n_boot=10000)`
+
+### 12.4 산출물 파일(고정)
+
+평가 1회 실행마다 아래 파일을 생성:
+
+- `results/per_query.csv`
+- `results/summary_all.csv`
+- `results/summary_by_split.csv`
+- `results/summary_by_doc_type.csv`
+- `results/bootstrap_ci.json`
+
+### 12.5 지표 계산 규칙(고정)
+
+- contamination: `Raw Cont@k`, `Adjusted Cont@k`, `Shared@k`
+- 품질: `Hit@k`, `MRR@k`
+- 라우팅: `ScopeAccuracy@M` (라우터 사용 실험에서 필수)
+- 보조(옵션): `Equip-Cont@k` (equip-target subset에서만)
+
+### 12.6 실험군 고정표 (논문 표 1:1 매핑)
+
+- Baseline: `B0`, `B1`, `B2`, `B3`, `B4`
+- Proposed: `P1`, `P2`, `P3`, `P4`
+- Optional: `P5` (F 구현, 효율 비교)
+- Matryoshka ablation: `dim={64,128,256,768}`, `M={1,3,5}`
+
+### 12.7 고정 파라미터 (v0.2)
+
+- `T(shared)=3`
+- `tau(family)=0.2`
+- `M(top device)=3`
+- `router_dim=128`
+
+원칙: dev set에서만 튜닝, test set에서는 고정.
