@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import os
 import re
 import sys
 import time
@@ -12,6 +13,20 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+
+AGENT_ENV_CAPTURE_KEYS = (
+    "AGENT_SECOND_STAGE_DOC_RETRIEVE_ENABLED",
+    "AGENT_EARLY_PAGE_PENALTY_ENABLED",
+    "AGENT_EARLY_PAGE_PENALTY_MAX_PAGE",
+    "AGENT_EARLY_PAGE_PENALTY_FACTOR",
+    "AGENT_SECOND_STAGE_MAX_DOC_IDS",
+    "AGENT_SECOND_STAGE_TOP_K",
+)
+
+
+def _capture_env(keys: tuple[str, ...]) -> dict[str, str]:
+    return {key: os.environ.get(key, "") for key in keys}
 
 
 def _normalize_doc_id(text: str) -> str:
@@ -318,6 +333,7 @@ def main() -> int:
     summary = {
         "total": total,
         "failures": failures,
+        "env": _capture_env(AGENT_ENV_CAPTURE_KEYS),
         "doc_hit": {f"@{k}": {"count": doc_hits[k], "ratio": doc_hits[k] / total} for k in sorted(doc_hits)},
         "page_hit": {f"@{k}": {"count": page_hits[k], "ratio": page_hits[k] / total} for k in sorted(page_hits)},
     }

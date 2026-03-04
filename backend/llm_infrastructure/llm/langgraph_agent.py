@@ -294,6 +294,7 @@ class SearchServiceRetriever:
         device_names: List[str] | None = None,
         equip_ids: List[str] | None = None,
         doc_types: List[str] | None = None,
+        doc_ids: List[str] | None = None,
         **kwargs: Any,
     ) -> List[RetrievalResult]:
         k = top_k or self.top_k
@@ -313,6 +314,8 @@ class SearchServiceRetriever:
             search_kwargs["equip_ids"] = equip_ids
         if doc_types:
             search_kwargs["doc_types"] = doc_types
+        if doc_ids:
+            search_kwargs["doc_ids"] = doc_ids
         return self.search_service.search(query, **search_kwargs)
 
 
@@ -2726,7 +2729,15 @@ def auto_parse_node(
     prev_equip_ids = list(state.get("selected_equip_ids") or [])
 
     devices = detected_devices if detected_devices else prev_devices
-    doc_types = detected_doc_types if detected_doc_types else prev_doc_types
+    parsed_query = state.get("parsed_query")
+    selected_doc_types_strict = bool(state.get("selected_doc_types_strict"))
+    if (not selected_doc_types_strict) and isinstance(parsed_query, dict):
+        selected_doc_types_strict = bool(parsed_query.get("doc_types_strict"))
+
+    if selected_doc_types_strict and prev_doc_types:
+        doc_types = prev_doc_types
+    else:
+        doc_types = detected_doc_types if detected_doc_types else prev_doc_types
     equip_ids = detected_equip_ids if detected_equip_ids else prev_equip_ids
 
     logger.info(
@@ -2786,7 +2797,10 @@ def auto_parse_node(
     # Set selected_devices and selected_doc_types for downstream nodes
     # STRICT: Only one device allowed
     selected_devices = devices[:1]
-    selected_doc_types = doc_types[:2]
+    if selected_doc_types_strict and prev_doc_types:
+        selected_doc_types = prev_doc_types
+    else:
+        selected_doc_types = doc_types[:2]
     selected_equip_ids = equip_ids[:1]
 
     # ParsedQuery 생성

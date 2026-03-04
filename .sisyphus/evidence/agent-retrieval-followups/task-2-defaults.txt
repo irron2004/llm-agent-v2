@@ -1,0 +1,6 @@
+python -c "from backend.config.settings import agent_settings; print(agent_settings.second_stage_doc_retrieve_enabled, agent_settings.early_page_penalty_enabled)"
+False False
+
+# Re-verified after restoring settings
+python -c "from backend.config.settings import agent_settings; print(agent_settings.second_stage_doc_retrieve_enabled, agent_settings.early_page_penalty_enabled)"
+False False

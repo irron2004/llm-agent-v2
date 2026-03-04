@@ -17,7 +17,13 @@ from typing import Any
 
 from elasticsearch import Elasticsearch, NotFoundError
 
-from .mappings import get_rag_chunks_mapping, get_index_settings, get_index_meta
+from .mappings import (
+    get_rag_chunks_mapping,
+    get_index_settings,
+    get_index_meta,
+    get_chunk_v3_content_mapping,
+    get_chunk_v3_embed_mapping,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -357,6 +363,71 @@ class EsIndexManager:
                 continue
 
         return max(versions) if versions else None
+
+    # =========================================================================
+    # chunk_v3 Index Operations
+    # =========================================================================
+
+    def create_chunk_v3_content_index(
+        self,
+        index_name: str = "chunk_v3_content",
+        number_of_shards: int = 1,
+        number_of_replicas: int = 0,
+        skip_if_exists: bool = True,
+    ) -> dict[str, Any]:
+        """chunk_v3_content 인덱스 생성 (원문 + 메타, embedding 없음)."""
+        if skip_if_exists and self.es.indices.exists(index=index_name):
+            logger.info(f"Index {index_name} already exists, skipping")
+            return {"acknowledged": True, "skipped": True}
+
+        body = {
+            "settings": get_index_settings(
+                number_of_shards=number_of_shards,
+                number_of_replicas=number_of_replicas,
+            ),
+            "mappings": get_chunk_v3_content_mapping(),
+        }
+        logger.info(f"Creating chunk_v3 content index: {index_name}")
+        response = self.es.indices.create(index=index_name, body=body)
+        logger.info(f"Index {index_name} created successfully")
+        return response
+
+    def create_chunk_v3_embed_index(
+        self,
+        index_name: str,
+        dims: int,
+        model_meta: dict[str, Any] | None = None,
+        hnsw_m: int = 16,
+        ef_construction: int = 100,
+        number_of_shards: int = 1,
+        number_of_replicas: int = 0,
+        skip_if_exists: bool = True,
+    ) -> dict[str, Any]:
+        """chunk_v3_embed_{model}_v1 인덱스 생성 (chunk_id + vector)."""
+        if skip_if_exists and self.es.indices.exists(index=index_name):
+            logger.info(f"Index {index_name} already exists, skipping")
+            return {"acknowledged": True, "skipped": True}
+
+        body = {
+            "settings": get_index_settings(
+                number_of_shards=number_of_shards,
+                number_of_replicas=number_of_replicas,
+            ),
+            "mappings": get_chunk_v3_embed_mapping(
+                dims=dims,
+                hnsw_m=hnsw_m,
+                ef_construction=ef_construction,
+                model_meta=model_meta,
+            ),
+        }
+        logger.info(f"Creating chunk_v3 embed index: {index_name} (dims={dims})")
+        response = self.es.indices.create(index=index_name, body=body)
+        logger.info(f"Index {index_name} created successfully")
+        return response
+
+    # =========================================================================
+    # Utility Methods
+    # =========================================================================
 
     def health_check(self) -> dict[str, Any]:
         """Check Elasticsearch cluster health.

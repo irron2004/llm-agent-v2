@@ -18,6 +18,7 @@ class RAGSettings(BaseSettings):
     All settings can be overridden via environment variables with prefix RAG_
     Example: RAG_PREPROCESS_METHOD=pe_domain
     """
+
     model_config = SettingsConfigDict(
         env_prefix="RAG_",
         env_file=".env",
@@ -29,173 +30,95 @@ class RAGSettings(BaseSettings):
     # Preprocessing
     preprocess_method: str = Field(
         default="normalize",
-        description="Preprocessing method name (e.g., normalize, standard, pe_domain)"
+        description="Preprocessing method name (e.g., normalize, standard, pe_domain)",
     )
-    preprocess_version: str = Field(
-        default="v1",
-        description="Preprocessing method version"
-    )
+    preprocess_version: str = Field(default="v1", description="Preprocessing method version")
     preprocess_level: str = Field(
-        default="L3",
-        description="Preprocessing level (used by normalize preprocessor)"
+        default="L3", description="Preprocessing level (used by normalize preprocessor)"
     )
 
     # Embedding
-    embedding_method: str = Field(
-        default="bge_base",
-        description="Embedding method name"
-    )
-    embedding_version: str = Field(
-        default="v1",
-        description="Embedding method version"
-    )
-    embedding_device: str = Field(
-        default="cpu",
-        description="Embedding device (cpu/auto/cuda:N)"
-    )
-    embedding_use_cache: bool = Field(
-        default=False,
-        description="Use disk cache for embeddings"
-    )
+    embedding_method: str = Field(default="bge_base", description="Embedding method name")
+    embedding_version: str = Field(default="v1", description="Embedding method version")
+    embedding_device: str = Field(default="cpu", description="Embedding device (cpu/auto/cuda:N)")
+    embedding_use_cache: bool = Field(default=False, description="Use disk cache for embeddings")
     embedding_cache_dir: str = Field(
-        default=".cache/embeddings",
-        description="Directory for embedding cache"
+        default=".cache/embeddings", description="Directory for embedding cache"
     )
 
     # Retrieval
-    retrieval_preset: str = Field(
-        default="hybrid_rrf_v1",
-        description="Retrieval preset name"
-    )
+    retrieval_preset: str = Field(default="hybrid_rrf_v1", description="Retrieval preset name")
     retrieval_method: str = Field(
-        default="hybrid",
-        description="Retrieval method (dense/bm25/hybrid)"
+        default="hybrid", description="Retrieval method (dense/bm25/hybrid)"
     )
-    retrieval_version: str = Field(
-        default="v1",
-        description="Retrieval method version"
-    )
+    retrieval_version: str = Field(default="v1", description="Retrieval method version")
     prompt_spec_version: str = Field(
         default="v1",
-        description="Prompt specification version for LangGraph YAML templates (RAG_PROMPT_SPEC_VERSION)"
+        description="Prompt specification version for LangGraph YAML templates (RAG_PROMPT_SPEC_VERSION)",
     )
 
-    retrieval_top_k: int = Field(
-        default=10,
-        description="Number of documents to retrieve"
-    )
+    retrieval_top_k: int = Field(default=10, description="Number of documents to retrieve")
 
     # Hybrid retrieval
-    hybrid_dense_weight: float = Field(
-        default=0.7,
-        description="Dense retrieval weight for hybrid"
-    )
+    hybrid_dense_weight: float = Field(default=0.7, description="Dense retrieval weight for hybrid")
     hybrid_sparse_weight: float = Field(
-        default=0.3,
-        description="Sparse retrieval weight for hybrid"
+        default=0.3, description="Sparse retrieval weight for hybrid"
     )
-    hybrid_rrf_k: int = Field(
-        default=60,
-        description="RRF k parameter"
-    )
+    hybrid_rrf_k: int = Field(default=60, description="RRF k parameter")
 
     # Chunking
     chunking_enabled: bool = Field(
-        default=True,
-        description="Enable text chunking before embedding"
+        default=True, description="Enable text chunking before embedding"
     )
     chunking_method: str = Field(
-        default="fixed_size",
-        description="Chunking method (fixed_size, recursive, semantic)"
+        default="fixed_size", description="Chunking method (fixed_size, recursive, semantic)"
     )
-    chunking_version: str = Field(
-        default="v1",
-        description="Chunking method version"
-    )
-    chunk_size: int = Field(
-        default=512,
-        description="Maximum chunk size (characters or tokens)"
-    )
-    chunk_overlap: int = Field(
-        default=50,
-        description="Overlap between chunks"
-    )
+    chunking_version: str = Field(default="v1", description="Chunking method version")
+    chunk_size: int = Field(default=512, description="Maximum chunk size (characters or tokens)")
+    chunk_overlap: int = Field(default=50, description="Overlap between chunks")
     chunk_split_by: str = Field(
-        default="char",
-        description="Split unit: 'char' (characters) or 'token' (tokens)"
+        default="char", description="Split unit: 'char' (characters) or 'token' (tokens)"
     )
     chunk_min_size: int = Field(
-        default=50,
-        description="Minimum chunk size (smaller chunks are merged)"
+        default=50, description="Minimum chunk size (smaller chunks are merged)"
     )
 
     # Multi-Query Expansion
     multi_query_enabled: bool = Field(
-        default=False,
-        description="Enable multi-query expansion for retrieval"
+        default=False, description="Enable multi-query expansion for retrieval"
     )
-    multi_query_method: str = Field(
-        default="llm",
-        description="Multi-query expansion method"
-    )
-    multi_query_n: int = Field(
-        default=3,
-        description="Number of expanded queries to generate"
-    )
+    multi_query_method: str = Field(default="llm", description="Multi-query expansion method")
+    multi_query_n: int = Field(default=3, description="Number of expanded queries to generate")
     multi_query_include_original: bool = Field(
-        default=True,
-        description="Include original query in expanded queries"
+        default=True, description="Include original query in expanded queries"
     )
     multi_query_prompt: str = Field(
-        default="general_mq_v1",
-        description="Prompt template name for multi-query expansion"
+        default="general_mq_v1", description="Prompt template name for multi-query expansion"
     )
 
     # Reranking
-    rerank_enabled: bool = Field(
-        default=False,
-        description="Enable reranking of retrieval results"
-    )
+    rerank_enabled: bool = Field(default=False, description="Enable reranking of retrieval results")
     rerank_method: str = Field(
-        default="cross_encoder",
-        description="Reranking method (cross_encoder, llm)"
+        default="cross_encoder", description="Reranking method (cross_encoder, llm)"
     )
     rerank_model: str = Field(
-        default="cross-encoder/ms-marco-MiniLM-L-6-v2",
-        description="Reranking model name/path"
+        default="cross-encoder/ms-marco-MiniLM-L-6-v2", description="Reranking model name/path"
     )
-    rerank_top_k: int = Field(
-        default=5,
-        description="Number of results to keep after reranking"
-    )
+    rerank_top_k: int = Field(default=5, description="Number of results to keep after reranking")
 
     # Vector store
     vector_store_dir: str = Field(
-        default="data/vector_stores",
-        description="Directory for persisted vector stores"
+        default="data/vector_stores", description="Directory for persisted vector stores"
     )
     vector_normalize: bool = Field(
-        default=True,
-        description="L2 normalize vectors for cosine similarity"
+        default=True, description="L2 normalize vectors for cosine similarity"
     )
 
     # RAGFlow integration
-    ragflow_enabled: bool = Field(
-        default=True,
-        description="Use RAGFlow for retrieval"
-    )
-    ragflow_base_url: str = Field(
-        default="http://ragflow:9380",
-        description="RAGFlow server URL"
-    )
-    ragflow_api_key: str = Field(
-        default="",
-        description="RAGFlow API key"
-    )
-    ragflow_agent_id: str = Field(
-        default="",
-        description="Default RAGFlow agent ID"
-    )
+    ragflow_enabled: bool = Field(default=True, description="Use RAGFlow for retrieval")
+    ragflow_base_url: str = Field(default="http://ragflow:9380", description="RAGFlow server URL")
+    ragflow_api_key: str = Field(default="", description="RAGFlow API key")
+    ragflow_agent_id: str = Field(default="", description="Default RAGFlow agent ID")
 
 
 class DeepDocSettings(BaseSettings):
@@ -206,7 +129,7 @@ class DeepDocSettings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore"
+        extra="ignore",
     )
 
     preferred_backend: str = Field(
@@ -314,33 +237,17 @@ class VLLMSettings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore"
+        extra="ignore",
     )
 
-    base_url: str = Field(
-        default="http://vllm:8000",
-        description="vLLM server URL"
-    )
-    model_name: str = Field(
-        default="gpt-oss-20b",
-        description="Model name/identifier"
-    )
-    temperature: float = Field(
-        default=0.7,
-        description="Sampling temperature"
-    )
+    base_url: str = Field(default="http://vllm:8000", description="vLLM server URL")
+    model_name: str = Field(default="gpt-oss-20b", description="Model name/identifier")
+    temperature: float = Field(default=0.7, description="Sampling temperature")
     reasoning_effort: str | None = Field(
-        default=None,
-        description="Reasoning effort hint for reasoning models (low|medium|high)."
+        default=None, description="Reasoning effort hint for reasoning models (low|medium|high)."
     )
-    max_tokens: int = Field(
-        default=30000,
-        description="Maximum tokens to generate"
-    )
-    timeout: int = Field(
-        default=60,
-        description="Request timeout in seconds"
-    )
+    max_tokens: int = Field(default=30000, description="Maximum tokens to generate")
+    timeout: int = Field(default=60, description="Request timeout in seconds")
 
 
 class VlmClientSettings(BaseSettings):
@@ -436,17 +343,11 @@ class TEISettings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore"
+        extra="ignore",
     )
 
-    endpoint_url: str = Field(
-        default="http://tei:80",
-        description="TEI server URL"
-    )
-    timeout: int = Field(
-        default=30,
-        description="Request timeout in seconds"
-    )
+    endpoint_url: str = Field(default="http://tei:80", description="TEI server URL")
+    timeout: int = Field(default=30, description="Request timeout in seconds")
 
 
 class APISettings(BaseSettings):
@@ -457,57 +358,26 @@ class APISettings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
-        extra="ignore"
+        extra="ignore",
     )
 
-    title: str = Field(
-        default="PE Agent API",
-        description="API title"
-    )
-    version: str = Field(
-        default="0.1.0",
-        description="API version"
-    )
-    description: str = Field(
-        default="PE Agent RAG API",
-        description="API description"
-    )
+    title: str = Field(default="PE Agent API", description="API title")
+    version: str = Field(default="0.1.0", description="API version")
+    description: str = Field(default="PE Agent RAG API", description="API description")
     simple_chat_prompt_file: str | None = Field(
         default=None,
         description="Path to system prompt file for simple chat (LLM-only)",
     )
-    host: str = Field(
-        default="0.0.0.0",
-        description="Host to bind"
-    )
-    port: int = Field(
-        default=8100,
-        description="Port to bind"
-    )
-    reload: bool = Field(
-        default=False,
-        description="Auto-reload on code changes"
-    )
-    log_level: str = Field(
-        default="info",
-        description="Logging level"
-    )
-    log_to_file: bool = Field(
-        default=False,
-        description="Write API logs to file"
-    )
-    log_file_path: str = Field(
-        default="/data/logs/api/api.log",
-        description="API log file path"
-    )
+    host: str = Field(default="0.0.0.0", description="Host to bind")
+    port: int = Field(default=8100, description="Port to bind")
+    reload: bool = Field(default=False, description="Auto-reload on code changes")
+    log_level: str = Field(default="info", description="Logging level")
+    log_to_file: bool = Field(default=False, description="Write API logs to file")
+    log_file_path: str = Field(default="/data/logs/api/api.log", description="API log file path")
     log_max_bytes: int = Field(
-        default=20 * 1024 * 1024,
-        description="Max bytes per log file before rotation"
+        default=20 * 1024 * 1024, description="Max bytes per log file before rotation"
     )
-    log_backup_count: int = Field(
-        default=5,
-        description="Number of rotated log files to keep"
-    )
+    log_backup_count: int = Field(default=5, description="Number of rotated log files to keep")
     enable_legacy_compat_routes: bool = Field(
         default=False,
         description="Enable legacy compatibility endpoints (e.g. /api/search/chat-pipeline)",
@@ -640,7 +510,6 @@ class SearchSettings(BaseSettings):
     )
 
 
-
 class AgentSettings(BaseSettings):
     """Agent settings."""
 
@@ -656,6 +525,13 @@ class AgentSettings(BaseSettings):
         default="fallback",
         description="Default mq_mode when request does not provide one",
     )
+    second_stage_doc_retrieve_enabled: bool = False
+    early_page_penalty_enabled: bool = False
+    early_page_penalty_max_page: int = 2
+    early_page_penalty_factor: float = 0.3
+    second_stage_max_doc_ids: int = 1
+    second_stage_top_k: int = 50
+
 
 # Global settings instances
 rag_settings = RAGSettings()

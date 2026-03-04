@@ -201,12 +201,23 @@ class EsSearchEngine:
         """
         if use_rrf:
             return self._hybrid_search_rrf(
-                query_vector, query_text, top_k, filters, rrf_k,
-                device_boost, device_boost_weight,
+                query_vector,
+                query_text,
+                top_k,
+                filters,
+                rrf_k,
+                device_boost,
+                device_boost_weight,
             )
         return self._hybrid_search_script_score(
-            query_vector, query_text, top_k, dense_weight, sparse_weight, filters,
-            device_boost, device_boost_weight,
+            query_vector,
+            query_text,
+            top_k,
+            dense_weight,
+            sparse_weight,
+            filters,
+            device_boost,
+            device_boost_weight,
         )
 
     def _hybrid_search_rrf(
@@ -260,8 +271,14 @@ class EsSearchEngine:
             # RRF may not be supported in all ES versions
             logger.warning("RRF search failed, falling back to script_score: %s", e)
             return self._hybrid_search_script_score(
-                query_vector, query_text, top_k, 0.7, 0.3, filters,
-                device_boost, device_boost_weight,
+                query_vector,
+                query_text,
+                top_k,
+                0.7,
+                0.3,
+                filters,
+                device_boost,
+                device_boost_weight,
             )
 
     def _hybrid_search_script_score(
@@ -381,8 +398,22 @@ class EsSearchEngine:
                     {
                         "bool": {
                             "should": [
-                                {"term": {"device_name": {"value": device_boost, "boost": device_boost_weight}}},
-                                {"term": {"device_name.keyword": {"value": device_boost, "boost": device_boost_weight}}},
+                                {
+                                    "term": {
+                                        "device_name": {
+                                            "value": device_boost,
+                                            "boost": device_boost_weight,
+                                        }
+                                    }
+                                },
+                                {
+                                    "term": {
+                                        "device_name.keyword": {
+                                            "value": device_boost,
+                                            "boost": device_boost_weight,
+                                        }
+                                    }
+                                },
                             ],
                             "minimum_should_match": 1,
                         }
@@ -423,6 +454,7 @@ class EsSearchEngine:
         project_id: str | None = None,
         doc_type: str | None = None,
         doc_types: list[str] | None = None,
+        doc_ids: list[str] | None = None,
         equip_ids: list[str] | None = None,
         lang: str | None = None,
         device_names: list[str] | None = None,
@@ -433,6 +465,7 @@ class EsSearchEngine:
             tenant_id: Filter by tenant.
             project_id: Filter by project.
             doc_type: Filter by document type.
+            doc_ids: Filter by document IDs (OR logic).
             equip_ids: Filter by equip_id values (OR logic).
             lang: Filter by language.
             device_names: Filter by device names (OR logic - match any).
@@ -440,6 +473,7 @@ class EsSearchEngine:
         Returns:
             ES filter clause or None if no filters.
         """
+
         def _term_or_keyword(field: str, value: str) -> dict[str, Any]:
             """Build a robust exact-match filter for both keyword and dynamic text mappings.
 
@@ -487,6 +521,10 @@ class EsSearchEngine:
             terms.append(_term_or_keyword("lang", lang))
         if device_names:
             terms.append(_terms_or_keyword("device_name", device_names))
+        if doc_ids:
+            normalized_doc_ids = [str(doc_id).strip() for doc_id in doc_ids if str(doc_id).strip()]
+            if normalized_doc_ids:
+                terms.append(_terms_or_keyword("doc_id", normalized_doc_ids))
         if equip_ids:
             normalized_eids = [str(eid).strip().upper() for eid in equip_ids if str(eid).strip()]
             if normalized_eids:

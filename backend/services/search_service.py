@@ -50,25 +50,33 @@ class SearchService:
         self.method = (method or rag_settings.retrieval_method).lower()
         self.version = version or rag_settings.retrieval_version
         self.top_k = top_k or rag_settings.retrieval_top_k
-        self.dense_weight = dense_weight if dense_weight is not None else rag_settings.hybrid_dense_weight
-        self.sparse_weight = sparse_weight if sparse_weight is not None else rag_settings.hybrid_sparse_weight
+        self.dense_weight = (
+            dense_weight if dense_weight is not None else rag_settings.hybrid_dense_weight
+        )
+        self.sparse_weight = (
+            sparse_weight if sparse_weight is not None else rag_settings.hybrid_sparse_weight
+        )
         self.rrf_k = rrf_k if rrf_k is not None else rag_settings.hybrid_rrf_k
 
         # Multi-query expansion settings
         self.multi_query_enabled = (
-            multi_query_enabled if multi_query_enabled is not None
+            multi_query_enabled
+            if multi_query_enabled is not None
             else rag_settings.multi_query_enabled
         )
         self.multi_query_method = multi_query_method or rag_settings.multi_query_method
         self.multi_query_n = multi_query_n or rag_settings.multi_query_n
         self.multi_query_include_original = (
-            multi_query_include_original if multi_query_include_original is not None
+            multi_query_include_original
+            if multi_query_include_original is not None
             else rag_settings.multi_query_include_original
         )
         self.multi_query_prompt = multi_query_prompt or rag_settings.multi_query_prompt
 
         # Reranking settings
-        self.rerank_enabled = rerank_enabled if rerank_enabled is not None else rag_settings.rerank_enabled
+        self.rerank_enabled = (
+            rerank_enabled if rerank_enabled is not None else rag_settings.rerank_enabled
+        )
         self.rerank_method = rerank_method or rag_settings.rerank_method
         self.rerank_model = rerank_model or rag_settings.rerank_model
         self.rerank_top_k = rerank_top_k or rag_settings.rerank_top_k
@@ -91,7 +99,9 @@ class SearchService:
         self.query_expander: Optional[BaseQueryExpander] = (
             self._build_query_expander() if self.multi_query_enabled else None
         )
-        self.reranker: Optional[BaseReranker] = self._build_reranker() if self.rerank_enabled else None
+        self.reranker: Optional[BaseReranker] = (
+            self._build_reranker() if self.rerank_enabled else None
+        )
 
     def _build_dense(self, **kwargs: Any):
         if self.corpus.vector_store is None:
@@ -149,10 +159,7 @@ class SearchService:
 
     def _build_reranker(self) -> BaseReranker:
         """Build reranker based on settings."""
-        logger.info(
-            f"Building reranker: method={self.rerank_method}, "
-            f"model={self.rerank_model}"
-        )
+        logger.info(f"Building reranker: method={self.rerank_method}, model={self.rerank_model}")
         return get_reranker(
             self.rerank_method,
             version="v1",
@@ -209,12 +216,14 @@ class SearchService:
             base = doc_payload[doc_id]
             # Preserve original metadata and add RRF info
             merged_metadata = dict(base.metadata) if base.metadata else {}
-            merged_metadata.update({
-                "rrf_score": rrf_score,
-                "original_scores": original_scores[doc_id],
-                "query_hits": query_hits[doc_id],
-                "total_queries": len(result_lists),
-            })
+            merged_metadata.update(
+                {
+                    "rrf_score": rrf_score,
+                    "original_scores": original_scores[doc_id],
+                    "query_hits": query_hits[doc_id],
+                    "total_queries": len(result_lists),
+                }
+            )
             merged.append(
                 RetrievalResult(
                     doc_id=doc_id,
@@ -240,6 +249,7 @@ class SearchService:
         device_names: Optional[list[str]] = None,
         equip_ids: Optional[list[str]] = None,
         doc_types: Optional[list[str]] = None,
+        doc_ids: Optional[list[str]] = None,
     ) -> list[RetrievalResult]:
         """Search for relevant documents with optional multi-query expansion and reranking.
 
@@ -280,6 +290,8 @@ class SearchService:
             retriever_kwargs["equip_ids"] = equip_ids
         if doc_types:
             retriever_kwargs["doc_types"] = doc_types
+        if doc_ids:
+            retriever_kwargs["doc_ids"] = doc_ids
 
         # Step 1: Multi-Query Expansion (if enabled)
         if should_expand and self.query_expander is not None:

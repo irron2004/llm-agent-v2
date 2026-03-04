@@ -547,12 +547,89 @@ def get_feedback_mapping() -> dict[str, Any]:
 FEEDBACK_MAPPING = get_feedback_mapping()
 
 
+# =========================================================================
+# chunk_v3 Mappings (content/embed 분리 구조)
+# =========================================================================
+
+
+def get_chunk_v3_content_mapping() -> dict[str, Any]:
+    """chunk_v3_content 인덱스 매핑: 원문 + 메타 (embedding 없음).
+
+    BM25 검색과 메타데이터 필터링에 사용. 벡터는 별도 embed 인덱스에 저장.
+    """
+    return {
+        "properties": {
+            "chunk_id": {"type": "keyword", "doc_values": True},
+            "doc_id": {"type": "keyword", "doc_values": True},
+            "page": {"type": "integer"},
+            "lang": {"type": "keyword", "doc_values": True},
+            "content": {"type": "text", "analyzer": "nori"},
+            "search_text": {"type": "text", "analyzer": "nori"},
+            "doc_type": {"type": "keyword", "doc_values": True},
+            "device_name": {"type": "keyword", "doc_values": True},
+            "equip_id": {"type": "keyword", "doc_values": True},
+            "chapter": {"type": "keyword", "doc_values": True},
+            "content_hash": {"type": "keyword", "doc_values": True},
+            "chunk_version": {"type": "keyword", "doc_values": True},
+            "pipeline_version": {"type": "keyword", "doc_values": True},
+            "created_at": {"type": "date"},
+        },
+    }
+
+
+def get_chunk_v3_embed_mapping(
+    dims: int,
+    hnsw_m: int = 16,
+    ef_construction: int = 100,
+    model_meta: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """chunk_v3_embed_{model}_v1 인덱스 매핑: chunk_id + vector + 최소 필터 메타.
+
+    Args:
+        dims: 임베딩 벡터 차원수
+        hnsw_m: HNSW m 파라미터
+        ef_construction: HNSW ef_construction 파라미터
+        model_meta: _meta에 저장할 모델 정보
+    """
+    mapping: dict[str, Any] = {
+        "properties": {
+            "chunk_id": {"type": "keyword", "doc_values": True},
+            "content_hash": {"type": "keyword", "doc_values": True},
+            "doc_type": {"type": "keyword", "doc_values": True},
+            "device_name": {"type": "keyword", "doc_values": True},
+            "chapter": {"type": "keyword", "doc_values": True},
+            "embedding": {
+                "type": "dense_vector",
+                "dims": dims,
+                "index": True,
+                "similarity": "cosine",
+                "index_options": {
+                    "type": "hnsw",
+                    "m": hnsw_m,
+                    "ef_construction": ef_construction,
+                },
+            },
+        },
+    }
+    if model_meta:
+        mapping["_meta"] = {
+            "embedding_model": model_meta.get("embedding_model", ""),
+            "dims": model_meta.get("dims", dims),
+            "normalize": model_meta.get("normalize", ""),
+            "query_prefix": model_meta.get("query_prefix", ""),
+            "document_prefix": model_meta.get("document_prefix", ""),
+        }
+    return mapping
+
+
 __all__ = [
     "get_rag_chunks_mapping",
     "get_index_settings",
     "get_index_meta",
     "get_chat_turns_mapping",
     "get_feedback_mapping",
+    "get_chunk_v3_content_mapping",
+    "get_chunk_v3_embed_mapping",
     "RAG_CHUNKS_MAPPING",
     "CHAT_TURNS_MAPPING",
     "FEEDBACK_MAPPING",

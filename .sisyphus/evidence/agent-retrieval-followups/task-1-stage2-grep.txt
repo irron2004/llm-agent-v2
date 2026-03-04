@@ -1,0 +1,231 @@
+## Command
+grep -R "AGENT_EARLY_PAGE_PENALTY_ENABLED\|AGENT_SECOND_STAGE_DOC_RETRIEVE_ENABLED\|_apply_early_page_penalty\|stage2" -n backend || true
+
+## Output
+grep: backend/.venv/lib/python3.12/site-packages/torch/_functorch/__pycache__/aot_autograd.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/aot_autograd.py:83:    aot_stage2_compile,
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/aot_autograd.py:84:    aot_stage2_export,
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/aot_autograd.py:827:                compiled_fn, _ = aot_stage2_compile(aot_state, aot_graph_capture)
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/aot_autograd.py:1106:            compiled_fn, _ = aot_stage2_compile(aot_state, aot_graph_capture)
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/aot_autograd.py:1203:    NB: You're not obligated to do a /full/ compile in stage2; instead you can
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/aot_autograd.py:1294:    compiled_fn, _ = aot_stage2_compile(jd._aot_state, jd._aot_graph_capture)
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/aot_autograd.py:1456:    # TODO: subsume this path with the aot_stage2_graph_capture path
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/aot_autograd.py:1704:        fx_g, meta = aot_stage2_export(aot_state, aot_graph_capture)
+grep: backend/.venv/lib/python3.12/site-packages/torch/_functorch/_aot_autograd/__pycache__/graph_compile.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/_aot_autograd/schemas.py:1015:    # only expected to pass to aot_stage2_compile to process.
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/_aot_autograd/schemas.py:1194:    # unspecified and only aot_stage2_compile knows how to deal with them.
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/_aot_autograd/graph_compile.py:189:def aot_stage2_export(
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/_aot_autograd/graph_compile.py:235:def aot_stage2_compile(
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/_aot_autograd/graph_compile.py:240:        return aot_stage2_autograd(aot_state, aot_graph_capture)
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/_aot_autograd/graph_compile.py:242:        return aot_stage2_inference(aot_state, aot_graph_capture)
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/_aot_autograd/graph_compile.py:245:def aot_stage2_inference(
+backend/.venv/lib/python3.12/site-packages/torch/_functorch/_aot_autograd/graph_compile.py:1317:def aot_stage2_autograd(
+grep: backend/.venv/lib/python3.12/site-packages/torch/lib/libtorch_cpu.so: binary file matches
+backend/.venv/lib/python3.12/site-packages/scipy/_lib/pyprima/cobyla/trustregion.py:122:    2. cviol. cviol is updated after at iteration in stage 1, while it remains a constant in stage2.
+grep: backend/.venv/lib/python3.12/site-packages/scipy/_lib/pyprima/cobyla/__pycache__/trustregion.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/upernet/configuration_upernet.py:109:            backbone_config = CONFIG_MAPPING["resnet"](out_features=["stage1", "stage2", "stage3", "stage4"])
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/upernet/__pycache__/configuration_upernet.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/deprecated/deta/configuration_deta.py:203:            backbone_config = CONFIG_MAPPING["resnet"](out_features=["stage2", "stage3", "stage4"])
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/deprecated/deta/__pycache__/configuration_deta.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/deprecated/nat/configuration_nat.py:68:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/deprecated/nat/__pycache__/configuration_nat.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/deprecated/nat/__pycache__/modeling_nat.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/deprecated/nat/modeling_nat.py:878:        ...     "shi-labs/nat-mini-in1k-224", out_features=["stage1", "stage2", "stage3", "stage4"]
+backend/.venv/lib/python3.12/site-packages/transformers/models/vitpose_backbone/configuration_vitpose_backbone.py:68:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/vitpose_backbone/__pycache__/configuration_vitpose_backbone.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/hgnet_v2/__pycache__/configuration_hgnet_v2.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/hgnet_v2/__pycache__/modular_hgnet_v2.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/hgnet_v2/modular_hgnet_v2.py:60:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib/python3.12/site-packages/transformers/models/hgnet_v2/configuration_hgnet_v2.py:50:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib/python3.12/site-packages/transformers/models/convnext/configuration_convnext.py:64:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/convnext/__pycache__/configuration_convnext.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/vitdet/configuration_vitdet.py:76:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/vitdet/__pycache__/configuration_vitdet.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/hiera/__pycache__/configuration_hiera.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/hiera/__pycache__/modeling_hiera.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/hiera/modeling_hiera.py:1387:        ...     "facebook/hiera-tiny-224-hf", out_features=["stage1", "stage2", "stage3", "stage4"]
+backend/.venv/lib/python3.12/site-packages/transformers/models/hiera/configuration_hiera.py:88:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/bit/__pycache__/configuration_bit.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/bit/configuration_bit.py:62:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib/python3.12/site-packages/transformers/models/dinov2_with_registers/modeling_dinov2_with_registers.py:669:        ...     "facebook/dinov2-with-registers-base", out_features=["stage2", "stage5", "stage8", "stage11"]
+backend/.venv/lib/python3.12/site-packages/transformers/models/dinov2_with_registers/configuration_dinov2_with_registers.py:74:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/dinov2_with_registers/__pycache__/configuration_dinov2_with_registers.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/dinov2_with_registers/__pycache__/modular_dinov2_with_registers.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/dinov2_with_registers/__pycache__/modeling_dinov2_with_registers.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/dinov2_with_registers/modular_dinov2_with_registers.py:87:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib/python3.12/site-packages/transformers/models/dinov2_with_registers/modular_dinov2_with_registers.py:391:        ...     "facebook/dinov2-with-registers-base", out_features=["stage2", "stage5", "stage8", "stage11"]
+backend/.venv/lib/python3.12/site-packages/transformers/models/maskformer/configuration_maskformer.py:141:                out_features=["stage1", "stage2", "stage3", "stage4"],
+backend/.venv/lib/python3.12/site-packages/transformers/models/maskformer/modeling_maskformer.py:1345:            backbone_config.out_features = ["stage1", "stage2", "stage3", "stage4"]
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/maskformer/__pycache__/configuration_maskformer.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/maskformer/__pycache__/modeling_maskformer.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/maskformer/__pycache__/configuration_maskformer_swin.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/maskformer/configuration_maskformer_swin.py:71:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib/python3.12/site-packages/transformers/models/oneformer/configuration_oneformer.py:212:                out_features=["stage1", "stage2", "stage3", "stage4"],
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/oneformer/__pycache__/configuration_oneformer.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/mask2former/configuration_mask2former.py:182:                out_features=["stage1", "stage2", "stage3", "stage4"],
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/mask2former/__pycache__/configuration_mask2former.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/swinv2/configuration_swinv2.py:75:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/swinv2/__pycache__/configuration_swinv2.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/swinv2/__pycache__/modeling_swinv2.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/swinv2/modeling_swinv2.py:1286:        ...     "microsoft/swinv2-tiny-patch4-window8-256", out_features=["stage1", "stage2", "stage3", "stage4"]
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/resnet/__pycache__/modeling_resnet.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/resnet/__pycache__/configuration_resnet.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/resnet/configuration_resnet.py:61:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib/python3.12/site-packages/transformers/models/resnet/modeling_resnet.py:396:        ...     "microsoft/resnet-50", out_features=["stage1", "stage2", "stage3", "stage4"]
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/convnextv2/__pycache__/configuration_convnextv2.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/convnextv2/configuration_convnextv2.py:58:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/beit/__pycache__/modeling_beit.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/beit/__pycache__/configuration_beit.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/beit/modeling_beit.py:1477:        ...     "microsoft/beit-base-patch16-224", out_features=["stage1", "stage2", "stage3", "stage4"]
+backend/.venv/lib/python3.12/site-packages/transformers/models/beit/configuration_beit.py:94:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/rt_detr/__pycache__/configuration_rt_detr_resnet.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/rt_detr/configuration_rt_detr_resnet.py:55:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib/python3.12/site-packages/transformers/models/swin/modeling_swin.py:1218:        ...     "microsoft/swin-tiny-patch4-window7-224", out_features=["stage1", "stage2", "stage3", "stage4"]
+backend/.venv/lib/python3.12/site-packages/transformers/models/swin/configuration_swin.py:79:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/swin/__pycache__/configuration_swin.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/swin/__pycache__/modeling_swin.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/pvt_v2/__pycache__/modeling_pvt_v2.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/pvt_v2/__pycache__/configuration_pvt_v2.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/pvt_v2/configuration_pvt_v2.py:80:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib/python3.12/site-packages/transformers/models/pvt_v2/modeling_pvt_v2.py:572:        ...     "OpenGVLab/pvt_v2_b0", out_features=["stage1", "stage2", "stage3", "stage4"]
+backend/.venv/lib/python3.12/site-packages/transformers/models/dinov2/modeling_dinov2.py:646:        ...     "facebook/dinov2-base", out_features=["stage2", "stage5", "stage8", "stage11"]
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/dinov2/__pycache__/configuration_dinov2.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/dinov2/__pycache__/modeling_dinov2.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/dinov2/configuration_dinov2.py:76:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib/python3.12/site-packages/transformers/models/focalnet/configuration_focalnet.py:81:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/focalnet/__pycache__/configuration_focalnet.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/textnet/__pycache__/configuration_textnet.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/textnet/configuration_textnet.py:60:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/zoedepth/__pycache__/configuration_zoedepth.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/zoedepth/configuration_zoedepth.py:195:                out_features=["stage6", "stage12", "stage18", "stage24"],
+backend/.venv/lib/python3.12/site-packages/transformers/models/dpt/configuration_dpt.py:198:                    "out_features": ["stage1", "stage2", "stage3"],
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/dpt/__pycache__/configuration_dpt.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/dinat/configuration_dinat.py:70:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/dinat/__pycache__/configuration_dinat.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/transformers/models/dinat/__pycache__/modeling_dinat.cpython-312.pyc: binary file matches
+backend/.venv/lib/python3.12/site-packages/transformers/models/dinat/modeling_dinat.py:802:        ...     "shi-labs/nat-mini-in1k-224", out_features=["stage1", "stage2", "stage3", "stage4"]
+backend/.venv/lib/python3.12/site-packages/transformers/utils/backbone_utils.py:155:        # the transformer model has out_features = ['stem', 'stage1', 'stage2', 'stage3', 'stage4']
+grep: backend/.venv/lib/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/nvidia/cusolver/lib/libcusolver.so.11: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/nvidia/cusolver/lib/libcusolverMg.so.11: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/nvidia/cublas/lib/libcublas.so.12: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/nvidia/cublas/lib/libcublasLt.so.12: binary file matches
+grep: backend/.venv/lib/python3.12/site-packages/nvidia/cusparselt/lib/libcusparseLt.so.0: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/torch/_functorch/__pycache__/aot_autograd.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/aot_autograd.py:83:    aot_stage2_compile,
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/aot_autograd.py:84:    aot_stage2_export,
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/aot_autograd.py:827:                compiled_fn, _ = aot_stage2_compile(aot_state, aot_graph_capture)
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/aot_autograd.py:1106:            compiled_fn, _ = aot_stage2_compile(aot_state, aot_graph_capture)
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/aot_autograd.py:1203:    NB: You're not obligated to do a /full/ compile in stage2; instead you can
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/aot_autograd.py:1294:    compiled_fn, _ = aot_stage2_compile(jd._aot_state, jd._aot_graph_capture)
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/aot_autograd.py:1456:    # TODO: subsume this path with the aot_stage2_graph_capture path
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/aot_autograd.py:1704:        fx_g, meta = aot_stage2_export(aot_state, aot_graph_capture)
+grep: backend/.venv/lib64/python3.12/site-packages/torch/_functorch/_aot_autograd/__pycache__/graph_compile.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/_aot_autograd/schemas.py:1015:    # only expected to pass to aot_stage2_compile to process.
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/_aot_autograd/schemas.py:1194:    # unspecified and only aot_stage2_compile knows how to deal with them.
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/_aot_autograd/graph_compile.py:189:def aot_stage2_export(
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/_aot_autograd/graph_compile.py:235:def aot_stage2_compile(
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/_aot_autograd/graph_compile.py:240:        return aot_stage2_autograd(aot_state, aot_graph_capture)
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/_aot_autograd/graph_compile.py:242:        return aot_stage2_inference(aot_state, aot_graph_capture)
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/_aot_autograd/graph_compile.py:245:def aot_stage2_inference(
+backend/.venv/lib64/python3.12/site-packages/torch/_functorch/_aot_autograd/graph_compile.py:1317:def aot_stage2_autograd(
+grep: backend/.venv/lib64/python3.12/site-packages/torch/lib/libtorch_cpu.so: binary file matches
+backend/.venv/lib64/python3.12/site-packages/scipy/_lib/pyprima/cobyla/trustregion.py:122:    2. cviol. cviol is updated after at iteration in stage 1, while it remains a constant in stage2.
+grep: backend/.venv/lib64/python3.12/site-packages/scipy/_lib/pyprima/cobyla/__pycache__/trustregion.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/upernet/configuration_upernet.py:109:            backbone_config = CONFIG_MAPPING["resnet"](out_features=["stage1", "stage2", "stage3", "stage4"])
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/upernet/__pycache__/configuration_upernet.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/deprecated/deta/configuration_deta.py:203:            backbone_config = CONFIG_MAPPING["resnet"](out_features=["stage2", "stage3", "stage4"])
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/deprecated/deta/__pycache__/configuration_deta.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/deprecated/nat/configuration_nat.py:68:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/deprecated/nat/__pycache__/configuration_nat.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/deprecated/nat/__pycache__/modeling_nat.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/deprecated/nat/modeling_nat.py:878:        ...     "shi-labs/nat-mini-in1k-224", out_features=["stage1", "stage2", "stage3", "stage4"]
+backend/.venv/lib64/python3.12/site-packages/transformers/models/vitpose_backbone/configuration_vitpose_backbone.py:68:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/vitpose_backbone/__pycache__/configuration_vitpose_backbone.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/hgnet_v2/__pycache__/configuration_hgnet_v2.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/hgnet_v2/__pycache__/modular_hgnet_v2.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/hgnet_v2/modular_hgnet_v2.py:60:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib64/python3.12/site-packages/transformers/models/hgnet_v2/configuration_hgnet_v2.py:50:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib64/python3.12/site-packages/transformers/models/convnext/configuration_convnext.py:64:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/convnext/__pycache__/configuration_convnext.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/vitdet/configuration_vitdet.py:76:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/vitdet/__pycache__/configuration_vitdet.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/hiera/__pycache__/configuration_hiera.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/hiera/__pycache__/modeling_hiera.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/hiera/modeling_hiera.py:1387:        ...     "facebook/hiera-tiny-224-hf", out_features=["stage1", "stage2", "stage3", "stage4"]
+backend/.venv/lib64/python3.12/site-packages/transformers/models/hiera/configuration_hiera.py:88:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/bit/__pycache__/configuration_bit.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/bit/configuration_bit.py:62:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib64/python3.12/site-packages/transformers/models/dinov2_with_registers/modeling_dinov2_with_registers.py:669:        ...     "facebook/dinov2-with-registers-base", out_features=["stage2", "stage5", "stage8", "stage11"]
+backend/.venv/lib64/python3.12/site-packages/transformers/models/dinov2_with_registers/configuration_dinov2_with_registers.py:74:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/dinov2_with_registers/__pycache__/configuration_dinov2_with_registers.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/dinov2_with_registers/__pycache__/modular_dinov2_with_registers.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/dinov2_with_registers/__pycache__/modeling_dinov2_with_registers.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/dinov2_with_registers/modular_dinov2_with_registers.py:87:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib64/python3.12/site-packages/transformers/models/dinov2_with_registers/modular_dinov2_with_registers.py:391:        ...     "facebook/dinov2-with-registers-base", out_features=["stage2", "stage5", "stage8", "stage11"]
+backend/.venv/lib64/python3.12/site-packages/transformers/models/maskformer/configuration_maskformer.py:141:                out_features=["stage1", "stage2", "stage3", "stage4"],
+backend/.venv/lib64/python3.12/site-packages/transformers/models/maskformer/modeling_maskformer.py:1345:            backbone_config.out_features = ["stage1", "stage2", "stage3", "stage4"]
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/maskformer/__pycache__/configuration_maskformer.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/maskformer/__pycache__/modeling_maskformer.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/maskformer/__pycache__/configuration_maskformer_swin.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/maskformer/configuration_maskformer_swin.py:71:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib64/python3.12/site-packages/transformers/models/oneformer/configuration_oneformer.py:212:                out_features=["stage1", "stage2", "stage3", "stage4"],
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/oneformer/__pycache__/configuration_oneformer.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/mask2former/configuration_mask2former.py:182:                out_features=["stage1", "stage2", "stage3", "stage4"],
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/mask2former/__pycache__/configuration_mask2former.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/swinv2/configuration_swinv2.py:75:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/swinv2/__pycache__/configuration_swinv2.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/swinv2/__pycache__/modeling_swinv2.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/swinv2/modeling_swinv2.py:1286:        ...     "microsoft/swinv2-tiny-patch4-window8-256", out_features=["stage1", "stage2", "stage3", "stage4"]
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/resnet/__pycache__/modeling_resnet.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/resnet/__pycache__/configuration_resnet.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/resnet/configuration_resnet.py:61:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib64/python3.12/site-packages/transformers/models/resnet/modeling_resnet.py:396:        ...     "microsoft/resnet-50", out_features=["stage1", "stage2", "stage3", "stage4"]
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/convnextv2/__pycache__/configuration_convnextv2.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/convnextv2/configuration_convnextv2.py:58:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/beit/__pycache__/modeling_beit.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/beit/__pycache__/configuration_beit.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/beit/modeling_beit.py:1477:        ...     "microsoft/beit-base-patch16-224", out_features=["stage1", "stage2", "stage3", "stage4"]
+backend/.venv/lib64/python3.12/site-packages/transformers/models/beit/configuration_beit.py:94:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/rt_detr/__pycache__/configuration_rt_detr_resnet.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/rt_detr/configuration_rt_detr_resnet.py:55:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib64/python3.12/site-packages/transformers/models/swin/modeling_swin.py:1218:        ...     "microsoft/swin-tiny-patch4-window7-224", out_features=["stage1", "stage2", "stage3", "stage4"]
+backend/.venv/lib64/python3.12/site-packages/transformers/models/swin/configuration_swin.py:79:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/swin/__pycache__/configuration_swin.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/swin/__pycache__/modeling_swin.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/pvt_v2/__pycache__/modeling_pvt_v2.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/pvt_v2/__pycache__/configuration_pvt_v2.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/pvt_v2/configuration_pvt_v2.py:80:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib64/python3.12/site-packages/transformers/models/pvt_v2/modeling_pvt_v2.py:572:        ...     "OpenGVLab/pvt_v2_b0", out_features=["stage1", "stage2", "stage3", "stage4"]
+backend/.venv/lib64/python3.12/site-packages/transformers/models/dinov2/modeling_dinov2.py:646:        ...     "facebook/dinov2-base", out_features=["stage2", "stage5", "stage8", "stage11"]
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/dinov2/__pycache__/configuration_dinov2.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/dinov2/__pycache__/modeling_dinov2.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/dinov2/configuration_dinov2.py:76:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+backend/.venv/lib64/python3.12/site-packages/transformers/models/focalnet/configuration_focalnet.py:81:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/focalnet/__pycache__/configuration_focalnet.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/textnet/__pycache__/configuration_textnet.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/textnet/configuration_textnet.py:60:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/zoedepth/__pycache__/configuration_zoedepth.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/zoedepth/configuration_zoedepth.py:195:                out_features=["stage6", "stage12", "stage18", "stage24"],
+backend/.venv/lib64/python3.12/site-packages/transformers/models/dpt/configuration_dpt.py:198:                    "out_features": ["stage1", "stage2", "stage3"],
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/dpt/__pycache__/configuration_dpt.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/dinat/configuration_dinat.py:70:            If used as backbone, list of features to output. Can be any of `"stem"`, `"stage1"`, `"stage2"`, etc.
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/dinat/__pycache__/configuration_dinat.cpython-312.pyc: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/transformers/models/dinat/__pycache__/modeling_dinat.cpython-312.pyc: binary file matches
+backend/.venv/lib64/python3.12/site-packages/transformers/models/dinat/modeling_dinat.py:802:        ...     "shi-labs/nat-mini-in1k-224", out_features=["stage1", "stage2", "stage3", "stage4"]
+backend/.venv/lib64/python3.12/site-packages/transformers/utils/backbone_utils.py:155:        # the transformer model has out_features = ['stem', 'stage1', 'stage2', 'stage3', 'stage4']
+grep: backend/.venv/lib64/python3.12/site-packages/nvidia/cudnn/lib/libcudnn_engines_precompiled.so.9: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/nvidia/cusolver/lib/libcusolver.so.11: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/nvidia/cusolver/lib/libcusolverMg.so.11: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/nvidia/cublas/lib/libcublas.so.12: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/nvidia/cublas/lib/libcublasLt.so.12: binary file matches
+grep: backend/.venv/lib64/python3.12/site-packages/nvidia/cusparselt/lib/libcusparseLt.so.0: binary file matches
+
+## Command (exclude backend/.venv)
+grep -R --exclude-dir=.venv "AGENT_EARLY_PAGE_PENALTY_ENABLED\|AGENT_SECOND_STAGE_DOC_RETRIEVE_ENABLED\|_apply_early_page_penalty\|stage2" -n backend || true
+
+## Output
+
+## Insertion Points
+- backend/llm_infrastructure/llm/langgraph_agent.py:1243 (retrieve_node)
+- backend/llm_infrastructure/retrieval/engines/es_search.py:517 (EsSearchEngine.build_filter)
