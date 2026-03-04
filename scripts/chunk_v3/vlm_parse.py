@@ -1,6 +1,7 @@
-"""VLM 파싱 + JSON 저장 CLI 스크립트.
+"""VLM 파싱 + JSON 저장 + 리뷰 MD 생성 CLI 스크립트.
 
 PDF/PPTX 파일을 VLM으로 파싱하고 결과를 JSON으로 저장한다.
+각 문서별로 원본 이미지 + 추출 텍스트를 비교할 수 있는 review.md를 생성한다.
 ES 적재는 하지 않음 (Phase 1 전용).
 
 Usage:
@@ -12,13 +13,20 @@ Usage:
     python scripts/chunk_v3/vlm_parse.py \
         --input sop_pdfs/ --doc-type sop_pdf \
         --output data/vlm_parsed/ --workers 2
+
+    # 리뷰 MD 생성 끄기
+    python scripts/chunk_v3/vlm_parse.py \
+        --input sop_pdfs/ --doc-type sop_pdf \
+        --output data/vlm_parsed/ --no-review
 """
 
 from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -63,14 +71,104 @@ def generate_doc_id(file_path: Path, base_path: Path | None = None) -> str:
     return doc_id or "doc"
 
 
+def render_page_images(input_path: Path) -> list:
+    """PDF/PPTX -> 페이지별 PIL Image 리스트 반환."""
+    from pdf2image import convert_from_path, convert_from_bytes
+
+    suffix = input_path.suffix.lower()
+
+    if suffix == ".pdf":
+        return convert_from_path(str(input_path), dpi=150)
+
+    if suffix == ".pptx":
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            pptx_copy = tmpdir_path / "input.pptx"
+            pptx_copy.write_bytes(input_path.read_bytes())
+            try:
+                subprocess.run(
+                    [
+                        "libreoffice", "--headless",
+                        "--convert-to", "pdf",
+                        "--outdir", str(tmpdir_path),
+                        str(pptx_copy),
+                    ],
+                    capture_output=True, text=True, check=True, timeout=120,
+                )
+            except Exception:
+                return []
+            pdf_path = tmpdir_path / "input.pdf"
+            if not pdf_path.exists():
+                return []
+            return convert_from_path(str(pdf_path), dpi=150)
+
+    return []
+
+
+def generate_review_md(
+    doc_id: str,
+    doc_type: str,
+    source_file: str,
+    vlm_model: str,
+    pages: list[dict],
+    images: list,
+    output_dir: str,
+) -> Path | None:
+    """원본 이미지 + 추출 텍스트를 비교하는 review.md 생성."""
+    if not images:
+        return None
+
+    review_dir = Path(output_dir) / "review" / doc_type / doc_id
+    img_dir = review_dir / "images"
+    img_dir.mkdir(parents=True, exist_ok=True)
+
+    # 이미지 저장
+    for i, img in enumerate(images, start=1):
+        img_path = img_dir / f"page_{i:03d}.png"
+        img.save(str(img_path), "PNG")
+
+    # review.md 생성
+    md_path = review_dir / "review.md"
+    lines = [
+        f"# {source_file} - VLM 파싱 리뷰",
+        f"",
+        f"- **doc_id**: `{doc_id}`",
+        f"- **doc_type**: `{doc_type}`",
+        f"- **모델**: `{vlm_model}`",
+        f"- **총 페이지**: {len(pages)}",
+        f"",
+    ]
+
+    for page_data in pages:
+        page_no = page_data["page"]
+        text = page_data["text"]
+        char_count = len(text)
+
+        lines.append(f"---")
+        lines.append(f"## Page {page_no}")
+        lines.append(f"")
+        lines.append(f"![page {page_no}](images/page_{page_no:03d}.png)")
+        lines.append(f"")
+        lines.append(f"### 추출 텍스트 ({char_count}자)")
+        lines.append(f"")
+        lines.append(f"````markdown")
+        lines.append(text)
+        lines.append(f"````")
+        lines.append(f"")
+
+    md_path.write_text("\n".join(lines), encoding="utf-8")
+    return md_path
+
+
 def parse_and_save(
     input_path: Path,
     doc_type: str,
     doc_id: str,
     output_dir: str,
     vlm_model: str | None = None,
+    generate_review: bool = True,
 ) -> dict:
-    """단일 PDF/PPTX -> VLM 파싱 -> JSON 저장."""
+    """단일 PDF/PPTX -> VLM 파싱 -> JSON 저장 + 리뷰 MD 생성."""
     from backend.config.settings import vlm_client_settings
     from backend.llm_infrastructure.vlm.clients import OpenAIVisionClient
     from backend.llm_infrastructure.preprocessing.parsers.base import PdfParseOptions
@@ -116,14 +214,35 @@ def parse_and_save(
         source_type=source_type,
     )
 
+    # 리뷰 MD 생성
+    review_path = None
+    if generate_review:
+        try:
+            images = render_page_images(input_path)
+            review_path = generate_review_md(
+                doc_id=doc_id,
+                doc_type=doc_type,
+                source_file=input_path.name,
+                vlm_model=model_name,
+                pages=pages,
+                images=images,
+                output_dir=output_dir,
+            )
+        except Exception as e:
+            print(f"  review MD 생성 실패 (무시): {e}", flush=True)
+
     return {
         "doc_id": doc_id,
         "pages": len(pages),
         "output": str(out_path),
+        "review": str(review_path) if review_path else None,
     }
 
 
-def _process_one(file_path: Path, doc_type: str, doc_id: str, output_dir: str) -> dict:
+def _process_one(
+    file_path: Path, doc_type: str, doc_id: str, output_dir: str,
+    generate_review: bool = True,
+) -> dict:
     """단일 파일 처리 (워커에서 호출)."""
     start = time.time()
     result = parse_and_save(
@@ -131,6 +250,7 @@ def _process_one(file_path: Path, doc_type: str, doc_id: str, output_dir: str) -
         doc_type=doc_type,
         doc_id=doc_id,
         output_dir=output_dir,
+        generate_review=generate_review,
     )
     elapsed = time.time() - start
     result["elapsed"] = round(elapsed, 1)
@@ -156,6 +276,10 @@ def parse_args() -> argparse.Namespace:
         "--workers", type=int, default=1,
         help="동시 처리 워커 수 (기본: 1, GPU 수에 맞춤)",
     )
+    parser.add_argument(
+        "--no-review", action="store_true",
+        help="리뷰 MD 생성 안 함 (이미지+텍스트 비교 파일)",
+    )
     return parser.parse_args()
 
 
@@ -170,7 +294,9 @@ def main() -> None:
     print(f"Found {len(files)} file(s) to process", flush=True)
     print(f"  doc_type: {args.doc_type}", flush=True)
     print(f"  output: {args.output}", flush=True)
+    generate_review = not args.no_review
     print(f"  workers: {workers}", flush=True)
+    print(f"  review MD: {'ON' if generate_review else 'OFF'}", flush=True)
 
     # 이미 파싱된 파일 스킵 (resume 지원)
     out_dir = Path(args.output) / args.doc_type
@@ -200,8 +326,9 @@ def main() -> None:
         for i, (file_path, doc_id) in enumerate(todo, 1):
             print(f"\n[{i}/{len(todo)}] {file_path.name} -> {doc_id}", flush=True)
             try:
-                result = _process_one(file_path, args.doc_type, doc_id, args.output)
-                print(f"  OK: {result['pages']}p, {result['elapsed']}s", flush=True)
+                result = _process_one(file_path, args.doc_type, doc_id, args.output, generate_review)
+                review_msg = f", review: {result['review']}" if result.get('review') else ""
+                print(f"  OK: {result['pages']}p, {result['elapsed']}s{review_msg}", flush=True)
                 success += 1
             except Exception as e:
                 print(f"  ERROR: {e}", flush=True)
@@ -211,7 +338,7 @@ def main() -> None:
         with ThreadPoolExecutor(max_workers=workers) as executor:
             for file_path, doc_id in todo:
                 fut = executor.submit(
-                    _process_one, file_path, args.doc_type, doc_id, args.output,
+                    _process_one, file_path, args.doc_type, doc_id, args.output, generate_review,
                 )
                 futures[fut] = (file_path.name, doc_id)
 
