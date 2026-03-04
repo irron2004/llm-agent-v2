@@ -273,7 +273,7 @@ class VlmClientSettings(BaseSettings):
         description="VLM model name/identifier",
     )
     timeout: int = Field(
-        default=600,
+        default=1200,
         description="Request timeout in seconds (VLM inference can be slow)",
     )
     max_tokens: int = Field(
