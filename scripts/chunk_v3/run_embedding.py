@@ -27,8 +27,15 @@ if str(ROOT) not in sys.path:
 from scripts.chunk_v3.common import load_chunks_jsonl
 
 
-# 임베딩 모델 설정 (추후 확정 시 업데이트)
+# 임베딩 모델 설정
 MODEL_CONFIGS: dict[str, dict[str, Any]] = {
+    "qwen3_emb_4b": {
+        "hf_name": "Qwen/Qwen3-Embedding-4B",
+        "dims": 1024,
+        "normalize": "l2",
+        "query_prefix": "",
+        "document_prefix": "",
+    },
     "bge_m3": {
         "hf_name": "BAAI/bge-m3",
         "dims": 1024,
@@ -36,19 +43,12 @@ MODEL_CONFIGS: dict[str, dict[str, Any]] = {
         "query_prefix": "",
         "document_prefix": "",
     },
-    "koe5": {
-        "hf_name": "nlpai-lab/KoE5",
+    "jina_v5": {
+        "hf_name": "jinaai/jina-embeddings-v5-text-small",
         "dims": 1024,
         "normalize": "l2",
-        "query_prefix": "query: ",
-        "document_prefix": "passage: ",
-    },
-    "multilingual_e5": {
-        "hf_name": "intfloat/multilingual-e5-large",
-        "dims": 1024,
-        "normalize": "l2",
-        "query_prefix": "query: ",
-        "document_prefix": "passage: ",
+        "query_prefix": "",
+        "document_prefix": "",
     },
 }
 
