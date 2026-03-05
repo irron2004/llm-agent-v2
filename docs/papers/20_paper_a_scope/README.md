@@ -10,19 +10,25 @@
 **RQ-A**: 장비 계층 메타데이터 기반 scope routing 정책(Hard/Family/Shared)을 적용하면,
 retrieval contamination을 유의하게 줄이면서 recall 손실을 억제할 수 있는가?
 
-## Core Contributions (3축)
+## Core Contributions (4축, v0.4)
 
 1. **(주기여) Hierarchy-aware Scope Routing Policy (G)**
    - 질의에서 장비/설비 스코프를 robust하게 결정 (명시/비명시/모호/공용 문서 포함)
    - AllowedScope(q) = Hard ∪ Family ∪ Shared 3단 정책 설계
-   - Contamination@k를 first-class safety metric으로 정의
+   - Contamination@k를 first-class safety metric으로 정의 (Raw/Adjusted/Shared 3종 보고)
 
-2. **(현장 반영 기여) Family Scope + Shared Doc Policy**
+2. **(알고리즘 기여) Contamination-aware Scoring + 적응형 λ(q)** ← v0.4 신규
+   - `Score(d,q) = Base(d,q) - λ(q)·v_scope(d,q)`: scope 위반을 목적함수 수준에서 penalty
+   - λ(q)를 라우팅 확신도(router confidence)에 따라 적응적으로 조절
+   - 확실→hard filter 수렴, 모호→soft penalty로 recall 보존
+   - C4(Hard↔Soft 전환) + C5(Contamination-aware reranking)를 하나의 점수함수로 통합
+
+3. **(현장 반영 기여) Family Scope + Shared Doc Policy**
    - 공유 문서 기반 장비 유사도 그래프로 equipment family 구축
    - 공용 SOP/TS 문서를 D_shared로 분류하여 contamination 정의에서 예외 처리
    - Hard filter의 recall 손실 문제를 family 확장으로 해결
 
-3. **(효율/실용화 기여) Matryoshka 저차원 라우터**
+4. **(효율/실용화 기여) Matryoshka 저차원 라우터**
    - 저차원(64/128/256d) device prototype 매칭으로 scope 후보 Top-M을 빠르게 선정
    - 장비명 미기재/모호 질의에서 auto-parse 한계를 보완
    - 대규모 코퍼스에서 스코프 제약 파이프라인의 latency/memory를 실용적 수준으로 유지

@@ -46,6 +46,10 @@ def parse_args() -> argparse.Namespace:
         help="출력 JSONL 파일 경로 (기본: data/chunks_v3/all_chunks.jsonl)",
     )
     parser.add_argument(
+        "--manifest", default="data/chunk_v3_manifest.json",
+        help="정규화 manifest 경로 (기본: data/chunk_v3_manifest.json)",
+    )
+    parser.add_argument(
         "--gcb-chunk-size", type=int, default=512,
         help="GCB chunk 크기 (기본: 512)",
     )
@@ -72,13 +76,19 @@ def main() -> None:
 
     # VLM parsed 문서 (SOP PDF/PPTX, TS, Setup Manual)
     if not args.skip_vlm:
-        for doc_type in ["sop_pdf", "sop_pptx", "ts", "setup_manual"]:
+        for doc_type in ["sop_pdf", "ts", "setup_manual"]:
             pattern = str(Path(args.vlm_dir) / doc_type / "*.json")
             json_paths = sorted(glob(pattern))
 
             type_chunks: list[ChunkV3Document] = []
             for json_path in json_paths:
-                type_chunks.extend(chunk_vlm_parsed(doc_type, json_path))
+                type_chunks.extend(
+                    chunk_vlm_parsed(
+                        doc_type,
+                        json_path,
+                        manifest_path=args.manifest,
+                    )
+                )
 
             all_chunks.extend(type_chunks)
             stats[doc_type] = len(type_chunks)

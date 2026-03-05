@@ -19,6 +19,8 @@ Paper A의 claim을 (1) 문헌 근거, (2) 실험 evidence에 매핑.
 | A-C6 | Family 확장은 유사 장비 문서로 인한 recall 손실을 회복한다 | (Jaccard topic graph) | P3 vs P2: Hit@k↑ on Ambiguous set | P3 |
 | A-C7 | 전체 정책(Router+Family+Shared)이 contamination-recall trade-off를 최적화한다 | (integrated) | P4: Cont@k↓ + Hit@k 유지/향상 (3개 서브셋) | P4 |
 | A-C8 | Matryoshka 저차원은 latency/memory를 절감하면서 routing 성능을 유지한다 | `kusupati2022matryoshka`, `li2024twodmatryoshka` | dim ablation: 128d vs 768d router quality + latency 비교 | Matryoshka abl. |
+| A-C9 | Contamination-aware scoring은 순수 relevance reranking보다 contamination을 추가 감소시킨다 | (gap: 기존 RAG reranking은 relevance만 최적화) | P6 vs P4: Cont@k 비교 (동일 scope 정책에서 scoring 효과 분리) | P6 |
+| A-C10 | 적응형 λ(q)는 고정 λ 대비 모호 질의에서 recall 손실을 억제한다 | (C4+C5 통합 기여) | P7 vs P6: Masked/Ambiguous subset에서 Hit@k 비교 | P7 |
 
 ---
 
@@ -29,9 +31,11 @@ Paper A의 claim을 (1) 문헌 근거, (2) 실험 evidence에 매핑.
 | Fig-A1 | Architecture | Scope routing pipeline (parse → route → filter → retrieve → rerank) | Overview |
 | Fig-A2 | Trade-off plot | Contamination@k vs Hit@k (B3/B4/P1/P2/P3/P4 비교) | A-C2~C7 |
 | Fig-A3 | Bar chart | ScopeAccuracy@M by query type (Explicit/Masked/Ambiguous) | A-C5 |
-| Tab-A1 | Main result | 10-row ablation (B0-P5) × {Raw Cont@5, Adj Cont@5, CE@5, Hit@5, MRR, latency} | All |
+| Tab-A1 | Main result | 12-row ablation (B0-P7) × {Raw Cont@5, Adj Cont@5, CE@5, Hit@5, MRR, latency} | All |
 | Tab-A2 | Matryoshka abl. | dim × M × {ScopeAccuracy, Cont@5, latency, memory} | A-C8 |
 | Tab-A3 | Error analysis | Failure mode breakdown: false reject / scope miss / shared ambiguity | A-C3, A-C4 |
+| Fig-A4 | λ sensitivity | λ 값에 따른 Cont@5 vs Hit@5 trade-off curve | A-C9, A-C10 |
+| Tab-A4 | Scoring ablation | P4 vs P6(λ fixed) vs P7(λ adaptive) × subset별 결과 | A-C9, A-C10 |
 
 ---
 
@@ -62,6 +66,9 @@ Paper A의 claim을 (1) 문헌 근거, (2) 실험 evidence에 매핑.
 | Device prototype index | **미생성** | A-C5, A-C8 (Matryoshka router) |
 | expected_device 라벨 (golden set) | **미추가** | A-C2~C7 (Cont@k 측정 전제) |
 | 코퍼스 통계 | **완료** | evidence/2026-03-04_corpus_statistics.md |
+| Cont-aware scoring 구현 (λ·v_scope) | **미구현** | A-C9 (P6 scoring 효과) |
+| Router confidence → λ(q) 적응형 | **미구현** | A-C10 (P7 적응형 효과) |
+| λ sensitivity sweep 데이터 | **미생성** | Fig-A4 (λ vs Cont/Hit trade-off) |
 
 ---
 
