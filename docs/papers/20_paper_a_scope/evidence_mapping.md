@@ -59,13 +59,18 @@ Paper A의 claim을 (1) 문헌 근거, (2) 실험 evidence에 매핑.
 | Artifact | Status | Blocking Claims |
 |----------|--------|----------------|
 | SOP79 golden set | 있음 | B0-B4 (Explicit subset) |
-| Mask set (device 토큰 제거) | **미생성** | A-C5 (P2 ScopeAccuracy) |
-| Ambiguous challenge set | **미생성** | A-C6 (P3 family 효과) |
-| D_shared 판정 결과 | **미생성** | A-C4 (P1 shared 효과) |
-| Family graph (topic-based Jaccard) | **미생성** | A-C6 (P3 family 효과) |
-| Device prototype index | **미생성** | A-C5, A-C8 (Matryoshka router) |
-| expected_device 라벨 (golden set) | **미추가** | A-C2~C7 (Cont@k 측정 전제) |
+| Mask set (implicit subset) | 존재 (`query_gold_master_v0_5.jsonl`, `scope_observability=implicit`) | A-C5 (P2 ScopeAccuracy) |
+| Ambiguous challenge set | 존재 (`query_gold_master_v0_5.jsonl`, `scope_observability=ambiguous`) | A-C6 (P3 family 효과) |
+| D_shared 판정 결과 | 존재 (`.sisyphus/evidence/paper-a/policy/shared_topics.json`, `shared_doc_ids.txt`) | A-C4 (P1 shared 효과) |
+| Family graph (topic-based Jaccard) | 존재 (`.sisyphus/evidence/paper-a/policy/family_map.json`) | A-C6 (P3 family 효과) |
+| Device prototype index | **미구현** | A-C5, A-C8 (Matryoshka router) |
+| expected_device 라벨 (golden set) | 존재 (`allowed_devices` in `query_gold_master_v0_5.jsonl`) | A-C2~C7 (Cont@k 측정 전제) |
 | 코퍼스 통계 | **완료** | evidence/2026-03-04_corpus_statistics.md |
+| Evidence Runs (4 slices) | **완료** | `.sisyphus/evidence/paper-a/runs/{test_explicit_device,test_implicit,test_explicit_equip,dev_ambiguous}/` |
+| Run Index | **완료** | `evidence/2026-03-05_paper_a_run_index.md` |
+| Error Analysis | **완료** | `evidence/2026-03-05_paper_a_error_analysis.md` |
+| Main Results Tables | **완료** | `evidence/2026-03-05_paper_a_main_results.md` |
+| Reviewer Report | **완료** | `review/reviewer_report.md` |
 | Cont-aware scoring 구현 (λ·v_scope) | **미구현** | A-C9 (P6 scoring 효과) |
 | Router confidence → λ(q) 적응형 | **미구현** | A-C10 (P7 적응형 효과) |
 | λ sensitivity sweep 데이터 | **미생성** | Fig-A4 (λ vs Cont/Hit trade-off) |

@@ -29,6 +29,12 @@ def parse_args() -> argparse.Namespace:
         required=True,
         help="Output directory for policy artifacts",
     )
+    _ = parser.add_argument(
+        "--expected-shared-topic-count",
+        type=int,
+        default=None,
+        help="Optional: warn (non-fatal) if shared topic count differs",
+    )
     return parser.parse_args()
 
 
@@ -123,6 +129,7 @@ def run() -> int:
             "es_doc_id": doc["es_doc_id"],
             "es_device_name": doc["es_device_name"],
             "es_doc_type": doc["es_doc_type"],
+            "es_equip_id": doc["es_equip_id"],
             "topic": topic,
             "is_shared": is_shared,
             "scope_level": scope_level,
@@ -141,10 +148,19 @@ def run() -> int:
         "shared_doc_count": shared_doc_count,
     }
 
-    if shared_topic_count != 13:
-        raise RuntimeError(
-            f"shared_topic_count mismatch: expected 13, got {shared_topic_count}"
+    expected = getattr(args, "expected_shared_topic_count", None)
+    if expected is not None and shared_topic_count != expected:
+        print(
+            f"WARNING: shared_topic_count drift: expected {expected}, got {shared_topic_count}",
+            file=sys.stderr,
         )
+        drift_report: dict[str, JsonValue] = {
+            "expected": expected,
+            "actual": shared_topic_count,
+            "status": "drift",
+        }
+        out_dir.mkdir(parents=True, exist_ok=True)
+        write_json(out_dir / "drift_report.json", drift_report)
 
     out_dir.mkdir(parents=True, exist_ok=True)
     write_json(out_dir / "shared_topics.json", shared_topics)

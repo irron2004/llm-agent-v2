@@ -82,11 +82,18 @@ retrieval contamination을 유의하게 줄이면서 recall 손실을 억제할 
 2. ES 인덱스 실제 chunk 수 vs 파싱 문서 578건 차이
 3. doc_id 공유 vs topic 공유: family 구축 기준 확정 필요
 
+## Paper Lineup
+
+- Paper A / A-1 / A-2 구분 문서: `paper_a_series_map.md`
+- Paper A / A-1 / A-2 상세 설계(RQ/H/실험/데이터셋/완성조건): `paper_a_series_blueprint.md`
+
 ## File Structure
 
 ```
 20_paper_a_scope/
 ├── README.md                 ← 이 파일 (개요)
+├── paper_a_series_map.md     ← Paper A / A-1 / A-2 포지셔닝
+├── paper_a_series_blueprint.md ← Paper A / A-1 / A-2 상세 실험 블루프린트
 ├── paper_a_scope_spec.md     ← 실험 정의서 v0.2
 ├── related_work.md           ← 문헌 조사 scaffold
 ├── references.bib            ← BibTeX 참고문헌
@@ -100,3 +107,5 @@ retrieval contamination을 유의하게 줄이면서 recall 손실을 억제할 
 - 공통 프로토콜: `../10_common_protocol/paper_common_protocol.md`
 - 논문 전략: `../00_thesis_strategy/`
 - 실험 정의서: `paper_a_scope_spec.md`
+- 시리즈 포지셔닝: `paper_a_series_map.md`
+- 시리즈 상세 블루프린트: `paper_a_series_blueprint.md`
