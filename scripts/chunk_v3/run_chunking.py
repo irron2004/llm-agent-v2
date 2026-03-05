@@ -76,7 +76,7 @@ def main() -> None:
 
     # VLM parsed 문서 (SOP PDF/PPTX, TS, Setup Manual)
     if not args.skip_vlm:
-        for doc_type in ["sop_pdf", "ts", "setup_manual"]:
+        for doc_type in ["sop", "ts", "setup_manual"]:
             pattern = str(Path(args.vlm_dir) / doc_type / "*.json")
             json_paths = sorted(glob(pattern))
 

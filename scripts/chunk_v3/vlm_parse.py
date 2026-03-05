@@ -6,17 +6,17 @@ ES 적재는 하지 않음 (Phase 1 전용).
 
 Usage:
     python scripts/chunk_v3/vlm_parse.py \
-        --input sop_pdfs/ --doc-type sop_pdf \
+        --input sops/ --doc-type sop \
         --output data/vlm_parsed/
 
     # GPU 2개 병렬 처리
     python scripts/chunk_v3/vlm_parse.py \
-        --input sop_pdfs/ --doc-type sop_pdf \
+        --input sops/ --doc-type sop \
         --output data/vlm_parsed/ --workers 2
 
     # 리뷰 MD 생성 끄기
     python scripts/chunk_v3/vlm_parse.py \
-        --input sop_pdfs/ --doc-type sop_pdf \
+        --input sops/ --doc-type sop \
         --output data/vlm_parsed/ --no-review
 """
 
@@ -266,7 +266,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--doc-type", required=True,
-        help="문서 종류 (sop_pdf, sop_pptx, ts, setup_manual)",
+        help="문서 종류 (sop, sop_pptx, ts, setup_manual)",
     )
     parser.add_argument(
         "--output", default="data/vlm_parsed",

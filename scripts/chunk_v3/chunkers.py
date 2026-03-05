@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -91,12 +92,53 @@ def _parse_setup_manual_filename(filename: str) -> dict[str, str]:
 
 
 FILENAME_PARSERS = {
-    "sop_pdf": _parse_sop_filename,
-    "sop_pptx": _parse_sop_filename,
     "sop": _parse_sop_filename,
     "ts": _parse_ts_filename,
     "setup_manual": _parse_setup_manual_filename,
 }
+
+DEFAULT_MANIFEST_PATH = Path("data/chunk_v3_manifest.json")
+
+
+@lru_cache(maxsize=8)
+def _load_manifest_index(manifest_path: str) -> dict[tuple[str, str], dict[str, Any]]:
+    """manifest를 (doc_type, file_name) 키 인덱스로 로드."""
+    path = Path(manifest_path)
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(data, list):
+        return {}
+
+    index: dict[tuple[str, str], dict[str, Any]] = {}
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        doc_type = str(item.get("doc_type", "")).strip().lower()
+        file_name = str(item.get("file_name", "")).strip().lower()
+        if not doc_type or not file_name:
+            continue
+        index[(doc_type, file_name)] = item
+    return index
+
+
+def _find_manifest_meta(
+    doc_type: str,
+    source_file: str,
+    manifest_path: str | Path | None = None,
+) -> dict[str, Any] | None:
+    """doc_type + source_file로 manifest 메타 조회."""
+    if not source_file:
+        return None
+    manifest = str(Path(manifest_path) if manifest_path else DEFAULT_MANIFEST_PATH)
+    index = _load_manifest_index(manifest)
+    if not index:
+        return None
+    key = (doc_type.strip().lower(), Path(source_file).name.strip().lower())
+    return index.get(key)
 
 
 # =============================================================================
@@ -107,15 +149,17 @@ def chunk_vlm_parsed(
     doc_type: str,
     vlm_json_path: str | Path,
     lang: str = "ko",
+    manifest_path: str | Path | None = None,
 ) -> list[ChunkV3Document]:
     """VLM JSON -> ChunkV3Document[] (SOP, TS, Setup Manual 공용).
 
     페이지 = chunk 단위. 메타데이터는 파일명에서 파싱.
 
     Args:
-        doc_type: 문서 종류 (sop_pdf, sop_pptx, ts, setup_manual)
+        doc_type: 문서 종류 (sop, ts, setup_manual)
         vlm_json_path: VLM 파싱 결과 JSON 경로
         lang: 언어 코드
+        manifest_path: 파일명 정규화 manifest 경로 (없으면 filename parser fallback)
 
     Returns:
         ChunkV3Document 리스트
@@ -125,7 +169,27 @@ def chunk_vlm_parsed(
     source_file = data.get("source_file", "")
 
     parser_fn = FILENAME_PARSERS.get(doc_type, lambda f: {"device_name": "", "chapter": ""})
-    meta = parser_fn(source_file)
+    parsed_meta = parser_fn(source_file)
+    manifest_meta = _find_manifest_meta(doc_type, source_file, manifest_path=manifest_path)
+
+    device_name = str(parsed_meta.get("device_name", "") or "")
+    chapter = str(parsed_meta.get("chapter", "") or "")
+    work_type = ""
+    module = ""
+    topic = ""
+    meta_source = "filename_parser"
+
+    if manifest_meta:
+        meta_source = "manifest"
+        device_name = str(manifest_meta.get("device_name", "") or device_name)
+        work_type = str(manifest_meta.get("work_type", "") or "")
+        module = str(manifest_meta.get("module", "") or "")
+        topic = str(manifest_meta.get("topic", "") or "")
+        if topic:
+            if doc_type == "ts" and module:
+                chapter = f"{module}_{topic}"
+            else:
+                chapter = topic
 
     chunks: list[ChunkV3Document] = []
     for idx, page in enumerate(data.get("pages", [])):
@@ -143,14 +207,18 @@ def chunk_vlm_parsed(
                 content=text,
                 search_text=text,
                 doc_type=doc_type.split("_")[0] if "_" in doc_type else doc_type,
-                device_name=meta.get("device_name", ""),
+                device_name=device_name,
                 equip_id="",
-                chapter=meta.get("chapter", ""),
+                chapter=chapter,
                 content_hash=compute_content_hash(text),
                 extra_meta={
                     "source_file": source_file,
                     "source_type": data.get("source_type", ""),
                     "vlm_model": data.get("vlm_model", ""),
+                    "meta_source": meta_source,
+                    "work_type": work_type,
+                    "module": module,
+                    "topic": topic,
                 },
             )
         )
