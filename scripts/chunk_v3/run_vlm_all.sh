@@ -36,6 +36,7 @@ TASKS=(
     "Setup_Manual|set_up_manual|$DATA_ROOT/set_up_manual/|14"
     "Trouble_Shooting|ts|$DATA_ROOT/ts_pdfs/|57"
     "SOP|sop_pdf|$DATA_ROOT/sop_pdfs/|507"
+    "PEMS|pems|$DATA_ROOT/pems_pdfs/|8"
 )
 
 TOTAL=${#TASKS[@]}
