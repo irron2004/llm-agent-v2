@@ -22,6 +22,8 @@ class SentenceTransformerEmbedder(BaseEmbedder):
         use_cache: bool = False,
         cache_dir: str = ".cache/embeddings",
         show_progress_bar: bool = False,
+        trust_remote_code: bool = False,
+        truncate_dim: Optional[int] = None,
     ) -> None:
         try:
             from sentence_transformers import SentenceTransformer  # type: ignore
@@ -32,9 +34,16 @@ class SentenceTransformerEmbedder(BaseEmbedder):
 
         self.device = pick_device(device)
         self.model_name = model_name
-        self.model = SentenceTransformer(model_name, device=self.device)
+        st_kwargs: dict = {"device": self.device}
+        if trust_remote_code:
+            st_kwargs["trust_remote_code"] = True
+            st_kwargs["model_kwargs"] = {"trust_remote_code": True}
+        if truncate_dim is not None:
+            st_kwargs["truncate_dim"] = truncate_dim
+        self.model = SentenceTransformer(model_name, **st_kwargs)
         self.normalize_embeddings = normalize_embeddings
         self.show_progress_bar = show_progress_bar
+        self.truncate_dim = truncate_dim
 
         self.cache: Optional[EmbeddingCache] = None
         if use_cache:

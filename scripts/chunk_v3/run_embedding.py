@@ -28,29 +28,80 @@ from scripts.chunk_v3.common import load_chunks_jsonl
 
 
 # 임베딩 모델 설정
+# dims: ES 인덱스에 저장할 최종 벡터 차원
+# native_dims: 모델 원래 차원 (MRL truncation 시 참고)
 MODEL_CONFIGS: dict[str, dict[str, Any]] = {
     "qwen3_emb_4b": {
         "hf_name": "Qwen/Qwen3-Embedding-4B",
         "dims": 1024,
+        "native_dims": 2560,
+        "truncate_dim": 1024,
         "normalize": "l2",
-        "query_prefix": "",
+        "trust_remote_code": False,
+        "query_prefix": "query: ",
         "document_prefix": "",
     },
     "bge_m3": {
         "hf_name": "BAAI/bge-m3",
         "dims": 1024,
+        "native_dims": 1024,
+        "truncate_dim": None,
         "normalize": "l2",
+        "trust_remote_code": False,
         "query_prefix": "",
         "document_prefix": "",
     },
     "jina_v5": {
         "hf_name": "jinaai/jina-embeddings-v5-text-small",
         "dims": 1024,
+        "native_dims": 1024,
+        "truncate_dim": None,
         "normalize": "l2",
+        "trust_remote_code": True,
         "query_prefix": "",
         "document_prefix": "",
     },
 }
+
+
+def _create_embedder(model_key: str, device: str = "cuda"):
+    """모델별 SentenceTransformerEmbedder 생성."""
+    from backend.llm_infrastructure.embedding.engines.sentence.embedder import (
+        SentenceTransformerEmbedder,
+    )
+
+    cfg = MODEL_CONFIGS[model_key]
+    return SentenceTransformerEmbedder(
+        model_name=cfg["hf_name"],
+        device=device,
+        trust_remote_code=cfg.get("trust_remote_code", False),
+        truncate_dim=cfg.get("truncate_dim"),
+    )
+
+
+def validate_model_contract(model_key: str, embedder) -> None:
+    """모델 contract 검증: dims, NaN, norm."""
+    cfg = MODEL_CONFIGS[model_key]
+    test_texts = ["hello world", "임베딩 테스트 문장입니다"]
+    vecs = embedder.encode(test_texts)
+
+    actual_dims = vecs.shape[1]
+    expected_dims = cfg["dims"]
+    if actual_dims != expected_dims:
+        raise ValueError(
+            f"[{model_key}] dims mismatch: expected={expected_dims}, actual={actual_dims}"
+        )
+
+    if np.any(np.isnan(vecs)) or np.any(np.isinf(vecs)):
+        raise ValueError(f"[{model_key}] NaN/Inf detected in embeddings")
+
+    norms = np.linalg.norm(vecs, axis=1)
+    if cfg["normalize"] == "l2" and (norms.min() < 0.95 or norms.max() > 1.05):
+        raise ValueError(
+            f"[{model_key}] L2 norm out of range: [{norms.min():.4f}, {norms.max():.4f}]"
+        )
+
+    print(f"  Contract OK: dims={actual_dims}, norm=[{norms.min():.4f}, {norms.max():.4f}]")
 
 
 def embed_model(
@@ -70,27 +121,20 @@ def embed_model(
     Returns:
         (N, dims) numpy array
     """
-    cfg = MODEL_CONFIGS[model_key]
+    embedder = _create_embedder(model_key, device=device)
 
-    from backend.llm_infrastructure.embedding.engines.sentence.embedder import (
-        SentenceTransformerEmbedder,
-    )
-
-    embedder = SentenceTransformerEmbedder(
-        model_name=cfg["hf_name"],
-        device=device,
-    )
+    print(f"  Validating model contract...")
+    validate_model_contract(model_key, embedder)
 
     all_vectors: list[np.ndarray] = []
     total = len(texts)
+    total_batches = (total + batch_size - 1) // batch_size
 
     for i in range(0, total, batch_size):
         batch = texts[i : i + batch_size]
-        vectors = embedder.embed(batch)
-        if isinstance(vectors, list):
-            vectors = np.array(vectors)
+        vectors = embedder.embed_batch(batch, batch_size=batch_size)
         all_vectors.append(vectors)
-        print(f"    Batch {i // batch_size + 1}/{(total + batch_size - 1) // batch_size} done")
+        print(f"    Batch {i // batch_size + 1}/{total_batches} done ({len(batch)} texts)")
 
     return np.vstack(all_vectors)
 
