@@ -68,6 +68,25 @@ class _FakeLangGraphRAGAgent:
         }
 
 
+class _ResumeOnlyGraph:
+    def get_state(self, _config: dict[str, Any]) -> Any:
+        return SimpleNamespace(values={"pending": True}, next=("resume",))
+
+    def invoke(self, _command: Any, config: dict[str, Any]) -> dict[str, Any]:
+        thread_id = str(config["configurable"]["thread_id"])
+        return {
+            "answer": f"guided-resumed:{thread_id}",
+            "judge": {},
+            "docs": [],
+            "search_queries": [],
+        }
+
+
+class _ResumeOnlyAgent:
+    def __init__(self) -> None:
+        self._graph = _ResumeOnlyGraph()
+
+
 def test_interrupt_resume_uses_fresh_agent_with_shared_checkpointer(
     client: TestClient,
     monkeypatch,
@@ -118,3 +137,43 @@ def test_interrupt_resume_uses_fresh_agent_with_shared_checkpointer(
     )
     assert _FakeLangGraphRAGAgent.instances[0].checkpointer is shared_checkpointer
     assert _FakeLangGraphRAGAgent.instances[1].checkpointer is shared_checkpointer
+
+
+def test_auto_parse_confirm_resume_routes_to_guided_confirm_agent(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    calls = {"guided": 0, "hil": 0}
+
+    def _fake_guided(*_args: Any, **_kwargs: Any) -> _ResumeOnlyAgent:
+        calls["guided"] += 1
+        return _ResumeOnlyAgent()
+
+    def _fake_hil(*_args: Any, **_kwargs: Any) -> _ResumeOnlyAgent:
+        calls["hil"] += 1
+        return _ResumeOnlyAgent()
+
+    monkeypatch.setattr(agent_router, "_new_guided_confirm_agent", _fake_guided)
+    monkeypatch.setattr(agent_router, "_new_hil_agent", _fake_hil)
+
+    app = cast(Any, client.app)
+    app.dependency_overrides[dependencies.get_default_llm] = lambda: object()
+    app.dependency_overrides[dependencies.get_prompt_spec_cached] = lambda: object()
+
+    tid = "resume-guided-confirm-thread"
+    response = client.post(
+        "/api/agent/run",
+        json={
+            "message": "resume",
+            "thread_id": tid,
+            "resume_decision": {"type": "auto_parse_confirm", "confirmed": True},
+            "auto_parse": True,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = cast(dict[str, Any], response.json())
+    assert payload["interrupted"] is False
+    assert payload["answer"] == f"guided-resumed:{tid}"
+    assert calls["guided"] == 1
+    assert calls["hil"] == 0

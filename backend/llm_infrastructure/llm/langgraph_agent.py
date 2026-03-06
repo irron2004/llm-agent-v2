@@ -109,8 +109,14 @@ class AgentState(TypedDict, total=False):
 
     # Language detection and translation
     detected_language: Optional[str]  # "ko", "en", "ja", "zh" - detected from query
+    target_language: Optional[str]  # Answer language override
     query_en: Optional[str]  # English version of query (for internal processing)
     query_ko: Optional[str]  # Korean version of query (for retrieval)
+    task_mode: Optional[str]  # Guided confirm selection ("sop"|"issue"|"all")
+
+    # Guided auto-parse confirmation
+    guided_confirm: bool
+    auto_parse_confirmed: bool
 
     # Device selection (HIL)
     available_devices: List[Dict[str, Any]]
@@ -1927,20 +1933,20 @@ def _get_answer_template(
 
 def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     route = state["route"]
-    detected_language = state.get("detected_language", "ko")
+    answer_language = state.get("target_language") or state.get("detected_language") or "ko"
     ref_items = state.get("answer_ref_json") or state.get("ref_json", [])
     ref_text = ref_json_to_text(ref_items)
     logger.info(
-        "answer_node: route=%s, language=%s, refs_chars=%d, docs=%d",
+        "answer_node: route=%s, answer_language=%s, refs_chars=%d, docs=%d",
         route,
-        detected_language,
+        answer_language,
         len(ref_text),
         len(ref_items),
     )
 
     # Use original query for non-English answers to avoid language drift.
     # (e.g., zh/ja prompts receiving an English-translated query can bias output to English)
-    if detected_language == "en":
+    if answer_language == "en":
         query_for_prompt = state.get("query_en") or state["query"]
     else:
         query_for_prompt = state["query"]
@@ -1951,19 +1957,19 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     # English (en): use *_en template if available
     # Japanese (ja): use *_ja template if available
     # Chinese (zh): use *_zh template if available
-    if detected_language == "en":
+    if answer_language == "en":
         templates = {
             "setup": spec.setup_ans_en or spec.setup_ans,
             "ts": spec.ts_ans_en or spec.ts_ans,
             "general": spec.general_ans_en or spec.general_ans,
         }
-    elif detected_language == "zh":
+    elif answer_language == "zh":
         templates = {
             "setup": spec.setup_ans_zh or spec.setup_ans,
             "ts": spec.ts_ans_zh or spec.ts_ans,
             "general": spec.general_ans_zh or spec.general_ans,
         }
-    elif detected_language == "ja":
+    elif answer_language == "ja":
         templates = {
             "setup": spec.setup_ans_ja or spec.setup_ans,
             "ts": spec.ts_ans_ja or spec.ts_ans,
@@ -1977,7 +1983,7 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
         }
 
     tmpl = templates.get(route, spec.general_ans)
-    logger.info("answer_node: using %s template for route=%s", detected_language, route)
+    logger.info("answer_node: using %s template for route=%s", answer_language, route)
 
     user = _format_prompt(tmpl.user, mapping)
 
@@ -2969,6 +2975,220 @@ def auto_parse_node(
     }
 
 
+def auto_parse_confirm_node(
+    state: AgentState,
+    *,
+    device_fetcher: Any | None = None,
+) -> Command[Literal["history_check"]]:
+    guided_confirm = state.get("guided_confirm") is True
+    already_confirmed = state.get("auto_parse_confirmed") is True
+    if (not guided_confirm) or already_confirmed:
+        return Command(goto="history_check", update={})
+
+    query = str(state.get("query") or "")
+    pq_dict = dict(state.get("parsed_query") or {})
+
+    parsed_devices = _dedupe_queries(
+        [
+            str(v).strip()
+            for v in (
+                pq_dict.get("device_names")
+                or state.get("auto_parsed_devices")
+                or ([state.get("auto_parsed_device")] if state.get("auto_parsed_device") else [])
+            )
+            if str(v).strip()
+        ]
+    )
+    parsed_equip_ids_raw = _dedupe_queries(
+        [
+            str(v).strip()
+            for v in (
+                pq_dict.get("equip_ids")
+                or state.get("auto_parsed_equip_ids")
+                or (
+                    [state.get("auto_parsed_equip_id")] if state.get("auto_parsed_equip_id") else []
+                )
+            )
+            if str(v).strip()
+        ]
+    )
+    parsed_equip_ids = [
+        eid
+        for eid in (_normalize_equip_id(v) for v in parsed_equip_ids_raw)
+        if _is_valid_equip_id(eid)
+    ]
+
+    detected_language_raw = str(
+        pq_dict.get("detected_language") or state.get("detected_language") or "ko"
+    ).lower()
+    detected_language = (
+        detected_language_raw if detected_language_raw in {"ko", "en", "zh", "ja"} else "ko"
+    )
+
+    language_options = [
+        {"value": "ko", "label": "한국어", "recommended": detected_language == "ko"},
+        {"value": "en", "label": "English", "recommended": detected_language == "en"},
+        {"value": "zh", "label": "中文", "recommended": detected_language == "zh"},
+        {"value": "ja", "label": "日本語", "recommended": detected_language == "ja"},
+    ]
+
+    device_options: List[Dict[str, Any]] = []
+    seen_devices: Set[str] = set()
+
+    for idx, device_name in enumerate(parsed_devices):
+        if device_name in seen_devices:
+            continue
+        seen_devices.add(device_name)
+        device_options.append(
+            {
+                "value": device_name,
+                "label": device_name,
+                "recommended": idx == 0,
+            }
+        )
+
+    if device_fetcher is not None:
+        try:
+            fetched = device_fetcher()
+            fetched_devices: List[Dict[str, Any]] = []
+            if isinstance(fetched, dict):
+                fetched_devices = fetched.get("devices", []) or []
+            elif isinstance(fetched, list):
+                fetched_devices = fetched
+
+            added = 0
+            for item in fetched_devices:
+                if added >= 8:
+                    break
+                if not isinstance(item, dict):
+                    continue
+                device_name = str(item.get("name") or "").strip()
+                if (not device_name) or (device_name in seen_devices):
+                    continue
+                seen_devices.add(device_name)
+                option: Dict[str, Any] = {
+                    "value": device_name,
+                    "label": device_name,
+                    "recommended": False,
+                }
+                doc_count = item.get("doc_count")
+                if isinstance(doc_count, int):
+                    option["doc_count"] = doc_count
+                device_options.append(option)
+                added += 1
+        except Exception as exc:
+            logger.warning("auto_parse_confirm_node: failed to fetch devices: %s", exc)
+
+    device_options.append(
+        {"value": "__skip__", "label": "건너뛰기", "recommended": len(parsed_devices) == 0}
+    )
+
+    equip_id_options: List[Dict[str, Any]] = []
+    for idx, equip_id in enumerate(parsed_equip_ids):
+        equip_id_options.append(
+            {
+                "value": equip_id,
+                "label": equip_id,
+                "recommended": idx == 0,
+            }
+        )
+    equip_id_options.append(
+        {
+            "value": "__skip__",
+            "label": "건너뛰기",
+            "recommended": len(parsed_equip_ids) == 0,
+        }
+    )
+    equip_id_options.append({"value": "__manual__", "label": "직접 입력", "recommended": False})
+
+    task_options = [
+        {"value": "sop", "label": "SOP 조회", "recommended": False},
+        {"value": "issue", "label": "이슈조회", "recommended": True},
+        {"value": "all", "label": "전체조회", "recommended": False},
+    ]
+
+    defaults = {
+        "target_language": detected_language,
+        "device": parsed_devices[0] if parsed_devices else None,
+        "equip_id": parsed_equip_ids[0] if parsed_equip_ids else None,
+        "task_mode": "issue",
+    }
+
+    payload = {
+        "type": "auto_parse_confirm",
+        "question": query,
+        "instruction": (
+            "아래 4단계를 숫자 입력 또는 클릭으로 선택하세요. "
+            "권장값은 바로 선택할 수 있고, 건너뛰기를 선택하면 해당 필터 없이 진행합니다."
+        ),
+        "steps": ["language", "device", "equip_id", "task"],
+        "options": {
+            "language": language_options,
+            "device": device_options,
+            "equip_id": equip_id_options,
+            "task": task_options,
+        },
+        "defaults": defaults,
+    }
+
+    decision = interrupt(payload)
+
+    update: Dict[str, Any] = {"auto_parse_confirmed": True}
+    merged_pq = dict(pq_dict)
+
+    if isinstance(decision, dict) and decision.get("type") == "auto_parse_confirm":
+        target_language = str(decision.get("target_language") or "").lower().strip()
+        if target_language in {"ko", "en", "zh", "ja"}:
+            update["target_language"] = target_language
+
+        selected_device = decision.get("selected_device")
+        selected_devices: List[str] = []
+        if isinstance(selected_device, str):
+            selected_device = selected_device.strip()
+            if selected_device and selected_device != "__skip__":
+                selected_devices = [selected_device]
+
+        selected_equip_id = decision.get("selected_equip_id")
+        selected_equip_ids: List[str] = []
+        if isinstance(selected_equip_id, str):
+            normalized_eid = _normalize_equip_id(selected_equip_id)
+            if selected_equip_id.strip() in {"__skip__", "__manual__"}:
+                normalized_eid = ""
+            if _is_valid_equip_id(normalized_eid):
+                selected_equip_ids = [normalized_eid]
+
+        task_mode = str(decision.get("task_mode") or "").lower().strip()
+        if task_mode in {"sop", "issue", "all"}:
+            update["task_mode"] = task_mode
+
+            if task_mode == "sop":
+                selected_doc_types = expand_doc_type_selection(["sop"])
+                selected_doc_types_strict = True
+            elif task_mode == "issue":
+                selected_doc_types = expand_doc_type_selection(["myservice", "gcb", "ts"])
+                selected_doc_types_strict = True
+            else:
+                selected_doc_types = []
+                selected_doc_types_strict = False
+
+            update["selected_doc_types"] = selected_doc_types
+            update["selected_doc_types_strict"] = selected_doc_types_strict
+            update["doc_type_selection_skipped"] = len(selected_doc_types) == 0
+
+            merged_pq["selected_doc_types"] = selected_doc_types
+            merged_pq["doc_types_strict"] = selected_doc_types_strict
+            merged_pq["doc_type_selection_skipped"] = len(selected_doc_types) == 0
+
+        update["selected_devices"] = selected_devices
+        update["selected_equip_ids"] = selected_equip_ids
+
+        merged_pq["selected_devices"] = selected_devices
+        merged_pq["selected_equip_ids"] = selected_equip_ids
+
+    update["parsed_query"] = merged_pq
+    return Command(goto="history_check", update=update)
+
+
 def translate_node(
     state: AgentState,
     *,
@@ -3266,6 +3486,7 @@ __all__ = [
     "human_review_node",
     "device_selection_node",
     "auto_parse_node",
+    "auto_parse_confirm_node",
     "history_check_node",
     "query_rewrite_node",
 ]

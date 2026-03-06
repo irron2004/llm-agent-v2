@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, Optional, cast
 
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
+from langgraph.types import Command
 
 from backend.config.settings import rag_settings
 from backend.llm_infrastructure.llm.base import BaseLLM
@@ -24,6 +25,7 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     SearchServiceRetriever,
     answer_node,
     ask_user_after_retrieve_node,
+    auto_parse_confirm_node,
     auto_parse_node,
     device_selection_node,
     expand_related_docs_node,
@@ -153,20 +155,38 @@ class LangGraphRAGAgent:
 
             # Log output result
             if result:
-                output_info = {}
-                for k, v in result.items():
-                    if k.startswith("_"):
-                        continue
-                    if isinstance(v, str) and len(v) > 100:
-                        output_info[k] = v[:100] + "..."
-                    elif isinstance(v, list) and len(v) > 0:
-                        output_info[k] = f"[{len(v)} items] {str(v)[:100]}..."
-                    else:
-                        output_info[k] = v
+                output_info: Dict[str, Any] = {}
+                if isinstance(result, dict):
+                    for k, v in result.items():
+                        if k.startswith("_"):
+                            continue
+                        if isinstance(v, str) and len(v) > 100:
+                            output_info[k] = v[:100] + "..."
+                        elif isinstance(v, list) and len(v) > 0:
+                            output_info[k] = f"[{len(v)} items] {str(v)[:100]}..."
+                        else:
+                            output_info[k] = v
+                elif isinstance(result, Command):
+                    output_info["command"] = True
+                    output_info["goto"] = result.goto
+                    update = result.update
+                    if isinstance(update, dict):
+                        output_info["update_keys"] = [
+                            k for k in update.keys() if not str(k).startswith("_")
+                        ]
+                    elif update is not None:
+                        output_info["update"] = type(update).__name__
                 logger.info("[langgraph] <<< %s OUTPUT: %s", name, output_info)
 
             # Build node-specific details for display
-            details = self._build_node_details(name, state, result)
+            details_result: Dict[str, Any] | None
+            if isinstance(result, dict):
+                details_result = result
+            else:
+                details_result = None
+            if isinstance(result, Command):
+                details_result = result.update if isinstance(result.update, dict) else None
+            details = self._build_node_details(name, state, details_result)
 
             # Format elapsed time
             if elapsed >= 1000:
@@ -413,8 +433,12 @@ class LangGraphRAGAgent:
         )
 
     def _prepare_retrieve_node(self, state: AgentState) -> Dict[str, Any]:
-        stable_query_en = " ".join((state.get("query_en") or state.get("query") or "").split()).strip()
-        stable_query_ko = " ".join((state.get("query_ko") or state.get("query") or "").split()).strip()
+        stable_query_en = " ".join(
+            (state.get("query_en") or state.get("query") or "").split()
+        ).strip()
+        stable_query_ko = " ".join(
+            (state.get("query_ko") or state.get("query") or "").split()
+        ).strip()
         update: Dict[str, Any] = {
             "skip_mq": True,
             "mq_used": False,
@@ -518,6 +542,16 @@ class LangGraphRAGAgent:
                     ),
                 ),
             )
+            builder.add_node(
+                "auto_parse_confirm",
+                self._wrap_node(
+                    "auto_parse_confirm",
+                    functools.partial(
+                        auto_parse_confirm_node,
+                        device_fetcher=self.device_fetcher,
+                    ),
+                ),
+            )
             # Chat history nodes: history_check → (conditional) → query_rewrite
             builder.add_node(
                 "history_check",
@@ -533,9 +567,10 @@ class LangGraphRAGAgent:
                     functools.partial(query_rewrite_node, llm=self.llm),
                 ),
             )
-            # Flow: START → auto_parse → history_check → [query_rewrite] → translate → route → mq
+            # Flow: START → auto_parse → auto_parse_confirm → history_check → [query_rewrite] → translate → route → mq
             builder.add_edge(START, "auto_parse")
-            builder.add_edge("auto_parse", "history_check")
+            builder.add_edge("auto_parse", "auto_parse_confirm")
+            builder.add_edge("auto_parse_confirm", "history_check")
             builder.add_conditional_edges(
                 "history_check",
                 lambda s: "query_rewrite" if s.get("needs_history") else "translate",

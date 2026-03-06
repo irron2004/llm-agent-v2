@@ -7,13 +7,13 @@ import json
 import logging
 import re
 import uuid
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, ClassVar, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from fastapi.responses import StreamingResponse
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from backend.api.dependencies import (
     get_default_llm,
@@ -234,6 +234,33 @@ def _new_auto_parse_agent(
     )
 
 
+def _new_guided_confirm_agent(
+    llm,
+    search_service,
+    prompt_spec,
+    *,
+    top_k: int,
+    use_canonical_retrieval: bool = False,
+    event_sink=None,
+) -> LangGraphRAGAgent:
+    """Auto-parse guided-confirm용 요청 단위 에이전트."""
+    return LangGraphRAGAgent(
+        llm=llm,
+        search_service=search_service,
+        prompt_spec=prompt_spec,
+        top_k=top_k,
+        retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
+        mode="verified",
+        ask_user_after_retrieve=False,
+        ask_device_selection=False,
+        auto_parse_enabled=True,
+        use_canonical_retrieval=use_canonical_retrieval,
+        device_fetcher=_create_device_fetcher(search_service),
+        checkpointer=_checkpointer,
+        event_sink=event_sink,
+    )
+
+
 # =============================================================================
 # Request/Response Models
 # =============================================================================
@@ -254,6 +281,7 @@ class AgentRequest(BaseModel):
     ask_user_after_retrieve: bool = Field(False, description="검색 후 사용자 확인")
     resume_decision: Optional[Any] = Field(None, description="interrupt 재개 응답")
     auto_parse: bool = Field(True, description="자동 장비/문서종류 파싱 (기본값: True)")
+    guided_confirm: bool = Field(False, description="auto-parse 가이드 확인 플로우 활성화 여부")
     # 대화 이력 (후속 질문 지원)
     chat_history: Optional[List[ChatHistoryTurn]] = Field(
         None, description="이전 대화 이력 (최근 1턴)"
@@ -272,6 +300,16 @@ class AgentRequest(BaseModel):
         False,
         description="검색 단계에서 canonical retrieval pipeline 사용 여부 (기본값: False)",
     )
+
+
+class AutoParseConfirmDecision(BaseModel):
+    type: Literal["auto_parse_confirm"] = Field(..., description="resume decision type")
+    target_language: Literal["ko", "en", "zh", "ja"] = Field("ko", description="답변 언어")
+    selected_device: Optional[str] = Field(None, description="선택된 장비명")
+    selected_equip_id: Optional[str] = Field(None, description="선택된 설비 ID")
+    task_mode: Literal["sop", "issue", "all"] = Field("all", description="작업 모드")
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
 
 class RetrievedDoc(BaseModel):
@@ -345,6 +383,24 @@ class TraceContext(BaseModel):
     trace_id: str
     traceparent: Optional[str] = None
     tracestate: Optional[str] = None
+
+
+def _is_auto_parse_confirm_resume(req: AgentRequest) -> bool:
+    if req.resume_decision is None or req.thread_id is None:
+        return False
+    if not isinstance(req.resume_decision, dict):
+        return False
+    return req.resume_decision.get("type") == "auto_parse_confirm"
+
+
+def _validated_auto_parse_confirm_decision(decision: Any) -> Dict[str, Any]:
+    try:
+        return AutoParseConfirmDecision.model_validate(decision).model_dump()
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid auto_parse_confirm resume_decision: {exc.errors()}",
+        ) from exc
 
 
 _TRACEPARENT_PATTERN = re.compile(r"^[\da-f]{2}-[\da-f]{32}-[\da-f]{16}-[\da-f]{2}$", re.IGNORECASE)
@@ -617,6 +673,48 @@ def _build_response_metadata(
     final_search_queries: List[str],
     index_name: Optional[str],
 ) -> Dict[str, Any]:
+    valid_languages = {"ko", "en", "zh", "ja"}
+
+    target_language_raw = result.get("target_language")
+    target_language = ""
+    if isinstance(target_language_raw, str):
+        target_language = target_language_raw.strip().lower()
+    has_valid_user_target = bool(target_language) and target_language in valid_languages
+
+    detected_language_raw = result.get("detected_language")
+    detected_language = ""
+    if isinstance(detected_language_raw, str):
+        detected_language = detected_language_raw.strip().lower()
+
+    answer_language = target_language if has_valid_user_target else (detected_language or "ko")
+
+    if has_valid_user_target:
+        selected_language_source = "user"
+    elif detected_language_raw is not None:
+        selected_language_source = "auto_parse"
+    else:
+        selected_language_source = "default"
+
+    selected_task_mode_raw = result.get("task_mode")
+    selected_task_mode: Optional[str]
+    if selected_task_mode_raw is None:
+        selected_task_mode = None
+    else:
+        normalized_task_mode = str(selected_task_mode_raw).strip().lower()
+        selected_task_mode = normalized_task_mode or None
+
+    applied_doc_type_scope_raw = result.get("selected_doc_types") or []
+    applied_doc_type_scope: List[str]
+    if isinstance(applied_doc_type_scope_raw, list):
+        applied_doc_type_scope = [
+            str(item).strip() for item in applied_doc_type_scope_raw if str(item).strip()
+        ]
+    elif isinstance(applied_doc_type_scope_raw, str):
+        scoped_value = applied_doc_type_scope_raw.strip()
+        applied_doc_type_scope = [scoped_value] if scoped_value else []
+    else:
+        applied_doc_type_scope = []
+
     retrieval_stage2_raw = result.get("retrieval_stage2")
     retrieval_stage2_doc_ids: List[str] = []
     retrieval_stage2_enabled = False
@@ -631,7 +729,12 @@ def _build_response_metadata(
         "st_gate": result.get("st_gate"),
         "search_queries": final_search_queries,
         "search_queries_final": final_search_queries,
+        "target_language": answer_language,
+        "selected_language_source": selected_language_source,
         "selected_device": result.get("selected_device"),
+        "selected_task_mode": selected_task_mode,
+        "applied_doc_type_scope": applied_doc_type_scope,
+        "scope_by_task_override": bool(selected_task_mode and selected_task_mode != "all"),
         "retrieval_stage2": {
             "enabled": retrieval_stage2_enabled,
             "doc_ids": retrieval_stage2_doc_ids,
@@ -684,6 +787,12 @@ async def run_agent(
 
     tid = req.thread_id or str(uuid.uuid4())
     is_resume = req.resume_decision is not None and req.thread_id is not None
+    is_auto_parse_confirm_resume = _is_auto_parse_confirm_resume(req)
+    validated_auto_parse_confirm_decision = (
+        _validated_auto_parse_confirm_decision(req.resume_decision)
+        if is_auto_parse_confirm_resume
+        else None
+    )
     trace_context = _resolve_trace_context(traceparent, tracestate)
     effective_mq_mode = req.mq_mode or agent_settings.mq_mode_default
 
@@ -694,6 +803,7 @@ async def run_agent(
     # Build chat_history state (separate from overrides to avoid triggering regeneration path)
     chat_state: Dict[str, Any] = {}
     chat_state["mq_mode"] = effective_mq_mode
+    chat_state["guided_confirm"] = req.guided_confirm
     if req.chat_history:
         chat_state["chat_history"] = [h.model_dump() for h in req.chat_history]
 
@@ -705,13 +815,23 @@ async def run_agent(
             and not req.ask_user_after_retrieve
             and not has_overrides
         ):
-            agent = _new_auto_parse_agent(
-                llm,
-                search_service,
-                prompt_spec,
-                top_k=req.top_k,
-                use_canonical_retrieval=req.use_canonical_retrieval,
-            )
+            if req.guided_confirm:
+                chat_state["auto_parse_confirmed"] = False
+                agent = _new_guided_confirm_agent(
+                    llm,
+                    search_service,
+                    prompt_spec,
+                    top_k=req.top_k,
+                    use_canonical_retrieval=req.use_canonical_retrieval,
+                )
+            else:
+                agent = _new_auto_parse_agent(
+                    llm,
+                    search_service,
+                    prompt_spec,
+                    top_k=req.top_k,
+                    use_canonical_retrieval=req.use_canonical_retrieval,
+                )
             result = agent.run(
                 req.message,
                 attempts=0,
@@ -741,12 +861,21 @@ async def run_agent(
             )
         # HIL 모드 (ask_user 또는 resume)
         elif req.ask_user_after_retrieve or is_resume:
-            agent = _new_hil_agent(
-                llm,
-                search_service,
-                prompt_spec,
-                use_canonical_retrieval=req.use_canonical_retrieval,
-            )
+            if is_resume and is_auto_parse_confirm_resume:
+                agent = _new_guided_confirm_agent(
+                    llm,
+                    search_service,
+                    prompt_spec,
+                    top_k=req.top_k,
+                    use_canonical_retrieval=req.use_canonical_retrieval,
+                )
+            else:
+                agent = _new_hil_agent(
+                    llm,
+                    search_service,
+                    prompt_spec,
+                    use_canonical_retrieval=req.use_canonical_retrieval,
+                )
             config = {"configurable": {"thread_id": tid}}
 
             if is_resume:
@@ -761,7 +890,12 @@ async def run_agent(
                     )
 
                 logger.info(f"[resume] next={state.next}, keys={list(state.values.keys())}")
-                result = agent._graph.invoke(Command(resume=req.resume_decision), config)
+                resume_payload = (
+                    validated_auto_parse_confirm_decision
+                    if is_auto_parse_confirm_resume
+                    else req.resume_decision
+                )
+                result = agent._graph.invoke(Command(resume=resume_payload), config)
             else:
                 result = agent.run(
                     req.message,
@@ -886,6 +1020,12 @@ async def run_agent_stream(
 
     tid = req.thread_id or str(uuid.uuid4())
     is_resume = req.resume_decision is not None and req.thread_id is not None
+    is_auto_parse_confirm_resume = _is_auto_parse_confirm_resume(req)
+    validated_auto_parse_confirm_decision = (
+        _validated_auto_parse_confirm_decision(req.resume_decision)
+        if is_auto_parse_confirm_resume
+        else None
+    )
     trace_context = _resolve_trace_context(traceparent, tracestate)
     trace_payload = trace_context.model_dump(exclude_none=True)
     effective_mq_mode = req.mq_mode or agent_settings.mq_mode_default
@@ -914,6 +1054,7 @@ async def run_agent_stream(
     # Build chat_history state (separate from overrides to avoid triggering regeneration path)
     chat_state_stream: Dict[str, Any] = {}
     chat_state_stream["mq_mode"] = effective_mq_mode
+    chat_state_stream["guided_confirm"] = req.guided_confirm
     if req.chat_history:
         chat_state_stream["chat_history"] = [h.model_dump() for h in req.chat_history]
 
@@ -926,14 +1067,25 @@ async def run_agent_stream(
                 and not req.ask_user_after_retrieve
                 and not has_overrides
             ):
-                agent = _new_auto_parse_agent(
-                    llm,
-                    search_service,
-                    prompt_spec,
-                    top_k=req.top_k,
-                    use_canonical_retrieval=req.use_canonical_retrieval,
-                    event_sink=_enqueue,
-                )
+                if req.guided_confirm:
+                    chat_state_stream["auto_parse_confirmed"] = False
+                    agent = _new_guided_confirm_agent(
+                        llm,
+                        search_service,
+                        prompt_spec,
+                        top_k=req.top_k,
+                        use_canonical_retrieval=req.use_canonical_retrieval,
+                        event_sink=_enqueue,
+                    )
+                else:
+                    agent = _new_auto_parse_agent(
+                        llm,
+                        search_service,
+                        prompt_spec,
+                        top_k=req.top_k,
+                        use_canonical_retrieval=req.use_canonical_retrieval,
+                        event_sink=_enqueue,
+                    )
                 result = agent.run(
                     req.message,
                     attempts=0,
@@ -963,13 +1115,23 @@ async def run_agent_stream(
                     state_overrides=state_overrides or None,
                 )
             elif req.ask_user_after_retrieve or is_resume:
-                agent = _new_hil_agent(
-                    llm,
-                    search_service,
-                    prompt_spec,
-                    use_canonical_retrieval=req.use_canonical_retrieval,
-                    event_sink=_enqueue,
-                )
+                if is_resume and is_auto_parse_confirm_resume:
+                    agent = _new_guided_confirm_agent(
+                        llm,
+                        search_service,
+                        prompt_spec,
+                        top_k=req.top_k,
+                        use_canonical_retrieval=req.use_canonical_retrieval,
+                        event_sink=_enqueue,
+                    )
+                else:
+                    agent = _new_hil_agent(
+                        llm,
+                        search_service,
+                        prompt_spec,
+                        use_canonical_retrieval=req.use_canonical_retrieval,
+                        event_sink=_enqueue,
+                    )
                 config = {"configurable": {"thread_id": tid}}
 
                 if is_resume:
@@ -983,7 +1145,12 @@ async def run_agent_stream(
                             }
                         )
                         return
-                    result = agent._graph.invoke(Command(resume=req.resume_decision), config)
+                    resume_payload = (
+                        validated_auto_parse_confirm_decision
+                        if is_auto_parse_confirm_resume
+                        else req.resume_decision
+                    )
+                    result = agent._graph.invoke(Command(resume=resume_payload), config)
                 else:
                     result = agent.run(
                         req.message,
