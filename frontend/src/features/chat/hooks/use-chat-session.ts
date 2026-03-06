@@ -32,7 +32,12 @@ type SendOptions = {
   };
 };
 
-type InterruptKind = "device_selection" | "retrieval_review" | "human_review" | "unknown";
+type InterruptKind =
+  | "auto_parse_confirm"
+  | "device_selection"
+  | "retrieval_review"
+  | "human_review"
+  | "unknown";
 
 type DeviceInfo = {
   name: string;
@@ -75,6 +80,60 @@ type PendingInterrupt = {
   payload?: Record<string, unknown> | null;
 };
 
+type PendingGuidedSelection = {
+  threadId: string;
+  question: string;
+  instruction: string;
+  payload: Record<string, unknown>;
+  stepIndex?: number;
+  draftDecision?: {
+    type: "auto_parse_confirm";
+    target_language?: "ko" | "en" | "zh" | "ja";
+    selected_device?: string | null;
+    selected_equip_id?: string | null;
+    task_mode?: "sop" | "issue" | "all";
+  };
+};
+
+type GuidedOption = {
+  value: string;
+  recommended?: boolean;
+};
+
+const toGuidedOptions = (value: unknown): GuidedOption[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      const src = isRecord(item) ? item : null;
+      const v = typeof src?.value === "string" ? src.value : "";
+      if (!v) return null;
+      return {
+        value: v,
+        recommended: Boolean(src?.recommended),
+      } satisfies GuidedOption;
+    })
+    .filter((x): x is GuidedOption => Boolean(x));
+};
+
+const normalizeTaskMode = (value: unknown): "sop" | "issue" | "all" => {
+  const v = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (v === "sop" || v === "issue") return v;
+  return "all";
+};
+
+const normalizeLanguage = (value: unknown): "ko" | "en" | "zh" | "ja" => {
+  const v = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (v === "en" || v === "zh" || v === "ja") return v;
+  return "ko";
+};
+
+const guidedSteps: Array<"language" | "device" | "equip_id" | "task"> = [
+  "language",
+  "device",
+  "equip_id",
+  "task",
+];
+
 const APPROVE_TOKENS = ["true", "yes", "y", "ok", "okay", "승인", "확인", "approve"];
 const REJECT_TOKENS = ["false", "no", "n", "거절", "reject", "decline"];
 
@@ -94,6 +153,7 @@ const resolveDecision = (text: string): boolean | string => {
 };
 
 const resolveInterruptKind = (payload?: Record<string, unknown> | null): InterruptKind => {
+  if (payload?.type === "auto_parse_confirm") return "auto_parse_confirm";
   if (payload?.type === "device_selection") return "device_selection";
   if (payload?.type === "retrieval_review") return "retrieval_review";
   if (payload?.type === "human_review") return "human_review";
@@ -199,6 +259,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingInterrupt, setPendingInterrupt] = useState<PendingInterrupt | null>(null);
+  const [pendingGuidedSelection, setPendingGuidedSelection] = useState<PendingGuidedSelection | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const isFirstMessageRef = useRef(true);
@@ -214,6 +275,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     message?: string | null;
   }>>({});
   const onSessionChangeRef = useRef(onSessionChange);
+  const guidedThreadIdRef = useRef<string | null>(null);
+  const guidedQuestionRef = useRef<string | null>(null);
   const threadIdRef = useRef<string | null>(null);
   const onTurnSavedRef = useRef(onTurnSaved);
   onSessionChangeRef.current = onSessionChange;
@@ -269,6 +332,44 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           typeof payload?.instruction === "string" && payload.instruction.trim()
             ? payload.instruction.trim()
             : "검색 결과를 확인한 뒤 승인/거절/키워드를 입력하세요.";
+
+        if (kind === "auto_parse_confirm") {
+          if (threadId && payload) {
+            guidedThreadIdRef.current = threadId;
+            guidedQuestionRef.current = question;
+
+            const optionsRaw = isRecord(payload.options) ? payload.options : {};
+            const defaultsRaw = isRecord(payload.defaults) ? payload.defaults : {};
+            const initialDecision = {
+              type: "auto_parse_confirm" as const,
+              target_language: normalizeLanguage(defaultsRaw.target_language),
+              selected_device: typeof defaultsRaw.device === "string" ? defaultsRaw.device : null,
+              selected_equip_id: typeof defaultsRaw.equip_id === "string" ? defaultsRaw.equip_id : null,
+              task_mode: normalizeTaskMode(defaultsRaw.task_mode),
+            };
+            setPendingGuidedSelection({
+              threadId,
+              question,
+              instruction,
+              payload,
+              stepIndex: 0,
+              draftDecision: initialDecision,
+            });
+          }
+          setPendingInterrupt(null);
+
+          updateMessage(assistantId, (m) => ({
+            ...m,
+            content: instruction,
+            retrievedDocs: res.retrieved_docs || [],
+            rawAnswer: JSON.stringify(res, null, 2),
+            currentNode: null,
+            sessionId,
+            searchQueries: effectiveSearchQueries.length > 0 ? effectiveSearchQueries : null,
+          }));
+          setIsStreaming(false);
+          return;
+        }
         // Use res.retrieved_docs directly (same source as message.retrievedDocs)
         const docs: ReviewDoc[] = (res.retrieved_docs || []).map((doc, index) => ({
           docId: doc.id,
@@ -329,6 +430,9 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
       // Conversation completed - clear logs and set retrieved docs
       setPendingInterrupt(null);
+      setPendingGuidedSelection(null);
+      guidedThreadIdRef.current = null;
+      guidedQuestionRef.current = null;
       clearLogs();
 
       // Set completed retrieved docs in context if available
@@ -470,15 +574,26 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       stop();
       setError(null);
       setPendingRegeneration(null);
-      const pending = pendingInterrupt;
-      // Only update user text if not resuming (keep original question for saves)
-      if (!pending) {
-        currentUserTextRef.current = text;
-      }
-      const isResume = Boolean(pending);
-      if (isResume && !pending?.threadId) {
+      const hilPending = pendingInterrupt;
+      const decisionRecord = isRecord(decisionOverride) ? decisionOverride : null;
+      const decisionType = typeof decisionRecord?.type === "string" ? decisionRecord.type : "";
+      const isGuidedResume = decisionType === "auto_parse_confirm" && Boolean(guidedThreadIdRef.current);
+      const isHilResume = Boolean(hilPending);
+      const isResume = isHilResume || isGuidedResume;
+
+      const resumeThreadId = isHilResume
+        ? (hilPending?.threadId ?? "")
+        : isGuidedResume
+          ? (guidedThreadIdRef.current ?? "")
+          : "";
+      if (isResume && !resumeThreadId) {
         setError("thread_id가 없어 검색 결과 확인을 이어갈 수 없습니다.");
         return;
+      }
+
+      // Only update user text if not resuming (keep original question for saves)
+      if (!isResume) {
+        currentUserTextRef.current = text;
       }
 
       // Clear logs when starting a new conversation (not resuming)
@@ -496,8 +611,17 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       const userId = nanoid();
       const assistantId = nanoid();
 
-      const requestMessage = isResume && pending ? pending.question : text;
-      const decision = isResume ? (decisionOverride ?? resolveDecision(text)) : undefined;
+      const requestMessage = isHilResume
+        ? (hilPending?.question ?? text)
+        : isGuidedResume
+          ? (guidedQuestionRef.current ?? text)
+          : text;
+
+      const decision = isHilResume
+        ? (decisionOverride ?? resolveDecision(text))
+        : isGuidedResume
+          ? decisionRecord
+          : undefined;
 
       appendMessage({
         id: userId,
@@ -539,9 +663,11 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         }
 
         const autoParseEnabled = overrides?.autoParse ?? !Boolean(overrides);
+        const guidedConfirmEnabled = !isResume && autoParseEnabled && !Boolean(overrides);
         const payload: AgentRequest = {
           message: requestMessage,
           auto_parse: autoParseEnabled,  // 자동 파싱 모드 활성화 (기본값)
+          guided_confirm: guidedConfirmEnabled,
           ask_user_after_retrieve: false,  // 문서 선택 UI 비활성화
           ...(chatHistory ? { chat_history: chatHistory } : {}),
           ...(overrides ? {
@@ -550,14 +676,21 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
             search_queries: overrides.searchQueries,
             selected_doc_ids: overrides.selectedDocIds,
           } : {}),
-          ...(isResume && pending
+          ...(isHilResume
             ? {
-                thread_id: pending.threadId,
+                thread_id: resumeThreadId,
                 resume_decision: decision,
-                auto_parse: false,  // resume 시에는 auto_parse 비활성화
-                ask_user_after_retrieve: true,  // resume은 HIL 모드
+                auto_parse: false,
+                ask_user_after_retrieve: true,
               }
-            : {}),
+            : isGuidedResume
+              ? {
+                  thread_id: resumeThreadId,
+                  resume_decision: decision,
+                  auto_parse: false,
+                  ask_user_after_retrieve: false,
+                }
+              : {}),
           ...(!isResume && threadIdRef.current
             ? { thread_id: threadIdRef.current }
             : {}),
@@ -707,7 +840,18 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         setIsStreaming(false);
       }
     },
-    [appendMessage, stop, updateMessage, handleAgentResponse, pendingInterrupt, sessionId, addLog, clearLogs, setPendingRegeneration]
+    [
+      appendMessage,
+      stop,
+      updateMessage,
+      handleAgentResponse,
+      pendingInterrupt,
+      pendingGuidedSelection,
+      sessionId,
+      addLog,
+      clearLogs,
+      setPendingRegeneration,
+    ]
   );
 
   const submitReview = useCallback(
@@ -808,11 +952,125 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     [pendingInterrupt, send]
   );
 
+  const submitGuidedSelectionNumber = useCallback(
+    (token: string) => {
+      const trimmed = token.trim();
+      if (!pendingGuidedSelection) return;
+      if (!/^[0-9]+$/.test(trimmed)) return;
+
+      const num = parseInt(trimmed, 10);
+      if (!Number.isFinite(num)) return;
+
+      const stepIndex = pendingGuidedSelection.stepIndex ?? 0;
+      const step = guidedSteps[Math.min(stepIndex, guidedSteps.length - 1)] ?? "language";
+
+      const optionsRaw = isRecord(pendingGuidedSelection.payload.options)
+        ? pendingGuidedSelection.payload.options
+        : {};
+
+      const stepOptions =
+        step === "language"
+          ? toGuidedOptions(optionsRaw.language)
+          : step === "device"
+            ? toGuidedOptions(optionsRaw.device)
+            : step === "equip_id"
+              ? toGuidedOptions(optionsRaw.equip_id)
+              : toGuidedOptions(optionsRaw.task);
+      if (stepOptions.length === 0) return;
+
+      const pickIndex = (n: number): number | null => {
+        if (n === 0) {
+          const recIdx = stepOptions.findIndex((o) => Boolean(o.recommended));
+          if (recIdx >= 0) return recIdx;
+          const skipIdx = stepOptions.findIndex((o) => o.value === "__skip__");
+          if (skipIdx >= 0) return skipIdx;
+          return 0;
+        }
+        if (n < 1 || n > stepOptions.length) return null;
+        return n - 1;
+      };
+
+      const idx = pickIndex(num);
+      if (idx === null) return;
+      const chosen = stepOptions[idx];
+      if (!chosen) return;
+
+      const prevDecision = pendingGuidedSelection.draftDecision ?? { type: "auto_parse_confirm" as const };
+      const nextDecision: NonNullable<PendingGuidedSelection["draftDecision"]> = {
+        ...prevDecision,
+        type: "auto_parse_confirm" as const,
+      };
+
+      if (step === "language") {
+        nextDecision.target_language = normalizeLanguage(chosen.value);
+      } else if (step === "device") {
+        nextDecision.selected_device = chosen.value === "__skip__" ? null : chosen.value;
+      } else if (step === "equip_id") {
+        if (chosen.value === "__skip__" || chosen.value === "__manual__") {
+          nextDecision.selected_equip_id = null;
+        } else {
+          nextDecision.selected_equip_id = chosen.value;
+        }
+      } else {
+        nextDecision.task_mode = normalizeTaskMode(chosen.value);
+      }
+
+      const isLastStep = step === "task";
+      if (isLastStep) {
+        const finalDecision = {
+          type: "auto_parse_confirm" as const,
+          target_language: normalizeLanguage(nextDecision.target_language),
+          selected_device: nextDecision.selected_device ?? null,
+          selected_equip_id: nextDecision.selected_equip_id ?? null,
+          task_mode: normalizeTaskMode(nextDecision.task_mode),
+        };
+        setPendingGuidedSelection(null);
+        send({
+          text: `가이드 확인: ${finalDecision.target_language} / ${finalDecision.selected_device ?? "(skip)"} / ${finalDecision.selected_equip_id ?? "(skip)"} / ${finalDecision.task_mode}`,
+          decisionOverride: finalDecision,
+        });
+        return;
+      }
+
+      setPendingGuidedSelection((prev) => {
+        if (!prev) return prev;
+        const nextStepIndex = Math.min((prev.stepIndex ?? 0) + 1, guidedSteps.length - 1);
+        return {
+          ...prev,
+          stepIndex: nextStepIndex,
+          draftDecision: nextDecision,
+        };
+      });
+    },
+    [pendingGuidedSelection, send]
+  );
+
+  const submitGuidedSelectionFinal = useCallback(
+    (decision: {
+      type: "auto_parse_confirm";
+      target_language: "ko" | "en" | "zh" | "ja";
+      selected_device?: string | null;
+      selected_equip_id?: string | null;
+      task_mode: "sop" | "issue" | "all";
+    }) => {
+      if (!pendingGuidedSelection) return;
+      setPendingGuidedSelection(null);
+      send({
+        text: `가이드 확인: ${decision.target_language} / ${decision.selected_device ?? "(skip)"} / ${decision.selected_equip_id ?? "(skip)"} / ${decision.task_mode}`,
+        decisionOverride: decision,
+      });
+    },
+    [pendingGuidedSelection, send]
+  );
+
   const reset = useCallback(() => {
     stop();
     setMessages([]);
     setError(null);
     setPendingInterrupt(null);
+    setPendingGuidedSelection(null);
+    guidedThreadIdRef.current = null;
+    guidedQuestionRef.current = null;
     streamedAutoParseRef.current = {};
     clearLogs();
     setCompletedRetrievedDocs(null);
@@ -1028,8 +1286,11 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       error,
       send,
       stop,
+      pendingGuidedSelection,
       pendingReview: pendingInterrupt?.kind === "retrieval_review" ? pendingInterrupt : null,
       pendingDeviceSelection: pendingInterrupt?.kind === "device_selection" ? pendingInterrupt : null,
+      submitGuidedSelectionNumber,
+      submitGuidedSelectionFinal,
       submitReview,
       submitSearchQueries,
       submitDeviceSelection,
@@ -1053,7 +1314,10 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       error,
       send,
       stop,
+      pendingGuidedSelection,
       pendingInterrupt,
+      submitGuidedSelectionNumber,
+      submitGuidedSelectionFinal,
       submitReview,
       submitSearchQueries,
       submitDeviceSelection,

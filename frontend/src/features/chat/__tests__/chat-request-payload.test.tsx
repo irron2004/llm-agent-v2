@@ -67,6 +67,217 @@ describe("chat request payload", () => {
     });
   });
 
+  it("includes guided_confirm=true on normal send", async () => {
+    env.chatPath = "/api/agent";
+    const { result } = renderHook(() => useChatSession(), { wrapper });
+
+    await act(async () => {
+      await result.current.send({ text: "guided confirm request" });
+    });
+
+    await waitFor(() => {
+      expect(postSpy).toHaveBeenCalledWith(
+        "/api/agent",
+        expect.objectContaining({
+          message: "guided confirm request",
+          guided_confirm: true,
+        })
+      );
+    });
+  });
+
+  it("sends guided resume payload with thread_id and auto_parse_confirm decision", async () => {
+    env.chatPath = "/api/agent";
+    postSpy.mockResolvedValueOnce({
+      ...mockAgentResponse,
+      interrupted: true,
+      thread_id: "t-1",
+      interrupt_payload: {
+        type: "auto_parse_confirm",
+        question: "질문",
+        instruction: "안내",
+        options: {
+          language: [{ value: "en", label: "English" }],
+          device: [{ value: "__skip__", label: "건너뛰기" }],
+          equip_id: [{ value: "__skip__", label: "건너뛰기" }],
+          task: [{ value: "issue", label: "Issue" }],
+        },
+        defaults: {
+          target_language: "en",
+          device: null,
+          equip_id: null,
+          task_mode: "issue",
+        },
+      },
+    } as any);
+
+    const { result } = renderHook(() => useChatSession(), { wrapper });
+
+    await act(async () => {
+      await result.current.send({ text: "first guided request" });
+    });
+
+    await waitFor(() => {
+      expect(postSpy).toHaveBeenCalledTimes(1);
+      expect(result.current.pendingGuidedSelection).not.toBeNull();
+    });
+
+    await act(async () => {
+      result.current.submitGuidedSelectionFinal({
+        type: "auto_parse_confirm",
+        target_language: "en",
+        selected_device: null,
+        selected_equip_id: null,
+        task_mode: "issue",
+      });
+    });
+
+    await waitFor(() => {
+      expect(postSpy).toHaveBeenCalledTimes(2);
+      expect(postSpy).toHaveBeenNthCalledWith(
+        2,
+        "/api/agent",
+        expect.objectContaining({
+          thread_id: "t-1",
+          resume_decision: expect.objectContaining({
+            type: "auto_parse_confirm",
+          }),
+        })
+      );
+    });
+  });
+
+  it("progresses guided steps via numeric input and sends correct resume payload", async () => {
+    env.chatPath = "/api/agent";
+    postSpy.mockResolvedValueOnce({
+      ...mockAgentResponse,
+      interrupted: true,
+      thread_id: "t-num",
+      interrupt_payload: {
+        type: "auto_parse_confirm",
+        question: "질문",
+        instruction: "안내",
+        steps: ["language", "device", "equip_id", "task"],
+        options: {
+          language: [
+            { value: "ko", label: "Korean", recommended: true },
+            { value: "en", label: "English" },
+          ],
+          device: [
+            { value: "ETCH-01", label: "ETCH-01" },
+            { value: "__skip__", label: "건너뛰기" },
+          ],
+          equip_id: [
+            { value: "EQ-100", label: "EQ-100" },
+            { value: "__skip__", label: "건너뛰기" },
+          ],
+          task: [
+            { value: "sop", label: "SOP" },
+            { value: "issue", label: "Issue" },
+            { value: "all", label: "All" },
+          ],
+        },
+        defaults: {
+          target_language: "ko",
+          device: null,
+          equip_id: null,
+          task_mode: "all",
+        },
+      },
+    } as any);
+
+    const { result } = renderHook(() => useChatSession(), { wrapper });
+
+    // Trigger guided interrupt
+    await act(async () => {
+      await result.current.send({ text: "numeric guided request" });
+    });
+    await waitFor(() => {
+      expect(result.current.pendingGuidedSelection).not.toBeNull();
+    });
+
+    // Step 1 (language): "2" = English
+    await act(async () => {
+      result.current.submitGuidedSelectionNumber("2");
+    });
+    // Step 2 (device): "1" = ETCH-01
+    await act(async () => {
+      result.current.submitGuidedSelectionNumber("1");
+    });
+    // Step 3 (equip_id): "0" = recommended/skip
+    await act(async () => {
+      result.current.submitGuidedSelectionNumber("0");
+    });
+    // Step 4 (task): "1" = SOP — this completes the flow
+    await act(async () => {
+      result.current.submitGuidedSelectionNumber("1");
+    });
+
+    await waitFor(() => {
+      expect(result.current.pendingGuidedSelection).toBeNull();
+      expect(postSpy).toHaveBeenCalledTimes(2);
+      expect(postSpy).toHaveBeenNthCalledWith(
+        2,
+        "/api/agent",
+        expect.objectContaining({
+          thread_id: "t-num",
+          resume_decision: {
+            type: "auto_parse_confirm",
+            target_language: "en",
+            selected_device: "ETCH-01",
+            selected_equip_id: null,
+            task_mode: "sop",
+          },
+        })
+      );
+    });
+  });
+
+  it("ignores out-of-range numeric input during guided flow", async () => {
+    env.chatPath = "/api/agent";
+    postSpy.mockResolvedValueOnce({
+      ...mockAgentResponse,
+      interrupted: true,
+      thread_id: "t-oob",
+      interrupt_payload: {
+        type: "auto_parse_confirm",
+        question: "질문",
+        instruction: "안내",
+        steps: ["language", "device", "equip_id", "task"],
+        options: {
+          language: [{ value: "ko", label: "Korean" }],
+          device: [{ value: "__skip__", label: "건너뛰기" }],
+          equip_id: [{ value: "__skip__", label: "건너뛰기" }],
+          task: [{ value: "all", label: "All" }],
+        },
+        defaults: {
+          target_language: "ko",
+          device: null,
+          equip_id: null,
+          task_mode: "all",
+        },
+      },
+    } as any);
+
+    const { result } = renderHook(() => useChatSession(), { wrapper });
+
+    await act(async () => {
+      await result.current.send({ text: "oob test" });
+    });
+    await waitFor(() => {
+      expect(result.current.pendingGuidedSelection).not.toBeNull();
+    });
+
+    // Out-of-range: only 1 option, so "5" should be ignored
+    await act(async () => {
+      result.current.submitGuidedSelectionNumber("5");
+    });
+
+    // Still on step 0 (language)
+    expect(result.current.pendingGuidedSelection).not.toBeNull();
+    expect(result.current.pendingGuidedSelection?.stepIndex ?? 0).toBe(0);
+  });
+
   it("sends regeneration payload with overrides correctly", async () => {
     env.chatPath = "/api/agent";
     const { result } = renderHook(() => useChatSession(), { wrapper });

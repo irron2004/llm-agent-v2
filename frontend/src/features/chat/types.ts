@@ -101,6 +101,8 @@ export type AutoParseResult = {
   message?: string | null;
 };
 
+export type TaskMode = "sop" | "issue" | "all";
+
 export type AgentResponse = {
   query: string;
   answer: string;
@@ -132,13 +134,16 @@ export type AgentRequest = {
   top_k?: number;
   max_attempts?: number;
   mode?: string;
+  task_mode?: TaskMode;
   thread_id?: string | null;
   ask_user_after_retrieve?: boolean;
   resume_decision?: unknown;
   auto_parse?: boolean;
+  guided_confirm?: boolean;
   chat_history?: ChatHistoryTurn[] | null;
   filter_devices?: string[] | null;
   filter_doc_types?: string[] | null;
+  filter_equip_ids?: string[] | null;
   search_queries?: string[] | null;
   selected_doc_ids?: string[] | null;
 };

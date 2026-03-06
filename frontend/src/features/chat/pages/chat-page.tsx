@@ -10,6 +10,7 @@ import {
   MessageItem,
   ChatInput,
   DeviceSelectionPanel,
+  GuidedSelectionPanel,
 } from "../components";
 import type { RegeneratePayload } from "../components/message-item";
 import { fetchDeviceCatalog } from "../api";
@@ -52,6 +53,9 @@ export default function ChatPage() {
     inputPlaceholder,
     pendingReview,
     pendingDeviceSelection,
+    pendingGuidedSelection,
+    submitGuidedSelectionNumber,
+    submitGuidedSelectionFinal,
     submitReview,
     submitSearchQueries,
     submitDeviceSelection,
@@ -230,6 +234,14 @@ export default function ChatPage() {
   };
 
   const handleSend = async (text: string) => {
+    if (pendingGuidedSelection) {
+      const trimmed = text.trim();
+      if (trimmed === "0" || /^[1-9][0-9]*$/.test(trimmed)) {
+        submitGuidedSelectionNumber(trimmed);
+      }
+      return;
+    }
+
     if (
       pendingRegeneration?.reason === "missing_device_parse" &&
       !lastSelectedDevice
@@ -478,6 +490,15 @@ export default function ChatPage() {
                 </>
               )}
             </div>
+          )}
+
+          {pendingGuidedSelection && (
+            <GuidedSelectionPanel
+              question={pendingGuidedSelection.question}
+              instruction={pendingGuidedSelection.instruction}
+              payload={pendingGuidedSelection.payload}
+              onComplete={submitGuidedSelectionFinal}
+            />
           )}
 
           {pendingDeviceSelection && (

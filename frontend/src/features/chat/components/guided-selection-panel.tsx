@@ -1,0 +1,253 @@
+import { useMemo, useState } from "react";
+import { Button, Card, Input, Space, Tag, Typography } from "antd";
+
+const { Text, Title } = Typography;
+
+type GuidedOption = {
+  value: string;
+  label: string;
+  recommended?: boolean;
+};
+
+type GuidedDecision = {
+  type: "auto_parse_confirm";
+  target_language: "ko" | "en" | "zh" | "ja";
+  selected_device?: string | null;
+  selected_equip_id?: string | null;
+  task_mode: "sop" | "issue" | "all";
+};
+
+type GuidedSelectionPanelProps = {
+  question: string;
+  instruction: string;
+  payload: Record<string, unknown>;
+  onComplete: (decision: GuidedDecision) => void;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === "object" && value !== null;
+};
+
+const asOptions = (value: unknown): GuidedOption[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (!isRecord(item)) return null;
+      const v = typeof item.value === "string" ? item.value : "";
+      const label = typeof item.label === "string" ? item.label : v;
+      if (!v) return null;
+      return {
+        value: v,
+        label,
+        recommended: Boolean(item.recommended),
+      } satisfies GuidedOption;
+    })
+    .filter((x): x is GuidedOption => Boolean(x));
+};
+
+const normalizeLanguage = (value: string): "ko" | "en" | "zh" | "ja" => {
+  const v = value.trim().toLowerCase();
+  if (v === "en" || v === "zh" || v === "ja") return v;
+  return "ko";
+};
+
+const normalizeTaskMode = (value: string): "sop" | "issue" | "all" => {
+  const v = value.trim().toLowerCase();
+  if (v === "sop" || v === "issue") return v;
+  return "all";
+};
+
+export function GuidedSelectionPanel({ question, instruction, payload, onComplete }: GuidedSelectionPanelProps) {
+  const steps = useMemo(() => {
+    const raw = isRecord(payload) ? payload.steps : null;
+    if (Array.isArray(raw)) {
+      const normalized = raw
+        .map((s) => (typeof s === "string" ? s.trim() : ""))
+        .filter((s) => s.length > 0);
+      if (normalized.length > 0) return normalized;
+    }
+    return ["language", "device", "equip_id", "task"];
+  }, [payload]);
+
+  const options = useMemo(() => {
+    const raw = isRecord(payload) ? payload.options : null;
+    const opts = isRecord(raw) ? raw : {};
+    return {
+      language: asOptions(opts.language),
+      device: asOptions(opts.device),
+      equip_id: asOptions(opts.equip_id),
+      task: asOptions(opts.task),
+    };
+  }, [payload]);
+
+  const defaults = useMemo(() => {
+    const raw = isRecord(payload) ? payload.defaults : null;
+    const d = isRecord(raw) ? raw : {};
+    const target_language = typeof d.target_language === "string" ? d.target_language : "ko";
+    const device = typeof d.device === "string" ? d.device : null;
+    const equip_id = typeof d.equip_id === "string" ? d.equip_id : null;
+    const task_mode = typeof d.task_mode === "string" ? d.task_mode : "all";
+    return {
+      target_language: normalizeLanguage(target_language),
+      device,
+      equip_id,
+      task_mode: normalizeTaskMode(task_mode),
+    };
+  }, [payload]);
+
+  const [stepIndex, setStepIndex] = useState(0);
+  const [targetLanguage, setTargetLanguage] = useState<GuidedDecision["target_language"]>(defaults.target_language);
+  const [selectedDevice, setSelectedDevice] = useState<string | null>(defaults.device);
+  const [selectedEquipId, setSelectedEquipId] = useState<string | null>(defaults.equip_id);
+  const [taskMode, setTaskMode] = useState<GuidedDecision["task_mode"]>(defaults.task_mode);
+  const [manualEquipId, setManualEquipId] = useState("");
+
+  const currentStep = steps[Math.min(stepIndex, steps.length - 1)] ?? "language";
+
+  const title =
+    currentStep === "language"
+      ? "언어 선택"
+      : currentStep === "device"
+        ? "기기 선택"
+        : currentStep === "equip_id"
+          ? "설비 ID 선택"
+          : "작업 선택";
+
+  const stepOptions: GuidedOption[] =
+    currentStep === "language"
+      ? options.language
+      : currentStep === "device"
+        ? options.device
+        : currentStep === "equip_id"
+          ? options.equip_id
+          : options.task;
+
+  const advance = () => {
+    setStepIndex((prev) => Math.min(prev + 1, steps.length - 1));
+  };
+
+  const applyOption = (opt: GuidedOption) => {
+    if (currentStep === "language") {
+      setTargetLanguage(normalizeLanguage(opt.value));
+      advance();
+      return;
+    }
+    if (currentStep === "device") {
+      if (opt.value === "__skip__") {
+        setSelectedDevice(null);
+      } else {
+        setSelectedDevice(opt.value);
+      }
+      advance();
+      return;
+    }
+    if (currentStep === "equip_id") {
+      if (opt.value === "__skip__") {
+        setSelectedEquipId(null);
+        setManualEquipId("");
+        advance();
+        return;
+      }
+      if (opt.value === "__manual__") {
+        setSelectedEquipId("__manual__");
+        return;
+      }
+      setSelectedEquipId(opt.value);
+      setManualEquipId("");
+      advance();
+      return;
+    }
+
+    const normalizedTask = normalizeTaskMode(opt.value);
+    setTaskMode(normalizedTask);
+    const equip = selectedEquipId === "__manual__" ? manualEquipId.trim() : selectedEquipId;
+    onComplete({
+      type: "auto_parse_confirm",
+      target_language: targetLanguage,
+      selected_device: selectedDevice,
+      selected_equip_id: equip && equip.length > 0 ? equip : null,
+      task_mode: normalizedTask,
+    });
+  };
+
+  const hasManualEquip = currentStep === "equip_id" && selectedEquipId === "__manual__";
+  const canConfirmManualEquip = manualEquipId.trim().length > 0;
+
+  return (
+    <Card
+      style={{
+        margin: "16px 0 8px",
+        borderRadius: 12,
+        border: "1px solid var(--color-border)",
+        backgroundColor: "var(--color-bg-secondary)",
+        maxWidth: 640,
+      }}
+    >
+      <Space direction="vertical" style={{ width: "100%" }} size="middle">
+        <div>
+          <Title level={5} style={{ margin: 0, marginBottom: 4 }}>{title}</Title>
+          <Text type="secondary" style={{ fontSize: 13 }}>{instruction}</Text>
+        </div>
+
+        <div
+          style={{
+            backgroundColor: "var(--color-bg-tertiary)",
+            padding: "12px 16px",
+            borderRadius: 8,
+            fontSize: 13,
+          }}
+        >
+          <Text strong>질문:</Text> {question}
+        </div>
+
+        <div>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            선택 요약: {targetLanguage} / {selectedDevice ?? "(skip)"} / {selectedEquipId === "__manual__" ? (manualEquipId.trim() || "(manual)") : (selectedEquipId ?? "(skip)")} / {taskMode}
+          </Text>
+        </div>
+
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          {stepOptions.map((opt) => (
+            <Button key={opt.value} onClick={() => applyOption(opt)}>
+              <Space size={6}>
+                <span>{opt.label}</span>
+                {opt.recommended ? <Tag color="blue">Recommend</Tag> : null}
+              </Space>
+            </Button>
+          ))}
+        </div>
+
+        {hasManualEquip ? (
+          <Space direction="vertical" style={{ width: "100%" }} size={8}>
+            <Input
+              placeholder="equip_id를 입력하세요 (예: ABCD-1234)"
+              value={manualEquipId}
+              onChange={(e) => setManualEquipId(e.target.value)}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <Button
+                type="primary"
+                disabled={!canConfirmManualEquip}
+                onClick={() => {
+                  setSelectedEquipId(manualEquipId.trim());
+                  advance();
+                }}
+              >
+                확인
+              </Button>
+              <Button
+                onClick={() => {
+                  setSelectedEquipId(null);
+                  setManualEquipId("");
+                  advance();
+                }}
+              >
+                건너뛰기
+              </Button>
+            </div>
+          </Space>
+        ) : null}
+      </Space>
+    </Card>
+  );
+}
