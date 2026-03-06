@@ -1,0 +1,53 @@
+qid,question,expected_doc,expected_pages,doc_type
+250,"SUPRA N series 설비의 Hook Lifter Servo Motor 교체 시 안전 및 주의사항은?",global_sop_supra_n_series_all_pm_hook_lifter_servo_motor,2,sop
+251,"SUPRA N series PM Hook Lifter 작업 시 Worker Location 배치는 어떻게 해야 하나요?",global_sop_supra_n_series_all_pm_hook_lifter_servo_motor,7,sop
+252,"SUPRA N series의 PIN MOTOR 교체 작업에 필요한 보호구는 무엇인가요?",global_sop_supra_n_series_all_pm_hook_lifter_servo_motor,9,sop
+253,"SUPRA N series EFEM Load Port Duraport 교체 시 협착 주의사항을 알려줘",global_sop_supra_n_series_all_efem_load_port_duraport,2,sop
+254,"SUPRA N series Load Port 작업 시 AMHS는 어떻게 설정해야 하나요?",global_sop_supra_n_series_all_efem_load_port_duraport,2,sop
+255,"What are the safety precautions for PRISM SOURCE 3000QC replacement on ZEDIUS XP?",global_sop_supra_xp_all_pm_prism_source_3000qc,2,sop
+256,"ZEDIUS XP PRISM SOURCE 교체 시 Power Cable 분리가 필요한 이유는?",global_sop_supra_xp_all_pm_prism_source_3000qc,2,sop
+257,"ZEDIUS XP 설비의 EFEM SW Install 작업 시 필요한 Tool은 무엇인가요?",global_sop_supra_xp_sw_all_sw_installation_setting,10,sop
+258,"ZEDIUS XP SW Installation 시 CD-Rom 관련 보안 규정은?",global_sop_supra_xp_sw_all_sw_installation_setting,3,sop
+259,"INTEGER plus AM Vacuum Line 작업 시 화상 주의사항과 안전 수칙은?",global_sop_integer_plus_all_am_vacuum_line,2,sop
+260,"INTEGER plus AM Baratron Gauge Calibration 작업 절차의 Flow Chart는 어떻게 되나요?",global_sop_integer_plus_all_am_vacuum_line,10,sop
+261,"INTEGER plus PM Baratron Gauge 조절에 필요한 Tool 목록을 알려줘",global_sop_integer_plus_all_pm_vacuum_line,9,sop
+262,"What is the scope of INTEGER plus PM Vacuum Line SOP?",global_sop_integer_plus_all_pm_vacuum_line,1,sop
+263,"PRECIA 설비 Process Kit (Top Mount Type) 세정 작업의 Flow Chart를 알려줘",global_sop_precia_all_pm_prevent_maintenance,8-9,sop
+264,"PRECIA PM Prevent Maintenance 작업 시 FDC Interlock 관련 주의사항은?",global_sop_precia_all_pm_prevent_maintenance,2,sop
+265,"PRECIA Load Lock Vision H/W 교체 작업에 필요한 Tool은?",global_sop_precia_all_ll_vision,10,sop
+266,"PRECIA LL Vision 작업 시 Robot Moving 관련 안전 주의사항은?",global_sop_precia_all_ll_vision,2,sop
+267,"PRECIA設備のLoad Lock Vision交換作業に必要な保護具は何ですか？",global_sop_precia_all_ll_vision,8,sop
+268,"SUPRA N series 설비에서 감전 재해의 정의와 응급처치 방법은?",global_sop_supra_n_series_all_pm_hook_lifter_servo_motor,4,sop
+269,"INTEGER plus 설비의 Worker Location에서 Module별 작업자 배치 규칙은?",global_sop_integer_plus_all_am_vacuum_line,5,sop
+270,"GENEVA STP300 XP Trouble Shooting 매뉴얼의 Top 5 Compliance Points는 무엇인가요?",ts_pdfs_pskh_geneva_stp300_xp_trouble_shooting_r1_cn,4,ts
+271,"GENEVA XP에서 O2 level out of range alarm 발생 시 Chamber pressure 확인 방법은?",ts_pdfs_pskh_ts_guide_geneva_xp_o2_level_out_of_range_alarm_0,3,ts
+272,"GENEVA XP O2 alarm 발생 시 Clamp, Bolt status check 절차를 알려줘",ts_pdfs_pskh_ts_guide_geneva_xp_o2_level_out_of_range_alarm_0,4,ts
+273,"GENEVA XP Disc motion move time out 알람 발생 시 Chamber Open 절차는?",ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_move_time_out,3,ts
+274,"GENEVA XP에서 Disc motion time out 시 이물질 확인 및 제거 방법은?",ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_move_time_out,4,ts
+275,"What is the alarm description and ALID for DISC MOTION POSITION ERROR on GENEVA XP?",ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_position_error,2,ts
+276,"GENEVA XP DISC MOTION POSITION ERROR 발생 시 Sensing test 절차는?",ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_position_error,3,ts
+277,"GENEVA XP PM Chamber Pressure Range Out 시 APC Setpoint 확인 방법은?",ts_pdfs_pskh_ts_guide_geneva_xp_pm_chamber_pressure_range_out_0,5,ts
+278,"GENEVA XP IO Response Error (Evac valve error) 발생 시 Air line check 절차는?",ts_pdfs_pskh_ts_guide_geneva_xp_io_respnse_error_evac_valve_error,3,ts
+279,"GENEVA XPのStage Wafer Vacuum Sensor Timeout発生時のFitting確認手順は？",ts_pdfs_pskh_ts_guide_geneva_xp_stage_1_5_wafer_vacuum_sensor_timeout,3,ts
+280,"INTEGER plus에서 Trace Leak Rate Over 발생 시 PM Chamber 관련 Check point는?",integer_plus_all_trouble_shooting_guide_trace_leak_rate_over,2,ts
+281,"INTEGER plus Leak Rate Over 시 AM Chamber와 TM Chamber의 점검 항목 차이는?",integer_plus_all_trouble_shooting_guide_trace_leak_rate_over,4-5,ts
+282,"SUPRA Np 설비 설치 매뉴얼의 목차 구성은 어떻게 되나요?",set_up_manual_supra_np,2,setup
+283,"SUPRA Np Setup 시 5대 중대 재해 항목은 무엇인가요?",set_up_manual_supra_np,3,setup
+284,"SUPRA Vm 설비 설치 시 Template Drawing 사전 준비 사항은?",set_up_manual_supra_vm,4,setup
+285,"What is the setup procedure sequence for ECOLITE 3000 installation?",set_up_manual_ecolite_3000,2,setup
+286,"SUPRA Nm 설비 설치 매뉴얼에서 300mm 라인 OHT 종류별 위험성은?",set_up_manual_supra_nm,4,setup
+287,"SUPRA N에서 KM0-6 OUT단 T상 BURNING 발생 원인과 대책은?",gcb_68157,,gcb
+288,"SUPRA N MC Cable 재작업 대상 설비 수와 교체 일정은?",gcb_68157,,gcb
+289,"SUPRA XP에서 Rack-SPS off alarm 발생 원인과 해결 방법은?",gcb_68366,,gcb
+290,"What was the root cause of SW-host disconnect error 30 on SUPRA Vplus?",gcb_68351,,gcb
+291,"SUPRA Vplus ERROR 30 메시지의 실제 원인은 host communication 문제인가요?",gcb_68351,,gcb
+292,"INTEGER plus Beneta evaluation에서 고객이 요청한 metal contamination spec 변경 내용은?",gcb_67993,,gcb
+293,"PRECIA LP communication error의 root cause는 무엇이었나요?",gcb_68367,,gcb
+294,"SUPRA Vm TDK LP mapper arm cylinder 파트 번호는?",gcb_68057,,gcb
+295,"GENEVA STP300 XP에서 AGV 사용을 위해 필요한 HW 파트는?",gcb_8509,,gcb
+296,"ECOLITE 3000에서 wafer clear abnormal 이슈의 분석 결과는?",gcb_23288,,gcb
+297,"SUPRA N 설비 Set-Up 시 EFEM Positioning 및 TM Docking 작업 내용은?",40001438,,myservice
+298,"SUPRA Vplus LP2 Mapping Arm Open Alarm 점검 시 발견된 원인과 조치는?",40001450,,myservice
+299,"INTEGER plus LL2 Venting 상태에서 TM Pumping 후 Base Pressure 변화는?",40006088,,myservice
+300,"PRECIA PM2 Oxide Wafer Vision 계측 결과 Uniformity 수치는 얼마인가요?",40008029,,myservice
+301,"What maintenance work was performed during SUPRA XP setup including D-net board issues?",40010397,,myservice
