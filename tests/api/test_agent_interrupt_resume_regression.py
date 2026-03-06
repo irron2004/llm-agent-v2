@@ -166,7 +166,13 @@ def test_auto_parse_confirm_resume_routes_to_guided_confirm_agent(
         json={
             "message": "resume",
             "thread_id": tid,
-            "resume_decision": {"type": "auto_parse_confirm", "confirmed": True},
+            "resume_decision": {
+                "type": "auto_parse_confirm",
+                "target_language": "ko",
+                "selected_device": "__skip__",
+                "selected_equip_id": "__skip__",
+                "task_mode": "all",
+            },
             "auto_parse": True,
         },
     )
