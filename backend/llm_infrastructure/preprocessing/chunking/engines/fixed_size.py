@@ -65,6 +65,7 @@ class FixedSizeChunker(BaseChunker):
         if self.params.split_by == "token":
             if not self._has_tokenizer():
                 import warnings
+
                 warnings.warn(
                     "Token-based splitting requested but no tokenizer provided. "
                     "Falling back to character-based splitting.",
@@ -75,10 +76,7 @@ class FixedSizeChunker(BaseChunker):
 
     def _has_tokenizer(self) -> bool:
         """Check if tokenizer is available."""
-        return (
-            self.tokenizer is not None
-            or self.tokenizer_fn is not None
-        )
+        return self.tokenizer is not None or self.tokenizer_fn is not None
 
     def _tokenize(self, text: str) -> list[str]:
         """Tokenize text into tokens."""
@@ -131,11 +129,7 @@ class FixedSizeChunker(BaseChunker):
         end = min(len(text), target_pos + search_range)
 
         # Use custom separator if specified
-        separators = (
-            [self.params.separator]
-            if self.params.separator
-            else self.DEFAULT_SEPARATORS
-        )
+        separators = [self.params.separator] if self.params.separator else self.DEFAULT_SEPARATORS
 
         # Find best split point (prefer earlier separators in list)
         best_pos = target_pos
@@ -288,9 +282,9 @@ class FixedSizeChunker(BaseChunker):
                 chunk_index += 1
 
             # Move position with overlap
+            prev_pos = pos
             pos = end_pos - overlap
-            if pos <= 0 or pos <= (end_pos - chunk_size):
-                # Prevent infinite loop
+            if pos <= prev_pos:
                 pos = end_pos
 
         return chunks

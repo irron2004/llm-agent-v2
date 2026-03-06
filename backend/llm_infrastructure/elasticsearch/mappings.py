@@ -558,6 +558,7 @@ def get_chunk_v3_content_mapping() -> dict[str, Any]:
     BM25 검색과 메타데이터 필터링에 사용. 벡터는 별도 embed 인덱스에 저장.
     """
     return {
+        "dynamic": False,
         "properties": {
             "chunk_id": {"type": "keyword", "doc_values": True},
             "doc_id": {"type": "keyword", "doc_values": True},
@@ -573,6 +574,7 @@ def get_chunk_v3_content_mapping() -> dict[str, Any]:
             "chunk_version": {"type": "keyword", "doc_values": True},
             "pipeline_version": {"type": "keyword", "doc_values": True},
             "created_at": {"type": "date"},
+            "extra_meta": {"type": "object", "enabled": False},
         },
     }
 
@@ -592,6 +594,7 @@ def get_chunk_v3_embed_mapping(
         model_meta: _meta에 저장할 모델 정보
     """
     mapping: dict[str, Any] = {
+        "dynamic": False,
         "properties": {
             "chunk_id": {"type": "keyword", "doc_values": True},
             "content_hash": {"type": "keyword", "doc_values": True},

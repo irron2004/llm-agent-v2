@@ -19,34 +19,55 @@ class ChunkV3Document:
     모두 이 포맷으로 변환되어 Phase 3/4에서 통합 처리된다.
     """
 
-    chunk_id: str           # {doc_type}_{doc_id}#{chunk_index:04d}
+    chunk_id: str  # {doc_type}_{doc_id}#{chunk_index:04d}
     doc_id: str
     page: int
     lang: str
     content: str
     search_text: str
-    doc_type: str           # sop, ts, setup_manual, myservice, gcb
+    doc_type: str  # sop, ts, setup, myservice, gcb
     device_name: str
     equip_id: str
     chapter: str
-    content_hash: str       # SHA256[:16]
+    content_hash: str  # SHA256[:16]
     chunk_version: str = "v3"
     pipeline_version: str = "1.0.0"
     extra_meta: dict[str, Any] = field(default_factory=dict)
+
+
+DOC_TYPE_ALIASES: dict[str, str] = {
+    "sop": "sop",
+    "ts": "ts",
+    "trouble_shooting": "ts",
+    "trouble_shooting_guide": "ts",
+    "troubleshooting": "ts",
+    "t/s": "ts",
+    "setup": "setup",
+    "setup_manual": "setup",
+    "set_up_manual": "setup",
+    "installation manual": "setup",
+    "myservice": "myservice",
+    "gcb": "gcb",
+}
+
+
+def canonicalize_doc_type(doc_type: str) -> str:
+    raw = str(doc_type or "").strip().lower()
+    return DOC_TYPE_ALIASES.get(raw, raw)
 
 
 def generate_chunk_id(doc_type: str, doc_id: str, index: int) -> str:
     """chunk_id 생성.
 
     Args:
-        doc_type: 문서 종류 (sop, ts, setup_manual, myservice, gcb)
+        doc_type: 문서 종류 (sop, ts, setup, myservice, gcb)
         doc_id: 문서 ID
         index: chunk 인덱스 (0-based)
 
     Returns:
         chunk_id (e.g., "sop_doc1#0000")
     """
-    return f"{doc_type}_{doc_id}#{index:04d}"
+    return f"{canonicalize_doc_type(doc_type)}_{doc_id}#{index:04d}"
 
 
 def compute_content_hash(text: str) -> str:
@@ -155,6 +176,8 @@ def load_chunks_jsonl(path: str | Path) -> list[ChunkV3Document]:
 
 __all__ = [
     "ChunkV3Document",
+    "DOC_TYPE_ALIASES",
+    "canonicalize_doc_type",
     "compute_content_hash",
     "generate_chunk_id",
     "load_chunks_jsonl",

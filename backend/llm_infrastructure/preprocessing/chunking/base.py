@@ -88,19 +88,25 @@ class BaseChunker(ABC):
 
         Args:
             params: ChunkParams instance with chunking configuration.
-            **kwargs: Additional parameters (can override params fields).
+            **kwargs: Additional parameters.
         """
         if params is None:
-            params = ChunkParams()
+            params = ChunkParams(
+                chunk_size=kwargs.get("chunk_size", ChunkParams.chunk_size),
+                chunk_overlap=kwargs.get("chunk_overlap", ChunkParams.chunk_overlap),
+                split_by=kwargs.get("split_by", ChunkParams.split_by),
+                min_chunk_size=kwargs.get("min_chunk_size", ChunkParams.min_chunk_size),
+                separator=kwargs.get("separator", ChunkParams.separator),
+                keep_separator=kwargs.get("keep_separator", ChunkParams.keep_separator),
+            )
 
-        # Allow kwargs to override params
         self.params = ChunkParams(
-            chunk_size=kwargs.get("chunk_size", params.chunk_size),
-            chunk_overlap=kwargs.get("chunk_overlap", params.chunk_overlap),
-            split_by=kwargs.get("split_by", params.split_by),
-            min_chunk_size=kwargs.get("min_chunk_size", params.min_chunk_size),
-            separator=kwargs.get("separator", params.separator),
-            keep_separator=kwargs.get("keep_separator", params.keep_separator),
+            chunk_size=params.chunk_size,
+            chunk_overlap=params.chunk_overlap,
+            split_by=params.split_by,
+            min_chunk_size=params.min_chunk_size,
+            separator=params.separator,
+            keep_separator=params.keep_separator,
         )
         self.config = kwargs
 
