@@ -24,7 +24,7 @@ qid,question,expected_doc,expected_pages
 22,APC 센서 위치를 지정 마킹에 맞게 재조정 다음에 할 일이 뭐야,,
 23,AR 과 관련있는 파라미터는 뭔가요?,,
 24,AR이 감소하면 어떻게 대처 해야 하나요?,,
-25,"Alarm descrption said Fan2 LCU connection fail이 알람이 뜨면 어떤 업무를 수행해야 하나요?",,
+25,Alarm descrption said Fan2 LCU connection fail이 알람이 뜨면 어떤 업무를 수행해야 하나요?,,
 26,Ashing Rate 와 관련있는 파라미터는?,,
 27,Ashing rate가 낮을때 Chuck온도가 관계있는 이유가 뭐야?,,
 28,Baffle의 하는 역할을 알려줘,,
@@ -163,7 +163,7 @@ qid,question,expected_doc,expected_pages
 161,integer 팬듈럼 밸드 교체법,,
 162,leak check 기능이 동작하는지 어떻게 체크해,,
 163,lp tp2 timeout alarm 발생 시 해결방법,,
-164,"manometer 이상",,
+164,manometer 이상,,
 165,micron japan에 설치된 설비가 뭐야,,
 166,micron japan에 설치된 설비들의 설비군과 그 대수를 알려줘,,
 167,mySERVICE 이력 중 SEC SRD 라인의 EPA404호기 LL 점검 이력을 찾을 수 있을까?,,
@@ -299,55 +299,154 @@ qid,question,expected_doc,expected_pages
 297,SUPRA Nm 작업 이력에서 핵심 점검 항목이 무엇이었는지 알려줘.,40054105,
 298,PRECIA 서비스 이력에서 교체/수리 작업 포인트를 정리해줘.,40042223,
 299,SUPRA XP の作業履歴では、主な対応内容と結果はどうなっていますか？,40128226,
-250,"SUPRA N series 설비의 Hook Lifter Servo Motor 교체 시 안전 및 주의사항은?",global_sop_supra_n_series_all_pm_hook_lifter_servo_motor,2
-251,"SUPRA N series PM Hook Lifter 작업 시 Worker Location 배치는 어떻게 해야 하나요?",global_sop_supra_n_series_all_pm_hook_lifter_servo_motor,7
-252,"SUPRA N series의 PIN MOTOR 교체 작업에 필요한 보호구는 무엇인가요?",global_sop_supra_n_series_all_pm_hook_lifter_servo_motor,9
-253,"SUPRA N series EFEM Load Port Duraport 교체 시 협착 주의사항을 알려줘",global_sop_supra_n_series_all_efem_load_port_duraport,2
-254,"SUPRA N series Load Port 작업 시 AMHS는 어떻게 설정해야 하나요?",global_sop_supra_n_series_all_efem_load_port_duraport,2
-255,"What are the safety precautions for PRISM SOURCE 3000QC replacement on ZEDIUS XP?",global_sop_supra_xp_all_pm_prism_source_3000qc,2
-256,"ZEDIUS XP PRISM SOURCE 교체 시 Power Cable 분리가 필요한 이유는?",global_sop_supra_xp_all_pm_prism_source_3000qc,2
-257,"ZEDIUS XP 설비의 EFEM SW Install 작업 시 필요한 Tool은 무엇인가요?",global_sop_supra_xp_sw_all_sw_installation_setting,10
-258,"ZEDIUS XP SW Installation 시 CD-Rom 관련 보안 규정은?",global_sop_supra_xp_sw_all_sw_installation_setting,3
-259,"INTEGER plus AM Vacuum Line 작업 시 화상 주의사항과 안전 수칙은?",global_sop_integer_plus_all_am_vacuum_line,2
-260,"INTEGER plus AM Baratron Gauge Calibration 작업 절차의 Flow Chart는 어떻게 되나요?",global_sop_integer_plus_all_am_vacuum_line,10
-261,"INTEGER plus PM Baratron Gauge 조절에 필요한 Tool 목록을 알려줘",global_sop_integer_plus_all_pm_vacuum_line,9
-262,"What is the scope of INTEGER plus PM Vacuum Line SOP?",global_sop_integer_plus_all_pm_vacuum_line,1
-263,"PRECIA 설비 Process Kit (Top Mount Type) 세정 작업의 Flow Chart를 알려줘",global_sop_precia_all_pm_prevent_maintenance,8-9
-264,"PRECIA PM Prevent Maintenance 작업 시 FDC Interlock 관련 주의사항은?",global_sop_precia_all_pm_prevent_maintenance,2
-265,"PRECIA Load Lock Vision H/W 교체 작업에 필요한 Tool은?",global_sop_precia_all_ll_vision,10
-266,"PRECIA LL Vision 작업 시 Robot Moving 관련 안전 주의사항은?",global_sop_precia_all_ll_vision,2
-267,"PRECIA設備のLoad Lock Vision交換作業に必要な保護具は何ですか？",global_sop_precia_all_ll_vision,8
-268,"SUPRA N series 설비에서 감전 재해의 정의와 응급처치 방법은?",global_sop_supra_n_series_all_pm_hook_lifter_servo_motor,4
-269,"INTEGER plus 설비의 Worker Location에서 Module별 작업자 배치 규칙은?",global_sop_integer_plus_all_am_vacuum_line,5
-270,"GENEVA STP300 XP Trouble Shooting 매뉴얼의 Top 5 Compliance Points는 무엇인가요?",ts_pdfs_pskh_geneva_stp300_xp_trouble_shooting_r1_cn,4
-271,"GENEVA XP에서 O2 level out of range alarm 발생 시 Chamber pressure 확인 방법은?",ts_pdfs_pskh_ts_guide_geneva_xp_o2_level_out_of_range_alarm_0,3
-272,"GENEVA XP O2 alarm 발생 시 Clamp, Bolt status check 절차를 알려줘",ts_pdfs_pskh_ts_guide_geneva_xp_o2_level_out_of_range_alarm_0,4
-273,"GENEVA XP Disc motion move time out 알람 발생 시 Chamber Open 절차는?",ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_move_time_out,3
-274,"GENEVA XP에서 Disc motion time out 시 이물질 확인 및 제거 방법은?",ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_move_time_out,4
-275,"What is the alarm description and ALID for DISC MOTION POSITION ERROR on GENEVA XP?",ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_position_error,2
-276,"GENEVA XP DISC MOTION POSITION ERROR 발생 시 Sensing test 절차는?",ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_position_error,3
-277,"GENEVA XP PM Chamber Pressure Range Out 시 APC Setpoint 확인 방법은?",ts_pdfs_pskh_ts_guide_geneva_xp_pm_chamber_pressure_range_out_0,5
-278,"GENEVA XP IO Response Error (Evac valve error) 발생 시 Air line check 절차는?",ts_pdfs_pskh_ts_guide_geneva_xp_io_respnse_error_evac_valve_error,3
-279,"GENEVA XPのStage Wafer Vacuum Sensor Timeout発生時のFitting確認手順は？",ts_pdfs_pskh_ts_guide_geneva_xp_stage_1_5_wafer_vacuum_sensor_timeout,3
-280,"INTEGER plus에서 Trace Leak Rate Over 발생 시 PM Chamber 관련 Check point는?",integer_plus_all_trouble_shooting_guide_trace_leak_rate_over,2
-281,"INTEGER plus Leak Rate Over 시 AM Chamber와 TM Chamber의 점검 항목 차이는?",integer_plus_all_trouble_shooting_guide_trace_leak_rate_over,4-5
-282,"SUPRA Np 설비 설치 매뉴얼의 목차 구성은 어떻게 되나요?",set_up_manual_supra_np,2
-283,"SUPRA Np Setup 시 5대 중대 재해 항목은 무엇인가요?",set_up_manual_supra_np,3
-284,"SUPRA Vm 설비 설치 시 Template Drawing 사전 준비 사항은?",set_up_manual_supra_vm,4
-285,"What is the setup procedure sequence for ECOLITE 3000 installation?",set_up_manual_ecolite_3000,2
-286,"SUPRA Nm 설비 설치 매뉴얼에서 300mm 라인 OHT 종류별 위험성은?",set_up_manual_supra_nm,4
-287,"SUPRA N에서 KM0-6 OUT단 T상 BURNING 발생 원인과 대책은?",gcb_68157,
-288,"SUPRA N MC Cable 재작업 대상 설비 수와 교체 일정은?",gcb_68157,
-289,"SUPRA XP에서 Rack-SPS off alarm 발생 원인과 해결 방법은?",gcb_68366,
-290,"What was the root cause of SW-host disconnect error 30 on SUPRA Vplus?",gcb_68351,
-291,"SUPRA Vplus ERROR 30 메시지의 실제 원인은 host communication 문제인가요?",gcb_68351,
-292,"INTEGER plus Beneta evaluation에서 고객이 요청한 metal contamination spec 변경 내용은?",gcb_67993,
-293,"PRECIA LP communication error의 root cause는 무엇이었나요?",gcb_68367,
-294,"SUPRA Vm TDK LP mapper arm cylinder 파트 번호는?",gcb_68057,
-295,"GENEVA STP300 XP에서 AGV 사용을 위해 필요한 HW 파트는?",gcb_8509,
-296,"ECOLITE 3000에서 wafer clear abnormal 이슈의 분석 결과는?",gcb_23288,
-297,"SUPRA N 설비 Set-Up 시 EFEM Positioning 및 TM Docking 작업 내용은?",40001438,
-298,"SUPRA Vplus LP2 Mapping Arm Open Alarm 점검 시 발견된 원인과 조치는?",40001450,
-299,"INTEGER plus LL2 Venting 상태에서 TM Pumping 후 Base Pressure 변화는?",40006088,
-300,"PRECIA PM2 Oxide Wafer Vision 계측 결과 Uniformity 수치는 얼마인가요?",40008029,
-301,"What maintenance work was performed during SUPRA XP setup including D-net board issues?",40010397,
+300,SUPRA N series 설비의 Hook Lifter Servo Motor 교체 시 안전 및 주의사항은?,global_sop_supra_n_series_all_pm_hook_lifter_servo_motor,2
+301,SUPRA N series PM Hook Lifter 작업 시 Worker Location 배치는 어떻게 해야 하나요?,global_sop_supra_n_series_all_pm_hook_lifter_servo_motor,7
+302,SUPRA N series의 PIN MOTOR 교체 작업에 필요한 보호구는 무엇인가요?,global_sop_supra_n_series_all_pm_hook_lifter_servo_motor,9
+303,SUPRA N series EFEM Load Port Duraport 교체 시 협착 주의사항을 알려줘,global_sop_supra_n_series_all_efem_load_port_duraport,2
+304,SUPRA N series Load Port 작업 시 AMHS는 어떻게 설정해야 하나요?,global_sop_supra_n_series_all_efem_load_port_duraport,2
+305,What are the safety precautions for PRISM SOURCE 3000QC replacement on ZEDIUS XP?,global_sop_supra_xp_all_pm_prism_source_3000qc,2
+306,ZEDIUS XP PRISM SOURCE 교체 시 Power Cable 분리가 필요한 이유는?,global_sop_supra_xp_all_pm_prism_source_3000qc,2
+307,ZEDIUS XP 설비의 EFEM SW Install 작업 시 필요한 Tool은 무엇인가요?,global_sop_supra_xp_sw_all_sw_installation_setting,10
+308,ZEDIUS XP SW Installation 시 CD-Rom 관련 보안 규정은?,global_sop_supra_xp_sw_all_sw_installation_setting,3
+309,INTEGER plus AM Vacuum Line 작업 시 화상 주의사항과 안전 수칙은?,global_sop_integer_plus_all_am_vacuum_line,2
+310,INTEGER plus AM Baratron Gauge Calibration 작업 절차의 Flow Chart는 어떻게 되나요?,global_sop_integer_plus_all_am_vacuum_line,10
+311,INTEGER plus PM Baratron Gauge 조절에 필요한 Tool 목록을 알려줘,global_sop_integer_plus_all_pm_vacuum_line,9
+312,What is the scope of INTEGER plus PM Vacuum Line SOP?,global_sop_integer_plus_all_pm_vacuum_line,1
+313,PRECIA 설비 Process Kit (Top Mount Type) 세정 작업의 Flow Chart를 알려줘,global_sop_precia_all_pm_prevent_maintenance,8-9
+314,PRECIA PM Prevent Maintenance 작업 시 FDC Interlock 관련 주의사항은?,global_sop_precia_all_pm_prevent_maintenance,2
+315,PRECIA Load Lock Vision H/W 교체 작업에 필요한 Tool은?,global_sop_precia_all_ll_vision,10
+316,PRECIA LL Vision 작업 시 Robot Moving 관련 안전 주의사항은?,global_sop_precia_all_ll_vision,2
+317,PRECIA設備のLoad Lock Vision交換作業に必要な保護具は何ですか？,global_sop_precia_all_ll_vision,8
+318,SUPRA N series 설비에서 감전 재해의 정의와 응급처치 방법은?,global_sop_supra_n_series_all_pm_hook_lifter_servo_motor,4
+319,INTEGER plus 설비의 Worker Location에서 Module별 작업자 배치 규칙은?,global_sop_integer_plus_all_am_vacuum_line,5
+320,GENEVA STP300 XP Trouble Shooting 매뉴얼의 Top 5 Compliance Points는 무엇인가요?,ts_pdfs_pskh_geneva_stp300_xp_trouble_shooting_r1_cn,4
+321,GENEVA XP에서 O2 level out of range alarm 발생 시 Chamber pressure 확인 방법은?,ts_pdfs_pskh_ts_guide_geneva_xp_o2_level_out_of_range_alarm_0,3
+322,"GENEVA XP O2 alarm 발생 시 Clamp, Bolt status check 절차를 알려줘",ts_pdfs_pskh_ts_guide_geneva_xp_o2_level_out_of_range_alarm_0,4
+323,GENEVA XP Disc motion move time out 알람 발생 시 Chamber Open 절차는?,ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_move_time_out,3
+324,GENEVA XP에서 Disc motion time out 시 이물질 확인 및 제거 방법은?,ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_move_time_out,4
+325,What is the alarm description and ALID for DISC MOTION POSITION ERROR on GENEVA XP?,ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_position_error,2
+326,GENEVA XP DISC MOTION POSITION ERROR 발생 시 Sensing test 절차는?,ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_position_error,3
+327,GENEVA XP PM Chamber Pressure Range Out 시 APC Setpoint 확인 방법은?,ts_pdfs_pskh_ts_guide_geneva_xp_pm_chamber_pressure_range_out_0,5
+328,GENEVA XP IO Response Error (Evac valve error) 발생 시 Air line check 절차는?,ts_pdfs_pskh_ts_guide_geneva_xp_io_respnse_error_evac_valve_error,3
+329,GENEVA XPのStage Wafer Vacuum Sensor Timeout発生時のFitting確認手順は？,ts_pdfs_pskh_ts_guide_geneva_xp_stage_1_5_wafer_vacuum_sensor_timeout,3
+330,INTEGER plus에서 Trace Leak Rate Over 발생 시 PM Chamber 관련 Check point는?,integer_plus_all_trouble_shooting_guide_trace_leak_rate_over,2
+331,INTEGER plus Leak Rate Over 시 AM Chamber와 TM Chamber의 점검 항목 차이는?,integer_plus_all_trouble_shooting_guide_trace_leak_rate_over,4-5
+332,SUPRA Np 설비 설치 매뉴얼의 목차 구성은 어떻게 되나요?,set_up_manual_supra_np,2
+333,SUPRA Np Setup 시 5대 중대 재해 항목은 무엇인가요?,set_up_manual_supra_np,3
+334,SUPRA Vm 설비 설치 시 Template Drawing 사전 준비 사항은?,set_up_manual_supra_vm,4
+335,What is the setup procedure sequence for ECOLITE 3000 installation?,set_up_manual_ecolite_3000,2
+336,SUPRA Nm 설비 설치 매뉴얼에서 300mm 라인 OHT 종류별 위험성은?,set_up_manual_supra_nm,4
+337,SUPRA N에서 KM0-6 OUT단 T상 BURNING 발생 원인과 대책은?,gcb_68157,
+338,SUPRA N MC Cable 재작업 대상 설비 수와 교체 일정은?,gcb_68157,
+339,SUPRA XP에서 Rack-SPS off alarm 발생 원인과 해결 방법은?,gcb_68366,
+340,What was the root cause of SW-host disconnect error 30 on SUPRA Vplus?,gcb_68351,
+341,SUPRA Vplus ERROR 30 메시지의 실제 원인은 host communication 문제인가요?,gcb_68351,
+342,INTEGER plus Beneta evaluation에서 고객이 요청한 metal contamination spec 변경 내용은?,gcb_67993,
+343,PRECIA LP communication error의 root cause는 무엇이었나요?,gcb_68367,
+344,SUPRA Vm TDK LP mapper arm cylinder 파트 번호는?,gcb_68057,
+345,GENEVA STP300 XP에서 AGV 사용을 위해 필요한 HW 파트는?,gcb_8509,
+346,ECOLITE 3000에서 wafer clear abnormal 이슈의 분석 결과는?,gcb_23288,
+347,SUPRA N 설비 Set-Up 시 EFEM Positioning 및 TM Docking 작업 내용은?,40001438,
+348,SUPRA Vplus LP2 Mapping Arm Open Alarm 점검 시 발견된 원인과 조치는?,40001450,
+349,INTEGER plus LL2 Venting 상태에서 TM Pumping 후 Base Pressure 변화는?,40006088,
+350,PRECIA PM2 Oxide Wafer Vision 계측 결과 Uniformity 수치는 얼마인가요?,40008029,
+351,What maintenance work was performed during SUPRA XP setup including D-net board issues?,40010397,
+352,GENEVA XP particle spec out 알람 발생 시 1차 진단 순서를 알려줘.,ts_pdfs_pskh_ts_guide_geneva_xp_particle_spec_out,2-4
+353,"In the SUPRA N work log, what was inspected first and what was replaced?",40033056,
+354,OMNIS PLUS 설치 후 초기 구동 전에 필수 확인해야 하는 체크포인트를 정리해줘.,set_up_manual_omnis_plus,4-8
+355,GENEVA XP heat exchanger 절차를 현장 작업자 기준으로 단계별로 설명해줘.,global_sop_geneva_xp_rep_pm_heat_exchanger,5-7
+356,GENEVA XP robot sr8240 작업에서 시작 전 점검 순서를 알려줘.,global_sop_geneva_xp_rep_efem_robot_sr8240,6-9
+357,ECOLITE II 事例の暫定対策と恒久対策の違いは何ですか？,gcb_7905,
+358,GENEVA XP O2 Cell 작업 후 복구 단계에서 반드시 확인해야 할 항목을 정리해줘.,global_sop_geneva_xp_rep_pm_o2_cell,8-10
+359,INTEGER PLUS d-net 절차를 현장 작업자 기준으로 단계별로 설명해줘.,global_sop_integer_plus_all_pm_d_net,9-12
+360,GENEVA STP300 xp 유사 장애 사례에서 현상-원인-대책 흐름을 요약해줘.,gcb_6894,
+361,GENEVA STP300 xp 현장 사례에서 재발 방지를 위해 적용한 핵심 조치를 알려줘.,gcb_6309,
+362,ECOLITE 3000 이슈 보고서 기준으로 원인 분석과 후속 조치 결과를 정리해줘.,gcb_6494,
+363,GENEVA XP のffu controller作業後、復旧前に必須のチェック項目は？,global_sop_geneva_xp_rep_efem_ffu_controller,5-9
+364,GENEVA XP pm formic gas leak 알람 발생 시 1차 진단 순서를 알려줘.,ts_pdfs_pskh_ts_guide_geneva_xp_pm_formic_gas_leak_0,6-8
+365,INTEGER PLUS gas spring PM 절차에서 안전 주의사항과 핵심 체크포인트는 뭐야?,global_sop_integer_plus_all_am_gas_spring,7-10
+366,DAS2000 이슈 보고서 기준으로 원인 분석과 후속 조치 결과를 정리해줘.,gcb_59452,
+367,GENEVA XP adapter ring 절차를 현장 작업자 기준으로 단계별로 설명해줘.,global_sop_geneva_xp_rep_pm_adapter_ring,9-11
+368,GENEVA XP pm bubbler leak 알람 발생 시 1차 진단 순서를 알려줘.,ts_pdfs_pskh_ts_guide_geneva_xp_pm_bubbler_leak,2-5
+369,INTEGER PLUS vacuum block PM 절차에서 안전 주의사항과 핵심 체크포인트는 뭐야?,global_sop_integer_plus_all_ll_vacuum_block,3-7
+370,INTEGER PLUS eda controller 작업 후 복구 단계에서 반드시 확인해야 할 항목을 정리해줘.,global_sop_integer_plus_all_efem_eda_controller,4-6
+371,INTEGER PLUS selector switch 절차를 현장 작업자 기준으로 단계별로 설명해줘.,global_sop_integer_plus_all_efem_selector_switch,5-8
+372,"After GENEVA XP chuck temp calibration maintenance, what recovery checks must be completed?",global_sop_geneva_xp_adj_pm_chuck_temp_calibration,6-10
+373,DAS2000 현장 사례에서 재발 방지를 위해 적용한 핵심 조치를 알려줘.,gcb_33556,
+374,GENEVA XP の분배기 PMで、安全上の注意点と確認ポイントは何ですか？,global_sop_geneva_xp_rep_pm_분배기,8-11
+375,ECOLITE 2000 장비 셋업에서 Hook-up 단계 핵심 주의사항은 뭐야?,set_up_manual_ecolite_2000,9-13
+376,"In a ECOLITE 3000 field case, what corrective actions resolved the reported issue?",gcb_7283,
+377,PRECIA 서비스 이력에서 주요 원인과 완료 결과를 요약해줘.,40155715,
+378,ECOLITE 3000 이슈 보고서 기준으로 원인 분석과 후속 조치 결과를 정리해줘 (현장 기준),gcb_5759,
+379,GENEVA XP process exhaust fail 장애에서 기구/전장 구분 진단 흐름을 설명해줘.,ts_pdfs_pskh_ts_guide_geneva_xp_process_exhaust_fail,5-7
+380,INTEGER PLUS signal tower 작업에서 시작 전 점검 순서를 알려줘.,global_sop_integer_plus_all_efem_signal_tower,6-9
+381,INTEGER PLUS stepping motor PM 절차에서 안전 주의사항과 핵심 체크포인트는 뭐야?,global_sop_integer_plus_all_ll_stepping_motor,7-11
+382,ECOLITE3000 이슈 보고서 기준으로 원인 분석과 후속 조치 결과를 정리해줘.,gcb_4328,
+383,GENEVA XP chuck hard stopper 절차를 현장 작업자 기준으로 단계별로 설명해줘.,global_sop_genevaxp_rep_chuck_hard_stopper,9-12
+384,"After INTEGER PLUS o2 gas leak detector maintenance, what recovery checks must be completed?",global_sop_integer_plus_all_efem_o2_gas_leak_detector,2-6
+385,GENEVA XP o2 analyzer PM 절차에서 안전 주의사항과 핵심 체크포인트는 뭐야?,global_sop_geneva_xp_rep_pm_o2_analyzer,3-5
+386,"In the INTEGER PLUS temp controller PM flow, what are the critical safety and verification points?",global_sop_integer_plus_all_am_temp_controller,4-7
+387,PRECIA 작업 이력에서 재작업을 줄이기 위해 적용한 확인 항목은 뭐였어?,40111457,
+388,GENEVA XP load lock 작업에서 시작 전 점검 순서를 알려줘.,global_sop_geneva_xp_rep_pm_load_lock,6-8
+389,SUPRA N 서비스 이력에서 주요 원인과 완료 결과를 요약해줘.,40046037,
+390,GENEVA XP measurement 작업 후 복구 단계에서 반드시 확인해야 할 항목을 정리해줘.,global_sop_geneva_xp_fa_measurement_en,8-12
+391,GENEVA XP Harmonic drive 절차를 현장 작업자 기준으로 단계별로 설명해줘.,global_sop_geneva_xp_rep_pm_harmonic_drive,9-11
+392,INTEGER PLUS cassette 작업에서 시작 전 점검 순서를 알려줘.,global_sop_integer_plus_all_ll_cassette,2-5
+393,GENEVA XP log backup PM 절차에서 안전 주의사항과 핵심 체크포인트는 뭐야?,global_sop_geneva_xp_sw_efem_log_backup,3-7
+394,SUPRA III 현장 작업 기록에서 핵심 교체 부품과 점검 포인트를 정리해줘.,40098563,
+395,GENEVA STP200 xp 사례에서 임시조치와 영구조치가 어떻게 달랐는지 설명해줘.,gcb_7804,
+396,ECOLITE 3000 유사 장애 사례에서 현상-원인-대책 흐름을 요약해줘.,gcb_6066,
+397,"For INTEGER PLUS device net board, what checks are required before starting the procedure?",global_sop_integer_plus_all_efem_device_net_board,7-9
+398,ECOLITE3000 이슈 보고서 기준으로 원인 분석과 후속 조치 결과를 정리해줘 (현장 기준),gcb_4231,
+399,"After GENEVA XP Loadlock APC VALVE maintenance, what recovery checks must be completed?",global_sop_geneva_xp_rep_pm_loadlock_apc_valve,9-13
+400,"In a ECOLITE3000 field case, what corrective actions resolved the reported issue?",gcb_5096,
+401,INTEGER PLUS Pin Move Abnormal 트러블슈팅에서 원인 분기 기준과 우선 점검 포인트는?,integer_plus_all_trouble_shooting_guide_trace_pin_move_abnormal,3-5
+402,"After ECOLITE II 400 setup, what must be verified before initial operation?",set_up_manual_ecolite_ii_400,4-8
+403,"When GENEVA XP disc motion position error occurs, what is the recommended first-level troubleshooting sequence?",ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_position_error,5-7
+404,GENEVA XP io respnse error (evac valve error) 알람 발생 시 1차 진단 순서를 알려줘.,ts_pdfs_pskh_ts_guide_geneva_xp_io_respnse_error_evac_valve_error,6-9
+405,GENEVA XP Bubbler Cabinet Feed Valve PM 절차에서 안전 주의사항과 핵심 체크포인트는 뭐야?,global_sop_geneva_xp_rep_bubbler_cabinet_feed_valve,7-11
+406,INTEGER PLUS disarray sensor 작업 후 복구 단계에서 반드시 확인해야 할 항목을 정리해줘.,global_sop_integer_plus_all_ll_disarray_sensor,8-10
+407,GENEVA XP io response error(purge valve error) 장애에서 기구/전장 구분 진단 흐름을 설명해줘.,ts_pdfs_pskh_ts_guide_geneva_xp_io_response_error_purge_valve_error,5-6
+408,INTEGER PLUS gas box door sensor 작업에서 시작 전 점검 순서를 알려줘.,global_sop_integer_plus_all_pm_gas_box_door_sensor,2-6
+409,INTEGER PLUS lifter assy PM 절차에서 안전 주의사항과 핵심 체크포인트는 뭐야?,global_sop_integer_plus_all_ll_lifter_assy,3-5
+410,"For GENEVA XP formic invalid transtion, how should engineers prioritize root-cause checks?",ts_pdfs_pskh_ts_guide_geneva_xp_formic_invalid_transtion,4-7
+411,GENEVA XP chamber apc valve 절차를 현장 작업자 기준으로 단계별로 설명해줘.,global_sop_geneva_xp_rep_pm_chamber_apc_valve,5-9
+412,SUPRA N 작업 이력 기준으로 실제 수행한 점검/조치 순서를 알려줘.,40036168,
+413,GENEVA XP Pressure switch PM 절차에서 안전 주의사항과 핵심 체크포인트는 뭐야?,global_sop_geneva_xp_rep_pm_pressure_switch,7-10
+414,GENEVA XP heater power off 이슈 대응 시 공정 재개 전에 확인해야 할 체크리스트가 뭐야?,ts_pdfs_pskh_ts_guide_geneva_xp_heater_power_off,8
+415,"For INTEGER PLUS slot valve, what checks are required before starting the procedure?",global_sop_integer_plus_all_ll_slot_valve,9-11
+416,GENEVA XP stage(1~5) wafer vacuum sensor timeout 알람 발생 시 1차 진단 순서를 알려줘.,ts_pdfs_pskh_ts_guide_geneva_xp_stage_1_5_wafer_vacuum_sensor_timeout,2-5
+417,GENEVA XP Robot controller PM 절차에서 안전 주의사항과 핵심 체크포인트는 뭐야?,global_sop_genevaxp_rep_efem_robot_controller,3-7
+418,INTEGER PLUS Particle Spec Out 장애에서 기구/전장 구분 진단 흐름을 설명해줘.,integer_plus_all_trouble_shooting_guide_trace_particle_spec_out,5-8
+419,"Before process restart after ALL FFU Abnormal, what must be verified?",all_all_trouble_shooting_guide_trace_ffu_abnormal,6
+420,GENEVA XP のpm chamber pressure range outアラーム発生時、一次診断の手順は？,ts_pdfs_pskh_ts_guide_geneva_xp_pm_chamber_pressure_range_out_0,7-9
+421,equipment セットアップ時、通電前に確認すべきインターロック項目を教えてください。,set_up_manual_supra_vplus_micron,8-11
+422,"After INTEGER PLUS mfc maintenance, what recovery checks must be completed?",global_sop_integer_plus_all_ll_mfc,9-13
+423,GENEVA Bubbler Cabinet Vent valve 작업에서 시작 전 점검 순서를 알려줘.,global_sop_geneva_rep_bubbler_cabinet_vent_valve,2-4
+424,GENEVA STP300 mini x ケースでは、再発防止のためにどの対策を実施しましたか？,gcb_7306,
+425,PRECIA 설치 후 초기 구동 전에 필수 확인해야 하는 체크포인트를 정리해줘.,set_up_manual_precia,4-8
+426,ECOLITE3000 の事例で、現象・原因・対策を要約してください。,gcb_4407,
+427,GENEVA STP300 XP r1 cn 알람 발생 시 1차 진단 순서를 알려줘.,ts_pdfs_pskh_geneva_stp300_xp_trouble_shooting_r1_cn,6-9
+428,"After ECOLITE 3000 setup, what must be verified before initial operation?",set_up_manual_ecolite_3000,7-11
+429,PRECIA 현장 작업 기록에서 핵심 교체 부품과 점검 포인트를 정리해줘.,40056882,
+430,GENEVA XP pm wafers exceed time limit 장애에서 기구/전장 구분 진단 흐름을 설명해줘.,ts_pdfs_pskh_ts_guide_geneva_xp_pm_wafers_exceed_time_limit,7-8
+431,"After INTEGER PLUS setup, what must be verified before initial operation?",set_up_manual_integer_plus,2-6
+432,GENEVA XP disc motion move time out 트러블슈팅에서 원인 분기 기준과 우선 점검 포인트는?,ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_move_time_out,3-5
+433,GENEVA XP pm formic gas detect fail 이슈 대응 시 공정 재개 전에 확인해야 할 체크리스트가 뭐야?,ts_pdfs_pskh_ts_guide_geneva_xp_pm_formic_gas_detect_fail,4-7
+434,"After INTEGER PLUS flow switch maintenance, what recovery checks must be completed?",global_sop_integer_plus_all_pm_flow_switch,5-9
+435,GENEVA XP のAIO CALIBRATION作業で、開始前に確認すべき手順を教えてください。,global_sop_geneva_xp_adj_pm_aio_calibration,6-8
+436,INTEGER plus 서비스 이력에서 주요 원인과 완료 결과를 요약해줘.,40028571,
+437,What recurrence-prevention actions were applied in the ECOLITE3000 case?,gcb_2819,
+438,ECOLITE3000 の事例で、現象・原因・対策を要約してください（現場視点）,gcb_4679,
+439,GENEVA STP300 XP 설치 절차에서 Utility 연결 전에 선행 확인해야 할 항목은?,set_up_manual_geneva_stp300_xp_r6,2-5
+440,OMNIS set-up 진행 시 전원 인가 전 인터락 점검 순서를 알려줘.,set_up_manual_omnis,3-7
+441,GENEVA XP io response error(ring seal vac error) 이슈 대응 시 공정 재개 전에 확인해야 할 체크리스트가 뭐야?,ts_pdfs_pskh_ts_guide_geneva_xp_io_response_error_ring_seal_vac_error,4-6
+442,"In the PRECIA work log, what was inspected first and what was replaced?",40078621,
+443,SUPRA N 作業履歴にある重要な確認ポイントは何ですか？,40037754,
+444,INTEGER PLUS diffuser PM 절차에서 안전 주의사항과 핵심 체크포인트는 뭐야?,global_sop_integer_plus_all_ll_diffuser,7-9
+445,INTEGER PLUS Load Lock Abnormal 이슈 대응 시 공정 재개 전에 확인해야 할 체크리스트가 뭐야?,integer_plus_all_trouble_shooting_guide_trace_load_lock_abnormal,4-5
+446,SUPRA N 장비 셋업에서 Hook-up 단계 핵심 주의사항은 뭐야?,set_up_manual_supra_n,9-13
+447,"For GENEVA XP bubbler cabinet formic detector, what checks are required before starting the procedure?",global_sop_geneva_xp_rep_bubbler_cabinet_formic_detector,2-4
+448,ECOLITE3000 현장 사례에서 재발 방지를 위해 적용한 핵심 조치를 알려줘.,gcb_2817,
+449,GENEVA XP Bubbler PT sensor 작업 후 복구 단계에서 반드시 확인해야 할 항목을 정리해줘.,global_sop_geneva_xp_rep_sub_bubbler_pt_sensor,4-8
+450,ECOLITE 3000 사례에서 임시조치와 영구조치가 어떻게 달랐는지 설명해줘.,gcb_7956,
