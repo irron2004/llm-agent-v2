@@ -54,6 +54,7 @@ def _get_es_client():
         kwargs["basic_auth"] = (search_settings.es_user, search_settings.es_password)
     kwargs["verify_certs"] = bool(getattr(search_settings, "es_verify_certs", True))
 
+    kwargs.setdefault("request_timeout", 120)
     return Elasticsearch(**kwargs)
 
 
