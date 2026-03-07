@@ -1,0 +1,8 @@
+T5 stage2 + early-page penalty unit verification
+
+Commands:
+  pytest -q backend/tests/test_retrieve_node_stage2_disabled.py
+  pytest -q backend/tests/test_retrieve_node_stage2_early_page_penalty.py
+
+Result:
+  both passed

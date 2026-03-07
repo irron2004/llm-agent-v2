@@ -1,0 +1,7 @@
+T6 stage2 doc_ids integration verification
+
+Command:
+  pytest -q tests/api/test_agent_stage2_retrieval.py -k stage1_stage2_calls
+
+Result:
+  passed (asserts stage1 calls doc_ids None; stage2 calls doc_ids == [expected])

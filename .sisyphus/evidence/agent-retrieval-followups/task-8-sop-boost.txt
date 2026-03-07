@@ -1,0 +1,7 @@
+T8 SOP soft boost verification
+
+Command:
+  pytest -q backend/tests/test_retrieve_node_sop_soft_boost.py
+
+Result:
+  1 passed

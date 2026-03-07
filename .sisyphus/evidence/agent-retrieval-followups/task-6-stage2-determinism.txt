@@ -1,0 +1,7 @@
+T6 stage2 determinism integration verification
+
+Command:
+  pytest -q tests/api/test_agent_stage2_retrieval.py -k deterministic
+
+Result:
+  passed (repeats request 5x and asserts identical retrieved_docs ordering)

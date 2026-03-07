@@ -1,0 +1,11 @@
+T12 JSONL schema normalization verification
+
+Commands:
+  python scripts/evaluation/evaluate_sop_agent_page_hit.py --out-dir /tmp/agent_eval_schema --use-testclient --limit 2
+  python scripts/evaluation/validate_agent_eval_jsonl.py --jsonl /tmp/agent_eval_schema/agent_eval.jsonl
+
+Result:
+  validator: {"ok": true, "rows": 2, "invalid": 0}
+
+Notes:
+  TestClient run returned HTTP 503 failures from API side, but still produced JSONL rows with canonical keys.

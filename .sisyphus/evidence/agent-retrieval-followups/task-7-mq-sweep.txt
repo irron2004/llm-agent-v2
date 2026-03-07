@@ -1,0 +1,15 @@
+T7 MQ sweep verification
+
+Commands:
+  python scripts/evaluation/evaluate_sop_agent_page_hit.py --out-dir /tmp/agent_eval_mq --use-testclient --limit 2 --mq-modes off,fallback,on
+  python scripts/evaluation/validate_agent_eval_jsonl.py --jsonl /tmp/agent_eval_mq/mq_off/agent_eval.jsonl
+  python scripts/evaluation/validate_agent_eval_jsonl.py --jsonl /tmp/agent_eval_mq/mq_fallback/agent_eval.jsonl
+  python scripts/evaluation/validate_agent_eval_jsonl.py --jsonl /tmp/agent_eval_mq/mq_on/agent_eval.jsonl
+
+Results:
+  mq_off validator: {"ok": true, "rows": 2, "invalid": 0}
+  mq_fallback validator: {"ok": true, "rows": 2, "invalid": 0}
+  mq_on validator: {"ok": true, "rows": 2, "invalid": 0}
+
+Notes:
+  TestClient calls returned HTTP 503 failures in this environment, but sweep outputs were produced and schema-validated.

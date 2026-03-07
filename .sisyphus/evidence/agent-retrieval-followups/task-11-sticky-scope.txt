@@ -1,0 +1,14 @@
+Task 11 sticky inheritance scope verification
+
+Assertions covered:
+- Follow-up (`needs_history=True` via rule-based check + chat_history) inherits only `doc_type`.
+- `devices` and `equip_ids` are not inherited on follow-up unless explicitly present.
+- New session/non-follow-up inherits nothing.
+
+pytest -q tests/api/test_agent_sticky_policy_followup_only.py
+.                                                                        [100%]
+1 passed, 5 warnings in 3.19s
+
+pytest -q tests/api/test_agent_sticky_autoparse_thread.py
+.                                                                        [100%]
+1 passed, 5 warnings in 3.14s

@@ -1,0 +1,73 @@
+==== RF-14 BEFORE 2026-03-06T01:26:16+00:00 ====
+# start server (stage2 disabled)
+AGENT_SECOND_STAGE_DOC_RETRIEVE_ENABLED=false AGENT_EARLY_PAGE_PENALTY_ENABLED=false .venv/bin/python -m uvicorn backend.api.main:app --host 127.0.0.1 --port 18021 --log-level info
+# health
+{"status":"ok","version":"0.1.0"}
+# run evaluator (http mode)
+{
+  "total": 79,
+  "failures": 79,
+  "env": {
+    "AGENT_SECOND_STAGE_DOC_RETRIEVE_ENABLED": "",
+    "AGENT_EARLY_PAGE_PENALTY_ENABLED": "",
+    "AGENT_EARLY_PAGE_PENALTY_MAX_PAGE": "",
+    "AGENT_EARLY_PAGE_PENALTY_FACTOR": "",
+    "AGENT_SECOND_STAGE_MAX_DOC_IDS": "",
+    "AGENT_SECOND_STAGE_TOP_K": ""
+  },
+  "doc_hit": {
+    "@1": {
+      "count": 0,
+      "ratio": 0.0
+    },
+    "@3": {
+      "count": 0,
+      "ratio": 0.0
+    },
+    "@5": {
+      "count": 0,
+      "ratio": 0.0
+    },
+    "@10": {
+      "count": 0,
+      "ratio": 0.0
+    }
+  },
+  "page_hit": {
+    "@1": {
+      "count": 0,
+      "ratio": 0.0
+    },
+    "@3": {
+      "count": 0,
+      "ratio": 0.0
+    },
+    "@5": {
+      "count": 0,
+      "ratio": 0.0
+    },
+    "@10": {
+      "count": 0,
+      "ratio": 0.0
+    }
+  }
+}
+rows: .sisyphus/evidence/agent-retrieval-followups/final_79/before/rows.csv
+raw: .sisyphus/evidence/agent-retrieval-followups/final_79/before/agent_eval.jsonl
+summary: .sisyphus/evidence/agent-retrieval-followups/final_79/before/summary.json
+report: .sisyphus/evidence/agent-retrieval-followups/final_79/before/report.md
+
+# validate
+{"ok": true, "rows": 79, "invalid": 0}
+
+# outputs
+total 304
+drwxrwxr-x 2 hskim hskim   4096 Mar  6 01:26 .
+drwxrwxr-x 3 hskim hskim   4096 Mar  6 01:26 ..
+-rw-rw-r-- 1 hskim hskim  44125 Mar  6 01:26 agent_eval.jsonl
+-rw-rw-r-- 1 hskim hskim     33 Mar  6 01:26 health.json
+-rw-rw-r-- 1 hskim hskim    232 Mar  6 01:26 report.md
+-rw-rw-r-- 1 hskim hskim  23099 Mar  6 01:26 rows.csv
+-rw-rw-r-- 1 hskim hskim 214090 Mar  6 01:26 server.log
+-rw-rw-r-- 1 hskim hskim      7 Mar  6 01:26 server.pid
+-rw-rw-r-- 1 hskim hskim    800 Mar  6 01:26 summary.json
