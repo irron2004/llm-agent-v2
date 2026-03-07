@@ -36,10 +36,10 @@ describe("GuidedSelectionPanel", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "English" }));
-    await user.click(screen.getByRole("button", { name: "ETCH-01" }));
-    await user.click(screen.getByRole("button", { name: "EQ-777" }));
-    await user.click(screen.getByRole("button", { name: "Issue" }));
+    await user.click(screen.getByRole("button", { name: /English/ }));
+    await user.click(screen.getByRole("button", { name: /ETCH-01/ }));
+    await user.click(screen.getByRole("button", { name: /EQ-777/ }));
+    await user.click(screen.getByRole("button", { name: /Issue/ }));
 
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(onComplete).toHaveBeenCalledWith({
@@ -77,14 +77,14 @@ describe("GuidedSelectionPanel", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Korean" }));
-    await user.click(screen.getByRole("button", { name: "건너뛰기" }));
-    await user.click(screen.getByRole("button", { name: "직접 입력" }));
+    await user.click(screen.getByRole("button", { name: /Korean/ }));
+    await user.click(screen.getByRole("button", { name: /건너뛰기/ }));
+    await user.click(screen.getByRole("button", { name: /직접 입력/ }));
 
     const equipInput = screen.getByPlaceholderText(/equip_id/i);
     await user.type(equipInput, "MANUAL-EQ-42");
     await user.click(screen.getByRole("button", { name: "확인" }));
-    await user.click(screen.getByRole("button", { name: "SOP" }));
+    await user.click(screen.getByRole("button", { name: /SOP/ }));
 
     expect(onComplete).toHaveBeenCalledTimes(1);
     expect(onComplete).toHaveBeenCalledWith({
@@ -94,5 +94,67 @@ describe("GuidedSelectionPanel", () => {
       selected_equip_id: "MANUAL-EQ-42",
       task_mode: "sop",
     });
+  });
+
+  it("reflects external stepIndex/draftDecision updates for numeric flow feedback", async () => {
+    const onComplete = vi.fn();
+
+    const { rerender } = render(
+      <GuidedSelectionPanel
+        question="질문"
+        instruction="단계별로 선택하세요"
+        payload={{
+          options: {
+            language: [
+              { value: "ko", label: "Korean" },
+              { value: "en", label: "English" },
+            ],
+            device: [{ value: "ETCH-01", label: "ETCH-01" }],
+            equip_id: [{ value: "__skip__", label: "건너뛰기" }],
+            task: [{ value: "sop", label: "SOP" }],
+          },
+          defaults: {
+            target_language: "ko",
+            device: null,
+            equip_id: null,
+            task_mode: "all",
+          },
+        }}
+        onComplete={onComplete}
+      />,
+    );
+
+    rerender(
+      <GuidedSelectionPanel
+        question="질문"
+        instruction="단계별로 선택하세요"
+        payload={{
+          options: {
+            language: [
+              { value: "ko", label: "Korean" },
+              { value: "en", label: "English" },
+            ],
+            device: [{ value: "ETCH-01", label: "ETCH-01" }],
+            equip_id: [{ value: "__skip__", label: "건너뛰기" }],
+            task: [{ value: "sop", label: "SOP" }],
+          },
+          defaults: {
+            target_language: "ko",
+            device: null,
+            equip_id: null,
+            task_mode: "all",
+          },
+        }}
+        stepIndex={1}
+        draftDecision={{
+          type: "auto_parse_confirm",
+          target_language: "en",
+        }}
+        onComplete={onComplete}
+      />,
+    );
+
+    expect(screen.getByText("기기 선택")).toBeInTheDocument();
+    expect(screen.getByText(/선택됨: 언어\(English\)/)).toBeInTheDocument();
   });
 });
