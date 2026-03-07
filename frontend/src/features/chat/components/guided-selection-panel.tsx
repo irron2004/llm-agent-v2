@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Button, Card, Input, Space, Tag, Typography } from "antd";
+import { useEffect, useMemo, useState } from "react";
+import { Button, Card, Input, Space, Tag, Tabs, Typography } from "antd";
 
 const { Text, Title } = Typography;
 
@@ -21,6 +21,8 @@ type GuidedSelectionPanelProps = {
   question: string;
   instruction: string;
   payload: Record<string, unknown>;
+  stepIndex?: number;
+  draftDecision?: Partial<GuidedDecision>;
   onComplete: (decision: GuidedDecision) => void;
 };
 
@@ -57,7 +59,14 @@ const normalizeTaskMode = (value: string): "sop" | "issue" | "all" => {
   return "all";
 };
 
-export function GuidedSelectionPanel({ question, instruction, payload, onComplete }: GuidedSelectionPanelProps) {
+export function GuidedSelectionPanel({
+  question,
+  instruction,
+  payload,
+  stepIndex: externalStepIndex,
+  draftDecision,
+  onComplete,
+}: GuidedSelectionPanelProps) {
   const steps = useMemo(() => {
     const raw = isRecord(payload) ? payload.steps : null;
     if (Array.isArray(raw)) {
@@ -101,6 +110,31 @@ export function GuidedSelectionPanel({ question, instruction, payload, onComplet
   const [selectedEquipId, setSelectedEquipId] = useState<string | null>(defaults.equip_id);
   const [taskMode, setTaskMode] = useState<GuidedDecision["task_mode"]>(defaults.task_mode);
   const [manualEquipId, setManualEquipId] = useState("");
+
+  useEffect(() => {
+    if (typeof externalStepIndex !== "number") return;
+    const clamped = Math.max(0, Math.min(externalStepIndex, steps.length - 1));
+    setStepIndex(clamped);
+  }, [externalStepIndex, steps.length]);
+
+  useEffect(() => {
+    if (!draftDecision) return;
+    if (typeof draftDecision.target_language === "string") {
+      setTargetLanguage(normalizeLanguage(draftDecision.target_language));
+    }
+    if ("selected_device" in draftDecision) {
+      setSelectedDevice(draftDecision.selected_device ?? null);
+    }
+    if ("selected_equip_id" in draftDecision) {
+      setSelectedEquipId(draftDecision.selected_equip_id ?? null);
+      if (typeof draftDecision.selected_equip_id === "string") {
+        setManualEquipId(draftDecision.selected_equip_id);
+      }
+    }
+    if (typeof draftDecision.task_mode === "string") {
+      setTaskMode(normalizeTaskMode(draftDecision.task_mode));
+    }
+  }, [draftDecision]);
 
   const currentStep = steps[Math.min(stepIndex, steps.length - 1)] ?? "language";
 
@@ -173,6 +207,33 @@ export function GuidedSelectionPanel({ question, instruction, payload, onComplet
   const hasManualEquip = currentStep === "equip_id" && selectedEquipId === "__manual__";
   const canConfirmManualEquip = manualEquipId.trim().length > 0;
 
+  const optionLabelByValue = useMemo(() => {
+    const toMap = (list: GuidedOption[]) => {
+      const m = new Map<string, string>();
+      for (const item of list) m.set(item.value, item.label);
+      return m;
+    };
+    return {
+      language: toMap(options.language),
+      device: toMap(options.device),
+      equip_id: toMap(options.equip_id),
+      task: toMap(options.task),
+    };
+  }, [options]);
+
+  const selectedLabel = {
+    language: optionLabelByValue.language.get(targetLanguage) ?? targetLanguage,
+    device: selectedDevice
+      ? (optionLabelByValue.device.get(selectedDevice) ?? selectedDevice)
+      : "(skip)",
+    equip_id: selectedEquipId === "__manual__"
+      ? (manualEquipId.trim() || "(manual)")
+      : selectedEquipId
+        ? (optionLabelByValue.equip_id.get(selectedEquipId) ?? selectedEquipId)
+        : "(skip)",
+    task: optionLabelByValue.task.get(taskMode) ?? taskMode,
+  };
+
   return (
     <Card
       style={{
@@ -183,6 +244,27 @@ export function GuidedSelectionPanel({ question, instruction, payload, onComplet
         maxWidth: 640,
       }}
     >
+      <div style={{ marginBottom: 12 }}>
+        <Text type="secondary" style={{ fontSize: 13 }}>
+          총 {steps.length}개 중 {stepIndex + 1}번째
+        </Text>
+      </div>
+      <Tabs
+        activeKey={String(stepIndex)}
+        onChange={(key) => setStepIndex(Number(key))}
+        items={steps.map((step, idx) => ({
+          key: String(idx),
+          label:
+            step === "language"
+              ? "언어"
+              : step === "device"
+                ? "기기"
+                : step === "equip_id"
+                  ? "설비"
+                  : "작업",
+        }))}
+        style={{ marginBottom: 16 }}
+      />
       <Space direction="vertical" style={{ width: "100%" }} size="middle">
         <div>
           <Title level={5} style={{ margin: 0, marginBottom: 4 }}>{title}</Title>
@@ -202,19 +284,36 @@ export function GuidedSelectionPanel({ question, instruction, payload, onComplet
 
         <div>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            선택 요약: {targetLanguage} / {selectedDevice ?? "(skip)"} / {selectedEquipId === "__manual__" ? (manualEquipId.trim() || "(manual)") : (selectedEquipId ?? "(skip)")} / {taskMode}
+            선택됨: 언어({selectedLabel.language}) / 기기({selectedLabel.device}) / 설비({selectedLabel.equip_id}) / 작업({selectedLabel.task})
           </Text>
         </div>
 
+        <Text type="secondary" style={{ fontSize: 12 }}>
+          숫자 선택: 1~{Math.max(stepOptions.length, 1)} (0은 추천 또는 건너뛰기)
+        </Text>
+
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-          {stepOptions.map((opt) => (
-            <Button key={opt.value} onClick={() => applyOption(opt)}>
-              <Space size={6}>
-                <span>{opt.label}</span>
-                {opt.recommended ? <Tag color="blue">Recommend</Tag> : null}
-              </Space>
-            </Button>
-          ))}
+          {stepOptions.map((opt, index) => {
+            const selectedForStep =
+              (currentStep === "language" && opt.value === targetLanguage) ||
+              (currentStep === "device" && opt.value === (selectedDevice ?? "__skip__")) ||
+              (currentStep === "equip_id" && opt.value === (selectedEquipId ?? "__skip__")) ||
+              (currentStep === "task" && opt.value === taskMode);
+
+            return (
+              <Button
+                key={opt.value}
+                type={selectedForStep ? "primary" : "default"}
+                onClick={() => applyOption(opt)}
+              >
+                <Space size={6}>
+                  <span>{index + 1}. {opt.label}</span>
+                  {opt.recommended ? <Tag color="blue">Recommend</Tag> : null}
+                  {selectedForStep ? <Tag color="green">Selected</Tag> : null}
+                </Space>
+              </Button>
+            );
+          })}
         </div>
 
         {hasManualEquip ? (
