@@ -64,3 +64,18 @@ papers/
 !docs/papers/
 !docs/papers/**
 docs/refactoring_analysis_report.md
+
+# OpenCode / agent runtime (keep .omc/plans tracked)
+.omc/sessions/
+.omc/state/
+.omc/project-memory.json
+
+# Sisyphus runtime backups
+.sisyphus/_untracked_backup/
+
+# Evidence runtime artifacts
+.sisyphus/evidence/**/*.pid
+.sisyphus/evidence/**/pid
+
+# Test artifacts
+test-results/
