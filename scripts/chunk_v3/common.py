@@ -33,6 +33,10 @@ class ChunkV3Document:
     chunk_version: str = "v3"
     pipeline_version: str = "1.0.0"
     extra_meta: dict[str, Any] = field(default_factory=dict)
+    section_chapter: str = ""
+    section_number: int = -1
+    chapter_source: str = "none"
+    chapter_ok: bool = False
 
 
 DOC_TYPE_ALIASES: dict[str, str] = {

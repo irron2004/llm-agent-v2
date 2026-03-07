@@ -267,6 +267,9 @@ def chunk_vlm_parsed(
             else:
                 chapter = topic
 
+    from scripts.chunk_v3.section_extractor import extract_sections
+    section_infos = extract_sections(data.get("pages", []), canonical_doc_type)
+
     chunks: list[ChunkV3Document] = []
     next_chunk_index = 0
     setup_sequence_no = 1
@@ -331,6 +334,7 @@ def chunk_vlm_parsed(
                 extra_meta["sequence_no"] = setup_sequence_no
                 setup_sequence_no += 1
 
+            sec = section_infos[page_idx] if page_idx < len(section_infos) else None
             chunk_id = generate_chunk_id(canonical_doc_type, doc_id, next_chunk_index)
             next_chunk_index += 1
             chunks.append(
@@ -347,6 +351,10 @@ def chunk_vlm_parsed(
                     chapter=chapter,
                     content_hash=compute_content_hash(content),
                     extra_meta=extra_meta,
+                    section_chapter=sec.section_chapter if sec else "",
+                    section_number=sec.section_number if sec else -1,
+                    chapter_source=sec.chapter_source if sec else "none",
+                    chapter_ok=sec.chapter_ok if sec else False,
                 )
             )
 

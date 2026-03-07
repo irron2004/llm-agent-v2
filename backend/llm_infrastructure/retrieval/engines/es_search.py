@@ -356,7 +356,44 @@ class EsSearchEngine:
             "device_name",
             "equip_id",
             "title",
+            "section_chapter",
+            "section_number",
+            "chapter_source",
+            "chapter_ok",
         ]
+
+    def fetch_section_chunks(
+        self,
+        doc_id: str,
+        section_chapter: str,
+        max_pages: int = 8,
+        content_index: str | None = None,
+    ) -> list[EsSearchHit]:
+        """Fetch all chunks for a doc_id + section_chapter, sorted by page."""
+        if not doc_id or not section_chapter:
+            return []
+        query: dict[str, Any] = {
+            "bool": {
+                "filter": [
+                    {"term": {"doc_id": doc_id}},
+                    {"term": {"section_chapter": section_chapter}},
+                    {"term": {"chapter_ok": True}},
+                ]
+            }
+        }
+        body: dict[str, Any] = {
+            "query": query,
+            "size": max_pages,
+            "sort": [{"page": {"order": "asc"}}],
+            "_source": self._source_fields(),
+        }
+        index = content_index or self.index_name
+        try:
+            resp = self.es.search(index=index, body=body)
+            return self._parse_hits(resp)
+        except Exception as e:
+            logger.warning("Section chunk fetch failed: %s", e)
+            return []
 
     def _build_text_query(
         self,
