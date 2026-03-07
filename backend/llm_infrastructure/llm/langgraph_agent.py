@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Literal, Optional, Protocol, Set, TypedDict
 from langgraph.types import Command, interrupt
 from pydantic import BaseModel
 
-from backend.config.settings import agent_settings
+from backend.config.settings import agent_settings, rag_settings
 from backend.domain.doc_type_mapping import (
     DOC_TYPE_GROUPS,
     expand_doc_type_selection,
@@ -1242,6 +1242,105 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     }
 
 
+def _apply_section_expansion(
+    docs: List[RetrievalResult],
+    es_engine: Any,
+) -> List[RetrievalResult]:
+    """Apply section expansion to retrieval results.
+
+    For top groups with reliable section_chapter, fetch all section chunks
+    and insert them into the result list at the trigger hit position.
+    """
+    from backend.llm_infrastructure.retrieval.postprocessors.section_expander import (
+        SectionExpander,
+    )
+
+    expander = SectionExpander.from_settings(rag_settings)
+    if not expander.enabled:
+        return docs
+
+    # Identify candidate groups from docs
+    seen_groups: set[tuple[str, str]] = set()
+    candidates: list[tuple[int, RetrievalResult]] = []
+
+    for idx, doc in enumerate(docs):
+        meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+        section_chapter = str(meta.get("section_chapter", "") or "")
+        chapter_source = str(meta.get("chapter_source", "") or "")
+        chapter_ok = bool(meta.get("chapter_ok", False))
+
+        if not section_chapter or not chapter_ok or chapter_source not in expander.allowed_sources:
+            continue
+
+        group_key = (str(doc.doc_id), section_chapter)
+        if group_key in seen_groups:
+            continue
+
+        seen_groups.add(group_key)
+        candidates.append((idx, doc))
+
+        if len(candidates) >= expander.top_groups:
+            break
+
+    if not candidates:
+        return docs
+
+    # Fetch expanded chunks for each candidate group
+    expanded_map: dict[int, list[RetrievalResult]] = {}
+    for idx, doc in candidates:
+        meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+        section_chapter = str(meta.get("section_chapter", "") or "")
+
+        section_hits = es_engine.fetch_section_chunks(
+            doc_id=str(doc.doc_id),
+            section_chapter=section_chapter,
+            max_pages=expander.max_pages,
+            content_index=None,
+        )
+
+        if section_hits:
+            expanded_map[idx] = [hit.to_retrieval_result() for hit in section_hits]
+
+    if not expanded_map:
+        return docs
+
+    # Build final result list: at each trigger position, insert expanded chunks
+    result: list[RetrievalResult] = []
+    seen_doc_ids_pages: set[tuple[str, Any]] = set()
+
+    def _dedup_key(d: RetrievalResult) -> tuple[str, Any]:
+        meta = d.metadata if isinstance(d.metadata, dict) else {}
+        return (str(d.doc_id), meta.get("chunk_id") or meta.get("page"))
+
+    for idx, doc in enumerate(docs):
+        key = _dedup_key(doc)
+        if key in seen_doc_ids_pages:
+            continue
+
+        if idx in expanded_map:
+            # Insert expanded section chunks (includes trigger hit by page order)
+            for expanded_doc in expanded_map[idx]:
+                ekey = _dedup_key(expanded_doc)
+                if ekey not in seen_doc_ids_pages:
+                    seen_doc_ids_pages.add(ekey)
+                    result.append(expanded_doc)
+            # Ensure trigger hit is included
+            if key not in seen_doc_ids_pages:
+                seen_doc_ids_pages.add(key)
+                result.append(doc)
+        else:
+            seen_doc_ids_pages.add(key)
+            result.append(doc)
+
+    logger.info(
+        "section_expansion: expanded %d groups, %d -> %d docs",
+        len(expanded_map),
+        len(docs),
+        len(result),
+    )
+    return result
+
+
 def retrieve_node(
     state: AgentState,
     *,
@@ -1597,6 +1696,10 @@ def retrieve_node(
     else:
         # No reranker: just take top final_top_k by score
         docs = sorted(all_docs, key=_stable_tie_break_key)[:final_top_k]
+
+    # Section expansion: expand top groups by fetching full section chunks
+    if rag_settings.section_expand_enabled and docs and hasattr(retriever, "es_engine"):
+        docs = _apply_section_expansion(docs, retriever.es_engine)
 
     logger.info(
         "retrieve_node: returning %d docs (all_docs_for_regen: %d)",
