@@ -1,5 +1,46 @@
 # Chapter-Aware Retrieval (Section/Chapter Grouping)
 
+## AGENT NOTE — 구현 완료 상태 (2026-03-07)
+
+> **이 플랜의 Phase 1, 3이 구현 완료됨. 아래 코드를 검토하고 Phase 2 (JSONL 재생성 + ES 재인덱싱)를 진행해주세요.**
+
+### 구현된 파일 목록
+
+| File | Status | Description |
+|------|--------|-------------|
+| `scripts/chunk_v3/section_extractor.py` | **NEW** | 섹션 경계 추출 모듈 (SOP/SETUP: TOC+헤더, TS: alpha TOC+X-N., PEMS: no-op) |
+| `scripts/chunk_v3/common.py` | **MODIFIED** | `ChunkV3Document`에 `section_chapter`, `section_number`, `chapter_source`, `chapter_ok` 필드 추가 |
+| `scripts/chunk_v3/chunkers.py` | **MODIFIED** | `chunk_vlm_parsed()`에서 `extract_sections()` 호출 + 청크 생성시 섹션 필드 할당 |
+| `backend/llm_infrastructure/elasticsearch/mappings.py` | **MODIFIED** | `get_chunk_v3_content_mapping()`에 section 필드 4개 추가 |
+| `scripts/chunk_v3/run_ingest.py` | **MODIFIED** | `allowed_fields`에 section 필드 4개 추가 |
+| `backend/config/settings.py` | **MODIFIED** | `RAGSettings`에 `section_expand_*` 설정 4개 추가 |
+| `backend/llm_infrastructure/retrieval/engines/es_search.py` | **MODIFIED** | `fetch_section_chunks()` 메서드 + `_source_fields()`에 section 필드 추가 |
+| `backend/llm_infrastructure/retrieval/postprocessors/section_expander.py` | **NEW** | `SectionExpander` 후처리기 (expand + ordering + dedup) |
+| `backend/llm_infrastructure/retrieval/postprocessors/__init__.py` | **NEW** | postprocessors 패키지 init |
+| `backend/tests/test_section_expansion.py` | **NEW** | 16 tests (SOP 4, TS 2, PEMS 2, Expander 8) — all passing |
+
+### 검증된 실제 데이터 결과
+
+- **SOP fill_valve (17p)**: 16/17 pages 섹션 할당 성공 (page 1 = TOC 스킵)
+- **SOP safety_valve, vent_valve, ctc**: 정상 동작 확인
+- **TS ffu_abnormal (6p)**: LaTeX 테이블 형식이라 X-N. 패턴 미매칭 (known limitation)
+
+### 남은 작업 (Phase 2 — 이 플랜의 TODO 5, 10에 해당)
+
+1. **JSONL 재생성**: `run_chunking.py`로 전체 VLM parsed JSON → JSONL 재생성 (section 필드 포함)
+2. **ES 재인덱싱**: `run_ingest.py content`로 ~390k docs 재인덱싱
+3. **Retrieval pipeline 통합**: `SectionExpander`를 실제 retrieval pipeline에 연결 (LangGraph RAG agent 또는 search service)
+4. **TS LaTeX 테이블 대응**: 테이블 셀 내 `A-1.` 패턴 파싱 (optional enhancement)
+
+### 검토 요청사항
+
+- [ ] `section_extractor.py`의 TOC 파싱 로직 검토 (edge case 없는지)
+- [ ] `section_expander.py`의 `all_results_ordered()` 정렬 로직 검토
+- [ ] `fetch_section_chunks()` ES 쿼리 효율성 검토
+- [ ] 실제 retrieval pipeline에 SectionExpander 통합 위치 결정
+
+---
+
 ## TL;DR
 > **Summary**: Add TOC/section-aware metadata at ingest time and expand retrieval results by `doc_id + section_chapter` so multi-page procedures are returned as a coherent unit.
 > **Deliverables**: section metadata fields on chunk_v3 docs + ES mapping + deterministic post-rerank expansion + fallbacks/caps + tests.
@@ -67,7 +108,7 @@ Wave 3: tests + regression + perf/observability
 
 ## TODOs
 
-- [ ] 1. Confirm current chunk_v3 schema + ingest write path and decide exact fields placement
+- [x] 1. Confirm current chunk_v3 schema + ingest write path and decide exact fields placement
 
   **What to do**:
   - Locate the code that creates/writes `chunk_v3_content` documents (likely `backend/services/es_ingest_service.py` and/or `backend/llm_infrastructure/elasticsearch/document.py`).
@@ -114,7 +155,7 @@ Wave 3: tests + regression + perf/observability
 
   **Commit**: YES | Message: `docs(plan): lock chunk_v3 section field contracts` | Files: [internal notes/evidence only if repo tracks it; otherwise code changes later]
 
-- [ ] 2. Extend `chunk_v3_content` ES mapping with section fields
+- [x] 2. Extend `chunk_v3_content` ES mapping with section fields
 
   **What to do**:
   - Update `backend/llm_infrastructure/elasticsearch/mappings.py` `get_chunk_v3_content_mapping()` properties to include:
@@ -160,7 +201,7 @@ Wave 3: tests + regression + perf/observability
 
   **Commit**: YES | Message: `feat(es): add section fields to chunk_v3_content mapping` | Files: `backend/llm_infrastructure/elasticsearch/mappings.py`, `backend/tests/test_chunk_v3_contracts.py`
 
-- [ ] 3. Implement section boundary extraction for SOP/SETUP (TOC + numbered headers)
+- [x] 3. Implement section boundary extraction for SOP/SETUP (TOC + numbered headers)
 
   **What to do**:
   - Implement a deterministic mapper that produces per-page `section_chapter`, `section_number`, `chapter_source`, `chapter_ok`.
@@ -205,7 +246,7 @@ Wave 3: tests + regression + perf/observability
 
   **Commit**: YES | Message: `feat(ingest): extract SOP/SETUP section chapters for chunk_v3` | Files: `backend/services/ingest/metadata_extractor.py`, new/updated tests
 
-- [ ] 4. Implement TS doc_type section strategy (alpha TOC + X-N subsection heuristic)
+- [x] 4. Implement TS doc_type section strategy (alpha TOC + X-N subsection heuristic)
 
   **What to do**:
   - Add TS-specific section mapping:
@@ -286,7 +327,7 @@ Wave 3: tests + regression + perf/observability
 
   **Commit**: YES | Message: `feat(ingest): persist section metadata into chunk_v3_content docs` | Files: ingest writer + tests/fixtures
 
-- [ ] 6. Implement retrieval post-processor: expand by `doc_id + section_chapter` after rerank
+- [x] 6. Implement retrieval post-processor: expand by `doc_id + section_chapter` after rerank
 
   **What to do**:
   - Add a post-processing step in the retrieval orchestration (preferred location):
@@ -340,7 +381,7 @@ Wave 3: tests + regression + perf/observability
 
   **Commit**: YES | Message: `feat(retrieval): expand context by doc section after rerank` | Files: retrieval orchestrator + tests
 
-- [ ] 7. Add configuration knobs (settings + preset defaults) for expansion and budgets
+- [x] 7. Add configuration knobs (settings + preset defaults) for expansion and budgets
 
   **What to do**:
   - Add settings (pydantic) with defaults:
@@ -384,7 +425,7 @@ Wave 3: tests + regression + perf/observability
 
   **Commit**: YES | Message: `feat(config): add section expansion settings and defaults` | Files: settings + preset(s) + tests
 
-- [ ] 8. Add/extend ES query helper for group fetch (doc_id + section_chapter) with page sorting
+- [x] 8. Add/extend ES query helper for group fetch (doc_id + section_chapter) with page sorting
 
   **What to do**:
   - Implement an ES query path in `backend/services/es_search_service.py` (or existing ES helper) to fetch by filters:
@@ -425,7 +466,7 @@ Wave 3: tests + regression + perf/observability
 
   **Commit**: YES | Message: `feat(es): add section group fetch by doc_id+section_chapter` | Files: es search service + tests
 
-- [ ] 9. End-to-end retrieval tests for expansion + fallback + ranking fairness
+- [x] 9. End-to-end retrieval tests for expansion + fallback + ranking fairness
 
   **What to do**:
   - Add tests that simulate:
