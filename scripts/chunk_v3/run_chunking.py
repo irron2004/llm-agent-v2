@@ -100,6 +100,7 @@ def main() -> None:
             "sop": ["sop"],
             "ts": ["ts", "trouble_shooting", "troubleshooting"],
             "setup": ["setup", "setup_manual", "set_up_manual"],
+            "pems": ["pems"],
         }
         for canonical_doc_type, alias_dirs in vlm_doc_type_dirs.items():
             seen: set[str] = set()
