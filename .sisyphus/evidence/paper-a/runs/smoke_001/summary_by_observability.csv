@@ -1,0 +1,5 @@
+scope_observability,system_id,n_queries,n_ok,n_skipped,mean_raw_cont@5,mean_adj_cont@5,mean_shared@5,mean_ce@5,mean_hit@5,mean_mrr
+explicit_device,B0,5,5,0,0.32,0.24,0.16,0.6,0.4,0.24
+explicit_device,B2,5,5,0,0.32,0.24,0.16,0.6,0.4,0.25
+explicit_device,B4,5,5,0,0.2,0.12,0.16,0.2,0.2,0.2
+explicit_device,P1,5,5,0,0.48,0.0,0.8800000000000001,0.0,0.0,0.0

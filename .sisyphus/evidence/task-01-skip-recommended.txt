@@ -1,0 +1,15 @@
+REQ-1 Evidence: __skip__ is never recommended
+
+Command:
+  pytest -q tests/api/test_agent_autoparse_confirm_interrupt_resume.py
+
+Result:
+  5 passed
+
+Key assertions added:
+  - interrupt_payload.options.device has __skip__ with recommended == false
+  - interrupt_payload.options.equip_id has __skip__ with recommended == false
+
+Code refs:
+  - backend/llm_infrastructure/llm/langgraph_agent.py
+  - tests/api/test_agent_autoparse_confirm_interrupt_resume.py

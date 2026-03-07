@@ -1,0 +1,60 @@
+{
+  "comparisons": [
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "adj_cont@5",
+      "n_queries": 0,
+      "system_a": "B3",
+      "system_b": "B4"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "hit@5",
+      "n_queries": 0,
+      "system_a": "B3",
+      "system_b": "B4"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "mrr",
+      "n_queries": 0,
+      "system_a": "B3",
+      "system_b": "B4"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "adj_cont@5",
+      "n_queries": 0,
+      "system_a": "B4",
+      "system_b": "P1"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "hit@5",
+      "n_queries": 0,
+      "system_a": "B4",
+      "system_b": "P1"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "mrr",
+      "n_queries": 0,
+      "system_a": "B4",
+      "system_b": "P1"
+    }
+  ],
+  "samples": 2000,
+  "seed": 20260305
+}

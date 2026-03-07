@@ -1,0 +1,44 @@
+{
+  "alias": "rag_chunks_dev_current",
+  "config": {
+    "bootstrap_samples": 2000,
+    "corpus_filter": ".sisyphus/evidence/paper-a/corpus/corpus_doc_ids.txt",
+    "device_doc_types": [
+      "setup",
+      "sop",
+      "ts"
+    ],
+    "doc_scope": ".sisyphus/evidence/paper-a/policy/doc_scope.jsonl",
+    "equip_doc_types": [
+      "myservice"
+    ],
+    "eval_set": "data/paper_a/eval/query_gold_master_v0_5.jsonl",
+    "family_map": ".sisyphus/evidence/paper-a/policy/family_map.json",
+    "reranker_model": null,
+    "top_k": 10,
+    "use_es_scope_fields": false
+  },
+  "corpus_doc_id_count": 578,
+  "git_sha": "3c3f7d505dc26c2fa9a10fb45b865ea23e641ff6",
+  "hashes": {
+    "corpus_filter": "55786f5e363d0c10c33d16e6c3080839581cd075f08069e18ac0f13094c72759",
+    "doc_scope": "13dc72a40542eebb7d0f022ffa224bfec36394d86dea6a4b9d9a1a2b03b11d60",
+    "eval_set": "e76fba2522dc961fe2f2d83bce80d1296a5e3b6523f37a6b67a4ee9c30d9a815",
+    "family_map": "ed2c1d05aa528d138be4ed9ffdd9e1a29a42dd1405290eeb2a961c78d2a2abcb"
+  },
+  "limit": 0,
+  "n_queries_selected": 21,
+  "n_queries_total": 472,
+  "resolved_index": "rag_chunks_dev_v2",
+  "scope_observability": "implicit",
+  "seed": 20260305,
+  "split": "test",
+  "systems": [
+    "B0",
+    "B1",
+    "B2",
+    "B3",
+    "B4",
+    "P1"
+  ]
+}

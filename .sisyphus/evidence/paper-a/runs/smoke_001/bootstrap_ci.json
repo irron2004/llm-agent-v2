@@ -1,0 +1,33 @@
+{
+  "comparisons": [
+    {
+      "ci_lower": -0.36,
+      "ci_upper": 0.0,
+      "delta_mean": -0.12,
+      "metric": "adj_cont@5",
+      "n_queries": 5,
+      "system_a": "B4",
+      "system_b": "P1"
+    },
+    {
+      "ci_lower": -0.6,
+      "ci_upper": 0.0,
+      "delta_mean": -0.2,
+      "metric": "hit@5",
+      "n_queries": 5,
+      "system_a": "B4",
+      "system_b": "P1"
+    },
+    {
+      "ci_lower": -0.6,
+      "ci_upper": 0.0,
+      "delta_mean": -0.2,
+      "metric": "mrr",
+      "n_queries": 5,
+      "system_a": "B4",
+      "system_b": "P1"
+    }
+  ],
+  "samples": 2000,
+  "seed": 20260305
+}

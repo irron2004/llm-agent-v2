@@ -1,0 +1,8 @@
+REQ-5 task_mode fixed doc_type mapping evidence
+
+- Command: `pytest -q tests/api/test_agent_autoparse_confirm_interrupt_resume.py`
+- Result: `5 passed, 15 warnings in 24.12s`
+
+Test assertion excerpt (tests/api/test_agent_autoparse_confirm_interrupt_resume.py):
+- `task_mode="sop"` resume path checks doc_types are within `expand_doc_type_selection(["sop", "ts", "setup"])`, includes SOP/TS/setup representatives, and excludes issue scope.
+- `task_mode="issue"` resume path checks doc_types are within `expand_doc_type_selection(["gcb", "myservice"])`, includes gcb/myservice representatives, and excludes sop/ts/setup scope.

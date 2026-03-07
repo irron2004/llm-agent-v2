@@ -1,0 +1,13 @@
+{
+  "request": {
+    "message": "resume",
+    "thread_id": "resume-without-pending-evidence",
+    "resume_decision": true,
+    "ask_user_after_retrieve": true,
+    "auto_parse": false
+  },
+  "response_status": 409,
+  "response_json": {
+    "detail": "RESUME_NO_PENDING_INTERRUPT: No pending interrupt exists for this thread_id. Start a new request without resume_decision."
+  }
+}

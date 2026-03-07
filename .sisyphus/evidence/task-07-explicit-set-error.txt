@@ -1,0 +1,1 @@
+Missing required columns: query(질문내용), target_device(장비), gold source file(정답문서), expected pages(정답 페이지)

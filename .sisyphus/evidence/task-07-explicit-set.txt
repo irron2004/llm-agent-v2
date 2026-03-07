@@ -1,0 +1,2 @@
+Wrote 79 rows to .sisyphus/evidence/paper-a/eval_sets/explicit.jsonl
+Validation passed: .sisyphus/evidence/paper-a/eval_sets/explicit.jsonl

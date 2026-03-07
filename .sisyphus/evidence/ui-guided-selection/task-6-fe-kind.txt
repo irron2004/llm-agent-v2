@@ -1,0 +1,346 @@
+
+> pe-agent-frontend@0.1.0 test
+> vitest run
+
+
+ RUN  v2.1.9 /home/hskim/work/llm-agent-v2/frontend
+
+ ✓ src/features/chat/__tests__/chat-review-context.test.tsx (2 tests) 29ms
+ ✓ src/features/retrieval-test/__tests__/use-retrieval-test.test.ts (14 tests) 50ms
+ ✓ src/features/chat/__tests__/chat-request-payload.test.tsx (8 tests) 49ms
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > renders search input and field weight controls
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > calls GET /api/search when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx > RetrievalTestPage - Replay Last Run > sends replay_run_id when clicking Replay last run button
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > renders search input and controls
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > has deterministic toggle ON by default
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls POST /api/retrieval/run with correct payload when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > calls GET /api/search when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls POST /api/retrieval/run with correct payload when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls POST /api/retrieval/run with correct payload when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > calls GET /api/search when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls POST /api/retrieval/run with correct payload when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stdout | src/features/chat/__tests__/chat-page-device-panel.test.tsx > Req 1 — confirmation dialog > shows "1. 예" and "2. 아니오" buttons when pendingRegeneration is set
+[ChatPage] pendingReview from hook: null
+
+stdout | src/features/chat/__tests__/chat-page-device-panel.test.tsx > Req 2 — type '1' to load device list > calls fetchDeviceCatalog after typing '1' + Enter
+[ChatPage] pendingReview from hook: null
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls POST /api/retrieval/run with correct payload when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > calls GET /api/search when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls POST /api/retrieval/run with correct payload when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls POST /api/retrieval/run with correct payload when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > calls GET /api/search when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls POST /api/retrieval/run with correct payload when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls POST /api/retrieval/run with correct payload when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls POST /api/retrieval/run with correct payload when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls POST /api/retrieval/run with correct payload when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > calls GET /api/search when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx > RetrievalTestPage - Replay Last Run > sends replay_run_id when clicking Replay last run button
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stdout | src/features/chat/__tests__/chat-page-device-panel.test.tsx > Req 3 — type '2' to dismiss panel > calls setPendingRegeneration(null) after typing '2' + Enter
+[ChatPage] pendingReview from hook: null
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls POST /api/retrieval/run with correct payload when searching
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stdout | src/features/chat/__tests__/chat-page-device-panel.test.tsx > Req 4 — numbered device list with maxWidth 480 > renders device names and container has maxWidth 480
+[ChatPage] pendingReview from hook: null
+
+stdout | src/features/chat/__tests__/chat-page-device-panel.test.tsx > Req 5 — type device number to send > sends message with "[Pump-A100] ..." and overrides after typing device number
+[ChatPage] pendingReview from hook: null
+
+stdout | src/features/chat/__tests__/chat-page-device-panel.test.tsx > Req 6 — click device item triggers same send() > clicking a device item calls send() with the same arguments as typing the number
+[ChatPage] pendingReview from hook: null
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls with deterministic=false when toggle is off
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls with deterministic=false when toggle is off
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stdout | src/features/chat/__tests__/chat-page-device-panel.test.tsx > Req 7 — type '0' to cancel > calls setPendingRegeneration(null) and does NOT call send()
+[ChatPage] pendingReview from hook: null
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > includes field_weights in the request URL
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx > RetrievalTestPage - Replay Last Run > sends replay_run_id when clicking Replay last run button
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+
+stdout | src/features/chat/__tests__/chat-page-device-panel.test.tsx > Req 8 — invalid input is ignored > does not call send or setPendingRegeneration on invalid input
+[ChatPage] pendingReview from hook: null
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls with deterministic=false when toggle is off
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls with deterministic=false when toggle is off
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls with deterministic=false when toggle is off
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls with deterministic=false when toggle is off
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stdout | src/features/chat/__tests__/chat-page-device-panel.test.tsx > Req 9 — auto-dismiss on subsequent missing_device_parse > auto-calls setPendingRegeneration(null) when a device was previously selected
+[ChatPage] pendingReview from hook: null
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > calls with deterministic=false when toggle is off
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stdout | src/features/chat/__tests__/chat-page-device-panel.test.tsx > Req 9 — auto-dismiss on subsequent missing_device_parse > auto-calls setPendingRegeneration(null) when a device was previously selected
+[ChatPage] pendingReview from hook: null
+
+stdout | src/features/chat/__tests__/chat-page-device-panel.test.tsx > Req 10 — auto-dismiss does NOT call send() > auto-dismiss only calls setPendingRegeneration(null), not send()
+[ChatPage] pendingReview from hook: null
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > includes field_weights in the request URL
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > includes field_weights in the request URL
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stdout | src/features/chat/__tests__/chat-page-device-panel.test.tsx > Req 10 — auto-dismiss does NOT call send() > auto-dismiss only calls setPendingRegeneration(null), not send()
+[ChatPage] pendingReview from hook: null
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays results after successful search
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > includes field_weights in the request URL
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > includes field_weights in the request URL
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays results after successful search
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays results after successful search
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays results after successful search
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > includes field_weights in the request URL
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays results after successful search
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays results after successful search
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stdout | src/features/chat/__tests__/chat-page-device-panel.test.tsx > Req 12 — HIL DeviceSelectionPanel renders > renders DeviceSelectionPanel when pendingDeviceSelection is set
+[ChatPage] pendingReview from hook: null
+
+ ✓ src/features/chat/__tests__/chat-page-device-panel.test.tsx (11 tests) 2950ms
+   ✓ Req 1 — confirmation dialog > shows "1. 예" and "2. 아니오" buttons when pendingRegeneration is set 2030ms
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays configuration info when debug is enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx > RetrievalTestPage - Replay Last Run > sends replay_run_id when clicking Replay last run button
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > displays results after successful search
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays configuration info when debug is enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays configuration info when debug is enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays configuration info when debug is enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays configuration info when debug is enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > displays results after successful search
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays configuration info when debug is enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > displays results after successful search
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > displays results after successful search
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > displays results after successful search
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > displays results after successful search
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx > RetrievalTestPage - Replay Last Run > enables Replay button after a successful run
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx > RetrievalTestPage - Replay Last Run > enables Replay button after a successful run
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays pipeline steps when debug is enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays pipeline steps when debug is enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays pipeline steps when debug is enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays pipeline steps when debug is enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays pipeline steps when debug is enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-page.test.tsx > SearchPage - Canonical Retrieval Endpoint > displays pipeline steps when debug is enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+ ✓ src/features/search/__tests__/search-page.test.tsx (8 tests) 2290ms
+   ✓ SearchPage - Canonical Retrieval Endpoint > renders search input and controls 385ms
+   ✓ SearchPage - Canonical Retrieval Endpoint > has deterministic toggle ON by default 304ms
+   ✓ SearchPage - Canonical Retrieval Endpoint > calls POST /api/retrieval/run with correct payload when searching 394ms
+   ✓ SearchPage - Canonical Retrieval Endpoint > calls with deterministic=false when toggle is off 408ms
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > shows BM25 mode switch and applies dense_weight=0.0 when enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx > RetrievalTestPage - Replay Last Run > enables Replay button after a successful run
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > shows BM25 mode switch and applies dense_weight=0.0 when enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > shows BM25 mode switch and applies dense_weight=0.0 when enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > shows BM25 mode switch and applies dense_weight=0.0 when enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > shows BM25 mode switch and applies dense_weight=0.0 when enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > shows BM25 mode switch and applies dense_weight=0.0 when enabled
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx > RetrievalTestPage - Replay Last Run > displays last run_id when available
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx > RetrievalTestPage - Replay Last Run > displays last run_id when available
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+stderr | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx > RetrievalTestPage - Replay Last Run > displays last run_id when available
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+
+ ✓ src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx (3 tests) 2914ms
+   ✓ RetrievalTestPage - Replay Last Run > sends replay_run_id when clicking Replay last run button 1766ms
+   ✓ RetrievalTestPage - Replay Last Run > enables Replay button after a successful run 710ms
+   ✓ RetrievalTestPage - Replay Last Run > displays last run_id when available 436ms
+stderr | src/features/search/__tests__/search-es-page.test.tsx > SearchESPage - Legacy Elasticsearch Endpoint > allows toggling field weights
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+ ✓ src/features/search/__tests__/search-es-page.test.tsx (7 tests) 3289ms
+   ✓ SearchESPage - Legacy Elasticsearch Endpoint > renders search input and field weight controls 477ms
+   ✓ SearchESPage - Legacy Elasticsearch Endpoint > calls GET /api/search when searching 813ms
+   ✓ SearchESPage - Legacy Elasticsearch Endpoint > includes field_weights in the request URL 417ms
+   ✓ SearchESPage - Legacy Elasticsearch Endpoint > displays results after successful search 532ms
+   ✓ SearchESPage - Legacy Elasticsearch Endpoint > shows BM25 mode switch and applies dense_weight=0.0 when enabled 489ms
+   ✓ SearchESPage - Legacy Elasticsearch Endpoint > displays error message on failed search 355ms
+
+ Test Files  7 passed (7)
+      Tests  53 passed (53)
+   Start at  14:49:36
+   Duration  5.91s (transform 1.32s, setup 504ms, collect 6.05s, tests 11.57s, environment 3.31s, prepare 1.01s)
+

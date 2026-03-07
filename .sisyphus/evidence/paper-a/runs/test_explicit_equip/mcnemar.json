@@ -1,0 +1,28 @@
+{
+  "tests": [
+    {
+      "b_count": 0,
+      "c_count": 0,
+      "chi2": 0.0,
+      "metric": "ce@5",
+      "n_paired": 8,
+      "p_corrected": 1.0,
+      "p_value_approx": 1.0,
+      "significant_corrected": false,
+      "system_a": "B3",
+      "system_b": "B4"
+    },
+    {
+      "b_count": 8,
+      "c_count": 0,
+      "chi2": 6.125,
+      "metric": "ce@5",
+      "n_paired": 8,
+      "p_corrected": 0.1,
+      "p_value_approx": 0.05,
+      "significant_corrected": false,
+      "system_a": "B4",
+      "system_b": "P1"
+    }
+  ]
+}

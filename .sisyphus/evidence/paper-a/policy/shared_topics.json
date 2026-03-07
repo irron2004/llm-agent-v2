@@ -1,0 +1,2693 @@
+{
+  "2ND GENERATION DUAL EPD": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "32 multi port": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "8-PORT PANEL": {
+    "deg": 1,
+    "devices": [
+      "SUPRA V"
+    ],
+    "is_shared": false
+  },
+  "8계통 Check": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "AIO CALIBRATION": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "APC VALVE": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ARM LEVELING SENSOR": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ATM RELAY": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "BAFFLE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "BARATRON GAUGE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "BCR READER KEYENCE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "BELLOWS": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "BUBBLER CABINET DRAIN VALVE": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "BUFFER PUSHER CYLINDER": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "BUFFER STAGE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "Bubbler Cabinet Feed Valve": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "Bubbler Cabinet Fill valve": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "Bubbler Cabinet Safety valve": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "Bubbler Cabinet Vent valve": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "Bubbler PT sensor": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "CERAMIC PLATE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "CHAMBER HINGE": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "CHAMBER LEVELING": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "CHUCK MOTOR": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "CONTROLLER": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "COOING STAGE PIN PLATE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "COOLING PUSHER CYLINDER": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "COOLING STAGE": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "CTC": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "CTC BUZZ USB CONNECTION": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "CTC CONTROLLER": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "CTC SW INSTALL": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "CYLINDER SENSOR": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "Controller": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "DEVICE NET BOARD": {
+    "deg": 1,
+    "devices": [
+      "SUPRA XP"
+    ],
+    "is_shared": false
+  },
+  "DEVICE NET SETTING": {
+    "deg": 1,
+    "devices": [
+      "SUPRA XP"
+    ],
+    "is_shared": false
+  },
+  "DOCKING": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "DOOR VALVE": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "DOOR VALVE (Presys)": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "DOOR VALVE (VAT)": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "DSM KIT": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "Differential gauge": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "Disc amplifier": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "Disc home sensor": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "Disc rotation sensor": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "EASY CLUSTER ENGINE INSTALL": {
+    "deg": 1,
+    "devices": [
+      "SUPRA IV"
+    ],
+    "is_shared": false
+  },
+  "EFEM SW INSTALL": {
+    "deg": 1,
+    "devices": [
+      "SUPRA IV"
+    ],
+    "is_shared": false
+  },
+  "EMO SWITCH 0": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "END EFFECTOR": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "EPD": {
+    "deg": 2,
+    "devices": [
+      "SUPRA Vplus",
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "EXHAUST RING": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "FAST VAC VALVE": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "FAST VACUUM VALVE": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "FCIP": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "FFU ASSY": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "FFU CONTROLLER": {
+    "deg": 2,
+    "devices": [
+      "SUPRA Vplus",
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "FFU FILTER": {
+    "deg": 2,
+    "devices": [
+      "SUPRA V",
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "FFU FILTER LV32(SAFAS)": {
+    "deg": 1,
+    "devices": [
+      "SUPRA V"
+    ],
+    "is_shared": false
+  },
+  "FLOW SWITCH": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "FOCUS ADAPTOR": {
+    "deg": 2,
+    "devices": [
+      "SUPRA Vplus",
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "FORMIC BOTTLE": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "GAS FEED THROUGH": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "GAS LINE LEAK CHECK": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "GAS SPRING": {
+    "deg": 2,
+    "devices": [
+      "SUPRA Vplus",
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "HEATER CHUCK": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "HEATER CHUCK CONNECTOR": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "HEATING JACKET": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "HOOK LIFT PIN": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "HOOK LIFTER LM GUIDE": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "HOOK LIFTER LM GUIDE GREASE": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "HOOK LIFTER PIN": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "HOOK LIFTER PIN LEVELING": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "HOOK LIFTER PIN PENDANT": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "HOOK LIFTER SERVO MOTOR": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "HOOK LIFTER SERVO MOTOR CONTROLLER": {
+    "deg": 1,
+    "devices": [
+      "SUPRA V"
+    ],
+    "is_shared": false
+  },
+  "Harmonic drive": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "Heater Chuck leveling": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "IB FLOW": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "IO CHECK": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ISOLATION VALVE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "LAMP FLUORESCENT": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N series"
+    ],
+    "is_shared": false
+  },
+  "LEAK CHECK": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "LIGHT CURTAIN": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "LOAD LOCK DOOR O-RING": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "LOAD LOCK O-RING": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "LOAD PORT": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "LOAD PORT CERTIFICATION": {
+    "deg": 1,
+    "devices": [
+      "SUPRA III"
+    ],
+    "is_shared": false
+  },
+  "LOAD PORT LEVELING": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "LOAD PORT MAPPING SENSOR SELOP8 0": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "LOAD PORT N2 PURGE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "LOG BACK UP": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Np"
+    ],
+    "is_shared": false
+  },
+  "LP MAIN BOARD": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "LP Z-AXIS MODULE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "Loadlock APC VALVE": {
+    "deg": 1,
+    "devices": [
+      "geneva_xp_rep"
+    ],
+    "is_shared": false
+  },
+  "MANOMETER": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "MULTI PORT": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "O2 ANALYZER Modify": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "O2 Cell": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "PCW DRAIN": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "PCW MANUAL VALVE": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "PIN MOTOR PENDANT": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "PIN SENSOR": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "PIO SENSOR BOARD": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "PIRANI GAUGE": {
+    "deg": 2,
+    "devices": [
+      "SUPRA Vplus",
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "PNEUMATIC VALVE": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "POWER TURN ON／OFF": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "PRESSURE SWITCH": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "PUMP TURN ON OFF": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "Pressure switch": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "RACK DC POWER SUPPLY": {
+    "deg": 1,
+    "devices": [
+      "INTEGER IVr"
+    ],
+    "is_shared": false
+  },
+  "RACK ELB": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "RACK MCB": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "RACK SAFETY MODULE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "RACK UPS Battery": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "RFID ANTENNA": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "RFID READER": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ROBOT": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ROBOT CONTROLLER": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ROBOT DEADZONE PATCH": {
+    "deg": 1,
+    "devices": [
+      "SUPRA V"
+    ],
+    "is_shared": false
+  },
+  "ROBOT END EFFECTOR PAD": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ROBOT END EFFECTOR VACUUM TUBE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ROBOT FIRMWARE PATCH": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "ROBOT LEVELING": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ROBOT LEVELING (Yaskawa)": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ROBOT PENDANT": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ROBOT PENDANT (Sankyo)": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ROBOT PENDANT (Yaskawa)": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ROBOT SR8240": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ROBOT TEACHING": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ROBOT TEACHING RND": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "Robot controller": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "Robot end effector": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "Robot(RND) Encoder Reset": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "SENSOR BOARD": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "SENSOR BOARD SFEM": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "SIGNAL TOWER 0": {
+    "deg": 1,
+    "devices": [
+      "SUPRA V"
+    ],
+    "is_shared": false
+  },
+  "SLOW VAC VALVE": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "SLOW VACUUM VALVE": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "SOLENOID VALVE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "SOURCE BOX INTERFACE BOARD": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "SU LOTO COVER": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Nm"
+    ],
+    "is_shared": false
+  },
+  "Support pin": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "TC WAFER": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "TEMP CONTROLLER": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "TOP LID": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "TOUCH DRIVER INSTALL": {
+    "deg": 1,
+    "devices": [
+      "TERA21"
+    ],
+    "is_shared": false
+  },
+  "UNDOCKING": {
+    "deg": 2,
+    "devices": [
+      "SUPRA Vm",
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT DC POWER SUPPLY": {
+    "deg": 1,
+    "devices": [
+      "SUPRA V"
+    ],
+    "is_shared": false
+  },
+  "UNIT FLOW SWITCH": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT GAS BOX BOARD": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT GAS LINE ADDITION": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT GAS MANUAL VALVE": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT GAS REGULATOR": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT GAS TURN ONOFF": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT MFC": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT NOISE FILTER": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N series"
+    ],
+    "is_shared": false
+  },
+  "UNIT PCW TURN ON OFF": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT PDB": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT PRESSURE SWITCH": {
+    "deg": 1,
+    "devices": [
+      "TIGMA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT SCR": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT SOLENOID VALVE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT TEMP CONTORLLER": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT TEMP CONTROL BOARD": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT TEMP CONTROL MONITOR": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "UNIT TEMP CONTROLLER": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT VAC TURN ON OFF": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "UNIT VACUUM SWITCH": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "UTILITY TURN ON OFF": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "VIEW QUARTZ": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "WATER SHUT OFF VALVE": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "adapter ring": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "aging": {
+    "deg": 1,
+    "devices": [
+      "OMNIS plus"
+    ],
+    "is_shared": false
+  },
+  "aging run": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "air tube": {
+    "deg": 1,
+    "devices": [
+      "SUPRA V"
+    ],
+    "is_shared": false
+  },
+  "aligner": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "all": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "angle valve": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "apc": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "apc auto calibration": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "apc product report": {
+    "deg": 1,
+    "devices": [
+      "OMNIS"
+    ],
+    "is_shared": false
+  },
+  "apc valve setting": {
+    "deg": 1,
+    "devices": [
+      "OMNIS plus"
+    ],
+    "is_shared": false
+  },
+  "awc sensor": {
+    "deg": 1,
+    "devices": [
+      "OMNIS plus"
+    ],
+    "is_shared": false
+  },
+  "baffle": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "baffle heater": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "baratron gauge": {
+    "deg": 2,
+    "devices": [
+      "PRECIA",
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "bottom structure": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "branch tap": {
+    "deg": 2,
+    "devices": [
+      "INTEGER plus",
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "bubbler cabinet canister": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "bubbler cabinet delivery valve": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "bubbler cabinet formic detector": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "bubbler cabinet formic detector cartridg": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "bubbler cabinet relief valve": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "buffer module": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "cassette": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "chamber apc valve": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "chamber hinge": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N series"
+    ],
+    "is_shared": false
+  },
+  "chamber lock": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "chamber open interlock change": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "chamber safety cover": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "chuck": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "chuck hard stopper": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "chuck temp calibration": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "chuck temp product report": {
+    "deg": 1,
+    "devices": [
+      "OMNIS plus"
+    ],
+    "is_shared": false
+  },
+  "cip": {
+    "deg": 1,
+    "devices": [
+      "SUPRA XP"
+    ],
+    "is_shared": false
+  },
+  "cip chamber": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "coded sensor": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "controller": {
+    "deg": 5,
+    "devices": [
+      "INTEGER plus",
+      "PRECIA",
+      "SUPRA N",
+      "SUPRA Vplus",
+      "ZEDIUS XP"
+    ],
+    "is_shared": true
+  },
+  "cooling chuck": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "ctc": {
+    "deg": 3,
+    "devices": [
+      "PRECIA",
+      "SUPRA N",
+      "ZEDIUS XP"
+    ],
+    "is_shared": true
+  },
+  "ctc controller": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "d-net": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "dc cooling fan motor": {
+    "deg": 2,
+    "devices": [
+      "INTEGER plus",
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "dc power supply": {
+    "deg": 1,
+    "devices": [
+      "SUPRA XP"
+    ],
+    "is_shared": false
+  },
+  "device net": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "device net board": {
+    "deg": 4,
+    "devices": [
+      "INTEGER plus",
+      "PRECIA",
+      "SUPRA N series",
+      "ZEDIUS XP"
+    ],
+    "is_shared": true
+  },
+  "devicenet board": {
+    "deg": 2,
+    "devices": [
+      "INTEGER plus",
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "diffuser": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "digihelic": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "disarray sensor": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "disc": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "docking": {
+    "deg": 1,
+    "devices": [
+      "OMNIS plus"
+    ],
+    "is_shared": false
+  },
+  "door valve": {
+    "deg": 2,
+    "devices": [
+      "PRECIA",
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "dual epd": {
+    "deg": 2,
+    "devices": [
+      "SUPRA N",
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "eda controller": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "efem robot leveling": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "elbow heater": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "epc": {
+    "deg": 2,
+    "devices": [
+      "INTEGER plus",
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "epd": {
+    "deg": 2,
+    "devices": [
+      "OMNIS plus",
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "er check": {
+    "deg": 1,
+    "devices": [
+      "OMNIS plus"
+    ],
+    "is_shared": false
+  },
+  "fcip": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "feedthrough": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "ffu": {
+    "deg": 6,
+    "devices": [
+      "GENEVA XP",
+      "INTEGER plus",
+      "PRECIA",
+      "SUPRA N",
+      "SUPRA N series",
+      "ZEDIUS XP"
+    ],
+    "is_shared": true
+  },
+  "ffu controller": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "ffu filter": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "ffu mcu": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "filter": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "flange adaptor": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "flow switch": {
+    "deg": 2,
+    "devices": [
+      "INTEGER plus",
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "fluorescent lamp": {
+    "deg": 3,
+    "devices": [
+      "PRECIA",
+      "SUPRA N",
+      "SUPRA N series"
+    ],
+    "is_shared": true
+  },
+  "gap sensor": {
+    "deg": 2,
+    "devices": [
+      "OMNIS plus",
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "gas box door sensor": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "gas feed through": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "gas line": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "gas spring": {
+    "deg": 3,
+    "devices": [
+      "INTEGER plus",
+      "PRECIA",
+      "SUPRA N"
+    ],
+    "is_shared": true
+  },
+  "gr generator": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "gr shut off valve": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "h2 gas leak detector": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "heat exchanger": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "heater chuck": {
+    "deg": 3,
+    "devices": [
+      "INTEGER plus",
+      "SUPRA N series",
+      "ZEDIUS XP"
+    ],
+    "is_shared": true
+  },
+  "heater chuck (without jig)": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "hook lifter servo motor": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "ib flow": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "igs block": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "insulation heater": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "interface board": {
+    "deg": 2,
+    "devices": [
+      "INTEGER plus",
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "io check": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "ionizer": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "isolation valve": {
+    "deg": 2,
+    "devices": [
+      "PRECIA",
+      "SUPRA N series"
+    ],
+    "is_shared": false
+  },
+  "laser sensor amp": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "lift pin": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "lifter assy": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "load lock": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "load port": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "load port duraport": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "load port leveling": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "log backup": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "manometer": {
+    "deg": 3,
+    "devices": [
+      "INTEGER plus",
+      "PRECIA",
+      "ZEDIUS XP"
+    ],
+    "is_shared": true
+  },
+  "measurement": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "mfc": {
+    "deg": 4,
+    "devices": [
+      "GENEVA XP",
+      "INTEGER plus",
+      "PRECIA",
+      "ZEDIUS XP"
+    ],
+    "is_shared": true
+  },
+  "microwave local interface": {
+    "deg": 1,
+    "devices": [
+      "SUPRA Nm"
+    ],
+    "is_shared": false
+  },
+  "mototr controller": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "multi port": {
+    "deg": 2,
+    "devices": [
+      "SUPRA N",
+      "SUPRA XP"
+    ],
+    "is_shared": false
+  },
+  "n2 curtain": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "o2 analyzer": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "o2 analyzer(teledyne)": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "o2 gas leak detector": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "pcw manual valve": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "pcw turn on": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N series"
+    ],
+    "is_shared": false
+  },
+  "pcw valve & switch": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N series"
+    ],
+    "is_shared": false
+  },
+  "pek kit": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N series"
+    ],
+    "is_shared": false
+  },
+  "pendulum valve": {
+    "deg": 2,
+    "devices": [
+      "PRECIA",
+      "SUPRA XP"
+    ],
+    "is_shared": false
+  },
+  "pin": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "pin alignment": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "pin assy": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "pin modify": {
+    "deg": 1,
+    "devices": [
+      "SUPRA XP"
+    ],
+    "is_shared": false
+  },
+  "pin motor": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "pio sensor board": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "pirani": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "pirani gauge": {
+    "deg": 2,
+    "devices": [
+      "PRECIA",
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "pneumatic valve": {
+    "deg": 2,
+    "devices": [
+      "INTEGER plus",
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "post align application": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "power turn on／off": {
+    "deg": 2,
+    "devices": [
+      "SUPRA N",
+      "SUPRA Vplus"
+    ],
+    "is_shared": false
+  },
+  "pressure & vacuum switch": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N series"
+    ],
+    "is_shared": false
+  },
+  "pressure gauge": {
+    "deg": 2,
+    "devices": [
+      "SUPRA N series",
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "pressure relief valve": {
+    "deg": 2,
+    "devices": [
+      "PRECIA",
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "pressure switch": {
+    "deg": 2,
+    "devices": [
+      "PRECIA",
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "prevent maintenance": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "preventive maintenance": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "prism source": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "prism source 3000qc": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "prism source 3100qc": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "process base parameter product report": {
+    "deg": 1,
+    "devices": [
+      "OMNIS plus"
+    ],
+    "is_shared": false
+  },
+  "process check": {
+    "deg": 1,
+    "devices": [
+      "OMNIS"
+    ],
+    "is_shared": false
+  },
+  "process kit": {
+    "deg": 2,
+    "devices": [
+      "SUPRA N",
+      "SUPRA XP"
+    ],
+    "is_shared": false
+  },
+  "purge line regulator": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "push button switch": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "quick connector": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "rack": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N series"
+    ],
+    "is_shared": false
+  },
+  "rack rf generator": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "regulator": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "relief valve": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "rf bias matcher": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "rf matcher": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "rf power on test": {
+    "deg": 1,
+    "devices": [
+      "OMNIS plus"
+    ],
+    "is_shared": false
+  },
+  "rfid": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "rfid assy": {
+    "deg": 2,
+    "devices": [
+      "SUPRA N",
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "robot": {
+    "deg": 4,
+    "devices": [
+      "INTEGER plus",
+      "PRECIA",
+      "SUPRA N",
+      "ZEDIUS XP"
+    ],
+    "is_shared": true
+  },
+  "robot m124": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "robot sr8240": {
+    "deg": 2,
+    "devices": [
+      "GENEVA XP",
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "robot sr8241": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "robot teaching": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "robot undocking": {
+    "deg": 1,
+    "devices": [
+      "OMNIS plus"
+    ],
+    "is_shared": false
+  },
+  "safety controller": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "safety limit switch": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "selector switch": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "sensor board": {
+    "deg": 3,
+    "devices": [
+      "INTEGER plus",
+      "PRECIA",
+      "SUPRA N"
+    ],
+    "is_shared": true
+  },
+  "serial 8port": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "side storage": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "signal tower": {
+    "deg": 2,
+    "devices": [
+      "INTEGER plus",
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "slot valve": {
+    "deg": 3,
+    "devices": [
+      "INTEGER plus",
+      "PRECIA",
+      "ZEDIUS XP"
+    ],
+    "is_shared": true
+  },
+  "slot vv housing o-ring": {
+    "deg": 1,
+    "devices": [
+      "SUPRA XP"
+    ],
+    "is_shared": false
+  },
+  "smart match": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "solenoid valve": {
+    "deg": 3,
+    "devices": [
+      "INTEGER plus",
+      "PRECIA",
+      "SUPRA N series"
+    ],
+    "is_shared": true
+  },
+  "source box board": {
+    "deg": 2,
+    "devices": [
+      "INTEGER plus",
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "source box interface board": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "speed controller indicator": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "stepping motor": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "sw install": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "sw installation & setting": {
+    "deg": 2,
+    "devices": [
+      "SUPRA N series",
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "sw operation": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "swap kit": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "switch": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "tc wafer": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "temp controller": {
+    "deg": 2,
+    "devices": [
+      "INTEGER plus",
+      "SUPRA XP"
+    ],
+    "is_shared": false
+  },
+  "top lid": {
+    "deg": 2,
+    "devices": [
+      "INTEGER plus",
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "turn table": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "twin guide cylinder": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "u-til online program": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "undocking": {
+    "deg": 2,
+    "devices": [
+      "PRECIA",
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "unit elt box assy": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "unit flow switch": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "unit gas box board": {
+    "deg": 2,
+    "devices": [
+      "SUPRA N series",
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "unit igs block": {
+    "deg": 2,
+    "devices": [
+      "SUPRA N",
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "unit manometer": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "unit mfc": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "unit pressure & vacuum switch": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "unit safety module": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "unit scr & noise filter": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N series"
+    ],
+    "is_shared": false
+  },
+  "unit solenoide valve": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "unit temp controller": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N series"
+    ],
+    "is_shared": false
+  },
+  "unit water shut off valve": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N"
+    ],
+    "is_shared": false
+  },
+  "utility turn onoff": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "vacuum block": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "vacuum line": {
+    "deg": 2,
+    "devices": [
+      "INTEGER XP",
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "vacuum pressure switch": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "vacuum pump": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  },
+  "view quartz": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "vision": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "wafer centering": {
+    "deg": 1,
+    "devices": [
+      "PRECIA"
+    ],
+    "is_shared": false
+  },
+  "wafer sensor": {
+    "deg": 1,
+    "devices": [
+      "SUPRA N series"
+    ],
+    "is_shared": false
+  },
+  "wafer shut off valve": {
+    "deg": 1,
+    "devices": [
+      "ZEDIUS XP"
+    ],
+    "is_shared": false
+  },
+  "wall temp controller": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "water shut off valve": {
+    "deg": 1,
+    "devices": [
+      "INTEGER plus"
+    ],
+    "is_shared": false
+  },
+  "분배기": {
+    "deg": 1,
+    "devices": [
+      "GENEVA XP"
+    ],
+    "is_shared": false
+  }
+}
