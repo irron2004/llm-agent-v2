@@ -101,7 +101,7 @@ class RAGSettings(BaseSettings):
     section_expand_top_groups: int = Field(default=2, description="Max groups to expand")
     section_expand_max_pages: int = Field(default=8, description="Max pages per group")
     section_expand_allowed_sources: str = Field(
-        default="title,rule,toc_match", description="Allowed chapter_source values"
+        default="title,toc_match", description="Allowed chapter_source values for expansion triggers"
     )
 
     # Reranking

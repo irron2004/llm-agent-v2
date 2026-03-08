@@ -340,7 +340,7 @@ MAX_TOKENS_ANSWER = 4096  # 답변 생성용
 MAX_REF_CHARS_REVIEW = 200  # 검색 결과 리뷰용
 MAX_REF_CHARS_ANSWER = 1200  # 답변 생성용
 RELATED_PAGE_WINDOW = 2  # 인접 페이지 범위 (±N)
-DOC_TYPES_SAME_DOC = {"gcb", "myservice"}
+DOC_TYPES_SAME_DOC = {"gcb", "myservice", "pems"}
 EXPAND_TOP_K = 20  # 확장 대상 최대 개수 (rerank 상위)
 
 # --- Per-node temperature settings ---

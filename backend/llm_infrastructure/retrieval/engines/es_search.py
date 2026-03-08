@@ -377,7 +377,6 @@ class EsSearchEngine:
                 "filter": [
                     {"term": {"doc_id": doc_id}},
                     {"term": {"section_chapter": section_chapter}},
-                    {"term": {"chapter_ok": True}},
                 ]
             }
         }

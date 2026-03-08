@@ -90,10 +90,10 @@ class TestSopSectionExtraction:
         assert result[1].chapter_source == "toc_match"
         assert result[1].chapter_ok is True
 
-        # Page 3: carry-forward from "1. Safety"
+        # Page 3: carry-forward from "1. Safety" (chapter_ok=False for carry)
         assert result[2].section_chapter == "1. Safety"
         assert result[2].chapter_source == "carry"
-        assert result[2].chapter_ok is True
+        assert result[2].chapter_ok is False
 
         # Page 4: "2. Preparation"
         assert result[3].section_chapter == "2. Preparation"
