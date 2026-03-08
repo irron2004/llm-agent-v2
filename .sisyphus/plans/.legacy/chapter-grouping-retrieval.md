@@ -1,43 +1,47 @@
 # Chapter-Aware Retrieval (Section/Chapter Grouping)
 
-## AGENT NOTE — 구현 완료 상태 (2026-03-07)
+## AGENT NOTE — 구현 상태 (2026-03-08 최종 업데이트)
 
-> **이 플랜의 Phase 1, 3이 구현 완료됨. 아래 코드를 검토하고 Phase 2 (JSONL 재생성 + ES 재인덱싱)를 진행해주세요.**
+> **Phase 1~3 구현 완료. Phase 2 (JSONL 재생성 + ES 재인덱싱) 완료. 신뢰도 개선 패치 적용됨.**
 
 ### 구현된 파일 목록
 
 | File | Status | Description |
 |------|--------|-------------|
-| `scripts/chunk_v3/section_extractor.py` | **NEW** | 섹션 경계 추출 모듈 (SOP/SETUP: TOC+헤더, TS: alpha TOC+X-N., PEMS: no-op) |
-| `scripts/chunk_v3/common.py` | **MODIFIED** | `ChunkV3Document`에 `section_chapter`, `section_number`, `chapter_source`, `chapter_ok` 필드 추가 |
-| `scripts/chunk_v3/chunkers.py` | **MODIFIED** | `chunk_vlm_parsed()`에서 `extract_sections()` 호출 + 청크 생성시 섹션 필드 할당 |
+| `scripts/chunk_v3/section_extractor.py` | **NEW** | 섹션 경계 추출 (SOP/SETUP: TOC+헤더+번호점프UNKNOWN, TS: TOC있으면 X-N/없으면 noop, PEMS: no-op) |
+| `scripts/chunk_v3/common.py` | **MODIFIED** | `ChunkV3Document`에 section 필드 4개 추가 |
+| `scripts/chunk_v3/chunkers.py` | **MODIFIED** | `chunk_vlm_parsed()`에서 `extract_sections()` 호출 + 섹션 필드 할당 |
+| `scripts/chunk_v3/run_chunking.py` | **MODIFIED** | PEMS doc type 추가 |
 | `backend/llm_infrastructure/elasticsearch/mappings.py` | **MODIFIED** | `get_chunk_v3_content_mapping()`에 section 필드 4개 추가 |
 | `scripts/chunk_v3/run_ingest.py` | **MODIFIED** | `allowed_fields`에 section 필드 4개 추가 |
-| `backend/config/settings.py` | **MODIFIED** | `RAGSettings`에 `section_expand_*` 설정 4개 추가 |
-| `backend/llm_infrastructure/retrieval/engines/es_search.py` | **MODIFIED** | `fetch_section_chunks()` 메서드 + `_source_fields()`에 section 필드 추가 |
+| `backend/config/settings.py` | **MODIFIED** | `RAGSettings`에 `section_expand_*` 설정 4개 (allowed_sources: title,toc_match) |
+| `backend/llm_infrastructure/retrieval/engines/es_search.py` | **MODIFIED** | `fetch_section_chunks()`: doc_id+section_chapter 필터 (chapter_ok 필터 제거됨) |
 | `backend/llm_infrastructure/retrieval/postprocessors/section_expander.py` | **NEW** | `SectionExpander` 후처리기 (expand + ordering + dedup) |
 | `backend/llm_infrastructure/retrieval/postprocessors/__init__.py` | **NEW** | postprocessors 패키지 init |
+| `backend/llm_infrastructure/llm/langgraph_agent.py` | **MODIFIED** | `_apply_section_expansion()` + retrieve_node 통합 + PEMS→DOC_TYPES_SAME_DOC |
 | `backend/tests/test_section_expansion.py` | **NEW** | 16 tests (SOP 4, TS 2, PEMS 2, Expander 8) — all passing |
 
-### 검증된 실제 데이터 결과
+### 신뢰도 개선 패치 (be0b6a7)
 
-- **SOP fill_valve (17p)**: 16/17 pages 섹션 할당 성공 (page 1 = TOC 스킵)
-- **SOP safety_valve, vent_valve, ctc**: 정상 동작 확인
-- **TS ffu_abnormal (6p)**: LaTeX 테이블 형식이라 X-N. 패턴 미매칭 (known limitation)
+- carry-forward `chapter_ok=False` (trigger 방지, fetch는 section_chapter 매칭으로)
+- TS TOC 없으면 noop 폴백 (rule 기반 확장 방지)
+- SOP 번호 점프(1→3) 시 TOC에 중간 번호 있으면 carry→UNKNOWN 처리
+- `fetch_section_chunks`에서 `chapter_ok` 필터 제거
+- `allowed_sources` 기본값: `title,toc_match` (rule 제거)
 
-### 남은 작업 (Phase 2 — 이 플랜의 TODO 5, 10에 해당)
+### 검증 결과
 
-1. **JSONL 재생성**: `run_chunking.py`로 전체 VLM parsed JSON → JSONL 재생성 (section 필드 포함)
-2. **ES 재인덱싱**: `run_ingest.py content`로 ~390k docs 재인덱싱
-3. **Retrieval pipeline 통합**: `SectionExpander`를 실제 retrieval pipeline에 연결 (LangGraph RAG agent 또는 search service)
-4. **TS LaTeX 테이블 대응**: 테이블 셀 내 `A-1.` 패턴 파싱 (optional enhancement)
+- **JSONL**: 395,773 chunks, section 필드 누락 0, PEMS 87건 포함
+- **SOP**: 12,281/13,116 chunks (93.6%) section_chapter 할당
+- **ES 재인덱싱**: 390,472 docs indexed (chunk_id 중복 제거)
+- **테스트**: 16/16 section + 15/15 contracts + 6/6 retrieval pipeline = 37 pass
 
-### 검토 요청사항
+### 남은 작업
 
-- [ ] `section_extractor.py`의 TOC 파싱 로직 검토 (edge case 없는지)
-- [ ] `section_expander.py`의 `all_results_ordered()` 정렬 로직 검토
-- [ ] `fetch_section_chunks()` ES 쿼리 효율성 검토
-- [ ] 실제 retrieval pipeline에 SectionExpander 통합 위치 결정
+- TODO 2 부분 완료: `test_chunk_v3_contracts.py`에 section 필드 타입 assert 미추가
+- TODO 7 부분 완료: preset YAML 오버라이드 미구현 (settings만 있음)
+- TODO 9 부분 완료: unit 테스트만 있고 E2E 통합 시나리오 없음
+- TODO 10 미완료: 운영 runbook (백필/재인덱싱/롤백/지표) 문서 없음
 
 ---
 
@@ -287,7 +291,7 @@ Wave 3: tests + regression + perf/observability
 
   **Commit**: YES | Message: `feat(ingest): add TS section mapping via X-N heuristic` | Files: ingest mapper + tests
 
-- [ ] 5. Wire section metadata into chunk creation/writing (chunk JSONL + ES ingest)
+- [x] 5. Wire section metadata into chunk creation/writing (chunk JSONL + ES ingest)
 
   **What to do**:
   - Ensure the ingest pipeline attaches section fields to each chunk document before indexing into `chunk_v3_content`.

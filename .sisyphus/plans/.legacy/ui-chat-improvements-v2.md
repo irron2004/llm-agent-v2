@@ -73,7 +73,7 @@ Wave 3: REQ-6(탭 UI 리팩토링) + 통합 테스트/QA
     Evidence: .sisyphus/evidence/task-01-skip-recommended.txt
   ```
 
-- [x] 2. REQ-4 라벨 `SOP 조회` → `절차조회`
+- [ ] 2. REQ-4 라벨 `SOP 조회` → `절차조회` (미완료: langgraph_agent.py:3208에 아직 "SOP 조회")
 
   **What to do**:
   - `task_options`의 label만 변경(value는 `sop` 유지)
@@ -93,7 +93,7 @@ Wave 3: REQ-6(탭 UI 리팩토링) + 통합 테스트/QA
     Evidence: .sisyphus/evidence/task-02-label.png
   ```
 
-- [x] 3. REQ-5 task_mode별 고정 문서군 매핑 변경(추가 질문 없음)
+- [x] 3. REQ-5 task_mode별 고정 문서군 매핑 변경(추가 질문 없음) (주의: 플랜=sop→sop+ts+setup/issue→gcb+myservice, 코드=sop→sop만/issue→gcb+myservice+ts — 불일치 확인 필요)
 
   **What to do**:
   - `task_mode == "sop"`: `expand_doc_type_selection(["sop", "ts", "setup"])`
@@ -149,7 +149,7 @@ Wave 3: REQ-6(탭 UI 리팩토링) + 통합 테스트/QA
     Evidence: .sisyphus/evidence/task-04-resume-guard.txt
   ```
 
-- [x] 5. REQ-2 모델 포맷 불이행 방어(파싱 fallback 통일 + judge JSON 강제 + 재시도 상한 + 정규화 + 프롬프트 강화)
+- [ ] 5. REQ-2 모델 포맷 불이행 방어(파싱 fallback 통일 + judge JSON 강제 + 재시도 상한 + 정규화 + 프롬프트 강화) (미완료: response_format, 재시도 상한, 정규화 미구현)
 
   **What to do**:
   - `_parse_auto_parse_result`, `_parse_queries`, `_parse_route`, `judge_node`, `_parse_needs_history_from_text`에 공통 fallback 유틸 적용
@@ -161,7 +161,7 @@ Wave 3: REQ-6(탭 UI 리팩토링) + 통합 테스트/QA
   **Acceptance Criteria**:
   - [ ] GLM 계열로도 judge 파싱 실패가 나더라도 재시도 루프가 과도하게 반복되지 않음
 
-- [ ] 6. REQ-6 탭 기반 guided selection UI 리팩토링
+- [x] 6. REQ-6 탭 기반 guided selection UI 리팩토링 (완료: guided-selection-panel.tsx에 탭+진행표시+이전단계수정 구현됨)
 
   **What to do**:
   - 기존 GuidedSelectionPanel을 탭 헤더 + 진행 상태로 리팩토링
