@@ -207,6 +207,33 @@ export function GuidedSelectionPanel({
   const hasManualEquip = currentStep === "equip_id" && selectedEquipId === "__manual__";
   const canConfirmManualEquip = manualEquipId.trim().length > 0;
 
+  // 숫자 키 입력으로 옵션 선택
+  useEffect(() => {
+    if (hasManualEquip) return; // manual input 모드에서는 키보드 비활성
+
+    const handler = (e: KeyboardEvent) => {
+      // input/textarea에 포커스 되어있으면 무시
+      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
+
+      const num = parseInt(e.key, 10);
+      if (isNaN(num)) return;
+
+      if (num === 0) {
+        // 0: recommended 항목 선택, 없으면 skip(__skip__) 선택
+        const recommended = stepOptions.find((o) => o.recommended);
+        const skip = stepOptions.find((o) => o.value === "__skip__");
+        const target = recommended ?? skip;
+        if (target) applyOption(target);
+      } else if (num >= 1 && num <= stepOptions.length) {
+        applyOption(stepOptions[num - 1]);
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [stepOptions, hasManualEquip, currentStep, targetLanguage, selectedDevice, selectedEquipId, taskMode, manualEquipId]);
+
   const optionLabelByValue = useMemo(() => {
     const toMap = (list: GuidedOption[]) => {
       const m = new Map<string, string>();
