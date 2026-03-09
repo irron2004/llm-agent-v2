@@ -132,29 +132,29 @@
 
 | System | Scope | Retrieval | Rerank | n_ok | mean_raw_cont@5 | mean_adj_cont@5 | mean_adj_den@5 | mean_shared@5 | mean_shared_rel@5 | mean_ce@5 | mean_hit@5 | mean_mrr |
 |--------|-------|-----------|--------|------|-----------------|-----------------|----------------|----------------|-------------------|-----------|-----------|---------|
-| B4 | Hard(device) | Hybrid+RRF | Yes | 51 | 0.3608 | 0.3229 | 2.4118 | 0.1255 | 0.0000 | 0.4118 | 0.1373 | 0.1046 |
-| B4.5 | Shared-aware | Dense | Yes | 51 | 0.5451 | 0.0000 | 0.4510 | 0.9098 | 0.0163 | 0.0000 | 0.0588 | 0.0616 |
+| B4 | Hard(device) | Hybrid+RRF | Yes | 51 | 0.3608 | 0.3229 | 4.1373 | 0.1725 | 0.0000 | 0.4118 | 0.2941 | 0.2239 |
+| B4.5 | Shared-aware | Dense | Yes | 51 | 0.4863 | 0.0000 | 1.8627 | 0.6275 | 0.0065 | 0.0000 | 0.1765 | 0.1417 |
 | P1 | Shared-aware | Hybrid+RRF | Yes | 51 | 0.5451 | 0.0000 | 0.4510 | 0.9098 | 0.0163 | 0.0000 | 0.0588 | 0.0588 |
 
 **Key findings:**
-- **B4 (hard device filter)**: Reduces adj_cont@5 from 0.3592 (B3) to 0.3229 (−10.1%), with adj_den@5 dropping from 4.1373 to 2.4118. Recall (hit@5) declines sharply: 0.2941 → 0.1373 (−53.3%).
-- **B4.5 & P1 (shared-aware)**: Achieve adj_cont@5 = 0.0000 across full test set by reclassifying out-of-scope docs as shared. Raw contamination remains high (0.5451), but shared@5 = 0.9098 indicates 91% of top-5 positions filled by shared docs. Recall drops further: hit@5 = 0.0588 (−80.0% vs B3).
-- **adj_den@5 collapse**: Shared-aware systems show adj_den@5 = 0.4510, meaning only ~0.45 in-scope docs per query in top-5 after filtering. Mitigation comes at extreme recall cost on full test set.
-- **shared_rel@5**: B4.5 and P1 show 0.0163, indicating shared docs fill 1.63% of top-5 positions among relevant in-scope contexts. This is marginal on aggregate, but concentrates on implicit and explicit_equip slices.
+- **B4 (hard device filter)**: Reduces adj_cont@5 from 0.3592 (B3) to 0.3229 (−10.1%) while preserving recall (hit@5 stays 0.2941). Density remains high (adj_den@5=4.1373).
+- **B4.5 (shared-aware dense)**: Achieves adj_cont@5 = 0.0000 with moderate recall (hit@5=0.1765), outperforming P1 on recall while using fewer shared docs (shared@5=0.6275).
+- **P1 (shared-aware hybrid)**: Also achieves adj_cont@5 = 0.0000, but with the strongest shared dominance (shared@5=0.9098) and the lowest recall (hit@5=0.0588).
+- **R2 mitigation interpretation**: `adj_den@5` and `shared_rel@5` now clearly separate “contamination removal” from “result density/utility” trade-offs across B4/B4.5/P1.
 
 ### Table 7: Explicit Device Slice — Scoped Systems Only (n=22)
 
 | System | Scope | Retrieval | Rerank | n_ok | mean_raw_cont@5 | mean_adj_cont@5 | mean_adj_den@5 | mean_shared@5 | mean_shared_rel@5 | mean_ce@5 | mean_hit@5 | mean_mrr |
 |--------|-------|-----------|--------|------|-----------------|-----------------|----------------|----------------|-------------------|-----------|-----------|---------|
-| B4 | Hard(device) | Hybrid+RRF | Yes | 22 | 0.0455 | 0.0455 | 0.3636 | 0.0182 | 0.0000 | 0.0455 | 0.0455 | 0.0455 |
-| B4.5 | Shared-aware | Dense | Yes | 22 | 0.2364 | 0.0000 | 0.5909 | 0.8818 | 0.0379 | 0.0000 | 0.1364 | 0.1429 |
+| B4 | Hard(device) | Hybrid+RRF | Yes | 22 | 0.0455 | 0.0455 | 4.3636 | 0.1273 | 0.0000 | 0.0455 | 0.4091 | 0.3220 |
+| B4.5 | Shared-aware | Dense | Yes | 22 | 0.1000 | 0.0000 | 3.8636 | 0.2273 | 0.0152 | 0.0000 | 0.4091 | 0.3285 |
 | P1 | Shared-aware | Hybrid+RRF | Yes | 22 | 0.2364 | 0.0000 | 0.5909 | 0.8818 | 0.0379 | 0.0000 | 0.1364 | 0.1364 |
 
 **R2 mitigation validation (new metrics):**
-- **adj_den@5 (R2 metric)**: Measures adjusted density — mean number of in-scope documents in top-5 after filtering. B4 achieves 0.3636 (sparse retrieval, only ~1 doc per 3 queries), while B4.5/P1 achieve 0.5909 (moderate density via shared-doc promotion).
-- **shared_rel@5 (R2 metric)**: Shared document relative ratio — fraction of top-5 filled by shared docs among relevant in-scope contexts. B4.5/P1 show 0.0379 (3.79%), indicating that on explicit_device slice, shared docs contribute modest density recovery without violating adjusted contamination.
-- **B4 vs B4.5**: B4 has near-zero adjusted contamination (0.0455) and near-zero shared usage (0.0182), but extreme sparsity (adj_den = 0.3636). B4.5 maintains zero adjusted contamination through full reclassification to shared (shared@5 = 0.8818), achieving better density (adj_den = 0.5909) at the cost of reduced hit@5 (0.1364 vs 0.0455 on explicit_device specifically).
-- **P1 vs B4.5**: Functionally identical on explicit_device slice (both achieve adj_cont@5 = 0.0, same shared@5 = 0.8818), suggesting scope-level reclassification is orthogonal to retrieval mode (Dense B4.5 vs Hybrid+RRF P1).
+- **adj_den@5 (R2 metric)**: B4 and B4.5 both keep high in-scope density (4.36 and 3.86 respectively), while P1 remains sparse (0.59) due to shared-heavy retrieval.
+- **shared_rel@5 (R2 metric)**: B4.5 (0.0152) is less shared-dependent than P1 (0.0379), indicating a lower shared-doc reliance at comparable adjusted contamination.
+- **B4 vs B4.5**: B4.5 eliminates adjusted contamination (0.0) while matching B4 recall (hit@5 both 0.4091) and improving MRR slightly (0.3285 vs 0.3220).
+- **P1 vs B4.5**: Both have adj_cont@5=0.0, but B4.5 is substantially better on utility (hit@5 0.4091 vs 0.1364; mrr 0.3285 vs 0.1364).
 
 ### Key Differences from 2026-03-05 Evaluation
 
@@ -164,4 +164,4 @@
 
 3. **Expanded slice analysis**: 2026-03-05 reported only explicit_device (n=22). 2026-03-09 adds full test set (n=51) baselines and scoped systems, enabling cross-slice comparisons.
 
-4. **B4.5 system**: New dense-retrieval variant of hard-device filtering. Shows that shared-aware scope policies (B4.5, P1) eliminate adjusted contamination but at severe recall cost (hit@5 = 0.0588 on full test set, vs 0.2941 for baseline B3).
+4. **B4.5 system**: New dense-retrieval shared-aware variant. It reaches zero adjusted contamination while preserving more recall than P1 (hit@5 0.1765 vs 0.0588 on full test set).

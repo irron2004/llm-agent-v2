@@ -141,30 +141,32 @@ These represent F4 (gold not in corpus) or fundamental retrieval failures unrela
 
 ---
 
-## 2026-03-09 Error Analysis (Post-Alias Fix)
+## 2026-03-09 Error Analysis (Initial Run, Superseded)
 
 > Date: 2026-03-09
 > Source: test_explicit_device_core (22q) from per_query.csv
 > Key Change: Explicit device parser improvements to resolve ZEDIUS XP/SUPRA_XP alias ambiguity
 
+> Note: this section summarizes the first 2026-03-09 run. It is superseded by the re-run after applying norm->raw ES device expansion (see section at end of this file).
+
 ### Test Set Overview
 
 The 2026-03-09 run includes 22 test_explicit_device queries with three systems compared:
-- **B4**: Hard device scope filter (no reranking)
-- **B4.5**: Hard device scope filter + cross-encoder reranking
+- **B4**: Hard device scope filter + cross-encoder reranking
+- **B4.5**: Hard device scope filter (shared OR device docs) + cross-encoder reranking
 - **P1**: Shared-aware scope policy + reranking
 
 All 22 queries completed with status=ok (no parse errors).
 
 ### Analysis 1: Top 3 Highest Contamination Queries (adj_cont@5) by System
 
-#### B4 (Hard Filter, No Reranking)
+#### B4 (Hard Filter + Reranking)
 
-B4 shows adj_cont@5 = 0.0 across all tested queries when filtering succeeds. The hard filter eliminates contamination by restricting to the declared device scope, but at the cost of recall (hit@5 is also frequently 0 when gold doc is outside the filtered scope).
+B4 shows mean adj_cont@5 = 0.0455 on this slice. The hard filter restricts to the declared device scope and reranking re-orders results, but recall is low (hit@5=0.0455) because many queries have no matching device-specific docs after filtering. Note: the 2026-03-09 run had a norm-vs-raw ES filter mismatch (normalized device names sent to ES `device_name` field which stores raw names), causing most B4 queries to retrieve zero device-specific docs.
 
 Top cases by volume:
-- **A-gs110** (troubleshooting, SUPRA_XP): adj_cont@5=0.0, hit@5=0.0 — hard device mismatch (F2, parser missing device)
-- **A-q006** (procedure, SUPRA_N): adj_cont@5=0.0, hit@5=0.0 — gold not in retrievable corpus (F4)
+- **A-gs110** (troubleshooting, SUPRA_XP): adj_cont@5=1.0, hit@5=0.0 — hard_device_empty=True, falls back to global; contamination present
+- **A-q006** (procedure, SUPRA_N): adj_cont@5=0.0, hit@5=0.0 — filter applied with norm name "SUPRA_N" but ES stores "SUPRA N"; zero device-specific results
 - **A-xdev021** (troubleshooting, OMNIS): adj_cont@5=0.0, hit@5=1.0 — successfully filters contamination
 
 #### B4.5 (Hard Filter + Reranking)
@@ -181,7 +183,7 @@ P1 achieves adj_cont@5=0.0 across all queries (same as B4/B4.5) because shared-a
 - **A-xdev021**: adj_cont@5=0.0, hit@5=1.0 — OMNIS scope properly isolated
 - **A-xdev002** (procedure, GENEVA_XP): adj_cont@5=0.0, hit@5=1.0 — shared policy recovers gold doc
 
-**Key Finding**: Post-reranking, all three systems achieve adj_cont@5=0.0. Contamination is not a differentiator; recall (hit@5) becomes the critical metric.
+**Key Finding**: B4.5 and P1 achieve adj_cont@5=0.0 via shared-doc reclassification, while B4 retains adj_cont@5=0.0455 (1 contaminated query). The 2026-03-09 B4 results are distorted by a norm-vs-raw ES filter bug (see §Analysis 4); a re-run with the fix is required for accurate B4 numbers. Recall (hit@5) remains the critical differentiator: B4=0.0455, B4.5=0.1364, P1=0.1364.
 
 ### Analysis 2: Top 3 Hit@5 Differences (B4 vs P1)
 
@@ -218,7 +220,7 @@ Categorizing failures in the 22-query test set:
 
 **Parser Alias Mismatch (F1) Dominates Failures**: 13 of 22 queries (59%) involve parsed device names that differ from allowed_devices. The ZEDIUS XP / SUPRA_XP mismatch is the primary offender, followed by SUPRA_V / SUPRA_VPLUS. This suggests the auto-parser's device name extraction is sensitive to product naming conventions not fully captured in the alias mapping.
 
-**Reranking + Shared Policy Eliminates Contamination Trade-off**: Unlike 2026-03-05 results, the 2026-03-09 run shows all systems achieving adj_cont@5=0.0. Reranking (B4.5) and shared-aware policy (P1) both suppress contamination without sacrificing recall in cases where gold docs are retrievable. The earlier F3 (shared over-inclusion) pattern no longer appears.
+**Norm-vs-Raw ES Filter Bug Distorts B4 Results**: The 2026-03-09 run passed normalized device names (e.g., "SUPRA_N") to ES's `device_name` field which stores raw names (e.g., "SUPRA N"). This caused B4 to retrieve zero device-specific docs for most queries, artificially deflating both contamination and recall. B4.5 and P1 were less affected because their filters also include shared_doc_ids. A re-run with `_expand_norms_to_es_raw()` fix is required for accurate B4 numbers.
 
 **Recall Bottleneck Shifts to Parser and Corpus Coverage**: With contamination resolved, hit@5 variance is now driven by:
 1. Parser mismatches preventing proper scope filtering (F1, F2)
@@ -238,3 +240,34 @@ Categorizing failures in the 22-query test set:
 4. **Acknowledge Corpus Gaps**: A-q006 and similar F4 cases represent fundamental corpus coverage issues orthogonal to scope policy performance. These should be noted as external constraints rather than algorithmic failures.
 
 5. **Defer F1 Resolution**: Until the parser alias mapping is fixed, report results stratified by parser success (hard_device_empty=False) to show unbiased scope policy performance on well-parsed queries.
+
+---
+
+## 2026-03-09 Error Analysis (Re-run After Norm->Raw ES Filter Fix)
+
+> Date: 2026-03-09 (rerun)
+> Source: `.sisyphus/evidence/paper-a/runs/2026-03-09_test_explicit_device_core/`
+> Run SHA refs: see `2026-03-05_paper_a_run_index.md` (Artifact Hashes)
+
+### Slice Summary (explicit_device, n=22)
+
+| System | mean_raw_cont@5 | mean_adj_cont@5 | mean_hit@5 | mean_mrr |
+|--------|------------------|------------------|------------|----------|
+| B4 | 0.0455 | 0.0455 | 0.4091 | 0.3220 |
+| B4.5 | 0.1000 | 0.0000 | 0.4091 | 0.3285 |
+| P1 | 0.2364 | 0.0000 | 0.1364 | 0.1364 |
+
+### Updated Findings
+
+1. **Norm->raw ES filter bug resolved**: B4 now returns non-empty retrievals across all 22 queries (no empty `top_doc_ids` rows) and rerank proof fields are present for all rerank systems.
+2. **Alias mismatch sharply reduced**: `alias_audit.csv` reports 1 mismatch query (`A-xdev016`, SUPRA_V vs SUPRA_VPLUS). ZEDIUS XP -> SUPRA_XP cases are now normalized without mismatch flags.
+3. **Contamination-recall trade-off is now clearer**:
+   - B4.5 and P1 both achieve `adj_cont@5 = 0.0`.
+   - B4.5 preserves utility (`hit@5=0.4091`, `mrr=0.3285`) while P1 remains shared-heavy with lower recall (`hit@5=0.1364`).
+4. **Remaining failure drivers**: parser miss (`hard_device_empty=True`) and device-name granularity mismatch (SUPRA_V vs SUPRA_VPLUS), not ES filter mechanics.
+
+### Action Items
+
+1. Add parser alias rule for `SUPRA_V -> SUPRA_VPLUS`.
+2. Keep reporting `adj_den@5` and `shared_rel@5` to avoid tautological interpretation of zero adjusted contamination.
+3. Preserve both B4.5 and P1 in tables; they are no longer functionally identical after the rerun.

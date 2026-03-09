@@ -46,7 +46,12 @@ from scripts.paper_a.canonicalize import compact_key
 K_VALUES = (1, 3, 5, 10)
 REQUIRED_SYSTEMS = {"B0", "B1", "B2", "B3", "B4", "B4.5", "P1"}
 OPTIONAL_SYSTEMS = {"P2", "P3", "P4", "P6", "P7"}
-CONTROL_SYSTEMS = {"C1_random_scope", "C2_global_postfilter", "C3_per_scope_merge", "C4_dedupe_only"}
+CONTROL_SYSTEMS = {
+    "C1_random_scope",
+    "C2_global_postfilter",
+    "C3_per_scope_merge",
+    "C4_dedupe_only",
+}
 ALL_SYSTEMS = REQUIRED_SYSTEMS | OPTIONAL_SYSTEMS | CONTROL_SYSTEMS
 DEFAULT_SYSTEMS = "B0,B1,B2,B3,B4,B4.5,P1"
 DEFAULT_TOP_K = 10
@@ -71,14 +76,30 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Paper A master-schema evaluator (v0.5)"
     )
-    _ = parser.add_argument("--eval-set", required=True, help="Path to query_gold_master_v0_5.jsonl")
-    _ = parser.add_argument("--systems", default=DEFAULT_SYSTEMS, help="Comma-separated system IDs")
-    _ = parser.add_argument("--corpus-filter", required=True, help="Path to corpus_doc_ids.txt")
-    _ = parser.add_argument("--doc-scope", required=True, help="Path to doc_scope.jsonl")
-    _ = parser.add_argument("--family-map", required=True, help="Path to family_map.json")
+    _ = parser.add_argument(
+        "--eval-set", required=True, help="Path to query_gold_master_v0_5.jsonl"
+    )
+    _ = parser.add_argument(
+        "--systems", default=DEFAULT_SYSTEMS, help="Comma-separated system IDs"
+    )
+    _ = parser.add_argument(
+        "--corpus-filter", required=True, help="Path to corpus_doc_ids.txt"
+    )
+    _ = parser.add_argument(
+        "--doc-scope", required=True, help="Path to doc_scope.jsonl"
+    )
+    _ = parser.add_argument(
+        "--family-map", required=True, help="Path to family_map.json"
+    )
     _ = parser.add_argument("--out-dir", required=True, help="Output directory")
-    _ = parser.add_argument("--shared-doc-ids", default=None, help="Optional shared_doc_ids.txt")
-    _ = parser.add_argument("--device-catalog", default=None, help="Path to device_catalog.csv (default: <doc_scope_dir>/../metadata/device_catalog.csv)")
+    _ = parser.add_argument(
+        "--shared-doc-ids", default=None, help="Optional shared_doc_ids.txt"
+    )
+    _ = parser.add_argument(
+        "--device-catalog",
+        default=None,
+        help="Path to device_catalog.csv (default: <doc_scope_dir>/../metadata/device_catalog.csv)",
+    )
     _ = parser.add_argument("--index", default=None, help="ES alias/index override")
     _ = parser.add_argument("--top-k", type=int, default=DEFAULT_TOP_K)
     _ = parser.add_argument("--seed", type=int, default=20260305)
@@ -86,15 +107,19 @@ def _parse_args() -> argparse.Namespace:
     _ = parser.add_argument("--use-es-scope-fields", action="store_true")
     _ = parser.add_argument("--reranker-model", default=None)
     _ = parser.add_argument(
-        "--split", default="all", choices=["dev", "test", "all"],
-        help="Filter by split"
+        "--split", default="all", choices=["dev", "test", "all"], help="Filter by split"
     )
     _ = parser.add_argument(
-        "--scope-observability", default="all",
-        help="Filter by scope_observability (explicit_device,explicit_equip,implicit,ambiguous,all)"
+        "--scope-observability",
+        default="all",
+        help="Filter by scope_observability (explicit_device,explicit_equip,implicit,ambiguous,all)",
     )
-    _ = parser.add_argument("--limit", type=int, default=0, help="Limit rows after filtering (0=no limit)")
-    _ = parser.add_argument("--repeats", type=int, default=1, help="Repeat runs for stability analysis")
+    _ = parser.add_argument(
+        "--limit", type=int, default=0, help="Limit rows after filtering (0=no limit)"
+    )
+    _ = parser.add_argument(
+        "--repeats", type=int, default=1, help="Repeat runs for stability analysis"
+    )
     return parser.parse_args()
 
 
@@ -112,13 +137,17 @@ def _load_master_eval_set(path: Path) -> list[MasterEvalQuery]:
 
         allowed_devices_raw = raw.get("allowed_devices")
         if isinstance(allowed_devices_raw, list):
-            allowed_devices = [str(d).strip() for d in allowed_devices_raw if str(d).strip()]
+            allowed_devices = [
+                str(d).strip() for d in allowed_devices_raw if str(d).strip()
+            ]
         else:
             allowed_devices = []
 
         allowed_equips_raw = raw.get("allowed_equips")
         if isinstance(allowed_equips_raw, list):
-            allowed_equips = [str(e).strip() for e in allowed_equips_raw if str(e).strip()]
+            allowed_equips = [
+                str(e).strip() for e in allowed_equips_raw if str(e).strip()
+            ]
         else:
             allowed_equips = []
 
@@ -133,14 +162,21 @@ def _load_master_eval_set(path: Path) -> list[MasterEvalQuery]:
         if not q_id or not split or not question:
             raise RuntimeError(f"eval row missing q_id/split/question: {raw}")
 
-        rows.append(MasterEvalQuery(
-            q_id=q_id, split=split, question=question,
-            scope_observability=scope_obs, intent_primary=intent,
-            target_scope_level=target_scope,
-            allowed_devices=allowed_devices, allowed_equips=allowed_equips,
-            shared_allowed=shared_allowed, family_allowed=family_allowed,
-            gold_doc_ids=gold_doc_ids,
-        ))
+        rows.append(
+            MasterEvalQuery(
+                q_id=q_id,
+                split=split,
+                question=question,
+                scope_observability=scope_obs,
+                intent_primary=intent,
+                target_scope_level=target_scope,
+                allowed_devices=allowed_devices,
+                allowed_equips=allowed_equips,
+                shared_allowed=shared_allowed,
+                family_allowed=family_allowed,
+                gold_doc_ids=gold_doc_ids,
+            )
+        )
     if not rows:
         raise RuntimeError(f"No eval rows in {path}")
     return rows
@@ -182,7 +218,11 @@ def _load_family_map(path: Path) -> dict[str, Any]:
 
 
 def _load_lines(path: Path) -> list[str]:
-    return [line.strip() for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        line.strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
 
 def _sha256_file(path: Path) -> str:
@@ -196,6 +236,7 @@ def _sha256_file(path: Path) -> str:
 # ---------------------------------------------------------------------------
 # Task 6: Device catalog + alias map
 # ---------------------------------------------------------------------------
+
 
 def _resolve_device_catalog(explicit: str | None, doc_scope_path: Path) -> Path:
     """Resolve device_catalog.csv path with fallback."""
@@ -251,9 +292,46 @@ def _normalize_device(raw_name: str, alias_map: dict[str, str]) -> str:
     return alias_map.get(ck, "")
 
 
+def _build_norm_to_raw_map(
+    device_candidates: list[str],
+    alias_map: dict[str, str],
+) -> dict[str, list[str]]:
+    """Build norm -> list of raw ES device names reverse map.
+
+    For each ES raw device name in device_candidates, resolve its canonical
+    norm via alias_map, then group all raw names under the same norm.
+    This allows expanding a normalized name back to ALL raw ES variants.
+    """
+    buckets: dict[str, set[str]] = {}
+    for raw in device_candidates:
+        norm = _normalize_device(raw, alias_map) or raw
+        buckets.setdefault(norm, set()).add(raw)
+    return {k: sorted(v) for k, v in buckets.items()}
+
+
+def _expand_norms_to_es_raw(
+    norms: list[str],
+    norm_to_raw_map: dict[str, list[str]],
+) -> list[str]:
+    """Expand normalized device names to all raw ES device_name variants.
+
+    If a norm has no reverse mapping, fall back to using the norm itself
+    (best-effort; may not match ES but preserves previous behaviour).
+    """
+    seen: set[str] = set()
+    result: list[str] = []
+    for norm in norms:
+        for raw in norm_to_raw_map.get(norm, [norm]):
+            if raw not in seen:
+                result.append(raw)
+                seen.add(raw)
+    return result
+
+
 # ---------------------------------------------------------------------------
 # ES resolution
 # ---------------------------------------------------------------------------
+
 
 def _resolve_alias_or_index(manager: EsIndexManager, requested: str) -> tuple[str, str]:
     default_alias = manager.get_alias_name()
@@ -264,7 +342,9 @@ def _resolve_alias_or_index(manager: EsIndexManager, requested: str) -> tuple[st
         return requested, target
     try:
         alias_response = manager.es.indices.get_alias(name=requested)
-        alias_targets = list(cast(dict[str, Any], cast(object, alias_response.body)).keys())
+        alias_targets = list(
+            cast(dict[str, Any], cast(object, alias_response.body)).keys()
+        )
         if not alias_targets:
             raise RuntimeError(f"Alias '{requested}' exists but has no targets")
         return requested, alias_targets[0]
@@ -281,7 +361,9 @@ def _build_es_client() -> Elasticsearch:
     return Elasticsearch(**kwargs)
 
 
-def _merge_filters(base: dict[str, Any], extra: dict[str, Any] | None) -> dict[str, Any]:
+def _merge_filters(
+    base: dict[str, Any], extra: dict[str, Any] | None
+) -> dict[str, Any]:
     if extra is None:
         return base
     combined = apply_scope_filter(base, extra)
@@ -290,7 +372,9 @@ def _merge_filters(base: dict[str, Any], extra: dict[str, Any] | None) -> dict[s
     return cast(dict[str, Any], combined)
 
 
-def _dedupe_top_doc_ids(results: list[RetrievalResult], top_k: int) -> list[dict[str, Any]]:
+def _dedupe_top_doc_ids(
+    results: list[RetrievalResult], top_k: int
+) -> list[dict[str, Any]]:
     seen: set[str] = set()
     rows: list[dict[str, Any]] = []
     for result in results:
@@ -298,18 +382,22 @@ def _dedupe_top_doc_ids(results: list[RetrievalResult], top_k: int) -> list[dict
         if not doc_id or doc_id in seen:
             continue
         seen.add(doc_id)
-        rows.append({
-            "doc_id": doc_id,
-            "score": float(result.score),
-            "metadata": dict(result.metadata or {}),
-        })
+        rows.append(
+            {
+                "doc_id": doc_id,
+                "score": float(result.score),
+                "metadata": dict(result.metadata or {}),
+            }
+        )
         if len(rows) >= top_k:
             break
     return rows
 
 
 class RetrievalRunner:
-    def __init__(self, *, index_name: str, corpus_doc_ids: list[str], reranker_model: str | None) -> None:
+    def __init__(
+        self, *, index_name: str, corpus_doc_ids: list[str], reranker_model: str | None
+    ) -> None:
         self.es_engine = EsSearchEngine(
             es_client=_build_es_client(),
             index_name=index_name,
@@ -351,37 +439,97 @@ class RetrievalRunner:
 
     def _to_result(self, hit: Any) -> RetrievalResult:
         return RetrievalResult(
-            doc_id=hit.doc_id, content=hit.content,
-            score=hit.score, metadata=hit.metadata, raw_text=hit.raw_text,
+            doc_id=hit.doc_id,
+            content=hit.content,
+            score=hit.score,
+            metadata=hit.metadata,
+            raw_text=hit.raw_text,
         )
 
-    def _maybe_rerank(self, *, query: str, results: list[RetrievalResult], top_k: int, rerank: bool) -> list[RetrievalResult]:
+    def _maybe_rerank(
+        self, *, query: str, results: list[RetrievalResult], top_k: int, rerank: bool
+    ) -> list[RetrievalResult]:
         if not rerank:
             return results
         if self._reranker is None:
             self._reranker = CrossEncoderReranker(
-                model_name=self._reranker_model, device=rag_settings.embedding_device,
+                model_name=self._reranker_model,
+                device=rag_settings.embedding_device,
             )
         return self._reranker.rerank(query=query, results=results, top_k=top_k)
 
-    def run_bm25(self, *, query: str, top_k: int, extra_filter: dict[str, Any] | None, rerank: bool) -> list[dict[str, Any]]:
+    def run_bm25(
+        self,
+        *,
+        query: str,
+        top_k: int,
+        extra_filter: dict[str, Any] | None,
+        rerank: bool,
+    ) -> list[dict[str, Any]]:
         final = _merge_filters(self.base_filter, extra_filter)
-        hits = self.es_engine.sparse_search(query_text=query, top_k=top_k, filters=final)
-        return _dedupe_top_doc_ids(self._maybe_rerank(query=query, results=[self._to_result(h) for h in hits], top_k=top_k, rerank=rerank), top_k)
+        hits = self.es_engine.sparse_search(
+            query_text=query, top_k=top_k, filters=final
+        )
+        return _dedupe_top_doc_ids(
+            self._maybe_rerank(
+                query=query,
+                results=[self._to_result(h) for h in hits],
+                top_k=top_k,
+                rerank=rerank,
+            ),
+            top_k,
+        )
 
-    def run_dense(self, *, query: str, top_k: int, extra_filter: dict[str, Any] | None, rerank: bool) -> list[dict[str, Any]]:
+    def run_dense(
+        self,
+        *,
+        query: str,
+        top_k: int,
+        extra_filter: dict[str, Any] | None,
+        rerank: bool,
+    ) -> list[dict[str, Any]]:
         final = _merge_filters(self.base_filter, extra_filter)
-        hits = self.es_engine.dense_search(query_vector=self._embed_query(query), top_k=top_k, filters=final)
-        return _dedupe_top_doc_ids(self._maybe_rerank(query=query, results=[self._to_result(h) for h in hits], top_k=top_k, rerank=rerank), top_k)
+        hits = self.es_engine.dense_search(
+            query_vector=self._embed_query(query), top_k=top_k, filters=final
+        )
+        return _dedupe_top_doc_ids(
+            self._maybe_rerank(
+                query=query,
+                results=[self._to_result(h) for h in hits],
+                top_k=top_k,
+                rerank=rerank,
+            ),
+            top_k,
+        )
 
-    def run_hybrid(self, *, query: str, top_k: int, extra_filter: dict[str, Any] | None, rerank: bool) -> list[dict[str, Any]]:
+    def run_hybrid(
+        self,
+        *,
+        query: str,
+        top_k: int,
+        extra_filter: dict[str, Any] | None,
+        rerank: bool,
+    ) -> list[dict[str, Any]]:
         final = _merge_filters(self.base_filter, extra_filter)
         hits = self.es_engine.hybrid_search(
-            query_vector=self._embed_query(query), query_text=query,
-            top_k=top_k, dense_weight=0.7, sparse_weight=0.3,
-            filters=final, use_rrf=True, rrf_k=60,
+            query_vector=self._embed_query(query),
+            query_text=query,
+            top_k=top_k,
+            dense_weight=0.7,
+            sparse_weight=0.3,
+            filters=final,
+            use_rrf=True,
+            rrf_k=60,
         )
-        return _dedupe_top_doc_ids(self._maybe_rerank(query=query, results=[self._to_result(h) for h in hits], top_k=top_k, rerank=rerank), top_k)
+        return _dedupe_top_doc_ids(
+            self._maybe_rerank(
+                query=query,
+                results=[self._to_result(h) for h in hits],
+                top_k=top_k,
+                rerank=rerank,
+            ),
+            top_k,
+        )
 
 
 def _extract_hard_devices(
@@ -487,13 +635,24 @@ def _compute_metrics(
     for k in K_VALUES:
         top_rows = doc_rows[:k]
         if not top_rows:
-            for pfx in ["raw_cont", "adj_cont", "shared", "ce", "hit", "adj_den", "shared_rel", "shared_rel_den"]:
+            for pfx in [
+                "raw_cont",
+                "adj_cont",
+                "shared",
+                "ce",
+                "hit",
+                "adj_den",
+                "shared_rel",
+                "shared_rel_den",
+            ]:
                 metrics[f"{pfx}@{k}"] = 0.0
             continue
 
         raw_oos = adj_oos = shared_count = ce = 0
         shared_relevant = 0
-        top_ids = [str(r.get("doc_id") or "") for r in top_rows if str(r.get("doc_id") or "")]
+        top_ids = [
+            str(r.get("doc_id") or "") for r in top_rows if str(r.get("doc_id") or "")
+        ]
 
         for row in top_rows:
             doc_id = str(row.get("doc_id") or "")
@@ -515,10 +674,14 @@ def _compute_metrics(
 
         adj_den = k - shared_count
         metrics[f"raw_cont@{k}"] = float(raw_oos) / float(k)
-        metrics[f"adj_cont@{k}"] = float(adj_oos) / max(adj_den, 1) if adj_den > 0 else 0.0
+        metrics[f"adj_cont@{k}"] = (
+            float(adj_oos) / max(adj_den, 1) if adj_den > 0 else 0.0
+        )
         metrics[f"adj_den@{k}"] = float(adj_den)
         metrics[f"shared@{k}"] = float(shared_count) / float(k)
-        metrics[f"shared_rel@{k}"] = float(shared_relevant) / max(shared_count, 1) if shared_count > 0 else 0.0
+        metrics[f"shared_rel@{k}"] = (
+            float(shared_relevant) / max(shared_count, 1) if shared_count > 0 else 0.0
+        )
         metrics[f"shared_rel_den@{k}"] = float(shared_count)
         metrics[f"ce@{k}"] = float(ce)
         metrics[f"hit@{k}"] = 1.0 if any(d in gold_set for d in top_ids) else 0.0
@@ -541,8 +704,11 @@ def _write_csv(path: Path, rows: list[dict[str, Any]], fieldnames: list[str]) ->
 def _bootstrap_delta(
     *,
     per_query_rows: list[dict[str, Any]],
-    system_a: str, system_b: str,
-    metric: str, seed: int, samples: int,
+    system_a: str,
+    system_b: str,
+    metric: str,
+    seed: int,
+    samples: int,
 ) -> dict[str, Any]:
     metric_by_qid: dict[str, dict[str, float]] = defaultdict(dict)
     for row in per_query_rows:
@@ -554,25 +720,49 @@ def _bootstrap_delta(
         if qid and sid and isinstance(val, (int, float)):
             metric_by_qid[qid][sid] = float(val)
 
-    paired = [(v[system_a], v[system_b]) for v in metric_by_qid.values() if system_a in v and system_b in v]
+    paired = [
+        (v[system_a], v[system_b])
+        for v in metric_by_qid.values()
+        if system_a in v and system_b in v
+    ]
     if not paired:
-        return {"system_a": system_a, "system_b": system_b, "metric": metric,
-                "n_queries": 0, "delta_mean": 0.0, "ci_lower": 0.0, "ci_upper": 0.0}
+        return {
+            "system_a": system_a,
+            "system_b": system_b,
+            "metric": metric,
+            "n_queries": 0,
+            "delta_mean": 0.0,
+            "ci_lower": 0.0,
+            "ci_upper": 0.0,
+        }
 
     rng = random.Random(seed)
     n = len(paired)
-    deltas = sorted([_mean([b - a for a, b in [paired[rng.randrange(n)] for _ in range(n)]]) for _ in range(samples)])
+    deltas = sorted(
+        [
+            _mean([b - a for a, b in [paired[rng.randrange(n)] for _ in range(n)]])
+            for _ in range(samples)
+        ]
+    )
     point = _mean([b - a for a, b in paired])
     lo = max(0, int(0.025 * len(deltas)) - 1)
     hi = min(len(deltas) - 1, int(0.975 * len(deltas)) - 1)
-    return {"system_a": system_a, "system_b": system_b, "metric": metric,
-            "n_queries": n, "delta_mean": point, "ci_lower": deltas[lo], "ci_upper": deltas[hi]}
+    return {
+        "system_a": system_a,
+        "system_b": system_b,
+        "metric": metric,
+        "n_queries": n,
+        "delta_mean": point,
+        "ci_lower": deltas[lo],
+        "ci_upper": deltas[hi],
+    }
 
 
 def _mcnemar_test(
     *,
     per_query_rows: list[dict[str, Any]],
-    system_a: str, system_b: str,
+    system_a: str,
+    system_b: str,
     metric: str,
 ) -> dict[str, Any]:
     by_qid: dict[str, dict[str, float]] = defaultdict(dict)
@@ -619,15 +809,23 @@ def _mcnemar_test(
             p_value = 0.5  # rough approximation
 
     return {
-        "system_a": system_a, "system_b": system_b, "metric": metric,
-        "n_paired": n_paired, "b_count": b_count, "c_count": c_count,
-        "chi2": chi2, "p_value_approx": p_value,
+        "system_a": system_a,
+        "system_b": system_b,
+        "metric": metric,
+        "n_paired": n_paired,
+        "b_count": b_count,
+        "c_count": c_count,
+        "chi2": chi2,
+        "p_value_approx": p_value,
     }
 
 
 def _holm_bonferroni(p_values: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Apply Holm-Bonferroni correction to a list of test results."""
-    indexed = [(i, d.get("p_value_approx", d.get("p_value", 1.0))) for i, d in enumerate(p_values)]
+    indexed = [
+        (i, d.get("p_value_approx", d.get("p_value", 1.0)))
+        for i, d in enumerate(p_values)
+    ]
     indexed.sort(key=lambda x: x[1])
     m = len(indexed)
     corrected = list(p_values)
@@ -639,7 +837,9 @@ def _holm_bonferroni(p_values: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return corrected
 
 
-def _summarize(rows: list[dict[str, Any]], group_keys: list[str]) -> list[dict[str, Any]]:
+def _summarize(
+    rows: list[dict[str, Any]], group_keys: list[str]
+) -> list[dict[str, Any]]:
     grouped: dict[tuple[str, ...], list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         grouped[tuple(str(row.get(k) or "") for k in group_keys)].append(row)
@@ -652,10 +852,21 @@ def _summarize(rows: list[dict[str, Any]], group_keys: list[str]) -> list[dict[s
         agg["n_ok"] = len(ok_items)
         agg["n_skipped"] = len(items) - len(ok_items)
         for metric in [
-            "raw_cont@5", "adj_cont@5", "adj_den@5", "shared@5",
-            "shared_rel@5", "shared_rel_den@5", "ce@5", "hit@5", "mrr",
+            "raw_cont@5",
+            "adj_cont@5",
+            "adj_den@5",
+            "shared@5",
+            "shared_rel@5",
+            "shared_rel_den@5",
+            "ce@5",
+            "hit@5",
+            "mrr",
         ]:
-            vals = [float(i[metric]) for i in ok_items if isinstance(i.get(metric), (int, float))]
+            vals = [
+                float(i[metric])
+                for i in ok_items
+                if isinstance(i.get(metric), (int, float))
+            ]
             agg[f"mean_{metric}"] = _mean(vals)
         out.append(agg)
     return out
@@ -663,21 +874,50 @@ def _summarize(rows: list[dict[str, Any]], group_keys: list[str]) -> list[dict[s
 
 METRIC_KEYS: list[str] = []
 for _k in K_VALUES:
-    for _pfx in ["raw_cont", "adj_cont", "adj_den", "shared", "shared_rel", "shared_rel_den", "ce", "hit"]:
+    for _pfx in [
+        "raw_cont",
+        "adj_cont",
+        "adj_den",
+        "shared",
+        "shared_rel",
+        "shared_rel_den",
+        "ce",
+        "hit",
+    ]:
         METRIC_KEYS.append(f"{_pfx}@{_k}")
 METRIC_KEYS.append("mrr")
 
 SKIP_METRICS = {k: "" for k in METRIC_KEYS}
 
-PER_QUERY_FIELDS = [
-    "q_id", "split", "scope_observability", "system_id", "status", "skip_reason",
-    "intent_primary", "target_scope_level",
-    "allowed_devices", "allowed_equips", "shared_allowed", "family_allowed",
-    "parsed_hard_devices", "parsed_hard_devices_norm", "hard_device_empty",
-    "parsed_hard_equip_ids", "family_devices",
-    "allowed_scope_size", "latency_ms",
-    "rerank_applied", "rerank_model_seen", "rerank_proof_count",
-] + METRIC_KEYS + ["top_doc_ids", "in_corpus_top_docs"]
+PER_QUERY_FIELDS = (
+    [
+        "q_id",
+        "split",
+        "scope_observability",
+        "system_id",
+        "status",
+        "skip_reason",
+        "intent_primary",
+        "target_scope_level",
+        "allowed_devices",
+        "allowed_equips",
+        "shared_allowed",
+        "family_allowed",
+        "parsed_hard_devices",
+        "parsed_hard_devices_norm",
+        "parsed_hard_devices_es",
+        "hard_device_empty",
+        "parsed_hard_equip_ids",
+        "family_devices",
+        "allowed_scope_size",
+        "latency_ms",
+        "rerank_applied",
+        "rerank_model_seen",
+        "rerank_proof_count",
+    ]
+    + METRIC_KEYS
+    + ["top_doc_ids", "in_corpus_top_docs"]
+)
 
 
 def _extract_rerank_proof(doc_rows: list[dict[str, Any]]) -> tuple[bool, str, int]:
@@ -707,15 +947,20 @@ def run() -> int:
     family_map_path = Path(cast(str, args.family_map))
     out_dir = Path(cast(str, args.out_dir))
 
-    for p, name in [(eval_set_path, "eval-set"), (corpus_filter_path, "corpus-filter"),
-                     (doc_scope_path, "doc-scope"), (family_map_path, "family-map")]:
+    for p, name in [
+        (eval_set_path, "eval-set"),
+        (corpus_filter_path, "corpus-filter"),
+        (doc_scope_path, "doc-scope"),
+        (family_map_path, "family-map"),
+    ]:
         if not p.exists() or not p.is_file():
             print(f"{name} file not found: {p}", file=sys.stderr)
             return 1
 
     # Task 6: Resolve and load device catalog
     device_catalog_path = _resolve_device_catalog(
-        cast(str | None, args.device_catalog), doc_scope_path,
+        cast(str | None, args.device_catalog),
+        doc_scope_path,
     )
     alias_map = _build_alias_map(device_catalog_path)
     print(f"Loaded alias map: {len(alias_map)} entries from {device_catalog_path}")
@@ -730,7 +975,9 @@ def run() -> int:
 
     try:
         all_queries = _load_master_eval_set(eval_set_path)
-        queries = _filter_queries(all_queries, str(args.split), str(args.scope_observability), int(args.limit))
+        queries = _filter_queries(
+            all_queries, str(args.split), str(args.scope_observability), int(args.limit)
+        )
         if not queries:
             print("No queries after filtering", file=sys.stderr)
             return 1
@@ -739,12 +986,17 @@ def run() -> int:
         doc_scope_rows = _load_doc_scope(doc_scope_path)
         family_map = _load_family_map(family_map_path)
         device_to_family = {
-            str(k): str(v) for k, v in cast(dict[str, Any], family_map.get("device_to_family") or {}).items()
+            str(k): str(v)
+            for k, v in cast(
+                dict[str, Any], family_map.get("device_to_family") or {}
+            ).items()
             if str(k).strip() and str(v).strip()
         }
         families = {
             str(fid): [str(m) for m in members if str(m).strip()]
-            for fid, members in cast(dict[str, Any], family_map.get("families") or {}).items()
+            for fid, members in cast(
+                dict[str, Any], family_map.get("families") or {}
+            ).items()
             if isinstance(members, list)
         }
 
@@ -758,43 +1010,68 @@ def run() -> int:
             for row in doc_scope_rows
             if bool(row.get("is_shared")) and str(row.get("es_doc_id") or "").strip()
         }
-        shared_path = Path(cast(str, args.shared_doc_ids)) if args.shared_doc_ids else doc_scope_path.parent / "shared_doc_ids.txt"
+        shared_path = (
+            Path(cast(str, args.shared_doc_ids))
+            if args.shared_doc_ids
+            else doc_scope_path.parent / "shared_doc_ids.txt"
+        )
         if shared_path.exists() and shared_path.is_file():
             shared_doc_ids.update(_load_lines(shared_path))
 
-        device_candidates = sorted({
-            str(row.get("es_device_name") or "").strip()
-            for row in doc_scope_rows if str(row.get("es_device_name") or "").strip()
-        })
+        device_candidates = sorted(
+            {
+                str(row.get("es_device_name") or "").strip()
+                for row in doc_scope_rows
+                if str(row.get("es_device_name") or "").strip()
+            }
+        )
+        # Reverse map: norm -> all raw ES device_name variants
+        norm_to_raw_map = _build_norm_to_raw_map(device_candidates, alias_map)
+        print(
+            f"Norm-to-raw map: {sum(len(v) for v in norm_to_raw_map.values())} raw names across {len(norm_to_raw_map)} norms"
+        )
+
         equip_candidates = {
             str(row.get("es_equip_id") or "").strip().upper()
-            for row in doc_scope_rows if str(row.get("es_equip_id") or "").strip()
+            for row in doc_scope_rows
+            if str(row.get("es_equip_id") or "").strip()
         }
 
-        device_doc_types = sorted({
-            str(row.get("es_doc_type") or "").strip()
-            for row in doc_scope_rows
-            if str(row.get("scope_level") or "") == "device" and str(row.get("es_doc_type") or "").strip()
-        }) or ["setup", "sop", "ts"]
+        device_doc_types = sorted(
+            {
+                str(row.get("es_doc_type") or "").strip()
+                for row in doc_scope_rows
+                if str(row.get("scope_level") or "") == "device"
+                and str(row.get("es_doc_type") or "").strip()
+            }
+        ) or ["setup", "sop", "ts"]
 
-        equip_doc_types = sorted({
-            str(row.get("es_doc_type") or "").strip()
-            for row in doc_scope_rows
-            if str(row.get("scope_level") or "") == "equip" and str(row.get("es_doc_type") or "").strip()
-        }) or ["gcb", "myservice"]
+        equip_doc_types = sorted(
+            {
+                str(row.get("es_doc_type") or "").strip()
+                for row in doc_scope_rows
+                if str(row.get("scope_level") or "") == "equip"
+                and str(row.get("es_doc_type") or "").strip()
+            }
+        ) or ["gcb", "myservice"]
 
         # Build device-by-doc-id lookup
         doc_scope_device_by_id = {
-            str(row.get("es_doc_id") or "").strip(): str(row.get("es_device_name") or "").strip()
-            for row in doc_scope_rows if str(row.get("es_doc_id") or "").strip()
+            str(row.get("es_doc_id") or "").strip(): str(
+                row.get("es_device_name") or ""
+            ).strip()
+            for row in doc_scope_rows
+            if str(row.get("es_doc_id") or "").strip()
         }
 
         # ES setup
         manager = EsIndexManager(
-            es_host=search_settings.es_host, env=search_settings.es_env,
+            es_host=search_settings.es_host,
+            env=search_settings.es_env,
             index_prefix=search_settings.es_index_prefix,
             es_user=search_settings.es_user or None,
-            es_password=search_settings.es_password or None, verify_certs=True,
+            es_password=search_settings.es_password or None,
+            verify_certs=True,
         )
         alias_or_index = cast(str | None, args.index) or manager.get_alias_name()
         alias_name, resolved_index = _resolve_alias_or_index(manager, alias_or_index)
@@ -812,28 +1089,46 @@ def run() -> int:
         for query in queries:
             # Parse hard devices/equips from query text (with alias resolution)
             hard_devices_raw, hard_devices_norm = _extract_hard_devices(
-                query.question, device_candidates, alias_map,
+                query.question,
+                device_candidates,
+                alias_map,
+            )
+            # Expand norm names back to ALL raw ES variants for filter construction
+            hard_devices_es = _expand_norms_to_es_raw(
+                hard_devices_norm, norm_to_raw_map
             )
             hard_equip_ids = _extract_hard_equip_ids(query.question, equip_candidates)
 
             # Determine allowed scope for metric computation (from gold labels)
             allowed_scope_devices: set[str] = set(query.allowed_devices)
             if query.family_allowed and hard_devices_norm:
-                family_expanded = _expand_family_devices(hard_devices_norm, device_to_family, families)
+                family_expanded = _expand_family_devices(
+                    hard_devices_norm, device_to_family, families
+                )
                 allowed_scope_devices.update(family_expanded)
 
             # Alias audit row (one per query, not per system)
-            alias_audit_rows.append({
-                "q_id": query.q_id,
-                "question": query.question,
-                "allowed_devices": "|".join(query.allowed_devices),
-                "parsed_hard_devices_norm": "|".join(hard_devices_norm),
-                "parsed_hard_devices": "|".join(hard_devices_raw),
-                "mismatch_flag": bool(
-                    hard_devices_raw and hard_devices_norm
-                    and set(hard_devices_norm) != set(hard_devices_raw)
-                ),
-            })
+            allowed_devices_norm = {
+                _normalize_device(d, alias_map) or d for d in query.allowed_devices if d
+            }
+            parsed_devices_norm = {d for d in hard_devices_norm if d}
+            alias_audit_rows.append(
+                {
+                    "q_id": query.q_id,
+                    "question": query.question,
+                    "allowed_devices": "|".join(query.allowed_devices),
+                    "parsed_hard_devices_norm": "|".join(hard_devices_norm),
+                    "parsed_hard_devices": "|".join(hard_devices_raw),
+                    "mismatch_flag": bool(
+                        (hard_devices_raw and not parsed_devices_norm)
+                        or (
+                            parsed_devices_norm
+                            and allowed_devices_norm
+                            and parsed_devices_norm.isdisjoint(allowed_devices_norm)
+                        )
+                    ),
+                }
+            )
 
             for system_id in systems:
                 row_base: dict[str, Any] = {
@@ -851,10 +1146,13 @@ def run() -> int:
                     "family_allowed": query.family_allowed,
                     "parsed_hard_devices": "|".join(hard_devices_raw),
                     "parsed_hard_devices_norm": "|".join(hard_devices_norm),
+                    "parsed_hard_devices_es": "|".join(hard_devices_es),
                     "hard_device_empty": len(hard_devices_norm) == 0,
                     "parsed_hard_equip_ids": "|".join(hard_equip_ids),
                     "family_devices": "|".join(
-                        _expand_family_devices(hard_devices_norm, device_to_family, families)
+                        _expand_family_devices(
+                            hard_devices_norm, device_to_family, families
+                        )
                     ),
                     "allowed_scope_size": len(allowed_scope_devices),
                     "latency_ms": 0.0,
@@ -903,39 +1201,81 @@ def run() -> int:
                 t0 = time.monotonic()
 
                 if system_id == "B0":
-                    doc_rows = retrieval.run_bm25(query=query.question, top_k=int(args.top_k), extra_filter=None, rerank=False)
+                    doc_rows = retrieval.run_bm25(
+                        query=query.question,
+                        top_k=int(args.top_k),
+                        extra_filter=None,
+                        rerank=False,
+                    )
                 elif system_id == "B1":
-                    doc_rows = retrieval.run_dense(query=query.question, top_k=int(args.top_k), extra_filter=None, rerank=False)
+                    doc_rows = retrieval.run_dense(
+                        query=query.question,
+                        top_k=int(args.top_k),
+                        extra_filter=None,
+                        rerank=False,
+                    )
                 elif system_id == "B2":
-                    doc_rows = retrieval.run_hybrid(query=query.question, top_k=int(args.top_k), extra_filter=None, rerank=False)
+                    doc_rows = retrieval.run_hybrid(
+                        query=query.question,
+                        top_k=int(args.top_k),
+                        extra_filter=None,
+                        rerank=False,
+                    )
                 elif system_id == "B3":
-                    doc_rows = retrieval.run_hybrid(query=query.question, top_k=int(args.top_k), extra_filter=None, rerank=True)
+                    doc_rows = retrieval.run_hybrid(
+                        query=query.question,
+                        top_k=int(args.top_k),
+                        extra_filter=None,
+                        rerank=True,
+                    )
                 elif system_id == "B4":
-                    if hard_devices_norm:
-                        extra_filter = retrieval.es_engine.build_filter(device_names=hard_devices_norm)
-                    doc_rows = retrieval.run_hybrid(query=query.question, top_k=int(args.top_k), extra_filter=cast(dict[str, Any] | None, extra_filter), rerank=True)
+                    if hard_devices_es:
+                        extra_filter = retrieval.es_engine.build_filter(
+                            device_names=hard_devices_es
+                        )
+                    doc_rows = retrieval.run_hybrid(
+                        query=query.question,
+                        top_k=int(args.top_k),
+                        extra_filter=cast(dict[str, Any] | None, extra_filter),
+                        rerank=True,
+                    )
                 elif system_id == "B4.5":
                     # B4.5: shared docs OR hard device docs, with rerank
                     b45_should: list[dict[str, Any]] = []
                     if shared_doc_ids:
                         b45_should.append({"terms": {"doc_id": sorted(shared_doc_ids)}})
-                    if hard_devices_norm:
-                        b45_should.append({"terms": {"device_name": hard_devices_norm}})
+                    if hard_devices_es:
+                        b45_should.append({"terms": {"device_name": hard_devices_es}})
                     if b45_should:
-                        extra_filter = {"bool": {"should": b45_should, "minimum_should_match": 1}}
-                    doc_rows = retrieval.run_hybrid(query=query.question, top_k=int(args.top_k), extra_filter=cast(dict[str, Any] | None, extra_filter), rerank=True)
+                        extra_filter = {
+                            "bool": {"should": b45_should, "minimum_should_match": 1}
+                        }
+                    doc_rows = retrieval.run_hybrid(
+                        query=query.question,
+                        top_k=int(args.top_k),
+                        extra_filter=cast(dict[str, Any] | None, extra_filter),
+                        rerank=True,
+                    )
                 elif system_id == "P1":
                     if bool(args.use_es_scope_fields):
                         extra_filter = build_scope_filter_by_fields(
-                            allowed_devices=hard_devices_norm, allowed_equip_ids=hard_equip_ids,
+                            allowed_devices=hard_devices_es,
+                            allowed_equip_ids=hard_equip_ids,
                         )
                     else:
                         extra_filter = build_scope_filter_by_doc_ids(
-                            allowed_devices=hard_devices_norm, allowed_equip_ids=hard_equip_ids,
+                            allowed_devices=hard_devices_es,
+                            allowed_equip_ids=hard_equip_ids,
                             shared_doc_ids=sorted(shared_doc_ids),
-                            device_doc_types=device_doc_types, equip_doc_types=equip_doc_types,
+                            device_doc_types=device_doc_types,
+                            equip_doc_types=equip_doc_types,
                         )
-                    doc_rows = retrieval.run_hybrid(query=query.question, top_k=int(args.top_k), extra_filter=cast(dict[str, Any] | None, extra_filter), rerank=True)
+                    doc_rows = retrieval.run_hybrid(
+                        query=query.question,
+                        top_k=int(args.top_k),
+                        extra_filter=cast(dict[str, Any] | None, extra_filter),
+                        rerank=True,
+                    )
                 else:
                     skip_row = dict(row_base)
                     skip_row["status"] = "skipped"
@@ -947,7 +1287,13 @@ def run() -> int:
                 latency_ms = (time.monotonic() - t0) * 1000.0
 
                 # Task 7: Extract rerank proof
-                rerank_applied, rerank_model_seen, rerank_proof_count = _extract_rerank_proof(doc_rows)
+                rerank_applied, rerank_model_seen, rerank_proof_count = (
+                    _extract_rerank_proof(doc_rows)
+                )
+                if system_id in rerank_systems and doc_rows and not rerank_applied:
+                    raise RuntimeError(
+                        f"Rerank proof missing for q_id={query.q_id}, system={system_id}"
+                    )
 
                 # Compute metrics using gold labels (with alias-aware comparison)
                 metrics = _compute_metrics(
@@ -964,7 +1310,9 @@ def run() -> int:
                 out_row["rerank_applied"] = rerank_applied
                 out_row["rerank_model_seen"] = rerank_model_seen
                 out_row["rerank_proof_count"] = rerank_proof_count
-                out_row["top_doc_ids"] = "|".join(str(r.get("doc_id") or "") for r in doc_rows)
+                out_row["top_doc_ids"] = "|".join(
+                    str(r.get("doc_id") or "") for r in doc_rows
+                )
                 out_row["in_corpus_top_docs"] = all(
                     str(r.get("doc_id") or "") in corpus_doc_set for r in doc_rows
                 )
@@ -975,40 +1323,77 @@ def run() -> int:
         _write_csv(out_dir / "per_query.csv", per_query_rows, PER_QUERY_FIELDS)
 
         # Task 6: Write alias audit CSV
-        _write_csv(out_dir / "alias_audit.csv", alias_audit_rows, [
-            "q_id", "question", "allowed_devices",
-            "parsed_hard_devices_norm", "parsed_hard_devices", "mismatch_flag",
-        ])
+        _write_csv(
+            out_dir / "alias_audit.csv",
+            alias_audit_rows,
+            [
+                "q_id",
+                "question",
+                "allowed_devices",
+                "parsed_hard_devices_norm",
+                "parsed_hard_devices",
+                "mismatch_flag",
+            ],
+        )
         mismatch_count = sum(1 for r in alias_audit_rows if r.get("mismatch_flag"))
-        print(f"Alias audit: {len(alias_audit_rows)} queries, {mismatch_count} mismatches")
+        print(
+            f"Alias audit: {len(alias_audit_rows)} queries, {mismatch_count} mismatches"
+        )
 
         summary_all = _summarize(per_query_rows, ["system_id"])
         summary_all_fields = [
-            "system_id", "n_queries", "n_ok", "n_skipped",
-            "mean_raw_cont@5", "mean_adj_cont@5", "mean_adj_den@5",
-            "mean_shared@5", "mean_shared_rel@5", "mean_shared_rel_den@5",
-            "mean_ce@5", "mean_hit@5", "mean_mrr",
+            "system_id",
+            "n_queries",
+            "n_ok",
+            "n_skipped",
+            "mean_raw_cont@5",
+            "mean_adj_cont@5",
+            "mean_adj_den@5",
+            "mean_shared@5",
+            "mean_shared_rel@5",
+            "mean_shared_rel_den@5",
+            "mean_ce@5",
+            "mean_hit@5",
+            "mean_mrr",
         ]
         _write_csv(out_dir / "summary_all.csv", summary_all, summary_all_fields)
 
-        summary_by_obs = _summarize(per_query_rows, ["scope_observability", "system_id"])
-        _write_csv(out_dir / "summary_by_observability.csv", summary_by_obs,
-                    ["scope_observability"] + summary_all_fields)
+        summary_by_obs = _summarize(
+            per_query_rows, ["scope_observability", "system_id"]
+        )
+        _write_csv(
+            out_dir / "summary_by_observability.csv",
+            summary_by_obs,
+            ["scope_observability"] + summary_all_fields,
+        )
 
         # Bootstrap CIs for preregistered comparisons
-        preregistered_pairs = [("B3", "B4"), ("B4", "B4.5"), ("B4.5", "P1"), ("B4", "P1")]
-        active_pairs = [(a, b) for a, b in preregistered_pairs if a in systems and b in systems]
+        preregistered_pairs = [
+            ("B3", "B4"),
+            ("B4", "B4.5"),
+            ("B4.5", "P1"),
+            ("B4", "P1"),
+        ]
+        active_pairs = [
+            (a, b) for a, b in preregistered_pairs if a in systems and b in systems
+        ]
         bootstrap_comparisons: list[dict[str, Any]] = []
         for sys_a, sys_b in active_pairs:
             for metric in ["adj_cont@5", "hit@5", "mrr"]:
-                bootstrap_comparisons.append(_bootstrap_delta(
-                    per_query_rows=per_query_rows,
-                    system_a=sys_a, system_b=sys_b, metric=metric,
-                    seed=int(args.seed), samples=int(args.bootstrap_samples),
-                ))
+                bootstrap_comparisons.append(
+                    _bootstrap_delta(
+                        per_query_rows=per_query_rows,
+                        system_a=sys_a,
+                        system_b=sys_b,
+                        metric=metric,
+                        seed=int(args.seed),
+                        samples=int(args.bootstrap_samples),
+                    )
+                )
 
         bootstrap_payload: dict[str, Any] = {
-            "seed": int(args.seed), "samples": int(args.bootstrap_samples),
+            "seed": int(args.seed),
+            "samples": int(args.bootstrap_samples),
             "comparisons": bootstrap_comparisons,
         }
         write_json(out_dir / "bootstrap_ci.json", bootstrap_payload)
@@ -1016,17 +1401,23 @@ def run() -> int:
         # McNemar tests for CE@5
         mcnemar_results: list[dict[str, Any]] = []
         for sys_a, sys_b in active_pairs:
-            mcnemar_results.append(_mcnemar_test(
-                per_query_rows=per_query_rows,
-                system_a=sys_a, system_b=sys_b, metric="ce@5",
-            ))
+            mcnemar_results.append(
+                _mcnemar_test(
+                    per_query_rows=per_query_rows,
+                    system_a=sys_a,
+                    system_b=sys_b,
+                    metric="ce@5",
+                )
+            )
         corrected = _holm_bonferroni(mcnemar_results) if mcnemar_results else []
         write_json(out_dir / "mcnemar.json", {"tests": corrected})
 
         # Manifest with hashes
         git_sha = ""
         try:
-            git_sha = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True, cwd=ROOT).strip()
+            git_sha = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], text=True, cwd=ROOT
+            ).strip()
         except Exception:
             pass
 
@@ -1073,6 +1464,7 @@ def run() -> int:
     except Exception as exc:
         print(f"evaluate_paper_a_master failed: {exc}", file=sys.stderr)
         import traceback
+
         traceback.print_exc()
         return 1
 
