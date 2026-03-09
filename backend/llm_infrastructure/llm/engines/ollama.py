@@ -22,6 +22,7 @@ class OllamaClient:
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         timeout: Optional[int] = None,
+        repeat_penalty: Optional[float] = None,
         client: Optional[httpx.Client] = None,
     ) -> None:
         self.base_url = (base_url or ollama_settings.base_url).rstrip("/")
@@ -29,6 +30,7 @@ class OllamaClient:
         self.temperature = temperature if temperature is not None else ollama_settings.temperature
         self.max_tokens = max_tokens if max_tokens is not None else ollama_settings.max_tokens
         self.timeout = timeout if timeout is not None else ollama_settings.timeout
+        self.repeat_penalty = repeat_penalty if repeat_penalty is not None else ollama_settings.repeat_penalty
         self._client = client or httpx.Client(timeout=self.timeout)
 
     def _is_openai_compatible(self) -> bool:
@@ -80,6 +82,9 @@ class OllamaClient:
             "max_tokens": max_tokens if max_tokens is not None else self.max_tokens,
             "stream": stream,
         }
+
+        if self.repeat_penalty and self.repeat_penalty != 1.0:
+            payload["frequency_penalty"] = min(self.repeat_penalty - 1.0, 2.0)
 
         if response_model is not None:
             payload["response_format"] = {"type": "json_object"}
@@ -138,6 +143,8 @@ class OllamaClient:
             ollama_options["temperature"] = resolved_temperature
         if resolved_max_tokens is not None:
             ollama_options["num_predict"] = resolved_max_tokens
+        if self.repeat_penalty and self.repeat_penalty != 1.0:
+            ollama_options["repeat_penalty"] = self.repeat_penalty
         if ollama_options:
             payload["options"] = ollama_options
 

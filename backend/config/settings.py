@@ -285,6 +285,7 @@ class OllamaSettings(BaseSettings):
     temperature: float = Field(default=0.7, description="Sampling temperature")
     max_tokens: int = Field(default=30000, description="Maximum tokens to generate")
     timeout: int = Field(default=60, description="Request timeout in seconds")
+    repeat_penalty: float = Field(default=1.1, description="Repetition penalty (1.0=off, >1.0=penalize)")
 
 
 class VlmClientSettings(BaseSettings):
