@@ -99,6 +99,61 @@ Corpus: 578 doc_ids, ES index: `rag_chunks_dev_v2` (alias `rag_chunks_dev_curren
 
 ---
 
+## 2026-03-09 Reruns (Alias Fix + B4.5 + Shared Metrics)
+
+> Git SHA: (post-alias-normalization branch)
+> Date: 2026-03-09
+> Key changes: canonical alias normalization, B4.5 system added, adj_den/shared_rel metrics, rerank proof fields
+
+### Run 1: test_baselines (n=51)
+
+- **Path**: `.sisyphus/evidence/paper-a/runs/2026-03-09_test_baselines/`
+- **Split**: test | **Systems**: B0, B1, B2, B3
+- **Queries**: 51 (all OK, 0 skipped)
+- **Note**: Baseline systems across full test set (explicit_device + explicit_equip + implicit)
+
+| System | n_ok | mean_raw_cont@5 | mean_adj_cont@5 | mean_adj_den@5 | mean_shared@5 | mean_shared_rel@5 | mean_ce@5 | mean_hit@5 | mean_mrr |
+|--------|------|-----------------|-----------------|----------------|----------------|-------------------|-----------|-----------|---------|
+| B0 | 51 | 0.3961 | 0.3592 | 4.1765 | 0.1647 | 0.0000 | 0.4706 | 0.2549 | 0.1918 |
+| B1 | 51 | 0.4667 | 0.4748 | 4.6078 | 0.0784 | 0.0196 | 0.6863 | 0.1765 | 0.1667 |
+| B2 | 51 | 0.3961 | 0.3601 | 4.1765 | 0.1647 | 0.0196 | 0.4706 | 0.2941 | 0.1941 |
+| B3 | 51 | 0.3961 | 0.3592 | 4.1373 | 0.1725 | 0.0196 | 0.4706 | 0.2941 | 0.2239 |
+
+### Run 2: test_core (n=51)
+
+- **Path**: `.sisyphus/evidence/paper-a/runs/2026-03-09_test_core/`
+- **Split**: test | **Systems**: B4, B4.5, P1
+- **Queries**: 51 (all OK, 0 skipped)
+- **Note**: Scoped systems (hard filter B4, new B4.5 dense variant, shared-aware P1) across full test set
+
+| System | n_ok | mean_raw_cont@5 | mean_adj_cont@5 | mean_adj_den@5 | mean_shared@5 | mean_shared_rel@5 | mean_ce@5 | mean_hit@5 | mean_mrr |
+|--------|------|-----------------|-----------------|----------------|----------------|-------------------|-----------|-----------|---------|
+| B4 | 51 | 0.3608 | 0.3229 | 2.4118 | 0.1255 | 0.0000 | 0.4118 | 0.1373 | 0.1046 |
+| B4.5 | 51 | 0.5451 | 0.0000 | 0.4510 | 0.9098 | 0.0163 | 0.0000 | 0.0588 | 0.0616 |
+| P1 | 51 | 0.5451 | 0.0000 | 0.4510 | 0.9098 | 0.0163 | 0.0000 | 0.0588 | 0.0588 |
+
+**New in B4.5**: Dense vector variant of scoped retrieval. Achieves zero adjusted contamination but lower hit@5 than B4 (0.0588 vs 0.1373), suggesting trade-off between scope-level reclassification and retrieval effectiveness.
+
+### Run 3: test_explicit_device_core (n=22)
+
+- **Path**: `.sisyphus/evidence/paper-a/runs/2026-03-09_test_explicit_device_core/`
+- **Split**: test | **Observability**: explicit_device
+- **Queries**: 22 (all OK, 0 skipped)
+- **Systems**: B4, B4.5, P1
+- **Note**: Scoped systems on device-observability queries only (R2 mitigation validation)
+
+| System | n_ok | mean_raw_cont@5 | mean_adj_cont@5 | mean_adj_den@5 | mean_shared@5 | mean_shared_rel@5 | mean_ce@5 | mean_hit@5 | mean_mrr |
+|--------|------|-----------------|-----------------|----------------|----------------|-------------------|-----------|-----------|---------|
+| B4 | 22 | 0.0455 | 0.0455 | 0.3636 | 0.0182 | 0.0000 | 0.0455 | 0.0455 | 0.0455 |
+| B4.5 | 22 | 0.2364 | 0.0000 | 0.5909 | 0.8818 | 0.0379 | 0.0000 | 0.1364 | 0.1429 |
+| P1 | 22 | 0.2364 | 0.0000 | 0.5909 | 0.8818 | 0.0379 | 0.0000 | 0.1364 | 0.1364 |
+
+**New metrics (R2 mitigation validation)**:
+- **adj_den@5**: adjusted density — mean number of in-scope documents per query in top-5 after filtering. B4 achieves 0.36 (sparse retrieval), B4.5/P1 achieve 0.59 (moderate density via shared-doc promotion).
+- **shared_rel@5**: shared document relative ratio — fraction of top-5 positions filled by shared docs among relevant in-scope contexts. B4.5/P1 show 0.0379 (3.79%), indicating marginal shared-doc density on explicit_device slice.
+
+---
+
 ## Files per Run
 
 Each run directory contains:

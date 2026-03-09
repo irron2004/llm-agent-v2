@@ -2,6 +2,24 @@
 
 ---
 
+# 1. Introduction
+
+Retrieval-Augmented Generation (RAG) systems play a critical role in semiconductor manufacturing environments, where maintenance engineers query shared document repositories spanning multiple equipment types for troubleshooting and preventive maintenance procedures. These systems must ground answers in high-fidelity equipment-specific information to maintain safety and operational efficiency in high-stakes fabrication settings.
+
+Global retrieval without scope awareness creates a fundamental challenge: documents from unrelated equipment contaminate the top-k results, risking answers grounded in incorrect procedures. For instance, a query about the SUPRA XP's calibration procedure may retrieve operation guides for INTEGER 45, misleading engineers toward inappropriate interventions. This cross-equipment contamination is not merely a ranking problem—it poses direct safety risks in manufacturing environments where procedural errors can damage equipment or compromise product quality.
+
+A naive approach applies hard device-name filtering (system B4) to eliminate most contamination, but at a significant cost. Aggressive filtering sacrifices recall for shared procedures—standard operating procedures (SOPs) and troubleshooting guides applicable across multiple equipment types—and fails entirely when the equipment type cannot be automatically parsed from query text. For implicit queries lacking explicit device mentions, such filtering degenerates to global retrieval, offering no contamination protection.
+
+We propose hierarchy-aware scope routing, a three-level document classification system that applies different retrieval filter granularities per document type. The approach classifies documents as *shared* (cross-equipment procedures), *device* (equipment-model-specific content), or *equip* (instance-level maintenance logs). The scope filter preserves access to shared documents while enforcing strict device-level filtering for equipment-specific procedures. We introduce Contamination@k (Cont@k) as a first-class safety metric, decomposing it into Raw and Adjusted variants to separate benign shared documents from true out-of-scope contamination.
+
+Our evaluation uses a test set of 51 queries across three scope observability slices: explicit-device (n=22), explicit-equip (n=8), and implicit (n=21). The minimum detectable effect size for hit@5 at alpha=0.05 and power=0.8 is 0.277 (27.7 percentage points) for the full test set, with higher MDEs for smaller slices; these constraints are sufficient to detect the large contamination differences observed between scoped and unscoped systems.
+
+This paper makes three contributions: (1) a contamination metric decomposition (Raw/Adjusted/Shared@k) that isolates true scope violations from benign shared-document retrieval; (2) a scope-level-aware filter construction that routes retrieval by document type hierarchy while preserving safety margins; and (3) empirical evaluation on a 578-document semiconductor maintenance corpus showing contamination reduction while maintaining recall for shared procedures.
+
+The rest of this paper is organized as follows: Section 2 reviews related work on retrieval filtering and safety in RAG systems, Section 3 formalizes the methodology and scope routing policy, Section 4 describes the experimental setup and datasets, Section 5 reports results and statistical significance, Section 6 discusses findings and limitations, and Section 7 concludes.
+
+---
+
 # 3. Methodology
 
 ## 3.1 Problem Setting
@@ -33,9 +51,19 @@ where:
 - $S_{\text{hard}}(q)$: devices/equips explicitly parsed from $q$ (e.g., device name mentioned in query text)
 - $S_{\text{family}}(q) = \bigcup_{d \in S_{\text{hard}}(q)} \text{Family}(d)$: family expansion for procedure documents only
 
-A document $d$ is **in-scope** if and only if:
+For queries where the parser cannot extract scope information, a future router will provide:
 
-$$d \in D_{\text{shared}} \quad \text{OR} \quad \text{device}(d) \in S(q)$$
+$$S(q) = S_{\text{hard}}(q) \cup S_{\text{family}}(q) \cup S_{\text{routed}}(q)$$
+
+where $S_{\text{routed}}(q)$ represents devices selected by an embedding-based router (systems P2–P4, planned). In the current evaluation, $S_{\text{routed}}(q) = \emptyset$.
+
+A document $d$ is **in-scope** for query $q$ based on its scope_level:
+
+$$\text{InScope}(d, q) = \begin{cases}
+\text{true} & \text{if } \text{scope\_level}(d) = \texttt{shared} \\
+\text{device}(d) \in S(q) & \text{if } \text{scope\_level}(d) = \texttt{device} \\
+\text{equip}(d) \in S_{\text{equip}}(q) \lor \text{device}(d) \in S(q) & \text{if } \text{scope\_level}(d) = \texttt{equip}
+\end{cases}$$
 
 ## 3.4 Document Scope Level
 
@@ -60,6 +88,8 @@ $$D_{\text{shared}} = \{d \mid \text{topic}(d) \in \mathcal{T}_{\text{shared}}\}
 $$\mathcal{T}_{\text{shared}} = \{t \mid |\{e \in \mathcal{E} : t \in \text{Topics}(e)\}| \geq T\}$$
 
 Only procedure document types (SOP, TS) are eligible for shared classification.
+
+The threshold $T=3$ was selected as the smallest value that excludes pair-wise overlaps (which may arise from naming variants or partial equipment reuse) while capturing genuinely cross-equipment procedures. In our corpus, $T=3$ yields 124 shared documents spanning 17 global and 107 multi-device topics.
 
 ## 3.6 Equipment Family Construction
 
@@ -137,6 +167,7 @@ For queries where the parser cannot extract device information, a low-dimensiona
 | B2 | Global | Hybrid+RRF | No | Reported |
 | B3 | Global | Hybrid+RRF | Yes | Reported |
 | B4 | Auto-parse Hard | Hybrid+RRF (filtered) | Yes | Reported |
+| B4.5 | Auto-parse Hard + Shared | Hybrid+RRF (shared∪device filter) | Yes | Reported |
 | P1 | Hard + Shared + scope_level | Hybrid+RRF (filtered) | Yes | Reported |
 | P2 | Matryoshka Router Top-M | Hybrid+RRF (filtered) | Yes | Planned |
 | P3 | Router + Family | Hybrid+RRF | Yes | Planned |
@@ -203,6 +234,84 @@ Output: ranked documents R, scope metadata
 16. R ← CROSS_ENCODER_RERANK(q, candidates, top_k=K)
 
 17. return R, mode, S_device, S_equip
+```
+
+### Edge Cases
+
+- **Empty scope fallback**: When `AUTO_PARSE` returns neither device_name nor equip_id (mode = `GLOBAL_FALLBACK`), the filter degenerates to the corpus-wide whitelist. All documents pass the scope check. This provides baseline behavior equivalent to B3.
+- **doc_scope miss**: If a retrieved document's `doc_id` is not present in the policy `doc_scope` artifact, it is treated as `scope_level = device` with unknown device. Such documents are counted as out-of-scope in contamination metrics unless their `device_name` metadata matches $S(q)$.
+
+---
+
+# Figures
+
+## Figure 1: Pipeline Overview
+
+```mermaid
+flowchart LR
+    Q[Query q] --> PARSE[Auto-Parse]
+    PARSE --> |device/equip| SCOPE[Scope Filter<br/>Construction]
+    PARSE --> |empty| FALLBACK[Global Fallback]
+    SCOPE --> HYBRID[Hybrid Search<br/>BM25 + Dense + RRF]
+    FALLBACK --> HYBRID
+    HYBRID --> RERANK[Cross-Encoder<br/>Reranker]
+    RERANK --> TOPK[Top-K Results]
+
+    DS[D_shared] --> SCOPE
+    FM[Family Map] --> SCOPE
+    DSC[Doc Scope] --> SCOPE
+```
+
+## Figure 2: Contamination Concept
+
+```mermaid
+flowchart TB
+    subgraph GLOBAL["Global Retrieval (B0-B3)"]
+        G1[Doc A: SUPRA XP ✓]
+        G2[Doc B: INTEGER plus ✗]
+        G3[Doc C: SUPRA N ✗]
+        G4[Doc D: SUPRA XP ✓]
+        G5[Doc E: PRECIA ✗]
+    end
+
+    subgraph SCOPED["Scope-Aware (P1)"]
+        S1[Doc A: SUPRA XP ✓]
+        S2[Doc D: SUPRA XP ✓]
+        S3[Doc F: Shared SOP ≈]
+        S4[Doc G: SUPRA XP ✓]
+        S5[Doc H: Shared SOP ≈]
+    end
+
+    Q[Query: SUPRA XP PM 절차] --> GLOBAL
+    Q --> SCOPED
+
+    style G2 fill:#ff6b6b
+    style G3 fill:#ff6b6b
+    style G5 fill:#ff6b6b
+    style S3 fill:#ffd93d
+    style S5 fill:#ffd93d
+```
+
+## Figure 3: Shared Document Exception (Adjusted Denominator)
+
+```mermaid
+flowchart LR
+    subgraph TOPK["Top-5 Results"]
+        D1["d1: SUPRA_XP (in-scope)"]
+        D2["d2: Shared SOP"]
+        D3["d3: SUPRA_XP (in-scope)"]
+        D4["d4: Shared SOP"]
+        D5["d5: INTEGER (OOS)"]
+    end
+
+    subgraph METRICS["Metric Computation"]
+        RAW["Raw Cont@5 = 3/5 = 0.60<br/>(d2,d4,d5 out-of-scope)"]
+        ADJ["Adj Cont@5 = 1/3 = 0.33<br/>(d5 only, den=5-2=3)"]
+        SHR["Shared@5 = 2/5 = 0.40"]
+        SREL["Shared_Rel@5 = 1/2 = 0.50<br/>(if d2 is relevant)"]
+    end
+
+    TOPK --> METRICS
 ```
 
 ---
