@@ -3205,7 +3205,7 @@ def auto_parse_confirm_node(
     equip_id_options.append({"value": "__manual__", "label": "직접 입력", "recommended": False})
 
     task_options = [
-        {"value": "sop", "label": "SOP 조회", "recommended": False},
+        {"value": "sop", "label": "절차조회", "recommended": False},
         {"value": "issue", "label": "이슈조회", "recommended": True},
         {"value": "all", "label": "전체조회", "recommended": False},
     ]
