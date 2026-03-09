@@ -1,0 +1,11 @@
+{
+  "total_rows": 124,
+  "empty_before": 0,
+  "filled_count": 0,
+  "distribution": {
+    "multi_device": 107,
+    "global": 17
+  },
+  "unexpected_values": [],
+  "status": "already_complete"
+}

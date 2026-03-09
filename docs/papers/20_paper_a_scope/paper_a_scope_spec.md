@@ -779,7 +779,7 @@ TypeDrift@k = (1/k) · Σ 1[doc_type(d_i) ∉ expected_types(intent(q))]
 |------|------|------|
 | `device_a` | str | device 1 |
 | `device_b` | str | device 2 |
-| `same_family_gold` | bool | 같은 family 여부 |
+| `same_family_seed` | bool | 같은 family 여부 |
 | `evidence_type` | str | `shared_doc` / `engineer_judgment` / `same_module_structure` / `not_family` |
 | `notes` | str | 비고 |
 

@@ -1,0 +1,40 @@
+device_name_raw,device_name_norm,device_aliases,family_seed,doc_count,chunk_count,doc_types,notes
+SUPRA N,SUPRA_N,"SUPRA N series|supra_n",SUPRA,35594,138090,gcb|myservice|sample|setup_manual|sop|ts_guide,"ES variants: 'SUPRA N'(137347), 'SUPRA N series'(733), 'supra_n'(10)"
+SUPRA Vplus,SUPRA_VPLUS,,SUPRA,14056,52501,gcb|myservice|sop,
+SUPRA V,SUPRA_V,,SUPRA,6484,25153,gcb|myservice|sop,
+SUPRA XP,SUPRA_XP,"ZEDIUS XP|ZEDIUS_XP|supra_bxp",SUPRA,4917,18657,gcb|myservice|sop|ts_guide,"ZEDIUS XP(7317 chunks)는 동일 장비의 제품명. SOP doc_id가 global_sop_supra_xp_* 형식. setup_manual doc_id='set_up_manual_zedius_xp_supra_xp'. supra_bxp(12)도 variant."
+INTEGER plus,INTEGER_PLUS,,INTEGER,4784,20582,gcb|myservice|sop|ts_guide,
+PRECIA,PRECIA,,PRECIA,2793,12533,gcb|myservice|setup_manual|sop|ts_guide,
+SUPRA Vm,SUPRA_VM,,SUPRA,2712,10352,gcb|myservice|setup_manual,
+TIGMA Vplus,TIGMA_VPLUS,,TIGMA,2344,8779,gcb|myservice,
+SUPRA IV,SUPRA_IV,,SUPRA,2278,8559,gcb|myservice,
+SUPRA III,SUPRA_III,,SUPRA,1946,7348,gcb|myservice,
+TERA21,TERA21,,TERA,1603,5786,gcb|myservice,
+ZEDIUS XP,SUPRA_XP,,SUPRA,1495,7317,myservice|setup_manual|sop|ts_guide,"→ SUPRA_XP alias. ES device_name='ZEDIUS XP' but same equipment."
+SUPRA Nm,SUPRA_NM,,SUPRA,1434,5832,gcb|myservice|setup_manual|sop,
+OMNIS plus,OMNIS_PLUS,,OMNIS,1280,4615,gcb|myservice|setup_manual|sop,
+OMNIS,OMNIS,,OMNIS,1015,3544,gcb|myservice|setup_manual|sop,
+INTEGER IVr,INTEGER_IVR,,INTEGER,768,2870,gcb|myservice,
+ZIVIS plus,ZIVIS_PLUS,,ZIVIS,710,2493,gcb|myservice,
+TIGMA Vm,TIGMA_VM,,TIGMA,549,2122,gcb|myservice,
+INTEGER XP,INTEGER_XP,,INTEGER,381,1521,gcb|myservice|sop,
+DAS2000,DAS2000,,ETC,342,1178,gcb|myservice,
+TERA21S,TERA21S,,TERA,329,1285,gcb|myservice,
+ECOLITE3000,ECOLITE3000,"ecolite",ECOLITE,182,646,gcb|setup_manual,"ES variant: 'ecolite'(12 chunks)"
+GENEVA XP,GENEVA_XP,"geneva_xp_rep",GENEVA,92,1880,setup_manual|sop|ts_guide,"ES variant: 'geneva_xp_rep'(22 chunks)"
+ZEDIUS,ZEDIUS,,ZEDIUS,87,314,gcb|myservice,
+SUPRA Vi,SUPRA_VI,,SUPRA,85,310,gcb|myservice,
+ZIVIS XP,ZIVIS_XP,,ZIVIS,77,276,gcb|myservice,
+SUPRA Np,SUPRA_NP,,SUPRA,50,456,myservice|setup_manual,
+ALL,ALL,,ETC,46,92,gcb,
+SUPRA Viplus,SUPRA_VI_PLUS,,SUPRA,31,117,myservice,"ES raw: 'SUPRA Viplus'"
+ECOLITE II 400,ECOLITE_II_400,,ECOLITE,24,174,gcb|setup_manual,
+INTEGER IV,INTEGER_IV,,INTEGER,23,52,gcb|myservice,
+etc,ETC,,ETC,21,55,gcb|myservice|ts_guide,
+TERA21i,TERA21I,,TERA,16,61,gcb|myservice,
+evolite_ii,ECOLITE_II,"ECOLITE_II|ecolite_ii",ECOLITE,13,29,gcb|myservice,"ES raw: 'evolite_ii' (typo)"
+ecolite_ii_300,ECOLITE_II_300,,ECOLITE,11,22,gcb,
+ECOLITE 2000,ECOLITE_2000,,ECOLITE,5,114,gcb|setup_manual,
+ecolite_iii,ECOLITE_III,,ECOLITE,2,4,gcb,
+prism,PRISM,,ETC,1,2,gcb,
+SUPRA XQ,SUPRA_XQ,,SUPRA,1,190,sop,

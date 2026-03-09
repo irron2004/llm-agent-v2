@@ -1,0 +1,13 @@
+{
+  "host": "http://localhost:8002",
+  "env": "dev",
+  "alias": "rag_chunks_dev_current",
+  "resolved_index": "rag_chunks_dev_v2",
+  "timestamp": "2026-03-09T03:49:24.075122+00:00",
+  "diagnostics": {
+    "cluster_name": "docker-cluster",
+    "version": "8.14.0",
+    "doc_count": 345935,
+    "es_index_prefix": "rag_chunks"
+  }
+}
