@@ -59,6 +59,15 @@ class RAGSettings(BaseSettings):
 
     retrieval_top_k: int = Field(default=10, description="Number of documents to retrieve")
 
+    llm_method: str = Field(
+        default="ollama",
+        description="Default LLM method name (e.g., vllm, ollama)",
+    )
+    llm_version: str = Field(
+        default="v1",
+        description="Default LLM adapter version",
+    )
+
     # Hybrid retrieval
     hybrid_dense_weight: float = Field(default=0.7, description="Dense retrieval weight for hybrid")
     hybrid_sparse_weight: float = Field(
@@ -101,7 +110,8 @@ class RAGSettings(BaseSettings):
     section_expand_top_groups: int = Field(default=2, description="Max groups to expand")
     section_expand_max_pages: int = Field(default=8, description="Max pages per group")
     section_expand_allowed_sources: str = Field(
-        default="title,toc_match", description="Allowed chapter_source values for expansion triggers"
+        default="title,toc_match",
+        description="Allowed chapter_source values for expansion triggers",
     )
 
     # Reranking
@@ -254,6 +264,25 @@ class VLLMSettings(BaseSettings):
     reasoning_effort: str | None = Field(
         default=None, description="Reasoning effort hint for reasoning models (low|medium|high)."
     )
+    max_tokens: int = Field(default=30000, description="Maximum tokens to generate")
+    timeout: int = Field(default=60, description="Request timeout in seconds")
+
+
+class OllamaSettings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_prefix="OLLAMA_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    base_url: str = Field(
+        default="http://localhost:11434",
+        description="Ollama server URL (native API base or OpenAI-compatible /v1 base)",
+    )
+    model_name: str = Field(default="qwen2.5:14b", description="Model name/identifier")
+    temperature: float = Field(default=0.7, description="Sampling temperature")
     max_tokens: int = Field(default=30000, description="Maximum tokens to generate")
     timeout: int = Field(default=60, description="Request timeout in seconds")
 
@@ -550,6 +579,7 @@ class AgentSettings(BaseSettings):
 # Global settings instances
 rag_settings = RAGSettings()
 vllm_settings = VLLMSettings()
+ollama_settings = OllamaSettings()
 vlm_client_settings = VlmClientSettings()
 tei_settings = TEISettings()
 api_settings = APISettings()
@@ -565,6 +595,7 @@ agent_settings = AgentSettings()
 __all__ = [
     "RAGSettings",
     "VLLMSettings",
+    "OllamaSettings",
     "VlmClientSettings",
     "TEISettings",
     "APISettings",
@@ -572,6 +603,7 @@ __all__ = [
     "SummarizationSettings",
     "rag_settings",
     "vllm_settings",
+    "ollama_settings",
     "vlm_client_settings",
     "tei_settings",
     "api_settings",

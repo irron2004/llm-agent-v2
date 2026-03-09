@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Callable
 
-from backend.config.settings import api_settings, rag_settings, vllm_settings
+from backend.config.settings import api_settings, ollama_settings, rag_settings, vllm_settings
 from backend.llm_infrastructure.embedding import get_embedder
 from backend.llm_infrastructure.embedding.base import BaseEmbedder
 from backend.llm_infrastructure.llm import get_llm
@@ -161,9 +161,23 @@ def get_simple_chat_prompt() -> str | None:
 @lru_cache
 def get_default_llm() -> BaseLLM:
     """Default LLM adapter from registry."""
+    method = (rag_settings.llm_method or "vllm").strip().lower() or "vllm"
+    version = (rag_settings.llm_version or "v1").strip() or "v1"
+
+    if method == "ollama":
+        return get_llm(
+            method,
+            version=version,
+            base_url=ollama_settings.base_url,
+            model=ollama_settings.model_name,
+            temperature=ollama_settings.temperature,
+            max_tokens=ollama_settings.max_tokens,
+            timeout=ollama_settings.timeout,
+        )
+
     return get_llm(
-        "vllm",
-        version="v1",
+        method,
+        version=version,
         base_url=vllm_settings.base_url,
         model=vllm_settings.model_name,
         temperature=vllm_settings.temperature,

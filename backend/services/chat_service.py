@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Iterable, Optional
 
-from backend.config.settings import rag_settings, vllm_settings
+from backend.config.settings import ollama_settings, rag_settings, vllm_settings
 from backend.llm_infrastructure.llm import get_llm, LLMResponse
 
 
@@ -16,8 +16,21 @@ class ChatService:
         llm_method: str | None = None,
         llm_version: str | None = None,
     ) -> None:
-        self.method = llm_method or "vllm"
-        self.version = llm_version or "v1"
+        self.method = (llm_method or rag_settings.llm_method or "vllm").strip().lower() or "vllm"
+        self.version = (llm_version or rag_settings.llm_version or "v1").strip() or "v1"
+
+        if self.method == "ollama":
+            self._llm = get_llm(
+                self.method,
+                version=self.version,
+                base_url=ollama_settings.base_url,
+                model=ollama_settings.model_name,
+                temperature=ollama_settings.temperature,
+                max_tokens=ollama_settings.max_tokens,
+                timeout=ollama_settings.timeout,
+            )
+            return
+
         self._llm = get_llm(
             self.method,
             version=self.version,
