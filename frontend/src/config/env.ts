@@ -26,7 +26,7 @@ const resolveApiBase = () => {
 export const env: Env = {
   apiBase: resolveApiBase(),
   apiPort: normalize(import.meta.env.VITE_API_PORT),
-  chatPath: normalize(import.meta.env.VITE_CHAT_PATH, "/api/chat"),
+  chatPath: normalize(import.meta.env.VITE_CHAT_PATH, "/api/agent/run"),
   apiKey: normalize(import.meta.env.VITE_API_KEY) || undefined,
   // Parsing 관련
   ingestionsBase: normalize(import.meta.env.VITE_INGESTIONS_BASE, "/data/ingestions"),
