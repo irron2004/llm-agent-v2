@@ -73,7 +73,7 @@ Wave 3: REQ-6(탭 UI 리팩토링) + 통합 테스트/QA
     Evidence: .sisyphus/evidence/task-01-skip-recommended.txt
   ```
 
-- [ ] 2. REQ-4 라벨 `SOP 조회` → `절차조회` (미완료: langgraph_agent.py:3208에 아직 "SOP 조회")
+- [x] 2. REQ-4 라벨 `SOP 조회` → `절차조회` (완료: b75ae98)
 
   **What to do**:
   - `task_options`의 label만 변경(value는 `sop` 유지)
