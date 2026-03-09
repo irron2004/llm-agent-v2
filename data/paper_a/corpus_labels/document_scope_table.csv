@@ -1,0 +1,429 @@
+doc_id,device_name_raw,device_name_norm,doc_type_raw,doc_type_norm,topic,chunk_count,scope_level_gold,is_shared_gold,shared_scope_type_gold
+global_sop_integer_plus_all_efem_pio_sensor_board,INTEGER plus,INTEGER_PLUS,SOP,sop,efem_pio_sensor_board,16,device,True,multi_device
+global_sop_integer_plus_all_pm_source_box_board,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_source_box_board,16,device,True,multi_device
+global_sop_integer_plus_all_pm_dc_cooling_fan_motor,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_dc_cooling_fan_motor,16,device,False,none
+global_sop_supra_n_series_all_efem_fluorescent_lamp,SUPRA N series,SUPRA_N,SOP,sop,efem_fluorescent_lamp,16,device,True,multi_device
+global_sop_omnis_plus_adj_pm_rf_power_on_test_eng,OMNIS plus,OMNIS_PLUS,SOP,sop,pm_rf_power_on_test_eng,17,device,False,none
+global_sop_precia_all_pm_prevent_maintenance,PRECIA,PRECIA,SOP,sop,pm_prevent_maintenance,108,device,False,none
+global_sop_supra_n_series_sw_all_sw_installation_setting,SUPRA N series,SUPRA_N,SOP,sop,all_sw_installation_setting,84,device,True,multi_device
+global_sop_supra_xp_all_pm_prism_source_3100qc,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_prism_source_3100qc,72,device,False,none
+global_sop_supra_xp_all_pm_prism_source,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_prism_source,70,device,False,none
+global_sop_supra_xp_all_sub_unit_igs_block,ZEDIUS XP,SUPRA_XP,SOP,sop,sub_unit_igs_block,71,device,True,multi_device
+global_sop_integer_plus_all_ll_stepping_motor,INTEGER plus,INTEGER_PLUS,SOP,sop,ll_stepping_motor,68,device,False,none
+global_sop_supra_xp_all_efem_ffu,ZEDIUS XP,SUPRA_XP,SOP,sop,efem_ffu,60,device,True,global
+global_sop_precia_all_pm_lift_pin,PRECIA,PRECIA,SOP,sop,pm_lift_pin,57,device,False,none
+global_sop_supra_xp_all_pm_prism_source_3000qc,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_prism_source_3000qc,82,device,False,none
+global_sop_integer_plus_all_ll_vacuum_line,INTEGER plus,INTEGER_PLUS,SOP,sop,ll_vacuum_line,77,device,False,none
+global_sop_supra_xp_all_pm_preventive_maintenance,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_preventive_maintenance,75,device,False,none
+global_sop_supra_n_series_all_tm_wafer_sensor,SUPRA N series,SUPRA_N,SOP,sop,tm_wafer_sensor,25,device,False,none
+global_sop_integer_plus_all_pm_igs_block,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_igs_block,26,device,False,none
+global_sop_supra_n_series_all_pm_isolation_valve,SUPRA N series,SUPRA_N,SOP,sop,pm_isolation_valve,25,device,False,none
+global_sop_precia_all_pm_slot_valve,PRECIA,PRECIA,SOP,sop,pm_slot_valve,36,device,True,multi_device
+global_sop_precia_all_efem_rfid,PRECIA,PRECIA,SOP,sop,efem_rfid,35,device,False,none
+global_sop_supra_xp_all_efem_robot_sr8241,ZEDIUS XP,SUPRA_XP,SOP,sop,efem_robot_sr8241,34,device,False,none
+global_sop_supra_xp_all_tm_device_net_board,ZEDIUS XP,SUPRA_XP,SOP,sop,tm_device_net_board,35,device,True,multi_device
+global_sop_supra_xp_all_pm_device_net_board,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_device_net_board,33,device,True,multi_device
+global_sop_supra_xp_all_pm_pressure_gauge,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_pressure_gauge,34,device,True,multi_device
+global_sop_supra_xp_all_pm_baratron_gauge,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_baratron_gauge,33,device,True,multi_device
+global_sop_supra_n_series_all_pcw_turn_on,SUPRA N series,SUPRA_N,SOP,sop,pcw_turn_on,31,device,False,none
+global_sop_precia_all_pm_pendulum_valve,PRECIA,PRECIA,SOP,sop,pm_pendulum_valve,32,device,True,multi_device
+global_sop_supra_xp_all_pm_manometer,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_manometer,32,device,True,multi_device
+global_sop_supra_xp_all_pm_flow_switch,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_flow_switch,32,device,True,multi_device
+global_sop_supra_xp_all_efem_rfid_assy,ZEDIUS XP,SUPRA_XP,SOP,sop,efem_rfid_assy,32,device,True,multi_device
+global_sop_supra_xp_all_pm_heater_chuck,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_heater_chuck,49,device,True,multi_device
+global_sop_supra_xp_all_tm_pressure_gauge,ZEDIUS XP,SUPRA_XP,SOP,sop,tm_pressure_gauge,31,device,False,none
+global_sop_supra_xp_all_ll_flow_switch,ZEDIUS XP,SUPRA_XP,SOP,sop,ll_flow_switch,30,device,False,none
+global_sop_supra_xp_all_efem_pressure_switch,ZEDIUS XP,SUPRA_XP,SOP,sop,efem_pressure_switch,31,device,False,none
+global_sop_supra_n_series_all_efem_pressure_vacuum_switch,SUPRA N series,SUPRA_N,SOP,sop,efem_pressure_vacuum_switch,29,device,False,none
+global_sop_supra_v_modify_all_air_tube,SUPRA V,SUPRA_V,SOP,sop,air_tube,29,device,False,none
+global_sop_supra_xp_all_ll_pressure_gauge,ZEDIUS XP,SUPRA_XP,SOP,sop,ll_pressure_gauge,28,device,False,none
+global_sop_precia_all_tm_pressure_switch,PRECIA,PRECIA,SOP,sop,tm_pressure_switch,27,device,False,none
+global_sop_integer_plus_all_efem_controller,INTEGER plus,INTEGER_PLUS,SOP,sop,efem_controller,28,device,True,multi_device
+global_sop_integer_plus_all_tm_vacuum_line,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_vacuum_line,26,device,False,none
+global_sop_omnis_plus_set_up_pm_docking_eng,OMNIS plus,OMNIS_PLUS,SOP,sop,global_sop_omnis_plus_set_up_pm_docking_eng,14,device,False,none
+global_sop_supra_xp_all_efem_pio_sensor_board,ZEDIUS XP,SUPRA_XP,SOP,sop,efem_pio_sensor_board,14,device,True,multi_device
+global_sop_supra_xp_all_pm_source_box_board,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_source_box_board,15,device,True,multi_device
+global_sop_integer_plus_all_tm_quick_connector,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_quick_connector,14,device,False,none
+global_sop_integer_plus_all_pm_h2_gas_leak_detector,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_h2_gas_leak_detector,17,device,False,none
+global_sop_integer_plus_all_pm_quick_connector,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_quick_connector,17,device,False,none
+global_sop_integer_plus_all_tm_u_til_online_program,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_u_til_online_program,17,device,False,none
+global_sop_supra_xp_all_efem_ionizer,ZEDIUS XP,SUPRA_XP,SOP,sop,efem_ionizer,17,device,False,none
+global_sop_integer_plus_all_efem_selector_switch,INTEGER plus,INTEGER_PLUS,SOP,sop,efem_selector_switch,15,device,False,none
+global_sop_supra_xp_all_pm_rf_matcher,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_rf_matcher,24,device,False,none
+global_sop_integer_plus_all_pm_cooling_chuck,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_cooling_chuck,23,device,False,none
+global_sop_precia_all_pm_mfc,PRECIA,PRECIA,SOP,sop,pm_mfc,23,device,True,multi_device
+global_sop_supra_n_series_all_sub_unit_gas_box_board,SUPRA N series,SUPRA_N,SOP,sop,sub_unit_gas_box_board,23,device,True,multi_device
+global_sop_supra_xp_all_rack_rf_generator,ZEDIUS XP,SUPRA_XP,SOP,sop,rack_rf_generator,23,device,False,none
+global_sop_precia_all_pm_wafer_centering,PRECIA,PRECIA,SOP,sop,pm_wafer_centering,23,device,False,none
+global_sop_integer_plus_all_pm_gas_line,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_gas_line,77,device,False,none
+global_sop_precia_all_pm_baratron_gauge,PRECIA,PRECIA,SOP,sop,pm_baratron_gauge,55,device,True,multi_device
+global_sop_supra_xp_all_tm_robot,ZEDIUS XP,SUPRA_XP,SOP,sop,tm_robot,47,device,True,multi_device
+global_sop_supra_n_series_all_pm_pcw_valve_switch,SUPRA N series,SUPRA_N,SOP,sop,pm_pcw_valve_switch,47,device,False,none
+global_sop_supra_n_series_all_pm_pressure_gauge,SUPRA N series,SUPRA_N,SOP,sop,pm_pressure_gauge,46,device,True,multi_device
+global_sop_precia_all_efem_ffu,PRECIA,PRECIA,SOP,sop,efem_ffu,50,device,True,global
+global_sop_supra_xp_all_efem_controller,ZEDIUS XP,SUPRA_XP,SOP,sop,efem_controller,46,device,True,multi_device
+global_sop_supra_xp_all_tm_ctc,ZEDIUS XP,SUPRA_XP,SOP,sop,tm_ctc,45,device,True,multi_device
+global_sop_supra_n_series_all_pm_pek_kit,SUPRA N series,SUPRA_N,SOP,sop,pm_pek_kit,43,device,False,none
+global_sop_supra_vplus_all_pm_controller,SUPRA Vplus,SUPRA_VPLUS,SOP,sop,pm_controller,42,device,True,multi_device
+global_sop_supra_xp_all_pm_dual_epd,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_dual_epd,40,device,True,multi_device
+global_sop_integer_plus_all_pm_slot_valve,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_slot_valve,39,device,True,multi_device
+global_sop_integer_plus_all_ll_slot_valve,INTEGER plus,INTEGER_PLUS,SOP,sop,ll_slot_valve,50,device,False,none
+global_sop_supra_xp_all_pm_pirani_gauge,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_pirani_gauge,40,device,True,multi_device
+global_sop_precia_all_tm_slot_valve,PRECIA,PRECIA,SOP,sop,tm_slot_valve,39,device,True,multi_device
+global_sop_integer_plus_all_pm_swap_kit,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_swap_kit,37,device,False,none
+global_sop_precia_all_pm_pirani_gauge,PRECIA,PRECIA,SOP,sop,pm_pirani_gauge,36,device,True,multi_device
+global_sop_supra_xp_all_pm_cip_chamber,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_cip_chamber,37,device,False,none
+global_sop_integer_plus_all_am_heater_chuck,INTEGER plus,INTEGER_PLUS,SOP,sop,am_heater_chuck,25,device,False,none
+global_sop_integer_plus_all_efem_eda_controller,INTEGER plus,INTEGER_PLUS,SOP,sop,efem_eda_controller,22,device,False,none
+global_sop_precia_all_ll_pirani,PRECIA,PRECIA,SOP,sop,ll_pirani,21,device,False,none
+global_sop_precia_all_efem_switch,PRECIA,PRECIA,SOP,sop,efem_switch,21,device,False,none
+global_sop_integer_plus_all_pm_flange_adaptor,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_flange_adaptor,21,device,False,none
+global_sop_integer_plus_all_tm_mototr_controller,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_mototr_controller,21,device,False,none
+global_sop_supra_nm_all_pm_microwave_local_interface,SUPRA Nm,SUPRA_NM,SOP,sop,pm_microwave_local_interface,21,device,False,none
+global_sop_precia_all_efem_regulator,PRECIA,PRECIA,SOP,sop,efem_regulator,20,device,False,none
+global_sop_integer_plus_all_ll_vacuum_block,INTEGER plus,INTEGER_PLUS,SOP,sop,ll_vacuum_block,20,device,False,none
+global_sop_integer_plus_all_am_flange_adaptor,INTEGER plus,INTEGER_PLUS,SOP,sop,am_flange_adaptor,20,device,False,none
+global_sop_integer_plus_all_pm_pneumatic_valve,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_pneumatic_valve,20,device,True,multi_device
+global_sop_integer_plus_all_am_view_quartz,INTEGER plus,INTEGER_PLUS,SOP,sop,am_view_quartz,20,device,False,none
+global_sop_integer_plus_all_tm_filter,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_filter,20,device,False,none
+global_sop_supra_n_series_all_pm_chamber_hinge,SUPRA N series,SUPRA_N,SOP,sop,pm_chamber_hinge,22,device,False,none
+global_sop_supra_xp_all_tm_slot_valve,ZEDIUS XP,SUPRA_XP,SOP,sop,tm_slot_valve,20,device,True,multi_device
+global_sop_precia_all_pm_manometer,PRECIA,PRECIA,SOP,sop,pm_manometer,20,device,True,multi_device
+global_sop_precia_all_ll_angle_valve,PRECIA,PRECIA,SOP,sop,ll_angle_valve,20,device,False,none
+global_sop_precia_all_tm_isolation_valve,PRECIA,PRECIA,SOP,sop,tm_isolation_valve,20,device,False,none
+global_sop_precia_all_pm_solenoid_valve,PRECIA,PRECIA,SOP,sop,pm_solenoid_valve,20,device,True,multi_device
+global_sop_integer_plus_all_am_gas_spring,INTEGER plus,INTEGER_PLUS,SOP,sop,am_gas_spring,19,device,False,none
+global_sop_integer_plus_all_am_solenoid_valve,INTEGER plus,INTEGER_PLUS,SOP,sop,am_solenoid_valve,19,device,False,none
+global_sop_supra_vplus_adj_all_undocking,SUPRA Vplus,SUPRA_VPLUS,SOP,sop,all_undocking,19,device,True,multi_device
+global_sop_supra_vplus_adj_all_power_turn_on_off,SUPRA Vplus,SUPRA_VPLUS,SOP,sop,all_power_turn_on_off,19,device,True,multi_device
+global_sop_supra_xp_all_pm_wafer_shut_off_valve,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_wafer_shut_off_valve,19,device,False,none
+global_sop_supra_xp_all_ll_pin,ZEDIUS XP,SUPRA_XP,SOP,sop,ll_pin,19,device,False,none
+global_sop_precia_all_tm_interface_board,PRECIA,PRECIA,SOP,sop,tm_interface_board,19,device,False,none
+global_sop_supra_xp_all_pm_n2_curtain_eng,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_n2_curtain_eng,19,device,False,none
+global_sop_precia_all_efem_fluorescent_lamp,PRECIA,PRECIA,SOP,sop,efem_fluorescent_lamp,19,device,True,multi_device
+global_sop_precia_all_ll_turn_table,PRECIA,PRECIA,SOP,sop,ll_turn_table,19,device,False,none
+global_sop_precia_all_efem_load_port_leveling,PRECIA,PRECIA,SOP,sop,efem_load_port_leveling,19,device,False,none
+global_sop_integer_plus_all_pm_water_shut_off_valve,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_water_shut_off_valve,19,device,False,none
+global_sop_precia_all_efem_interface_board,PRECIA,PRECIA,SOP,sop,efem_interface_board,19,device,False,none
+global_sop_integer_plus_all_tm_purge_line_regulator,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_purge_line_regulator,19,device,False,none
+global_sop_integer_plus_all_tm_solenoid_valve,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_solenoid_valve,19,device,True,multi_device
+global_sop_integer_plus_all_pm_coded_sensor,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_coded_sensor,19,device,False,none
+global_sop_integer_plus_all_pm_gas_spring,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_gas_spring,19,device,True,multi_device
+global_sop_integer_plus_all_pm_safety_controller,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_safety_controller,19,device,False,none
+global_sop_integer_plus_all_tm_coded_sensor,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_coded_sensor,19,device,False,none
+global_sop_integer_plus_all_pm_pcw_manual_valve,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_pcw_manual_valve,19,device,False,none
+global_sop_integer_plus_all_pm_flow_switch,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_flow_switch,19,device,True,multi_device
+global_sop_integer_plus_all_pm_view_quartz,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_view_quartz,19,device,False,none
+global_sop_precia_adj_all_undocking,PRECIA,PRECIA,SOP,sop,all_undocking,18,device,True,multi_device
+global_sop_precia_all_efem_serial_8port,PRECIA,PRECIA,SOP,sop,efem_serial_8port,18,device,False,none
+global_sop_integer_plus_all_pm_gas_box_door_sensor,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_gas_box_door_sensor,18,device,False,none
+global_sop_integer_plus_all_ll_diffuser,INTEGER plus,INTEGER_PLUS,SOP,sop,ll_diffuser,18,device,False,none
+global_sop_precia_all_pm_gas_spring,PRECIA,PRECIA,SOP,sop,pm_gas_spring,18,device,True,multi_device
+global_sop_precia_all_ll_relief_valve,PRECIA,PRECIA,SOP,sop,ll_relief_valve,18,device,False,none
+global_sop_precia_all_efem_sensor_board,PRECIA,PRECIA,SOP,sop,efem_sensor_board,17,device,False,none
+global_sop_precia_all_efem_pressure_relief_valve,PRECIA,PRECIA,SOP,sop,efem_pressure_relief_valve,17,device,False,none
+global_sop_supra_xp_all_sub_unit_gas_box_board,ZEDIUS XP,SUPRA_XP,SOP,sop,sub_unit_gas_box_board,18,device,True,multi_device
+global_sop_precia_all_efem_device_net_board,PRECIA,PRECIA,SOP,sop,efem_device_net_board,17,device,True,multi_device
+global_sop_integer_plus_all_ll_speed_controller_indicator,INTEGER plus,INTEGER_PLUS,SOP,sop,ll_speed_controller_indicator,17,device,False,none
+global_sop_supra_xp_all_pm_chamber_safety_cover,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_chamber_safety_cover,18,device,False,none
+global_sop_integer_plus_all_efem_device_net_board,INTEGER plus,INTEGER_PLUS,SOP,sop,efem_device_net_board,16,device,True,multi_device
+global_sop_supra_vplus_adj_all_io_check,SUPRA Vplus,SUPRA_VPLUS,SOP,sop,all_io_check,15,device,False,none
+global_sop_supra_n_series_all_tm_solenoid_valve,SUPRA N series,SUPRA_N,SOP,sop,tm_solenoid_valve,18,device,True,multi_device
+global_sop_supra_xp_all_tm_mfc,ZEDIUS XP,SUPRA_XP,SOP,sop,tm_mfc,18,device,False,none
+global_sop_integer_plus_all_am_interface_board,INTEGER plus,INTEGER_PLUS,SOP,sop,am_interface_board,18,device,False,none
+global_sop_integer_plus_all_efem_push_button_switch,INTEGER plus,INTEGER_PLUS,SOP,sop,efem_push_button_switch,18,device,False,none
+global_sop_integer_plus_all_ll_disarray_sensor,INTEGER plus,INTEGER_PLUS,SOP,sop,ll_disarray_sensor,18,device,False,none
+global_sop_supra_n_series_all_rack,SUPRA N series,SUPRA_N,SOP,sop,rack,84,device,False,none
+global_sop_supra_xp_sw_all_sw_installation_setting,ZEDIUS XP,SUPRA_XP,SOP,sop,all_sw_installation_setting,74,device,True,multi_device
+global_sop_integer_plus_all_am_gas_line,INTEGER plus,INTEGER_PLUS,SOP,sop,am_gas_line,67,device,False,none
+global_sop_supra_n_series_all_efem_ffu,SUPRA N series,SUPRA_N,SOP,sop,efem_ffu,59,device,True,global
+global_sop_supra_n_series_all_sub_unit_temp_controller,SUPRA N series,SUPRA_N,SOP,sop,sub_unit_temp_controller,56,device,False,none
+global_sop_precia_all_pm_rf_bias_matcher,PRECIA,PRECIA,SOP,sop,pm_rf_bias_matcher,55,device,False,none
+global_sop_supra_xp_all_pm_pin_assy,ZEDIUS XP,SUPRA_XP,SOP,sop,pm_pin_assy,124,device,False,none
+global_sop_precia_all_tm_solenoid_valve,PRECIA,PRECIA,SOP,sop,tm_solenoid_valve,17,device,True,multi_device
+global_sop_integer_plus_all_pm_baffle_heater,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_baffle_heater,22,device,False,none
+global_sop_integer_plus_all_tm_epc,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_epc,21,device,True,multi_device
+global_sop_omnis_plus_all_pm_apc_product_report,OMNIS,OMNIS,SOP,sop,pm_apc_product_report,8,device,False,none
+global_sop_supra_xp_all_ll_cip,SUPRA XP,SUPRA_XP,SOP,sop,ll_cip,51,device,False,none
+global_sop_supra_n_series_all_pm_device_net_board,SUPRA N series,SUPRA_N,SOP,sop,pm_device_net_board,45,device,True,multi_device
+global_sop_precia_adj_all_utility_turn_onoff,PRECIA,PRECIA,SOP,sop,all_utility_turn_onoff,44,device,False,none
+global_sop_supra_n_series_all_pm_heater_chuck,SUPRA N series,SUPRA_N,SOP,sop,pm_heater_chuck,40,device,True,multi_device
+global_sop_supra_n_series_all_sub_unit_scr_noise_filter,SUPRA N series,SUPRA_N,SOP,sop,sub_unit_scr_noise_filter,40,device,False,none
+global_sop_integer_plus_all_pm_vacuum_line,INTEGER XP,INTEGER_XP,SOP,sop,pm_vacuum_line,133,device,False,none
+set_up_manual_integer_plus,INTEGER plus,INTEGER_PLUS,SOP,sop,set_up_manual_integer_plus,167,device,False,none
+global_sop_supra_n_series_all_pm_door_valve,SUPRA N,SUPRA_N,SOP,sop,pm_door_valve,55,device,False,none
+global_sop_supra_n_series_all_sub_unit_solenoide_valve,SUPRA N,SUPRA_N,SOP,sop,sub_unit_solenoide_valve,17,device,False,none
+global_sop_supra_n_series_all_tm_pressure_relief_valve,SUPRA N,SUPRA_N,SOP,sop,tm_pressure_relief_valve,19,device,True,multi_device
+global_sop_supra_n_series_all_efem_controller,SUPRA N,SUPRA_N,SOP,sop,efem_controller,40,device,True,multi_device
+global_sop_supra_n_series_all_efem_load_port_duraport,SUPRA N,SUPRA_N,SOP,sop,efem_load_port_duraport,93,device,False,none
+global_sop_supra_n_series_all_pm_tc_wafer,SUPRA N,SUPRA_N,SOP,sop,pm_tc_wafer,21,device,False,none
+global_sop_supra_n_series_all_sub_unit_water_shut_off_valve,SUPRA N,SUPRA_N,SOP,sop,sub_unit_water_shut_off_valve,16,device,False,none
+global_sop_supra_n_series_all_tm_robot,SUPRA N,SUPRA_N,SOP,sop,tm_robot,107,device,True,multi_device
+global_sop_supra_n_series_all_pm_hook_lifter_servo_motor,SUPRA N,SUPRA_N,SOP,sop,pm_hook_lifter_servo_motor,106,device,False,none
+global_sop_precia_all_ll_aligner,PRECIA,PRECIA,SOP,sop,ll_aligner,35,device,False,none
+global_sop_precia_all_tm_epc,PRECIA,PRECIA,SOP,sop,tm_epc,21,device,True,multi_device
+global_sop_precia_all_tm_pneumatic_valve,PRECIA,PRECIA,SOP,sop,tm_pneumatic_valve,19,device,False,none
+global_sop_precia_all_tm_robot,PRECIA,PRECIA,SOP,sop,tm_robot,56,device,True,multi_device
+global_sop_precia_all_pm_device_net_board,PRECIA,PRECIA,SOP,sop,pm_device_net_board,37,device,True,multi_device
+global_sop_precia_all_efem_door_valve,PRECIA,PRECIA,SOP,sop,efem_door_valve,18,device,False,none
+global_sop_precia_all_ll_vision,PRECIA,PRECIA,SOP,sop,ll_vision,82,device,False,none
+global_sop_precia_all_pm_gap_sensor,PRECIA,PRECIA,SOP,sop,pm_gap_sensor,79,device,False,none
+global_sop_precia_all_efem_robot,PRECIA,PRECIA,SOP,sop,efem_robot,64,device,True,multi_device
+global_sop_precia_all_tm_pirani,PRECIA,PRECIA,SOP,sop,tm_pirani,21,device,False,none
+global_sop_precia_all_tm_pressure_relief_valve,PRECIA,PRECIA,SOP,sop,tm_pressure_relief_valve,16,device,True,multi_device
+global_sop_precia_all_efem_signal_tower,PRECIA,PRECIA,SOP,sop,efem_signal_tower,18,device,True,multi_device
+global_sop_integer_plus_all_ll_cassette,INTEGER plus,INTEGER_PLUS,SOP,sop,ll_cassette,86,device,False,none
+global_sop_integer_plus_all_am_pin_motor,INTEGER plus,INTEGER_PLUS,SOP,sop,am_pin_motor,84,device,False,none
+global_sop_integer_plus_all_am_vacuum_line,INTEGER plus,INTEGER_PLUS,SOP,sop,am_vacuum_line,135,device,False,none
+global_sop_integer_plus_all_ll_lifter_assy,INTEGER plus,INTEGER_PLUS,SOP,sop,ll_lifter_assy,81,device,False,none
+global_sop_integer_plus_all_gr_shut_off_valve,INTEGER plus,INTEGER_PLUS,SOP,sop,gr_shut_off_valve,21,device,False,none
+global_sop_integer_plus_all_pm_wall_temp_controller,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_wall_temp_controller,21,device,False,none
+global_sop_integer_plus_all_ll_sensor_board,INTEGER plus,INTEGER_PLUS,SOP,sop,ll_sensor_board,17,device,False,none
+global_sop_integer_plus_all_tm_laser_sensor_amp,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_laser_sensor_amp,17,device,False,none
+global_sop_precia_all_tm_sensor_board,PRECIA,PRECIA,SOP,sop,tm_sensor_board,18,device,True,multi_device
+global_sop_geneva_xp_cln_bubbler_cabinet_canister,GENEVA XP,GENEVA_XP,SOP,sop,global_sop_geneva_xp_cln_bubbler_cabinet_canister,20,device,False,none
+global_sop_geneva_xp_rep_pm_load_lock,GENEVA XP,GENEVA_XP,SOP,sop,pm_load_lock,22,device,False,none
+global_sop_geneva_xp_rep_pm_insulation_heater,GENEVA XP,GENEVA_XP,SOP,sop,pm_insulation_heater,21,device,False,none
+global_sop_geneva_xp_rep_pm_mfc,GENEVA XP,GENEVA_XP,SOP,sop,pm_mfc,18,device,True,multi_device
+global_sop_geneva_xp_rep_pm_vacuum_pressure_switch,GENEVA XP,GENEVA_XP,SOP,sop,pm_vacuum_pressure_switch,18,device,False,none
+global_sop_geneva_xp_rep_pm_apc,GENEVA XP,GENEVA_XP,SOP,sop,pm_apc,15,device,False,none
+global_sop_geneva_xp_rep_pm_load_lock_door_o_ring,GENEVA XP,GENEVA_XP,SOP,sop,pm_load_lock_door_o_ring,23,device,False,none
+global_sop_geneva_xp_rep_pm_elbow_heater,GENEVA XP,GENEVA_XP,SOP,sop,pm_elbow_heater,22,device,False,none
+global_sop_geneva_xp_sw_efem_log_backup,GENEVA XP,GENEVA_XP,SOP,sop,efem_log_backup,13,device,False,none
+global_sop_geneva_xp_rep_pm_분배기,GENEVA XP,GENEVA_XP,SOP,sop,pm_분배기,13,device,False,none
+global_sop_geneva_xp_adj_efem_efem_robot_leveling,GENEVA XP,GENEVA_XP,SOP,sop,efem_efem_robot_leveling,15,device,False,none
+global_sop_geneva_xp_adj_apc_auto_calibration,GENEVA XP,GENEVA_XP,SOP,sop,apc_auto_calibration,15,device,False,none
+global_sop_genevaxp_rep_pm_disc_rotation_sensor,GENEVA XP,GENEVA_XP,SOP,sop,pm_disc_rotation_sensor,15,device,False,none
+global_sop_geneva_xp_rep_sub_bubbler_pt_sensor,GENEVA XP,GENEVA_XP,SOP,sop,sub_bubbler_pt_sensor,15,device,False,none
+global_sop_geneva_xp_rep_pm_chamber_lock,GENEVA XP,GENEVA_XP,SOP,sop,pm_chamber_lock,14,device,False,none
+global_sop_geneva_xp_rep_pm_o2_cell,GENEVA XP,GENEVA_XP,SOP,sop,pm_o2_cell,14,device,False,none
+global_sop_geneva_xp_rep_efem_ffu_controller,GENEVA XP,GENEVA_XP,SOP,sop,efem_ffu_controller,21,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_stage6_ll_wafer_vacuum_sensor_time_out,GENEVA XP,GENEVA_XP,SOP,sop,ts_pdfs_pskh_ts_guide_geneva_xp_stage6_ll_wafer_vacuum_sensor_time_out,10,device,False,none
+global_sop_supra_n_mfg_all_aging_run,SUPRA N,SUPRA_N,SOP,sop,aging_run,14,device,False,none
+global_sop_integer_plus_all_tm_pcw_manual_valve,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_pcw_manual_valve,16,device,False,none
+global_sop_integer_plus_all_efem_o2_gas_leak_detector,INTEGER plus,INTEGER_PLUS,SOP,sop,efem_o2_gas_leak_detector,17,device,False,none
+global_sop_integer_plus_all_efem_signal_tower,INTEGER plus,INTEGER_PLUS,SOP,sop,efem_signal_tower,18,device,True,multi_device
+global_sop_integer_plus_all_pm_manometer,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_manometer,20,device,True,multi_device
+global_sop_supra_series_all_sw_operation,SUPRA N,SUPRA_N,SOP,sop,sw_operation,49,device,False,none
+global_sop_supra_series_all_smart_match,SUPRA N,SUPRA_N,SOP,sop,smart_match,29,device,False,none
+global_sop_supra_series_all_pm_bottom_structure,SUPRA N,SUPRA_N,SOP,sop,pm_bottom_structure,105,device,False,none
+global_sop_supra_xp_all_tm_slot_vv_housing_o_ring,SUPRA XP,SUPRA_XP,SOP,sop,tm_slot_vv_housing_o_ring,38,device,False,none
+global_sop_supra_xp_all_pm_temp_controller,SUPRA XP,SUPRA_XP,SOP,sop,pm_temp_controller,35,device,True,multi_device
+global_sop_supra_xp_all_pm_process_kit,SUPRA XP,SUPRA_XP,SOP,sop,pm_process_kit,27,device,True,multi_device
+global_sop_supra_xp_all_pm_pendulum_valve,SUPRA XP,SUPRA_XP,SOP,sop,pm_pendulum_valve,27,device,True,multi_device
+global_sop_genevaxp_rep_chuck_hard_stopper,GENEVA XP,GENEVA_XP,SOP,sop,chuck_hard_stopper,16,device,False,none
+global_sop_supra_n_adj_all_undocking,SUPRA N,SUPRA_N,SOP,sop,all_undocking,19,device,True,multi_device
+global_sop_supra_n_adj_all_power_turn_on_off,SUPRA N,SUPRA_N,SOP,sop,all_power_turn_on_off,18,device,True,multi_device
+global_sop_omnis_plus_pm_apc_valve_setting_eng,OMNIS plus,OMNIS_PLUS,SOP,sop,global_sop_omnis_plus_pm_apc_valve_setting_eng,18,device,False,none
+global_sop_omnis_plus_pm_aging_eng,OMNIS plus,OMNIS_PLUS,SOP,sop,global_sop_omnis_plus_pm_aging_eng,12,device,False,none
+global_sop_omnis_plus_rep_tm_robot_undocking,OMNIS plus,OMNIS_PLUS,SOP,sop,tm_robot_undocking,25,device,False,none
+global_sop_omnis_plus_all_chuck_temp_product_report,OMNIS plus,OMNIS_PLUS,SOP,sop,chuck_temp_product_report,20,device,False,none
+global_sop_omnis_plus_all_pm_process_base_parameter_product_report_eng,OMNIS plus,OMNIS_PLUS,SOP,sop,pm_process_base_parameter_product_report_eng,10,device,False,none
+global_sop_omnis_sw_all_process_check_eng,OMNIS,OMNIS,SOP,sop,all_process_check_eng,19,device,False,none
+set_up_manual_supra_xq,SUPRA XQ,SUPRA_XQ,SOP,sop,set_up_manual_supra_xq,190,device,False,none
+global_sop_geneva_xp_fa_measurement_en,GENEVA XP,GENEVA_XP,SOP,sop,global_sop_geneva_xp_fa_measurement_en,24,device,False,none
+global_sop_geneva_xp_rep_pm_formic_bottle,GENEVA XP,GENEVA_XP,SOP,sop,pm_formic_bottle,15,device,False,none
+global_sop_geneva_xp_rep_efem_lp_main_board,GENEVA XP,GENEVA_XP,SOP,sop,efem_lp_main_board,31,device,False,none
+global_sop_geneva_xp_adj_pm_chuck_motor,GENEVA XP,GENEVA_XP,SOP,sop,pm_chuck_motor,22,device,False,none
+global_sop_geneva_xp_adj_pm_chuck_temp_calibration,GENEVA XP,GENEVA_XP,SOP,sop,pm_chuck_temp_calibration,21,device,False,none
+global_sop_geneva_xp_adj_heater_chuck_leveling,GENEVA XP,GENEVA_XP,SOP,sop,heater_chuck_leveling,16,device,False,none
+global_sop_supra_n_all_sub_unit_mfc,SUPRA N,SUPRA_N,SOP,sop,sub_unit_mfc,21,device,False,none
+set_up_manual_supra_n,SUPRA N,SUPRA_N,SOP,sop,set_up_manual_supra_n,265,device,False,none
+global_sop_geneva_xp_rep_pm_controller,GENEVA XP,GENEVA_XP,SOP,sop,pm_controller,12,device,True,multi_device
+global_sop_integer_plus_all_tm_top_lid,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_top_lid,72,device,False,none
+global_sop_integer_plus_all_tm_robot,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_robot,103,device,True,multi_device
+global_sop_integer_plus_all_pm_safety_limit_switch,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_safety_limit_switch,19,device,False,none
+global_sop_integer_plus_all_pm_pin_motor,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_pin_motor,126,device,False,none
+global_sop_integer_plus_all_am_temp_controller,INTEGER plus,INTEGER_PLUS,SOP,sop,am_temp_controller,27,device,False,none
+global_sop_integer_plus_all_pm_temp_controller,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_temp_controller,27,device,True,multi_device
+global_sop_integer_plus_all_am_devicenet_board,INTEGER plus,INTEGER_PLUS,SOP,sop,am_devicenet_board,58,device,False,none
+global_sop_integer_plus_all_tm_32_multi_port,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_32_multi_port,24,device,False,none
+global_sop_integer_plus_all_tm_devicenet_board,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_devicenet_board,21,device,True,multi_device
+global_sop_integer_plus_all_tm_safety_controller,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_safety_controller,19,device,False,none
+global_sop_integer_plus_all_pm_solenoid_valve,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_solenoid_valve,19,device,True,multi_device
+global_sop_integer_plus_all_efem_robot,INTEGER plus,INTEGER_PLUS,SOP,sop,efem_robot,126,device,True,multi_device
+ts_pdfs_pskh_ts_guide_geneva_xp_io_response_error_ring_seal_vac_error,GENEVA XP,GENEVA_XP,SOP,sop,ts_pdfs_pskh_ts_guide_geneva_xp_io_response_error_ring_seal_vac_error,16,device,False,none
+global_sop_geneva_xp_rep_bubbler_cabinet_drain_valve,GENEVA XP,GENEVA_XP,SOP,sop,bubbler_cabinet_drain_valve,22,device,False,none
+global_sop_geneva_xp_rep_pm_disc_amplifier_r1,GENEVA XP,GENEVA_XP,SOP,sop,pm_disc_amplifier_r1,43,device,False,none
+global_sop_geneva_xp_rep_pm_harmonic_drive,GENEVA XP,GENEVA_XP,SOP,sop,pm_harmonic_drive,35,device,False,none
+global_sop_geneva_xp_rep_pm_adapter_ring,GENEVA XP,GENEVA_XP,SOP,sop,pm_adapter_ring,30,device,False,none
+global_sop_geneva_xp_rep_pm_support_pin,GENEVA XP,GENEVA_XP,SOP,sop,pm_support_pin,25,device,False,none
+global_sop_geneva_xp_rep_bubbler_cabinet_feed_valve,GENEVA XP,GENEVA_XP,SOP,sop,bubbler_cabinet_feed_valve,21,device,False,none
+global_sop_geneva_xp_adj_post_align_application,GENEVA XP,GENEVA_XP,SOP,sop,post_align_application,20,device,False,none
+global_sop_geneva_xp_adj_pm_aio_calibration,GENEVA XP,GENEVA_XP,SOP,sop,pm_aio_calibration,18,device,False,none
+global_sop_geneva_xp_rep_pm_differential_gauge,GENEVA XP,GENEVA_XP,SOP,sop,pm_differential_gauge,18,device,False,none
+global_sop_geneva_xp_rep_efem_load_port,GENEVA XP,GENEVA_XP,SOP,sop,efem_load_port,18,device,False,none
+global_sop_geneva_xp_rep_efem_ffu,GENEVA XP,GENEVA_XP,SOP,sop,efem_ffu,14,device,True,global
+global_sop_geneva_xp_rep_efem_ffu_filter,GENEVA XP,GENEVA_XP,SOP,sop,efem_ffu_filter,18,device,False,none
+global_sop_geneva_xp_rep_pm_chamber_apc_valve,GENEVA XP,GENEVA_XP,SOP,sop,pm_chamber_apc_valve,22,device,False,none
+global_sop_geneva_xp_adj_all_sw_install,GENEVA XP,GENEVA_XP,SOP,sop,all_sw_install,16,device,False,none
+global_sop_geneva_xp_adj_pm_pin_alignment,GENEVA XP,GENEVA_XP,SOP,sop,pm_pin_alignment,25,device,False,none
+global_sop_geneva_xp_adj_efem_robot_teaching,GENEVA XP,GENEVA_XP,SOP,sop,efem_robot_teaching,28,device,False,none
+global_sop_supra_n_series_all_pm_dual_epd,SUPRA N,SUPRA_N,SOP,sop,pm_dual_epd,41,device,True,multi_device
+global_sop_supra_n_all_efem_robot_sr8240,SUPRA N,SUPRA_N,SOP,sop,efem_robot_sr8240,44,device,True,multi_device
+global_sop_supra_n_series_all_pm_gas_spring,SUPRA N,SUPRA_N,SOP,sop,pm_gas_spring,22,device,True,multi_device
+global_sop_supra_n_series_all_tm_twin_guide_cylinder,SUPRA N,SUPRA_N,SOP,sop,tm_twin_guide_cylinder,24,device,False,none
+global_sop_supra_n_all_efem_robot_m124,SUPRA N,SUPRA_N,SOP,sop,efem_robot_m124,45,device,False,none
+global_sop_supra_n_series_all_tm_ffu_mcu,SUPRA N,SUPRA_N,SOP,sop,tm_ffu_mcu,57,device,False,none
+global_sop_supra_n_all_pm_chamber_open_interlock_change,SUPRA N,SUPRA_N,SOP,sop,pm_chamber_open_interlock_change,24,device,False,none
+global_sop_integer_plus_all_tm_ctc_controller,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_ctc_controller,51,device,False,none
+global_sop_integer_plus_all_gr_generator,INTEGER plus,INTEGER_PLUS,SOP,sop,gr_generator,42,device,False,none
+global_sop_integer_plus_all_efem_ffu,INTEGER plus,INTEGER_PLUS,SOP,sop,efem_ffu,46,device,True,global
+global_sop_integer_plus_all_pm_d_net,INTEGER plus,INTEGER_PLUS,SOP,sop,pm_d_net,56,device,False,none
+global_sop_supra_n_series_all_tm_branch_tap,SUPRA N,SUPRA_N,SOP,sop,tm_branch_tap,21,device,True,multi_device
+global_sop_supra_n_series_all_sub_unit_safety_module,SUPRA N,SUPRA_N,SOP,sop,sub_unit_safety_module,44,device,False,none
+global_sop_supra_n_series_all_pm_source_box_interface_board,SUPRA N,SUPRA_N,SOP,sop,pm_source_box_interface_board,18,device,False,none
+global_sop_supra_n_series_all_tm_ib_flow,SUPRA N,SUPRA_N,SOP,sop,tm_ib_flow,23,device,False,none
+global_sop_supra_n_series_all_tm_fluorescent_lamp,SUPRA N,SUPRA_N,SOP,sop,tm_fluorescent_lamp,23,device,False,none
+global_sop_supra_n_series_all_tm_buffer_module,SUPRA N,SUPRA_N,SOP,sop,tm_buffer_module,33,device,False,none
+global_sop_supra_n_series_all_efem_rfid_assy,SUPRA N,SUPRA_N,SOP,sop,efem_rfid_assy,33,device,True,multi_device
+global_sop_supra_n_series_all_tm_devicenet_board,SUPRA N,SUPRA_N,SOP,sop,tm_devicenet_board,31,device,True,multi_device
+global_sop_supra_n_series_all_sub_unit_flow_switch,SUPRA N,SUPRA_N,SOP,sop,sub_unit_flow_switch,17,device,False,none
+global_sop_supra_n_series_all_pm_process_kit,SUPRA N,SUPRA_N,SOP,sop,pm_process_kit,55,device,True,multi_device
+global_sop_supra_n_series_all_sub_unit_elt_box_assy,SUPRA N,SUPRA_N,SOP,sop,sub_unit_elt_box_assy,95,device,False,none
+global_sop_supra_n_series_all_sub_unit_manometer,SUPRA N,SUPRA_N,SOP,sop,sub_unit_manometer,32,device,False,none
+global_sop_supra_n_series_all_tm_multi_port,SUPRA N,SUPRA_N,SOP,sop,tm_multi_port,22,device,True,multi_device
+global_sop_supra_n_series_all_pm_top_lid,SUPRA N,SUPRA_N,SOP,sop,pm_top_lid,48,device,False,none
+global_sop_supra_n_series_all_pm_epd,SUPRA N,SUPRA_N,SOP,sop,pm_epd,49,device,False,none
+global_sop_supra_n_series_all_sub_unit_pressure_vacuum_switch,SUPRA N,SUPRA_N,SOP,sop,sub_unit_pressure_vacuum_switch,28,device,False,none
+global_sop_supra_n_all_tm_sensor_board,SUPRA N,SUPRA_N,SOP,sop,tm_sensor_board,15,device,True,multi_device
+global_sop_supra_n_all_pm_fcip_r5,SUPRA N,SUPRA_N,SOP,sop,pm_fcip_r5,45,device,False,none
+global_sop_supra_n_all_pm_fcip_r3,SUPRA N,SUPRA_N,SOP,sop,pm_fcip_r3,84,device,False,none
+global_sop_precia_all_efem_ctc,PRECIA,PRECIA,SOP,sop,efem_ctc,51,device,False,none
+global_sop_precia_all_efem_controller,PRECIA,PRECIA,SOP,sop,efem_controller,42,device,True,multi_device
+global_sop_precia_all_efem_side_storage,PRECIA,PRECIA,SOP,sop,efem_side_storage,37,device,False,none
+global_sop_precia_all_pm_chuck,PRECIA,PRECIA,SOP,sop,pm_chuck,132,device,False,none
+global_sop_precia_all_pm_feedthrough,PRECIA,PRECIA,SOP,sop,pm_feedthrough,18,device,False,none
+global_sop_precia_all_efem_dc_cooling_fan_motor,PRECIA,PRECIA,SOP,sop,efem_dc_cooling_fan_motor,15,device,False,none
+global_sop_precia_all_tm_device_net_board,PRECIA,PRECIA,SOP,sop,tm_device_net_board,36,device,True,multi_device
+global_sop_geneva_rep_ctc,GENEVA XP,GENEVA_XP,SOP,sop,ctc,18,device,False,none
+global_sop_geneva_rep_bubbler_cabinet_fill_valve,GENEVA XP,GENEVA_XP,SOP,sop,bubbler_cabinet_fill_valve,17,device,False,none
+global_sop_geneva_rep_bubbler_cabinet_safety_valve,GENEVA XP,GENEVA_XP,SOP,sop,bubbler_cabinet_safety_valve,16,device,False,none
+global_sop_geneva_rep_bubbler_cabinet_vent_valve,GENEVA XP,GENEVA_XP,SOP,sop,bubbler_cabinet_vent_valve,17,device,False,none
+set_up_manual_supra_np,SUPRA Np,SUPRA_NP,set_up_manual,manual,setup_manual,266,device,True,global
+set_up_manual_supra_nm,SUPRA Nm,SUPRA_NM,set_up_manual,manual,setup_manual,239,device,True,global
+set_up_manual_supra_vm,SUPRA Vm,SUPRA_VM,set_up_manual,manual,setup_manual,316,device,True,global
+global_sop_supra_n_series_all_tm_ffu,SUPRA N,SUPRA_N,set_up_manual,manual,setup_manual,32,device,True,global
+set_up_manual_precia,PRECIA,PRECIA,set_up_manual,manual,setup_manual,159,device,True,global
+global_sop_integer_plus_all_am_slot_valve,INTEGER plus,INTEGER_PLUS,SOP,sop,am_slot_valve,39,device,False,none
+global_sop_precia_all_tm_branch_tap,INTEGER plus,INTEGER_PLUS,SOP,sop,tm_branch_tap,23,device,True,multi_device
+global_sop_integer_plus_all_am_baffle,INTEGER plus,INTEGER_PLUS,SOP,sop,am_baffle,18,device,False,none
+global_sop_integer_plus_all_ll_mfc,INTEGER plus,INTEGER_PLUS,SOP,sop,ll_mfc,20,device,False,none
+global_sop_precia_all_pm_pneumatic_valve,PRECIA,PRECIA,SOP,sop,pm_pneumatic_valve,20,device,True,multi_device
+global_sop_geneva_xp_rep_pm_heat_exchanger,GENEVA XP,GENEVA_XP,SOP,sop,pm_heat_exchanger,14,device,False,none
+supra_n_all_trouble_shooting_guide_trace_apc_abnormal,supra_n,SUPRA_N,trouble_shooting_guide,ts,trace_apc_abnormal,10,device,False,none
+supra_n_all_trouble_shooting_guide_trace_device_net_abnormal,SUPRA XP,SUPRA_XP,trouble_shooting_guide,ts,trace_device_net_abnormal,9,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_pm_bubbler_leak,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_pm_bubbler_leak,9,device,False,none
+precia_pm_trouble_shooting_guide_rf_power_abnormal,PRECIA,PRECIA,trouble_shooting_guide,ts,rf_power_abnormal,5,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_o2_level_out_of_range_alarm_0,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_o2_level_out_of_range_alarm_0,17,device,False,none
+supra_xp_sub_unit_trouble_shooting_guide_igs_block_abnormal,SUPRA XP,SUPRA_XP,trouble_shooting_guide,ts,igs_block_abnormal,6,device,False,none
+supra_xp_pm_trouble_shooting_guide_trace_chuck_abnormal,SUPRA XP,SUPRA_XP,trouble_shooting_guide,ts,trace_chuck_abnormal,6,device,False,none
+supra_xp_all_trouble_shooting_guide_trace_ctc_abnormal,SUPRA XP,SUPRA_XP,trouble_shooting_guide,ts,trace_ctc_abnormal,6,device,False,none
+supra_xp_tm_trouble_shooting_guide_trace_slot_valve_abnormal,SUPRA XP,SUPRA_XP,trouble_shooting_guide,ts,trace_slot_valve_abnormal,6,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_stage_chuck_move_time_out,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_stage_chuck_move_time_out,6,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_stage_1_5_wafer_vacuum_sensor_timeout,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_stage_1_5_wafer_vacuum_sensor_timeout,13,device,False,none
+precia_all_trouble_shooting_guide_pin_motor_abnormal,PRECIA,PRECIA,trouble_shooting_guide,ts,pin_motor_abnormal,9,device,False,none
+supra_n_all_trouble_shooting_guide_trace_vacuum_vent_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_vacuum_vent_abnormal,9,device,False,none
+integer_plus_all_trouble_shooting_guide_trace_slot_valve_move_abnormal,INTEGER plus,INTEGER_PLUS,trouble_shooting_guide,ts,trace_slot_valve_move_abnormal,5,device,False,none
+integer_plus_all_trouble_shooting_guide_trace_particle_spec_out,INTEGER plus,INTEGER_PLUS,trouble_shooting_guide,ts,trace_particle_spec_out,8,device,False,none
+global_sop_geneva_xp_rep_pm_loadlock_apc_valve,geneva_xp_rep,GENEVA_XP,SOP,sop,pm_loadlock_apc_valve,22,device,False,none
+supra_n_all_trouble_shooting_guide_trace_tm_robot_abnormal,SUPRA XP,SUPRA_XP,trouble_shooting_guide,ts,trace_tm_robot_abnormal,12,device,True,multi_device
+supra_n_all_trouble_shooting_guide_trace_gas_flow_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_gas_flow_abnormal,7,device,False,none
+all_all_trouble_shooting_guide_trace_ffu_abnormal,etc,ETC,trouble_shooting_guide,ts,trace_ffu_abnormal,6,device,False,none
+global_sop_supra_n_all_sub_unit_igs_block,SUPRA N,SUPRA_N,SOP,sop,sub_unit_igs_block,67,device,True,multi_device
+global_sop_supra_n_series_all_pm_gas_feed_through,SUPRA N,SUPRA_N,SOP,sop,pm_gas_feed_through,18,device,False,none
+global_sop_supra_n_series_all_tm_ctc,SUPRA N,SUPRA_N,SOP,sop,tm_ctc,82,device,True,multi_device
+ts_pdfs_pskh_ts_guide_geneva_xp_pm_wafers_exceed_time_limit,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_pm_wafers_exceed_time_limit,8,device,False,none
+ts_pdfs_pskh_geneva_stp300_xp_trouble_shooting_r1_cn,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_geneva_stp300_xp_trouble_shooting_r1_cn,49,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_position_error,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_position_error,14,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_io_respnse_error_evac_valve_error,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_io_respnse_error_evac_valve_error,13,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_pm_chamber_pressure_range_out_0,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_pm_chamber_pressure_range_out_0,14,device,False,none
+set_up_manual_omnis,OMNIS,OMNIS,set_up_manual,manual,setup_manual,107,device,True,global
+set_up_manual_omnis_plus,OMNIS plus,OMNIS_PLUS,set_up_manual,manual,setup_manual,95,device,True,global
+global_sop_supra_xp_all_tm_multi_port,SUPRA XP,SUPRA_XP,SOP,sop,tm_multi_port,24,device,True,multi_device
+global_sop_supra_xp_all_ll_pin_modify_eng,SUPRA XP,SUPRA_XP,SOP,sop,ll_pin_modify_eng,21,device,False,none
+global_sop_supra_xp_all_tm_dc_power_supply,SUPRA XP,SUPRA_XP,SOP,sop,tm_dc_power_supply,18,device,False,none
+supra_n_all_trouble_shooting_guide_trace_microwave_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_microwave_abnormal,56,device,False,none
+global_sop_omnis_plus_adj_pm_epd_eng,OMNIS plus,OMNIS_PLUS,SOP,sop,pm_epd_eng,14,device,False,none
+global_sop_omnis_plus_pm_er_check_eng,OMNIS plus,OMNIS_PLUS,SOP,sop,global_sop_omnis_plus_pm_er_check_eng,13,device,False,none
+global_sop_omnis_plus_pm_gap_sensor_eng,OMNIS plus,OMNIS_PLUS,SOP,sop,global_sop_omnis_plus_pm_gap_sensor_eng,12,device,False,none
+global_sop_omnis_plus_tm_awc_sensor_r0,OMNIS plus,OMNIS_PLUS,SOP,sop,global_sop_omnis_plus_tm_awc_sensor_r0,12,device,False,none
+global_sop_geneva_xp_rep_pm_heater_chuck_without_jig,GENEVA XP,GENEVA_XP,SOP,sop,pm_heater_chuck_without_jig,52,device,False,none
+global_sop_geneva_xp_rep_pm_o2_analyzer_modify,GENEVA XP,GENEVA_XP,SOP,sop,pm_o2_analyzer_modify,33,device,False,none
+global_sop_genevaxp_rep_efem_robot_controller,GENEVA XP,GENEVA_XP,SOP,sop,efem_robot_controller,16,device,False,none
+global_sop_genevaxp_rep_efem_robot_end_effector,GENEVA XP,GENEVA_XP,SOP,sop,efem_robot_end_effector,15,device,False,none
+global_sop_geneva_xp_rep_pm_temp_controller,GENEVA XP,GENEVA_XP,SOP,sop,pm_temp_controller,23,device,True,multi_device
+global_sop_geneva_xp_rep_pm_o2_analyzer_teledyne,GENEVA XP,GENEVA_XP,SOP,sop,pm_o2_analyzer_teledyne,20,device,False,none
+global_sop_geneva_xp_rep_bubbler_cabinet_delivery_valve,GENEVA XP,GENEVA_XP,SOP,sop,bubbler_cabinet_delivery_valve,19,device,False,none
+global_sop_geneva_xp_rep_pm_vacuum_pump,GENEVA XP,GENEVA_XP,SOP,sop,pm_vacuum_pump,21,device,False,none
+global_sop_geneva_xp_rep_efem_robot_sr8240,GENEVA XP,GENEVA_XP,SOP,sop,efem_robot_sr8240,17,device,True,multi_device
+global_sop_geneva_xp_rep_bubbler_cabinet_relief_valve,GENEVA XP,GENEVA_XP,SOP,sop,bubbler_cabinet_relief_valve,17,device,False,none
+global_sop_geneva_xp_rep_pm_pressure_switch,GENEVA XP,GENEVA_XP,SOP,sop,pm_pressure_switch,16,device,False,none
+global_sop_geneva_xp_rep_bubbler_cabinet_formic_detector_cartridge,GENEVA XP,GENEVA_XP,SOP,sop,bubbler_cabinet_formic_detector_cartridge,15,device,False,none
+global_sop_geneva_xp_rep_bubbler_cabinet_formic_detector,GENEVA XP,GENEVA_XP,SOP,sop,bubbler_cabinet_formic_detector,15,device,False,none
+global_sop_genevaxp_rep_pm_disc_home_sensor,GENEVA XP,GENEVA_XP,SOP,sop,pm_disc_home_sensor,15,device,False,none
+global_sop_geneva_xp_rep_pm_device_net,GENEVA XP,GENEVA_XP,SOP,sop,pm_device_net,15,device,False,none
+global_sop_geneva_xp_rep_pm_o2_analyzer,GENEVA XP,GENEVA_XP,SOP,sop,pm_o2_analyzer,14,device,False,none
+global_sop_geneva_xp_rep_pm_digihelic,GENEVA XP,GENEVA_XP,SOP,sop,pm_digihelic,13,device,False,none
+global_sop_geneva_xp_cln_chamber_all,GENEVA XP,GENEVA_XP,SOP,sop,global_sop_geneva_xp_cln_chamber_all,47,device,False,none
+global_sop_geneva_xp_all_8계통_check,GENEVA XP,GENEVA_XP,SOP,sop,8계통_check,46,device,False,none
+global_sop_geneva_xp_rep_pm_disc,GENEVA XP,GENEVA_XP,SOP,sop,pm_disc,31,device,False,none
+global_sop_geneva_xp_rep_pm_load_lock_o_ring,GENEVA XP,GENEVA_XP,SOP,sop,pm_load_lock_o_ring,30,device,False,none
+supra_n_all_trouble_shooting_guide_trace_door_valve_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_door_valve_abnormal,5,device,False,none
+supra_n_pm_trouble_shooting_guide_trace_epd_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_epd_abnormal,5,device,True,multi_device
+supra_n_all_trouble_shooting_guide_trace_fcip_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_fcip_abnormal,9,device,False,none
+supra_n_all_trouble_shooting_guide_trace_efem_robot_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_efem_robot_abnormal,10,device,True,multi_device
+supra_n_all_trouble_shooting_guide_trace_communication_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_communication_abnormal,5,device,False,none
+supra_n_all_trouble_shooting_guide_trace_process_specification_out,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_process_specification_out,6,device,False,none
+integer_plus_all_trouble_shooting_guide_trace_pin_move_abnormal,INTEGER plus,INTEGER_PLUS,trouble_shooting_guide,ts,trace_pin_move_abnormal,5,device,True,multi_device
+integer_plus_all_trouble_shooting_guide_trace_efem_robot_abnormal,INTEGER plus,INTEGER_PLUS,trouble_shooting_guide,ts,trace_efem_robot_abnormal,6,device,True,multi_device
+ts_pdfs_pskh_ts_guide_geneva_xp_o2_analyzer_communication_alarm,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_o2_analyzer_communication_alarm,12,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_particle_spec_out,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_particle_spec_out,18,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_io_response_error_purge_valve_error,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_io_response_error_purge_valve_error,6,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_formic_invalid_transtion,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_formic_invalid_transtion,9,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_ll_door_move_timeout,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_ll_door_move_timeout,10,device,False,none
+precia_all_trouble_shooting_guide_rf_matching_alarm,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,rf_matching_alarm,5,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_pm_formic_gas_detect_fail,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_pm_formic_gas_detect_fail,12,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_move_time_out,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_disc_motion_move_time_out,16,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_process_exhaust_fail,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_process_exhaust_fail,12,device,False,none
+set_up_manual_ecolite_ii_400,ECOLITE II 400,ECOLITE_II_400,set_up_manual,manual,setup_manual,128,device,True,global
+set_up_manual_ecolite_3000,ECOLITE3000,ECOLITE3000,set_up_manual,manual,setup_manual,284,device,True,global
+set_up_manual_ecolite_2000,ECOLITE 2000,ECOLITE_2000,set_up_manual,manual,setup_manual,106,device,True,global
+supra_n_all_trouble_shooting_guide_trace_awc_abnormal,PRECIA,PRECIA,trouble_shooting_guide,ts,trace_awc_abnormal,6,device,False,none
+supra_n_all_trouble_shooting_guide_trace_tool_shut_down,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_tool_shut_down,4,device,False,none
+supra_n_tm_trouble_shooting_guide_trace_bm_module_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_bm_module_abnormal,6,device,False,none
+precia_all_trouble_shooting_guide_trace_awc_abnormal,PRECIA,PRECIA,trouble_shooting_guide,ts,trace_awc_abnormal,6,device,False,none
+supra_n_all_trouble_shooting_guide_trace_temperature_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_temperature_abnormal,5,device,False,none
+precia_ll_trouble_shooting_guide_trace_aligner_alarm,PRECIA,PRECIA,trouble_shooting_guide,ts,trace_aligner_alarm,5,device,False,none
+precia_pm_trouble_shooting_guide_gap_sensor_alarm,PRECIA,PRECIA,trouble_shooting_guide,ts,gap_sensor_alarm,5,device,False,none
+precia_all_trouble_shooting_guide_trace_er_trace,PRECIA,PRECIA,trouble_shooting_guide,ts,trace_er_trace,6,device,False,none
+integer_plus_all_trouble_shooting_guide_trace_tm_robot_abnormal,INTEGER plus,INTEGER_PLUS,trouble_shooting_guide,ts,trace_tm_robot_abnormal,5,device,True,multi_device
+integer_plus_all_trouble_shooting_guide_trace_load_lock_abnormal,INTEGER plus,INTEGER_PLUS,trouble_shooting_guide,ts,trace_load_lock_abnormal,5,device,False,none
+integer_plus_all_trouble_shooting_guide_trace_leak_rate_over,INTEGER plus,INTEGER_PLUS,trouble_shooting_guide,ts,trace_leak_rate_over,12,device,True,multi_device
+supra_n_all_trouble_shooting_guide_trace_fps_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_fps_abnormal,5,device,False,none
+precia_all_trouble_shooting_guide_trace_fps_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_fps_abnormal,5,device,False,none
+supra_xp_tm_trouble_shooting_guide_trace_tm_robot_abnormal,SUPRA XP,SUPRA_XP,trouble_shooting_guide,ts,trace_tm_robot_abnormal,12,device,True,multi_device
+supra_xp_all_trouble_shooting_guide_trace_slot_valve_abnormal,SUPRA XP,SUPRA_XP,trouble_shooting_guide,ts,trace_slot_valve_abnormal,6,device,False,none
+supra_xp_pm_trouble_shooting_guide_trace_prism_abnormal,SUPRA XP,SUPRA_XP,trouble_shooting_guide,ts,trace_prism_abnormal,6,device,False,none
+supra_xp_pm_trouble_shooting_guide_trace_leak_rate_over,ZEDIUS XP,SUPRA_XP,trouble_shooting_guide,ts,trace_leak_rate_over,6,device,True,multi_device
+supra_n_all_trouble_shooting_guide_trace_auto_scan_limit_out,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_auto_scan_limit_out,11,device,False,none
+supra_n_all_trouble_shooting_guide_trace_leak_rate_over,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_leak_rate_over,5,device,True,multi_device
+precia_all_trouble_shooting_particle_trace,PRECIA,PRECIA,trouble_shooting_guide,ts,precia_all_trouble_shooting_particle_trace,5,device,False,none
+supra_n_all_trouble_shooting_guide_trace_pin_move_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_pin_move_abnormal,8,device,True,multi_device
+precia_pm_trouble_shooting_guide_chuck_abnormal,PRECIA,PRECIA,trouble_shooting_guide,ts,chuck_abnormal,5,device,False,none
+precia_pm_trouble_shooting_guide_process_stable_time_out_alarm,PRECIA,PRECIA,trouble_shooting_guide,ts,process_stable_time_out_alarm,5,device,False,none
+precia_all_trouble_shooting_guide_trace_gas_abnormal,PRECIA,PRECIA,trouble_shooting_guide,ts,trace_gas_abnormal,7,device,False,none
+precia_pm_trouble_shooting_guide_centering_abnormal,PRECIA,PRECIA,trouble_shooting_guide,ts,centering_abnormal,6,device,False,none
+ts_pdfs_pskh_ts_guide_geneva_xp_pm_formic_gas_leak_0,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_pm_formic_gas_leak_0,9,device,False,none
+supra_xp_all_trouble_shooting_guide_trace_device_net_abnormal,SUPRA XP,SUPRA_XP,trouble_shooting_guide,ts,trace_device_net_abnormal,7,device,False,none
+supra_xp_pm_trouble_shooting_guide_trace_pin_move_abnormal,SUPRA XP,SUPRA_XP,trouble_shooting_guide,ts,trace_pin_move_abnormal,9,device,True,multi_device
+ts_pdfs_pskh_ts_guide_geneva_xp_facilities_vacuum_fail,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_facilities_vacuum_fail,8,device,False,none
+precia_all_trouble_shooting_guide_leak_abnormal,INTEGER plus,INTEGER_PLUS,trouble_shooting_guide,ts,leak_abnormal,7,device,False,none
+supra_n_all_trouble_shooting_guide_trace_loadport_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_loadport_abnormal,7,device,False,none
+supra_xp_efem_trouble_shooting_guide_trace_loadport_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_loadport_abnormal,6,device,False,none
+supra_n_all_trouble_shooting_guide_trace_pcw_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_pcw_abnormal,5,device,False,none
+supran_all_trouble_shooting_guide_trace_pcw_abnormal,SUPRA N,SUPRA_N,trouble_shooting_guide,ts,trace_pcw_abnormal,5,device,False,none
+supra_xp_pm_trouble_shooting_guide_trace_epd_abnormal,SUPRA XP,SUPRA_XP,trouble_shooting_guide,ts,trace_epd_abnormal,6,device,True,multi_device
+ts_pdfs_pskh_ts_guide_geneva_xp_heater_power_off,GENEVA XP,GENEVA_XP,trouble_shooting_guide,ts,ts_pdfs_pskh_ts_guide_geneva_xp_heater_power_off,8,device,False,none
+set_up_manual_zedius_xp_supra_xp,ZEDIUS XP,SUPRA_XP,set_up_manual,manual,setup_manual,145,device,True,global
+set_up_manual_geneva_stp300_xp_r6,GENEVA XP,GENEVA_XP,set_up_manual,manual,setup_manual,168,device,True,global
