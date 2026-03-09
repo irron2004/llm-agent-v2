@@ -1,4 +1,4 @@
-.PHONY: clean clean-pyc clean-test clean-build help run-api stop-api up prod-up dev-up up-prod up-dev up-vllm build-up logs logs-api logs-es logs-vllm logs-tei
+.PHONY: clean clean-pyc clean-test clean-build help run-api stop-api up prod-up dev-up dev-rebuild up-prod up-dev up-vllm build-up logs logs-api logs-es logs-vllm logs-tei
 
 ROOT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 PYTHON ?= $(shell if [ -x "$(ROOT_DIR).venv/bin/python" ]; then echo "$(ROOT_DIR).venv/bin/python"; else echo python3; fi)
@@ -24,6 +24,7 @@ help:
 	@echo "up           - docker compose up -d (api + ES, uses external vLLM)"
 	@echo "prod-up      - docker compose --profile prod up -d"
 	@echo "dev-up       - docker compose --profile dev up -d"
+	@echo "dev-rebuild  - docker compose --profile dev up -d --build"
 	@echo "up-prod      - alias of prod-up"
 	@echo "up-dev       - alias of dev-up"
 	@echo "up-vllm      - docker compose up -d with vLLM (--profile with-vllm)"
@@ -70,11 +71,12 @@ up:
 	@echo ""
 
 prod-up:
-	$(DOCKER_COMPOSE) --env-file .env --env-file .env.prod --profile prod down
 	$(DOCKER_COMPOSE) --env-file .env --env-file .env.prod --profile prod up -d --build
 
 dev-up:
-	$(DOCKER_COMPOSE) --env-file .env --env-file .env.dev --profile dev down
+	$(DOCKER_COMPOSE) --env-file .env --env-file .env.dev --profile dev up -d
+
+dev-rebuild:
 	$(DOCKER_COMPOSE) --env-file .env --env-file .env.dev --profile dev up -d --build
 
 up-prod: prod-up

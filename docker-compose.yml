@@ -26,10 +26,6 @@ services:
       - API_ENABLE_LEGACY_COMPAT_ROUTES=${API_ENABLE_LEGACY_COMPAT_ROUTES:-false}
 
     volumes:
-      # Code hot-reload (development): mount backend source into /app/backend
-      - ./backend:/app/backend
-      # Scripts for batch jobs
-      - ./scripts:/app/scripts
       # Ingestion data (original pdf, pages, parsed.json)
       - ./data/ingestions:/data/ingestions
       # Vector store persistence (local-only; can be moved later)
@@ -66,6 +62,7 @@ services:
       - API_LOG_TO_FILE=true
       - API_LOG_FILE_PATH=/data/logs/api/api.log
       - API_ENABLE_LEGACY_COMPAT_ROUTES=${API_ENABLE_LEGACY_COMPAT_ROUTES_DEV:-true}
+    command: uvicorn backend.api.main:app --host 0.0.0.0 --port 8000 --reload
 
     volumes:
       - ./backend:/app/backend
@@ -299,20 +296,20 @@ services:
 
   frontend-dev:
     container_name: rag-frontend-dev
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_BASE: ""
-        VITE_CHAT_PATH: ${VITE_CHAT_PATH:-/api/agent/run}
-        VITE_INGESTIONS_BASE: ${VITE_INGESTIONS_BASE:-/data/ingestions}
-        VITE_DEFAULT_INGESTION_RUN: ${VITE_DEFAULT_INGESTION_RUN:-}
-    env_file:
-      - .env
+    image: node:20
+    working_dir: /app
     environment:
-      NGINX_API_PROXY_PASS: ${NGINX_API_PROXY_PASS_DEV:-http://api-dev:8000/api/}
+      API_PROXY_TARGET: ${API_PROXY_TARGET_DEV:-http://api-dev:8000}
+      PORT: "9097"
+      CHOKIDAR_USEPOLLING: "true"
+    command: >
+      sh -lc "if [ ! -d node_modules ] || [ -z \"$(ls -A node_modules 2>/dev/null)\" ]; then npm ci; fi;
+      npm run dev -- --host 0.0.0.0 --port 9097 --strictPort"
     volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
       - ./data/ingestions:/data/ingestions
+      - ./data:/data
     ports:
       - "${FRONTEND_DEV_PORT:-9098}:9097"
     depends_on:
@@ -334,4 +331,6 @@ networks:
 
 volumes:
   es_data:
+    driver: local
+  frontend_node_modules:
     driver: local
