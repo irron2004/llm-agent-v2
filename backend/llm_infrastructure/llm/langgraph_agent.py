@@ -342,6 +342,54 @@ MAX_REF_CHARS_ANSWER = 1200  # 답변 생성용
 RELATED_PAGE_WINDOW = 2  # 인접 페이지 범위 (±N)
 DOC_TYPES_SAME_DOC = {"gcb", "myservice", "pems"}
 EXPAND_TOP_K = 20  # 확장 대상 최대 개수 (rerank 상위)
+REPETITION_MIN_BLOCK_LEN = 40  # 반복 감지 최소 블록 길이 (문자)
+REPETITION_MAX_REPEATS = 2  # 같은 블록 최대 허용 반복 횟수
+
+
+def _truncate_repetition(text: str, min_block_len: int = REPETITION_MIN_BLOCK_LEN, max_repeats: int = REPETITION_MAX_REPEATS) -> str:
+    """텍스트에서 반복되는 블록을 감지하고 절삭한다.
+
+    긴 블록(min_block_len 이상)이 max_repeats회를 초과하여 연속 반복되면,
+    max_repeats회까지만 유지하고 나머지를 제거한다.
+    """
+    if not text or len(text) < min_block_len * (max_repeats + 1):
+        return text
+
+    # 각 위치에서 최소 반복 단위를 찾아 반복 횟수 확인
+    i = 0
+    while i < len(text) - min_block_len * 2:
+        for block_len in range(min_block_len, min(800, (len(text) - i) // 2) + 1):
+            # text[i:i+L] == text[i+L:i+2L] 인지 확인
+            if text[i : i + block_len] != text[i + block_len : i + block_len * 2]:
+                continue
+
+            # 반복 발견 — 횟수 카운트
+            block = text[i : i + block_len]
+            count = 2
+            j = i + block_len * 2
+            while j + block_len <= len(text) and text[j : j + block_len] == block:
+                count += 1
+                j += block_len
+
+            if count > max_repeats:
+                before = text[:i]
+                kept = block * max_repeats
+                after = text[i + block_len * count :]
+                truncated = before + kept + after
+                logger.info(
+                    "_truncate_repetition: %d → %d chars (block=%d, repeats=%d→%d)",
+                    len(text), len(truncated), block_len, count, max_repeats,
+                )
+                # 재귀: 추가 반복이 있을 수 있음
+                return _truncate_repetition(truncated, min_block_len, max_repeats)
+
+            # 최소 반복 단위를 찾았으면 더 큰 블록 시도 불필요
+            break
+
+        i += 1
+
+    return text
+
 
 # --- Per-node temperature settings ---
 # 분류/판단 노드: 결정적 (동일 입력 → 동일 출력)
@@ -2106,6 +2154,15 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     answer, reasoning = _invoke_llm_with_reasoning(
         llm, tmpl.system, user, max_tokens=MAX_TOKENS_ANSWER, temperature=TEMP_ANSWER
     )
+    # 반복 블록 감지 및 절삭 (안전망)
+    original_len = len(answer)
+    answer = _truncate_repetition(answer)
+    if len(answer) < original_len:
+        logger.warning(
+            "answer_node: [REPETITION_FALLBACK] 반복 절삭 발생! %d → %d chars (%.0f%% 제거). "
+            "repeat_penalty/repeat_last_n 설정 점검 필요.",
+            original_len, len(answer), (1 - len(answer) / original_len) * 100,
+        )
     logger.info(
         "answer_node: answer_chars=%d, reasoning_chars=%d, answer_preview=%s",
         len(answer),

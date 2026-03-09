@@ -31,6 +31,7 @@ class OllamaClient:
         self.max_tokens = max_tokens if max_tokens is not None else ollama_settings.max_tokens
         self.timeout = timeout if timeout is not None else ollama_settings.timeout
         self.repeat_penalty = repeat_penalty if repeat_penalty is not None else ollama_settings.repeat_penalty
+        self.repeat_last_n = ollama_settings.repeat_last_n
         self._client = client or httpx.Client(timeout=self.timeout)
 
     def _is_openai_compatible(self) -> bool:
@@ -145,6 +146,8 @@ class OllamaClient:
             ollama_options["num_predict"] = resolved_max_tokens
         if self.repeat_penalty and self.repeat_penalty != 1.0:
             ollama_options["repeat_penalty"] = self.repeat_penalty
+        if self.repeat_last_n != 64:  # only set if non-default
+            ollama_options["repeat_last_n"] = self.repeat_last_n
         if ollama_options:
             payload["options"] = ollama_options
 
