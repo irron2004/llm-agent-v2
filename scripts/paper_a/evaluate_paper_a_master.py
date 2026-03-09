@@ -44,11 +44,11 @@ from scripts.paper_a._io import read_jsonl, write_json
 from scripts.paper_a.canonicalize import compact_key
 
 K_VALUES = (1, 3, 5, 10)
-REQUIRED_SYSTEMS = {"B0", "B1", "B2", "B3", "B4", "P1"}
+REQUIRED_SYSTEMS = {"B0", "B1", "B2", "B3", "B4", "B4.5", "P1"}
 OPTIONAL_SYSTEMS = {"P2", "P3", "P4", "P6", "P7"}
 CONTROL_SYSTEMS = {"C1_random_scope", "C2_global_postfilter", "C3_per_scope_merge", "C4_dedupe_only"}
 ALL_SYSTEMS = REQUIRED_SYSTEMS | OPTIONAL_SYSTEMS | CONTROL_SYSTEMS
-DEFAULT_SYSTEMS = "B0,B1,B2,B3,B4,P1"
+DEFAULT_SYSTEMS = "B0,B1,B2,B3,B4,B4.5,P1"
 DEFAULT_TOP_K = 10
 
 
@@ -78,6 +78,7 @@ def _parse_args() -> argparse.Namespace:
     _ = parser.add_argument("--family-map", required=True, help="Path to family_map.json")
     _ = parser.add_argument("--out-dir", required=True, help="Output directory")
     _ = parser.add_argument("--shared-doc-ids", default=None, help="Optional shared_doc_ids.txt")
+    _ = parser.add_argument("--device-catalog", default=None, help="Path to device_catalog.csv (default: <doc_scope_dir>/../metadata/device_catalog.csv)")
     _ = parser.add_argument("--index", default=None, help="ES alias/index override")
     _ = parser.add_argument("--top-k", type=int, default=DEFAULT_TOP_K)
     _ = parser.add_argument("--seed", type=int, default=20260305)
@@ -192,6 +193,68 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+# ---------------------------------------------------------------------------
+# Task 6: Device catalog + alias map
+# ---------------------------------------------------------------------------
+
+def _resolve_device_catalog(explicit: str | None, doc_scope_path: Path) -> Path:
+    """Resolve device_catalog.csv path with fallback."""
+    if explicit:
+        p = Path(explicit)
+        if p.exists() and p.is_file():
+            return p
+        raise RuntimeError(f"--device-catalog path not found: {p}")
+    default = doc_scope_path.parent.parent / "metadata" / "device_catalog.csv"
+    if default.exists() and default.is_file():
+        return default
+    raise RuntimeError(
+        f"device_catalog.csv not found at default path: {default}\n"
+        f"Provide --device-catalog explicitly or place the file at the default location."
+    )
+
+
+def _build_alias_map(catalog_path: Path) -> dict[str, str]:
+    """Build compact_key -> device_name_norm mapping from device_catalog.csv.
+
+    Maps both device_name_raw and device_aliases to device_name_norm.
+    """
+    alias_map: dict[str, str] = {}
+    with catalog_path.open("r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            norm = str(row.get("device_name_norm") or "").strip()
+            if not norm:
+                continue
+            raw = str(row.get("device_name_raw") or "").strip()
+            if raw:
+                ck = compact_key(raw)
+                if ck:
+                    alias_map[ck] = norm
+            aliases_str = str(row.get("device_aliases") or "").strip()
+            if aliases_str:
+                for alias in aliases_str.split("|"):
+                    alias = alias.strip()
+                    if alias:
+                        ck = compact_key(alias)
+                        if ck:
+                            alias_map[ck] = norm
+    if not alias_map:
+        raise RuntimeError(f"device_catalog produced empty alias map: {catalog_path}")
+    return alias_map
+
+
+def _normalize_device(raw_name: str, alias_map: dict[str, str]) -> str:
+    """Resolve raw device name to canonical norm via alias_map."""
+    ck = compact_key(raw_name)
+    if not ck:
+        return ""
+    return alias_map.get(ck, "")
+
+
+# ---------------------------------------------------------------------------
+# ES resolution
+# ---------------------------------------------------------------------------
+
 def _resolve_alias_or_index(manager: EsIndexManager, requested: str) -> tuple[str, str]:
     default_alias = manager.get_alias_name()
     if requested == default_alias:
@@ -267,6 +330,13 @@ class RetrievalRunner:
         self._reranker_model = reranker_model
         self._reranker: CrossEncoderReranker | None = None
 
+    @property
+    def effective_reranker_model(self) -> str:
+        """Return the model name that the reranker will actually use."""
+        if self._reranker is not None:
+            return self._reranker.model_name
+        return self._reranker_model or CrossEncoderReranker.DEFAULT_MODEL
+
     def _embed_query(self, query: str) -> list[float]:
         cached = self._embed_cache.get(query)
         if cached is not None:
@@ -314,10 +384,20 @@ class RetrievalRunner:
         return _dedupe_top_doc_ids(self._maybe_rerank(query=query, results=[self._to_result(h) for h in hits], top_k=top_k, rerank=rerank), top_k)
 
 
-def _extract_hard_devices(query: str, device_candidates: list[str]) -> list[str]:
+def _extract_hard_devices(
+    query: str,
+    device_candidates: list[str],
+    alias_map: dict[str, str],
+) -> tuple[list[str], list[str]]:
+    """Extract hard device names from query text and return (raw_matches, norm_matches).
+
+    Returns:
+        raw_matches: device names as matched from device_candidates (ES raw values)
+        norm_matches: canonical device_name_norm values via alias_map
+    """
     query_compact = compact_key(query)
     if not query_compact:
-        return []
+        return [], []
 
     def is_valid(name: str) -> bool:
         cleaned = str(name).strip()
@@ -342,7 +422,20 @@ def _extract_hard_devices(query: str, device_candidates: list[str]) -> list[str]
         if item not in seen:
             deduped.append(item)
             seen.add(item)
-    return deduped[:1]
+    raw_matches = deduped[:1]
+
+    # Canonicalize via alias_map
+    norm_seen: set[str] = set()
+    norm_matches: list[str] = []
+    for raw in raw_matches:
+        norm = _normalize_device(raw, alias_map)
+        if norm and norm not in norm_seen:
+            norm_matches.append(norm)
+            norm_seen.add(norm)
+        elif not norm:
+            norm_matches.append(raw)
+
+    return raw_matches, norm_matches
 
 
 def _extract_hard_equip_ids(query: str, equip_candidates: set[str]) -> list[str]:
@@ -373,6 +466,7 @@ def _compute_metrics(
     gold_doc_ids: list[str],
     allowed_devices: set[str],
     shared_doc_ids: set[str],
+    alias_map: dict[str, str],
 ) -> dict[str, float]:
     gold_set = set(gold_doc_ids)
     metrics: dict[str, float] = {}
@@ -384,33 +478,48 @@ def _compute_metrics(
             break
     metrics["mrr"] = mrr
 
+    # Build canonical allowed set for comparison
+    allowed_norms: set[str] = set()
+    for d in allowed_devices:
+        norm = _normalize_device(d, alias_map)
+        allowed_norms.add(norm if norm else d)
+
     for k in K_VALUES:
         top_rows = doc_rows[:k]
         if not top_rows:
-            for pfx in ["raw_cont", "adj_cont", "shared", "ce", "hit"]:
+            for pfx in ["raw_cont", "adj_cont", "shared", "ce", "hit", "adj_den", "shared_rel", "shared_rel_den"]:
                 metrics[f"{pfx}@{k}"] = 0.0
             continue
 
         raw_oos = adj_oos = shared_count = ce = 0
+        shared_relevant = 0
         top_ids = [str(r.get("doc_id") or "") for r in top_rows if str(r.get("doc_id") or "")]
 
         for row in top_rows:
             doc_id = str(row.get("doc_id") or "")
             meta = cast(dict[str, Any], row.get("metadata") or {})
             doc_device = str(meta.get("device_name") or "").strip()
-            in_scope = bool(doc_device and doc_device in allowed_devices)
+            # Canonicalize the doc's device name for comparison
+            doc_norm = _normalize_device(doc_device, alias_map) if doc_device else ""
+            in_scope = bool(doc_norm and doc_norm in allowed_norms)
             is_shared = doc_id in shared_doc_ids
             if is_shared:
                 shared_count += 1
+                if doc_id in gold_set:
+                    shared_relevant += 1
             if not in_scope:
                 raw_oos += 1
             if not in_scope and not is_shared:
                 adj_oos += 1
                 ce = 1
 
+        adj_den = k - shared_count
         metrics[f"raw_cont@{k}"] = float(raw_oos) / float(k)
-        metrics[f"adj_cont@{k}"] = float(adj_oos) / float(k)
+        metrics[f"adj_cont@{k}"] = float(adj_oos) / max(adj_den, 1) if adj_den > 0 else 0.0
+        metrics[f"adj_den@{k}"] = float(adj_den)
         metrics[f"shared@{k}"] = float(shared_count) / float(k)
+        metrics[f"shared_rel@{k}"] = float(shared_relevant) / max(shared_count, 1) if shared_count > 0 else 0.0
+        metrics[f"shared_rel_den@{k}"] = float(shared_count)
         metrics[f"ce@{k}"] = float(ce)
         metrics[f"hit@{k}"] = 1.0 if any(d in gold_set for d in top_ids) else 0.0
 
@@ -542,7 +651,10 @@ def _summarize(rows: list[dict[str, Any]], group_keys: list[str]) -> list[dict[s
         agg["n_queries"] = len(items)
         agg["n_ok"] = len(ok_items)
         agg["n_skipped"] = len(items) - len(ok_items)
-        for metric in ["raw_cont@5", "adj_cont@5", "shared@5", "ce@5", "hit@5", "mrr"]:
+        for metric in [
+            "raw_cont@5", "adj_cont@5", "adj_den@5", "shared@5",
+            "shared_rel@5", "shared_rel_den@5", "ce@5", "hit@5", "mrr",
+        ]:
             vals = [float(i[metric]) for i in ok_items if isinstance(i.get(metric), (int, float))]
             agg[f"mean_{metric}"] = _mean(vals)
         out.append(agg)
@@ -551,7 +663,7 @@ def _summarize(rows: list[dict[str, Any]], group_keys: list[str]) -> list[dict[s
 
 METRIC_KEYS: list[str] = []
 for _k in K_VALUES:
-    for _pfx in ["raw_cont", "adj_cont", "shared", "ce", "hit"]:
+    for _pfx in ["raw_cont", "adj_cont", "adj_den", "shared", "shared_rel", "shared_rel_den", "ce", "hit"]:
         METRIC_KEYS.append(f"{_pfx}@{_k}")
 METRIC_KEYS.append("mrr")
 
@@ -561,9 +673,30 @@ PER_QUERY_FIELDS = [
     "q_id", "split", "scope_observability", "system_id", "status", "skip_reason",
     "intent_primary", "target_scope_level",
     "allowed_devices", "allowed_equips", "shared_allowed", "family_allowed",
-    "parsed_hard_devices", "parsed_hard_equip_ids", "family_devices",
+    "parsed_hard_devices", "parsed_hard_devices_norm", "hard_device_empty",
+    "parsed_hard_equip_ids", "family_devices",
     "allowed_scope_size", "latency_ms",
+    "rerank_applied", "rerank_model_seen", "rerank_proof_count",
 ] + METRIC_KEYS + ["top_doc_ids", "in_corpus_top_docs"]
+
+
+def _extract_rerank_proof(doc_rows: list[dict[str, Any]]) -> tuple[bool, str, int]:
+    """Extract rerank proof fields from top-k doc metadata.
+
+    Returns:
+        (rerank_applied, rerank_model_seen, rerank_proof_count)
+    """
+    models: set[str] = set()
+    proof_count = 0
+    for row in doc_rows:
+        meta = cast(dict[str, Any], row.get("metadata") or {})
+        if "original_score" in meta:
+            proof_count += 1
+        model = str(meta.get("rerank_model") or "").strip()
+        if model:
+            models.add(model)
+    rerank_applied = proof_count > 0 or len(models) > 0
+    return rerank_applied, "|".join(sorted(models)), proof_count
 
 
 def run() -> int:
@@ -580,10 +713,20 @@ def run() -> int:
             print(f"{name} file not found: {p}", file=sys.stderr)
             return 1
 
+    # Task 6: Resolve and load device catalog
+    device_catalog_path = _resolve_device_catalog(
+        cast(str | None, args.device_catalog), doc_scope_path,
+    )
+    alias_map = _build_alias_map(device_catalog_path)
+    print(f"Loaded alias map: {len(alias_map)} entries from {device_catalog_path}")
+
     systems = [s.strip() for s in str(args.systems).split(",") if s.strip()]
     if not systems:
         print("No systems selected", file=sys.stderr)
         return 1
+
+    # Task 7: Identify rerank systems
+    rerank_systems = [s for s in systems if s in {"B3", "B4", "B4.5", "P1"}]
 
     try:
         all_queries = _load_master_eval_set(eval_set_path)
@@ -664,17 +807,33 @@ def run() -> int:
         )
 
         per_query_rows: list[dict[str, Any]] = []
+        alias_audit_rows: list[dict[str, Any]] = []
 
         for query in queries:
-            # Parse hard devices/equips from query text
-            hard_devices = _extract_hard_devices(query.question, device_candidates)
+            # Parse hard devices/equips from query text (with alias resolution)
+            hard_devices_raw, hard_devices_norm = _extract_hard_devices(
+                query.question, device_candidates, alias_map,
+            )
             hard_equip_ids = _extract_hard_equip_ids(query.question, equip_candidates)
 
             # Determine allowed scope for metric computation (from gold labels)
             allowed_scope_devices: set[str] = set(query.allowed_devices)
-            if query.family_allowed and hard_devices:
-                family_expanded = _expand_family_devices(hard_devices, device_to_family, families)
+            if query.family_allowed and hard_devices_norm:
+                family_expanded = _expand_family_devices(hard_devices_norm, device_to_family, families)
                 allowed_scope_devices.update(family_expanded)
+
+            # Alias audit row (one per query, not per system)
+            alias_audit_rows.append({
+                "q_id": query.q_id,
+                "question": query.question,
+                "allowed_devices": "|".join(query.allowed_devices),
+                "parsed_hard_devices_norm": "|".join(hard_devices_norm),
+                "parsed_hard_devices": "|".join(hard_devices_raw),
+                "mismatch_flag": bool(
+                    hard_devices_raw and hard_devices_norm
+                    and set(hard_devices_norm) != set(hard_devices_raw)
+                ),
+            })
 
             for system_id in systems:
                 row_base: dict[str, Any] = {
@@ -690,13 +849,18 @@ def run() -> int:
                     "allowed_equips": "|".join(query.allowed_equips),
                     "shared_allowed": query.shared_allowed,
                     "family_allowed": query.family_allowed,
-                    "parsed_hard_devices": "|".join(hard_devices),
+                    "parsed_hard_devices": "|".join(hard_devices_raw),
+                    "parsed_hard_devices_norm": "|".join(hard_devices_norm),
+                    "hard_device_empty": len(hard_devices_norm) == 0,
                     "parsed_hard_equip_ids": "|".join(hard_equip_ids),
                     "family_devices": "|".join(
-                        _expand_family_devices(hard_devices, device_to_family, families)
+                        _expand_family_devices(hard_devices_norm, device_to_family, families)
                     ),
                     "allowed_scope_size": len(allowed_scope_devices),
                     "latency_ms": 0.0,
+                    "rerank_applied": False,
+                    "rerank_model_seen": "",
+                    "rerank_proof_count": 0,
                 }
 
                 # Skip if no gold docs and we need them for metrics
@@ -747,17 +911,27 @@ def run() -> int:
                 elif system_id == "B3":
                     doc_rows = retrieval.run_hybrid(query=query.question, top_k=int(args.top_k), extra_filter=None, rerank=True)
                 elif system_id == "B4":
-                    if hard_devices:
-                        extra_filter = retrieval.es_engine.build_filter(device_names=hard_devices)
+                    if hard_devices_norm:
+                        extra_filter = retrieval.es_engine.build_filter(device_names=hard_devices_norm)
+                    doc_rows = retrieval.run_hybrid(query=query.question, top_k=int(args.top_k), extra_filter=cast(dict[str, Any] | None, extra_filter), rerank=True)
+                elif system_id == "B4.5":
+                    # B4.5: shared docs OR hard device docs, with rerank
+                    b45_should: list[dict[str, Any]] = []
+                    if shared_doc_ids:
+                        b45_should.append({"terms": {"doc_id": sorted(shared_doc_ids)}})
+                    if hard_devices_norm:
+                        b45_should.append({"terms": {"device_name": hard_devices_norm}})
+                    if b45_should:
+                        extra_filter = {"bool": {"should": b45_should, "minimum_should_match": 1}}
                     doc_rows = retrieval.run_hybrid(query=query.question, top_k=int(args.top_k), extra_filter=cast(dict[str, Any] | None, extra_filter), rerank=True)
                 elif system_id == "P1":
                     if bool(args.use_es_scope_fields):
                         extra_filter = build_scope_filter_by_fields(
-                            allowed_devices=hard_devices, allowed_equip_ids=hard_equip_ids,
+                            allowed_devices=hard_devices_norm, allowed_equip_ids=hard_equip_ids,
                         )
                     else:
                         extra_filter = build_scope_filter_by_doc_ids(
-                            allowed_devices=hard_devices, allowed_equip_ids=hard_equip_ids,
+                            allowed_devices=hard_devices_norm, allowed_equip_ids=hard_equip_ids,
                             shared_doc_ids=sorted(shared_doc_ids),
                             device_doc_types=device_doc_types, equip_doc_types=equip_doc_types,
                         )
@@ -772,17 +946,24 @@ def run() -> int:
 
                 latency_ms = (time.monotonic() - t0) * 1000.0
 
-                # Compute metrics using gold labels
+                # Task 7: Extract rerank proof
+                rerank_applied, rerank_model_seen, rerank_proof_count = _extract_rerank_proof(doc_rows)
+
+                # Compute metrics using gold labels (with alias-aware comparison)
                 metrics = _compute_metrics(
                     doc_rows=doc_rows,
                     gold_doc_ids=query.gold_doc_ids,
                     allowed_devices=allowed_scope_devices,
                     shared_doc_ids=shared_doc_ids,
+                    alias_map=alias_map,
                 )
 
                 out_row = dict(row_base)
                 out_row.update(metrics)
                 out_row["latency_ms"] = round(latency_ms, 2)
+                out_row["rerank_applied"] = rerank_applied
+                out_row["rerank_model_seen"] = rerank_model_seen
+                out_row["rerank_proof_count"] = rerank_proof_count
                 out_row["top_doc_ids"] = "|".join(str(r.get("doc_id") or "") for r in doc_rows)
                 out_row["in_corpus_top_docs"] = all(
                     str(r.get("doc_id") or "") in corpus_doc_set for r in doc_rows
@@ -793,20 +974,29 @@ def run() -> int:
         out_dir.mkdir(parents=True, exist_ok=True)
         _write_csv(out_dir / "per_query.csv", per_query_rows, PER_QUERY_FIELDS)
 
+        # Task 6: Write alias audit CSV
+        _write_csv(out_dir / "alias_audit.csv", alias_audit_rows, [
+            "q_id", "question", "allowed_devices",
+            "parsed_hard_devices_norm", "parsed_hard_devices", "mismatch_flag",
+        ])
+        mismatch_count = sum(1 for r in alias_audit_rows if r.get("mismatch_flag"))
+        print(f"Alias audit: {len(alias_audit_rows)} queries, {mismatch_count} mismatches")
+
         summary_all = _summarize(per_query_rows, ["system_id"])
-        _write_csv(out_dir / "summary_all.csv", summary_all,
-                    ["system_id", "n_queries", "n_ok", "n_skipped",
-                     "mean_raw_cont@5", "mean_adj_cont@5", "mean_shared@5",
-                     "mean_ce@5", "mean_hit@5", "mean_mrr"])
+        summary_all_fields = [
+            "system_id", "n_queries", "n_ok", "n_skipped",
+            "mean_raw_cont@5", "mean_adj_cont@5", "mean_adj_den@5",
+            "mean_shared@5", "mean_shared_rel@5", "mean_shared_rel_den@5",
+            "mean_ce@5", "mean_hit@5", "mean_mrr",
+        ]
+        _write_csv(out_dir / "summary_all.csv", summary_all, summary_all_fields)
 
         summary_by_obs = _summarize(per_query_rows, ["scope_observability", "system_id"])
         _write_csv(out_dir / "summary_by_observability.csv", summary_by_obs,
-                    ["scope_observability", "system_id", "n_queries", "n_ok", "n_skipped",
-                     "mean_raw_cont@5", "mean_adj_cont@5", "mean_shared@5",
-                     "mean_ce@5", "mean_hit@5", "mean_mrr"])
+                    ["scope_observability"] + summary_all_fields)
 
         # Bootstrap CIs for preregistered comparisons
-        preregistered_pairs = [("B3", "B4"), ("B4", "P1")]
+        preregistered_pairs = [("B3", "B4"), ("B4", "B4.5"), ("B4.5", "P1"), ("B4", "P1")]
         active_pairs = [(a, b) for a, b in preregistered_pairs if a in systems and b in systems]
         bootstrap_comparisons: list[dict[str, Any]] = []
         for sys_a, sys_b in active_pairs:
@@ -857,16 +1047,20 @@ def run() -> int:
                 "corpus_filter": _sha256_file(corpus_filter_path),
                 "doc_scope": _sha256_file(doc_scope_path),
                 "family_map": _sha256_file(family_map_path),
+                "device_catalog": _sha256_file(device_catalog_path),
             },
             "config": {
                 "eval_set": str(args.eval_set),
                 "corpus_filter": str(args.corpus_filter),
                 "doc_scope": str(args.doc_scope),
                 "family_map": str(args.family_map),
+                "device_catalog": str(device_catalog_path),
                 "top_k": int(args.top_k),
                 "bootstrap_samples": int(args.bootstrap_samples),
                 "use_es_scope_fields": bool(args.use_es_scope_fields),
-                "reranker_model": cast(str | None, args.reranker_model),
+                "reranker_model_requested": cast(str | None, args.reranker_model),
+                "reranker_model_effective": retrieval.effective_reranker_model,
+                "rerank_systems": rerank_systems,
                 "device_doc_types": device_doc_types,
                 "equip_doc_types": equip_doc_types,
             },
