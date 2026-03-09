@@ -38,6 +38,8 @@ services:
       - ./data/logs/api:/data/logs/api
     ports:
       - "${API_PORT}:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       elasticsearch:
         condition: service_healthy
@@ -74,6 +76,8 @@ services:
       - ./data/logs/api-dev:/data/logs/api
     ports:
       - "${API_DEV_PORT:-8011}:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       elasticsearch:
         condition: service_healthy
