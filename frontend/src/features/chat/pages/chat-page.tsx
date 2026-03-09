@@ -532,7 +532,7 @@ export default function ChatPage() {
               onStop={stop}
               isStreaming={isStreaming}
               placeholder={inputPlaceholder}
-              disabled={isLoadingSession}
+              disabled={isLoadingSession || !!pendingGuidedSelection}
             />
           </InputArea>
         </ChatContainer>
