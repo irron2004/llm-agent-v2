@@ -75,7 +75,7 @@ export function GuidedSelectionPanel({
         .filter((s) => s.length > 0);
       if (normalized.length > 0) return normalized;
     }
-    return ["language", "device", "equip_id", "task"];
+    return ["device", "equip_id"];
   }, [payload]);
 
   const options = useMemo(() => {
@@ -160,6 +160,19 @@ export function GuidedSelectionPanel({
     setStepIndex((prev) => Math.min(prev + 1, steps.length - 1));
   };
 
+  const completeSelection = (device: string | null, equipId: string | null) => {
+    const equip = equipId === "__manual__" ? manualEquipId.trim() : equipId;
+    onComplete({
+      type: "auto_parse_confirm",
+      target_language: targetLanguage,
+      selected_device: device,
+      selected_equip_id: equip && equip.length > 0 ? equip : null,
+      task_mode: taskMode,
+    });
+  };
+
+  const isLastStep = stepIndex >= steps.length - 1;
+
   const applyOption = (opt: GuidedOption) => {
     if (currentStep === "language") {
       setTargetLanguage(normalizeLanguage(opt.value));
@@ -167,19 +180,24 @@ export function GuidedSelectionPanel({
       return;
     }
     if (currentStep === "device") {
-      if (opt.value === "__skip__") {
-        setSelectedDevice(null);
+      const device = opt.value === "__skip__" ? null : opt.value;
+      setSelectedDevice(device);
+      if (isLastStep) {
+        completeSelection(device, selectedEquipId);
       } else {
-        setSelectedDevice(opt.value);
+        advance();
       }
-      advance();
       return;
     }
     if (currentStep === "equip_id") {
       if (opt.value === "__skip__") {
         setSelectedEquipId(null);
         setManualEquipId("");
-        advance();
+        if (isLastStep) {
+          completeSelection(selectedDevice, null);
+        } else {
+          advance();
+        }
         return;
       }
       if (opt.value === "__manual__") {
@@ -188,10 +206,15 @@ export function GuidedSelectionPanel({
       }
       setSelectedEquipId(opt.value);
       setManualEquipId("");
-      advance();
+      if (isLastStep) {
+        completeSelection(selectedDevice, opt.value);
+      } else {
+        advance();
+      }
       return;
     }
 
+    // task step (legacy fallback)
     const normalizedTask = normalizeTaskMode(opt.value);
     setTaskMode(normalizedTask);
     const equip = selectedEquipId === "__manual__" ? manualEquipId.trim() : selectedEquipId;
@@ -348,15 +371,20 @@ export function GuidedSelectionPanel({
             <Input
               placeholder="equip_id를 입력하세요 (예: ABCD-1234)"
               value={manualEquipId}
-              onChange={(e) => setManualEquipId(e.target.value)}
+              onChange={(e: { target: { value: string } }) => setManualEquipId(e.target.value)}
             />
             <div style={{ display: "flex", gap: 8 }}>
               <Button
                 type="primary"
                 disabled={!canConfirmManualEquip}
                 onClick={() => {
-                  setSelectedEquipId(manualEquipId.trim());
-                  advance();
+                  const trimmed = manualEquipId.trim();
+                  setSelectedEquipId(trimmed);
+                  if (isLastStep) {
+                    completeSelection(selectedDevice, trimmed);
+                  } else {
+                    advance();
+                  }
                 }}
               >
                 확인
@@ -365,7 +393,11 @@ export function GuidedSelectionPanel({
                 onClick={() => {
                   setSelectedEquipId(null);
                   setManualEquipId("");
-                  advance();
+                  if (isLastStep) {
+                    completeSelection(selectedDevice, null);
+                  } else {
+                    advance();
+                  }
                 }}
               >
                 건너뛰기
