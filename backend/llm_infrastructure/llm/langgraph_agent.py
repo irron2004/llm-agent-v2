@@ -3007,11 +3007,11 @@ def auto_parse_node(
     if chat_history:
         needs_history = _history_check_rule_based(state)
 
-    prev_devices: list[str] = []
-    prev_doc_types = list(state.get("selected_doc_types") or []) if needs_history else []
-    prev_equip_ids: list[str] = []
+    prev_devices = list(state.get("selected_devices") or [])
+    prev_doc_types = list(state.get("selected_doc_types") or [])
+    prev_equip_ids = list(state.get("selected_equip_ids") or [])
 
-    devices = detected_devices
+    devices = detected_devices if detected_devices else prev_devices
     parsed_query = state.get("parsed_query")
     selected_doc_types_strict = bool(state.get("selected_doc_types_strict"))
     if (not selected_doc_types_strict) and isinstance(parsed_query, dict):
@@ -3021,7 +3021,7 @@ def auto_parse_node(
         doc_types = prev_doc_types
     else:
         doc_types = detected_doc_types if detected_doc_types else prev_doc_types
-    equip_ids = detected_equip_ids
+    equip_ids = detected_equip_ids if detected_equip_ids else prev_equip_ids
 
     logger.info(
         "auto_parse_node: needs_history=%s, detected_devices=%s, detected_doc_types=%s, detected_equip_ids=%s, effective_devices=%s, effective_doc_types=%s, effective_equip_ids=%s, language=%s (rule-based only)",

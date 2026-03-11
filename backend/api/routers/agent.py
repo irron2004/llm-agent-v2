@@ -133,6 +133,22 @@ def _create_device_fetcher(search_service):
     return _fetch_devices
 
 
+SOP_DOC_TYPES = {"sop", "setup", "set_up_manual"}
+ISSUE_DOC_TYPES = {"myservice", "gcb", "pems", "ts", "trouble_shooting_guide"}
+
+
+def _infer_task_mode(doc_types: list[str] | None) -> str | None:
+    """Infer task_mode from filter_doc_types selection."""
+    if not doc_types:
+        return None
+    types_set = {dt.lower() for dt in doc_types}
+    if types_set <= SOP_DOC_TYPES:
+        return "sop"
+    if types_set <= ISSUE_DOC_TYPES:
+        return "issue"
+    return None
+
+
 def _build_state_overrides(req: "AgentRequest") -> Dict[str, Any]:
     overrides: Dict[str, Any] = {}
     pq_fields: Dict[str, Any] = {}

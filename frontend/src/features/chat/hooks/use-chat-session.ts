@@ -662,8 +662,9 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           }
         }
 
-        const autoParseEnabled = overrides?.autoParse ?? !Boolean(overrides);
-        const guidedConfirmEnabled = !isResume && autoParseEnabled && !Boolean(overrides);
+        const hasUserFilters = Boolean(overrides?.filterDevices?.length || overrides?.filterDocTypes?.length);
+        const autoParseEnabled = hasUserFilters ? false : (overrides?.autoParse ?? !Boolean(overrides));
+        const guidedConfirmEnabled = !isResume && autoParseEnabled && !hasUserFilters;
         const payload: AgentRequest = {
           message: requestMessage,
           auto_parse: autoParseEnabled,  // 자동 파싱 모드 활성화 (기본값)
