@@ -25,8 +25,12 @@ import logging
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from ..rrf import merge_retrieval_result_lists_rrf
+
 if TYPE_CHECKING:
     from elasticsearch import Elasticsearch
+
+    from ..base import RetrievalResult
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +49,7 @@ class EsSearchHit:
 
     def to_retrieval_result(self) -> "RetrievalResult":
         """Convert to RetrievalResult."""
-        from backend.llm_infrastructure.retrieval.base import RetrievalResult
+        from ..base import RetrievalResult
 
         return RetrievalResult(
             doc_id=self.doc_id,
@@ -181,7 +185,7 @@ class EsSearchEngine:
         """Perform hybrid search combining dense and sparse.
 
         Two modes:
-        1. use_rrf=True: Use ES 8.x RRF (Reciprocal Rank Fusion)
+        1. use_rrf=True: Use app-level RRF (Reciprocal Rank Fusion)
         2. use_rrf=False: Use script_score with weighted combination
 
         Args:
@@ -191,7 +195,7 @@ class EsSearchEngine:
             dense_weight: Weight for dense (vector) score.
             sparse_weight: Weight for sparse (BM25) score.
             filters: Optional ES filter clause.
-            use_rrf: Whether to use RRF (requires ES 8.x+).
+            use_rrf: Whether to use app-level RRF fusion.
             rrf_k: RRF constant (only used if use_rrf=True).
             device_boost: Optional device_name to boost.
             device_boost_weight: Boost weight for matching device (default: 2.0).
@@ -230,56 +234,91 @@ class EsSearchEngine:
         device_boost: str | None = None,
         device_boost_weight: float = 2.0,
     ) -> list[EsSearchHit]:
-        """Hybrid search using ES 8.x RRF."""
-        knn_query: dict[str, Any] = {
-            "field": self.vector_field,
-            "query_vector": query_vector,
-            "k": top_k,
-            "num_candidates": top_k * 2,
+        """Hybrid search using app-level RRF over dense + sparse candidates."""
+
+        def _has_value(value: object | None) -> bool:
+            return value not in (None, "")
+
+        def _dedupe_key(
+            doc_id: str, metadata: dict[str, Any] | None
+        ) -> tuple[str] | tuple[str, str]:
+            base_metadata = metadata or {}
+
+            chunk_id = base_metadata.get("chunk_id")
+            if _has_value(chunk_id):
+                return (doc_id, str(chunk_id))
+
+            page = base_metadata.get("page")
+            if _has_value(page):
+                return (doc_id, str(page))
+
+            return (doc_id,)
+
+        def _rank_by_key(hits: list[EsSearchHit]) -> dict[tuple[str] | tuple[str, str], int]:
+            rank_map: dict[tuple[str] | tuple[str, str], int] = {}
+            for rank, hit in enumerate(hits, start=1):
+                key = _dedupe_key(hit.doc_id, hit.metadata)
+                if key not in rank_map:
+                    rank_map[key] = rank
+            return rank_map
+
+        top_n = top_k * 2
+
+        dense_hits = self.dense_search(query_vector=query_vector, top_k=top_n, filters=filters)
+
+        sparse_query: dict[str, Any] = {
+            "bool": {
+                "must": self._build_text_query(query_text, device_boost, device_boost_weight),
+            }
         }
         if filters:
-            knn_query["filter"] = filters
+            sparse_query["bool"]["filter"] = filters
 
-        text_query = self._build_text_query(query_text, device_boost, device_boost_weight)
-        if filters:
-            text_query = {
-                "bool": {
-                    "must": text_query,
-                    "filter": filters,
-                }
-            }
-
-        body: dict[str, Any] = {
-            "sub_searches": [
-                {"query": {"knn": knn_query}},
-                {"query": text_query},
-            ],
-            "rank": {
-                "rrf": {
-                    "window_size": top_k * 2,
-                    "rank_constant": rrf_k,
-                }
-            },
-            "size": top_k,
+        sparse_body: dict[str, Any] = {
+            "query": sparse_query,
+            "size": top_n,
             "_source": self._source_fields(),
         }
+        sparse_resp = self.es.search(index=self.index_name, body=sparse_body)
+        sparse_hits = self._parse_hits(sparse_resp)
 
-        try:
-            resp = self.es.search(index=self.index_name, body=body)
-            return self._parse_hits(resp)
-        except Exception as e:
-            # RRF may not be supported in all ES versions
-            logger.warning("RRF search failed, falling back to script_score: %s", e)
-            return self._hybrid_search_script_score(
-                query_vector,
-                query_text,
-                top_k,
-                0.7,
-                0.3,
-                filters,
-                device_boost,
-                device_boost_weight,
+        dense_rank_by_key = _rank_by_key(dense_hits)
+        sparse_rank_by_key = _rank_by_key(sparse_hits)
+
+        dense_results = [hit.to_retrieval_result() for hit in dense_hits]
+        sparse_results = [hit.to_retrieval_result() for hit in sparse_hits]
+        fused_results = merge_retrieval_result_lists_rrf([dense_results, sparse_results], k=rrf_k)
+
+        fused_hits: list[EsSearchHit] = []
+        for fused in fused_results[:top_k]:
+            metadata = dict(fused.metadata or {})
+            fused_key = _dedupe_key(fused.doc_id, metadata)
+            metadata["rrf_dense_rank"] = dense_rank_by_key.get(fused_key)
+            metadata["rrf_sparse_rank"] = sparse_rank_by_key.get(fused_key)
+            metadata["rrf_score"] = fused.score
+            metadata["rrf_k"] = rrf_k
+            chunk_id = str(metadata.get("chunk_id") or fused.doc_id)
+            page_value = metadata.get("page")
+            page: int | None = None
+            if isinstance(page_value, int):
+                page = page_value
+            elif isinstance(page_value, str):
+                try:
+                    page = int(page_value)
+                except ValueError:
+                    page = None
+            fused_hits.append(
+                EsSearchHit(
+                    doc_id=fused.doc_id,
+                    chunk_id=chunk_id,
+                    content=fused.content,
+                    score=fused.score,
+                    page=page,
+                    metadata=metadata,
+                    raw_text=fused.raw_text,
+                )
             )
+        return fused_hits
 
     def _hybrid_search_script_score(
         self,
@@ -458,25 +497,36 @@ class EsSearchEngine:
             }
         }
 
-    def _parse_hits(self, resp: dict[str, Any]) -> list[EsSearchHit]:
+    def _parse_hits(self, resp: Any) -> list[EsSearchHit]:
         """Parse ES response into EsSearchHit objects."""
         hits = resp.get("hits", {}).get("hits", [])
         results: list[EsSearchHit] = []
 
         for hit in hits:
             source = hit.get("_source", {})
+            # Compute chunk_id: use source.chunk_id, fallback to _id
+            chunk_id = source.get("chunk_id", hit.get("_id", ""))
+            # Parse score: handle None, missing, or non-numeric values
+            raw_score = hit.get("_score")
+            try:
+                score = float(raw_score) if raw_score is not None else 0.0
+            except (TypeError, ValueError):
+                score = 0.0
+            # Build metadata, ensuring chunk_id is always present
+            metadata = {
+                k: v for k, v in source.items() if k not in ("embedding", self.content_field)
+            }
+            if "chunk_id" not in metadata:
+                metadata["chunk_id"] = chunk_id
+
             results.append(
                 EsSearchHit(
                     doc_id=source.get("doc_id", hit.get("_id", "")),
-                    chunk_id=source.get("chunk_id", hit.get("_id", "")),
+                    chunk_id=chunk_id,
                     content=source.get(self.content_field, ""),
-                    score=float(hit.get("_score", 0.0)),
+                    score=score,
                     page=source.get("page"),
-                    metadata={
-                        k: v
-                        for k, v in source.items()
-                        if k not in ("embedding", self.content_field)
-                    },
+                    metadata=metadata,
                     raw_text=source.get(self.content_field),
                 )
             )
