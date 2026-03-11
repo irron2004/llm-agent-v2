@@ -117,3 +117,31 @@ def test_ollama_adapter_parses_response_model(monkeypatch):
     assert parsed.answer == "ok"
     assert isinstance(fake_client.last_json, dict)
     assert fake_client.last_json.get("format") == "json"
+
+
+def test_ollama_adapter_normalizes_known_model_alias(monkeypatch):
+    fake_client = _FakeClient(
+        {
+            "message": {
+                "role": "assistant",
+                "content": "alias ok",
+            }
+        }
+    )
+    monkeypatch.setattr(
+        "backend.llm_infrastructure.llm.engines.ollama.httpx.Client",
+        lambda timeout=None: fake_client,
+    )
+
+    llm = get_llm(
+        "ollama",
+        version="v1",
+        base_url="http://localhost:11434",
+        model="openai/gpt-oss-20b",
+    )
+    resp = llm.generate([{"role": "user", "content": "hi"}])
+
+    assert isinstance(resp, LLMResponse)
+    assert resp.text == "alias ok"
+    assert isinstance(fake_client.last_json, dict)
+    assert fake_client.last_json.get("model") == "gpt-oss:120b"

@@ -11,6 +11,11 @@ from ..base import LLMResponse
 
 T = TypeVar("T", bound=BaseModel)
 
+_MODEL_ALIASES = {
+    "openai/gpt-oss-20b": "gpt-oss:120b",
+    "gpt-oss-20b": "gpt-oss:120b",
+}
+
 
 class OllamaClient:
     _ALLOWED_REASONING_EFFORTS = {"low", "medium", "high"}
@@ -26,7 +31,8 @@ class OllamaClient:
         client: Optional[httpx.Client] = None,
     ) -> None:
         self.base_url = (base_url or ollama_settings.base_url).rstrip("/")
-        self.model = model or ollama_settings.model_name
+        configured_model = str(model or ollama_settings.model_name).strip()
+        self.model = _MODEL_ALIASES.get(configured_model, configured_model)
         self.temperature = temperature if temperature is not None else ollama_settings.temperature
         self.max_tokens = max_tokens if max_tokens is not None else ollama_settings.max_tokens
         self.timeout = timeout if timeout is not None else ollama_settings.timeout
