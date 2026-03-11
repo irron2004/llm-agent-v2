@@ -1,38 +1,25 @@
-"""RAPTOR evaluation scripts.
+from __future__ import annotations
 
-This package provides evaluation tools for the Meta-guided Hierarchical RAG system:
-- raptor_evaluation: Evaluation framework with metrics computation
-- ablation_configs: Experiment configurations for ablation studies
+from typing import TYPE_CHECKING, cast
 
-Usage:
-    from scripts.evaluation import (
-        RaptorEvaluator,
+if TYPE_CHECKING:
+    from scripts.evaluation.ablation_configs import (
+        EXPERIMENT_DESCRIPTIONS,
+        ExperimentConfig,
+        HyperparamConfig,
         get_ablation_configs,
+        get_all_configs,
         get_baseline_configs,
+        get_degradation_configs,
+        get_hyperparameter_configs,
+        get_paper_figure_configs,
     )
-
-    evaluator = RaptorEvaluator(es_client, index_name, embedder)
-    configs = get_ablation_configs()
-    results = evaluator.run_ablation_study(configs)
-"""
-
-from scripts.evaluation.ablation_configs import (
-    EXPERIMENT_DESCRIPTIONS,
-    ExperimentConfig,
-    HyperparamConfig,
-    get_ablation_configs,
-    get_all_configs,
-    get_baseline_configs,
-    get_degradation_configs,
-    get_hyperparameter_configs,
-    get_paper_figure_configs,
-)
-from scripts.evaluation.raptor_evaluation import (
-    GoldenQuery,
-    RaptorEvaluator,
-    RetrievalMetrics,
-    run_full_evaluation,
-)
+    from scripts.evaluation.raptor_evaluation import (
+        GoldenQuery,
+        RaptorEvaluator,
+        RetrievalMetrics,
+        run_full_evaluation,
+    )
 
 __all__ = [
     # Evaluator
@@ -51,3 +38,32 @@ __all__ = [
     "get_paper_figure_configs",
     "EXPERIMENT_DESCRIPTIONS",
 ]
+
+
+def __getattr__(name: str) -> object:
+    if name in {
+        "ExperimentConfig",
+        "HyperparamConfig",
+        "get_ablation_configs",
+        "get_baseline_configs",
+        "get_degradation_configs",
+        "get_hyperparameter_configs",
+        "get_all_configs",
+        "get_paper_figure_configs",
+        "EXPERIMENT_DESCRIPTIONS",
+    }:
+        from scripts.evaluation import ablation_configs as module
+
+        return cast(object, getattr(module, name))
+
+    if name in {
+        "RaptorEvaluator",
+        "GoldenQuery",
+        "RetrievalMetrics",
+        "run_full_evaluation",
+    }:
+        from scripts.evaluation import raptor_evaluation as module
+
+        return cast(object, getattr(module, name))
+
+    raise AttributeError(name)
