@@ -1,0 +1,230 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1773211558891,
+  "projectRoot": "/home/hskim/work/llm-agent-v2/frontend",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "react",
+        "version": "18.2.0",
+        "category": "frontend"
+      },
+      {
+        "name": "react-dom",
+        "version": "18.2.0",
+        "category": "frontend"
+      },
+      {
+        "name": "vite",
+        "version": "5.0.0",
+        "category": "build"
+      },
+      {
+        "name": "vitest",
+        "version": "2.1.9",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": "npm test",
+    "lintCommand": null,
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "vite",
+      "build": "vite build",
+      "preview": "vite preview",
+      "test": "vitest run",
+      "test:watch": "vitest"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": "feature-based"
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "public",
+      "src"
+    ],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "data": {
+      "path": "data",
+      "purpose": "Data files",
+      "fileCount": 0,
+      "lastAccessed": 1773211558872,
+      "keyFiles": []
+    },
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 4,
+      "lastAccessed": 1773211558872,
+      "keyFiles": [
+        "favicon-16x16.ico",
+        "favicon-32x32.ico",
+        "favicon.ico",
+        "index.html"
+      ]
+    },
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 3,
+      "lastAccessed": 1773211558884,
+      "keyFiles": [
+        "favicon-16x16.ico",
+        "favicon-32x32.ico",
+        "favicon.ico"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 2,
+      "lastAccessed": 1773211558885,
+      "keyFiles": [
+        "main.tsx",
+        "styles.css"
+      ]
+    },
+    "dist/assets": {
+      "path": "dist/assets",
+      "purpose": "Static assets",
+      "fileCount": 2,
+      "lastAccessed": 1773211558888,
+      "keyFiles": [
+        "index-D0p2U5su.js",
+        "index-WVBVuStV.css"
+      ]
+    },
+    "src/__tests__": {
+      "path": "src/__tests__",
+      "purpose": "Test files",
+      "fileCount": 1,
+      "lastAccessed": 1773211558889,
+      "keyFiles": [
+        "setup.ts"
+      ]
+    },
+    "src/app": {
+      "path": "src/app",
+      "purpose": "Application code",
+      "fileCount": 2,
+      "lastAccessed": 1773211558889,
+      "keyFiles": [
+        "providers.tsx",
+        "router.tsx"
+      ]
+    },
+    "src/components": {
+      "path": "src/components",
+      "purpose": "UI components",
+      "fileCount": 5,
+      "lastAccessed": 1773211558889,
+      "keyFiles": [
+        "image-preview-modal.css",
+        "image-preview-modal.tsx",
+        "not-found-page.tsx"
+      ]
+    },
+    "src/config": {
+      "path": "src/config",
+      "purpose": "Configuration files",
+      "fileCount": 1,
+      "lastAccessed": 1773211558889,
+      "keyFiles": [
+        "env.ts"
+      ]
+    },
+    "src/lib": {
+      "path": "src/lib",
+      "purpose": "Library code",
+      "fileCount": 2,
+      "lastAccessed": 1773211558889,
+      "keyFiles": [
+        "api-client.ts",
+        "sse.ts"
+      ]
+    }
+  },
+  "hotPaths": [
+    {
+      "path": "src/components/layout/index.tsx",
+      "accessCount": 7,
+      "lastAccessed": 1773211737741,
+      "type": "file"
+    },
+    {
+      "path": "src/features/chat/components/chat-input.tsx",
+      "accessCount": 3,
+      "lastAccessed": 1773211812326,
+      "type": "file"
+    },
+    {
+      "path": "src/features/chat/pages/chat-page.tsx",
+      "accessCount": 2,
+      "lastAccessed": 1773211675469,
+      "type": "file"
+    },
+    {
+      "path": "src",
+      "accessCount": 1,
+      "lastAccessed": 1773211583559,
+      "type": "directory"
+    },
+    {
+      "path": "src/features/chat",
+      "accessCount": 1,
+      "lastAccessed": 1773211584503,
+      "type": "directory"
+    },
+    {
+      "path": "src/features/chat/api.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773211588659,
+      "type": "file"
+    },
+    {
+      "path": "src/features/chat/types.ts",
+      "accessCount": 1,
+      "lastAccessed": 1773211621537,
+      "type": "directory"
+    },
+    {
+      "path": "src/components/image-preview-modal.tsx",
+      "accessCount": 1,
+      "lastAccessed": 1773211710696,
+      "type": "file"
+    }
+  ],
+  "userDirectives": []
+}

@@ -1,0 +1,16 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.1, pluggy-1.6.0 -- /home/hskim/work/llm-agent-v2/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/hskim/work/llm-agent-v2/backend
+configfile: pyproject.toml
+plugins: anyio-4.12.0, langsmith-0.4.59
+collecting ... collected 4 items
+
+backend/tests/test_answer_language_templates.py::test_answer_node_uses_chinese_template_when_detected_language_is_zh PASSED [ 25%]
+backend/tests/test_answer_language_templates.py::test_load_prompt_spec_includes_chinese_templates PASSED [ 50%]
+backend/tests/test_answer_language_templates.py::test_load_prompt_spec_v2_includes_language_templates_for_all_routes PASSED [ 75%]
+backend/tests/test_answer_language_templates.py::test_load_prompt_spec_v2_includes_issue_prompts_when_files_exist PASSED [100%]
+
+============================== 4 passed in 4.16s ===============================
+
+EXIT_CODE=0

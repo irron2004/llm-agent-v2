@@ -1,0 +1,83 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import sys
+
+
+def pop_global_options(argv: list[str]) -> list[str]:
+    items = list(argv)
+    while len(items) >= 2 and items[0] in {"-L", "-f"}:
+        items = items[2:]
+    return items
+
+
+def read_value(argv: list[str], flag: str, default: str = "") -> str:
+    if flag in argv:
+        index = argv.index(flag)
+        if index + 1 < len(argv):
+            return argv[index + 1]
+    return default
+
+
+def main() -> int:
+    args = pop_global_options(sys.argv[1:])
+    if not args:
+        return 0
+
+    command = args[0]
+
+    if command == "has-session":
+        target = read_value(args, "-t")
+        if target in {"=aiwb-demo", "=renamed-session", "=aiwb-11111111", "=aiwb-22222222"}:
+            return 0
+        print("can't find session", file=sys.stderr)
+        return 1
+
+    if command == "list-sessions":
+        print("aiwb-demo\tws-1\t1\t$1\t/tmp/tmux-1002/default")
+        print("renamed-session\tws-renamed\t0\t$2\t/tmp/tmux-1002/default")
+        print("aiwb-11111111\tws-11111111\t1\t$3\t/tmp/tmux-1002/default")
+        print("aiwb-22222222\tws-22222222\t0\t$4\t/tmp/tmux-1002/default")
+        return 0
+
+    if command == "list-panes":
+        target = read_value(args, "-t")
+        if target in {"=aiwb-demo", "=renamed-session", "=aiwb-11111111", "=aiwb-22222222"}:
+            print("%1\t0\t1\t0\tbash\tAIWB claude\tclaude\t1234\t\tbash -lc claude")
+            print("%2\t1\t0\t0\tbash\tAIWB codex\tcodex\t1235\t\tbash -lc codex")
+            print("%3\t2\t0\t0\tbash\tAIWB opencode\topencode\t1236\t\tbash -lc opencode")
+            return 0
+        print("can't find session", file=sys.stderr)
+        return 1
+
+    if command == "new-session":
+        print("%1")
+        return 0
+
+    if command == "split-window":
+        print("%2")
+        return 0
+
+    if command == "capture-pane":
+        print("line one")
+        print("line two")
+        print("line three")
+        return 0
+
+    if command in {
+        "set-option",
+        "select-pane",
+        "select-layout",
+        "swap-pane",
+        "respawn-pane",
+        "attach-session",
+        "switch-client",
+        "kill-session",
+    }:
+        return 0
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

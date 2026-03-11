@@ -1,0 +1,302 @@
+[
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_delivery_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same subsystem (Bubbler Cabinet), but covers Delivery Valve not Drain Valve. Neighboring valve SOP may contain contextual setup steps."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_drain_valve",
+    "relevance": 2,
+    "reason": "Exact match: GENEVA XP Bubbler Cabinet Drain Valve replacement SOP directly answers the query."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_feed_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same subsystem (Bubbler Cabinet), but covers Feed Valve not Drain Valve. Partial context."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_relief_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same subsystem (Bubbler Cabinet), but covers Relief Valve not Drain Valve. Partial context."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_geneva_xp_rep_efem_ffu",
+    "relevance": 0,
+    "reason": "Same device (GENEVA_XP) but completely different component (EFEM FFU vs Bubbler Cabinet Drain Valve). No relevant information."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_geneva_xp_rep_pm_mfc",
+    "relevance": 0,
+    "reason": "Same device (GENEVA_XP) but completely different component (MFC vs Bubbler Cabinet Drain Valve). No relevant information."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_supra_xp_all_pm_heater_chuck",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and completely different component (Heater Chuck). Not relevant."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and completely different component (TM CTC). Not relevant."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_geneva_rep_bubbler_cabinet_vent_valve",
+    "relevance": 1,
+    "reason": "Related device (GENEVA, predecessor/sibling to GENEVA_XP) and same subsystem (Bubbler Cabinet), but covers Vent Valve not Drain Valve. Partial relevance."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_delivery_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same Bubbler Cabinet subsystem, but covers Delivery Valve not Drain Valve. Partial context for masked query."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_drain_valve",
+    "relevance": 2,
+    "reason": "Exact match: GENEVA XP Bubbler Cabinet Drain Valve SOP directly answers the query even when device is masked."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_feed_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same Bubbler Cabinet subsystem, but covers Feed Valve not Drain Valve. Partial context."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_relief_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same Bubbler Cabinet subsystem, but covers Relief Valve not Drain Valve. Partial context."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_supra_n_series_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device family (SUPRA N series) and completely different component (TM CTC). Not relevant."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_supra_n_series_all_tm_robot",
+    "relevance": 0,
+    "reason": "Different device family (SUPRA_N) and completely different component (TM Robot). Not relevant."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and completely different component (Device Net Board). Not relevant."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and completely different component (TM CTC). Not relevant."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and completely different component (TM Device Net Board). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40034602",
+    "relevance": 0,
+    "reason": "Different device (SUPRA V, not Vplus) and about Signal Tower replacement, not Controller initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40043342",
+    "relevance": 0,
+    "reason": "Different device (SUPRA V) and about TM Robot Servo/EMO issues, not Controller replacement/initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40044732",
+    "relevance": 1,
+    "reason": "Different device (SUPRA V) but covers Pin Motor Controller replacement and parameter initialization (Parameter Back Up, Parameter 변경), which is partially relevant to controller initialization procedure."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40046555",
+    "relevance": 0,
+    "reason": "Different device (SUPRA V) and about FFU/MCB replacement, not Controller initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40054699",
+    "relevance": 1,
+    "reason": "Same device (SUPRA Vplus) and covers TM Robot Controller replacement and post-replacement troubleshooting, partially relevant to Controller replacement/initialization context."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40075928",
+    "relevance": 0,
+    "reason": "Different device (TIGMA Vplus) and about FFU/MCB trips, not Controller initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40076066",
+    "relevance": 1,
+    "reason": "Same device (SUPRA Vplus) and covers PMC (PM Controller) replacement with ignition test, partially relevant to controller replacement/initialization procedure."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40097172",
+    "relevance": 0,
+    "reason": "Same device (SUPRA Vplus) but about TM Robot communication alarm and full robot replacement, not controller initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "global_sop_supra_n_series_all_efem_controller",
+    "relevance": 1,
+    "reason": "Different device (SUPRA_N) but same component type (EFEM Controller). Controller replacement/initialization procedures may share common steps across N and Vplus series."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "global_sop_supra_n_series_all_efem_ffu",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and different component (EFEM FFU, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "global_sop_supra_n_series_all_sub_unit_temp_controller",
+    "relevance": 1,
+    "reason": "Different device (SUPRA N series) but covers Sub Unit Temp Controller replacement/initialization, which shares controller initialization concepts."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "global_sop_supra_v_modify_all_air_tube",
+    "relevance": 0,
+    "reason": "Related device (SUPRA V) but completely different component (Air Tube modification). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "global_sop_supra_vplus_all_pm_controller",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA Vplus PM Controller SOP directly covers controller replacement and initialization procedures for the queried device."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "set_up_manual_supra_vm",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_VM) and setup manual covering initial installation, not controller post-replacement initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "40054699",
+    "relevance": 1,
+    "reason": "Same device (SUPRA Vplus) and covers TM Robot Controller replacement with post-replacement troubleshooting. Partial relevance for masked device query."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_genevaxp_rep_efem_robot_controller",
+    "relevance": 1,
+    "reason": "Different device (GENEVA_XP) but same component type (Robot Controller replacement SOP). Controller replacement procedure may share common initialization steps."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (Device Net Board, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (PM Device Net Board, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_precia_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (TM Device Net Board, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_supra_n_series_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and different component (PM Device Net Board, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (PM Device Net Board, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (TM CTC). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (TM Device Net Board, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "set_up_manual_geneva_stp300_xp_r6",
+    "relevance": 0,
+    "reason": "Different device (GENEVA_STP300_XP) and setup manual for initial installation, not controller initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "set_up_manual_supra_xq",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XQ) and setup manual for initial installation, not controller post-replacement initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "set_up_manual_zedius_xp_supra_xp",
+    "relevance": 0,
+    "reason": "Different device (ZEDIUS_XP) and setup manual for initial installation, not controller initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "supra_n_all_trouble_shooting_guide_trace_device_net_abnormal",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and covers Device Net communication troubleshooting, not Controller replacement/initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "supra_xp_all_trouble_shooting_guide_trace_device_net_abnormal",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and covers Device Net communication troubleshooting, not Controller replacement/initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "40046755",
+    "relevance": 0,
+    "reason": "Different device (SUPRA Nm) and about high-temperature process setup with Baffle/Focus Adaptor/Applicator Tube, not OMNIS Arcing component replacement. Not relevant."
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_integer_plus_all_ll_mfc",
+    "relevance": 0,
+    "reason": "Different device (INTEGER plus) and different component (LL MFC). No connection to OMNIS Arcing. Not relevant."
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_integer_plus_all_ll_sensor_board",
+    "relevance": 0,
+    "reason": "Different device (INTEGER plus) and different component (LL Sensor Board). No connection to OMNIS Arcing. Not relevant."
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_omnis_plus_all_pm_apc_product_report",
+    "relevance": 1,
+    "reason": "Related device (OMNIS_PLUS, close variant of OMNIS) and PM APC test SOP for the chamber. APC (Adaptive Pressure Control) testing in PM context may share setup/teardown steps relevant to arcing component replacement, but does not directly cover Arcing."
+  }
+]

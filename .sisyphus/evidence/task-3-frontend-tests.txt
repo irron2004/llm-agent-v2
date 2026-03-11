@@ -1,0 +1,351 @@
+
+> pe-agent-frontend@0.1.0 test
+> vitest run
+
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90m/home/hskim/work/llm-agent-v2/frontend[39m
+
+ [32m✓[39m src/features/retrieval-test/__tests__/use-retrieval-test.test.ts [2m([22m[2m14 tests[22m[2m)[22m[90m 51[2mms[22m[39m
+ [32m✓[39m src/features/chat/__tests__/chat-review-context.test.tsx [2m([22m[2m2 tests[22m[2m)[22m[90m 23[2mms[22m[39m
+ [32m✓[39m src/features/chat/__tests__/chat-request-payload.test.tsx [2m([22m[2m13 tests[22m[2m)[22m[90m 86[2mms[22m[39m
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mrenders search input and field weight controls
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mcalls GET /api/search when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx[2m > [22m[2mRetrievalTestPage - Replay Last Run[2m > [22m[2msends replay_run_id when clicking Replay last run button
+[22m[39mWarning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstdout[2m | src/features/chat/__tests__/chat-page-device-panel.test.tsx[2m > [22m[2mReq 1 — confirmation dialog[2m > [22m[2mshows "1. 예" and "2. 아니오" buttons when pendingRegeneration is set
+[22m[39m[ChatPage] pendingReview from hook: [1mnull[22m
+
+[90mstdout[2m | src/features/chat/__tests__/chat-page-device-panel.test.tsx[2m > [22m[2mReq 2 — type '1' to load device list[2m > [22m[2mcalls fetchDeviceCatalog after typing '1' + Enter
+[22m[39m[ChatPage] pendingReview from hook: [1mnull[22m
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mrenders search input and controls
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mhas deterministic toggle ON by default
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls POST /api/retrieval/run with correct payload when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls POST /api/retrieval/run with correct payload when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls POST /api/retrieval/run with correct payload when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls POST /api/retrieval/run with correct payload when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstdout[2m | src/features/chat/__tests__/chat-page-device-panel.test.tsx[2m > [22m[2mReq 3 — type '2' to dismiss panel[2m > [22m[2mcalls setPendingRegeneration(null) after typing '2' + Enter
+[22m[39m[ChatPage] pendingReview from hook: [1mnull[22m
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls POST /api/retrieval/run with correct payload when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls POST /api/retrieval/run with correct payload when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mcalls GET /api/search when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls POST /api/retrieval/run with correct payload when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstdout[2m | src/features/chat/__tests__/chat-page-device-panel.test.tsx[2m > [22m[2mReq 4 — numbered device list with maxWidth 480[2m > [22m[2mrenders device names and container has maxWidth 480
+[22m[39m[ChatPage] pendingReview from hook: [1mnull[22m
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls POST /api/retrieval/run with correct payload when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls POST /api/retrieval/run with correct payload when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mcalls GET /api/search when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls POST /api/retrieval/run with correct payload when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls POST /api/retrieval/run with correct payload when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mcalls GET /api/search when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstdout[2m | src/features/chat/__tests__/chat-page-device-panel.test.tsx[2m > [22m[2mReq 5 — type device number to send[2m > [22m[2msends message with "[Pump-A100] ..." and overrides after typing device number
+[22m[39m[ChatPage] pendingReview from hook: [1mnull[22m
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mcalls GET /api/search when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstdout[2m | src/features/chat/__tests__/chat-page-device-panel.test.tsx[2m > [22m[2mReq 6 — click device item triggers same send()[2m > [22m[2mclicking a device item calls send() with the same arguments as typing the number
+[22m[39m[ChatPage] pendingReview from hook: [1mnull[22m
+
+ [32m✓[39m src/features/chat/__tests__/guided-selection-panel.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 1463[2mms[22m[39m
+   [33m[2m✓[22m[39m GuidedSelectionPanel[2m > [22mcompletes click flow and calls onComplete once with expected decision [33m732[2mms[22m[39m
+   [33m[2m✓[22m[39m GuidedSelectionPanel[2m > [22muses manual equip path and submits typed selected_equip_id [33m649[2mms[22m[39m
+[90mstderr[2m | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx[2m > [22m[2mRetrievalTestPage - Replay Last Run[2m > [22m[2msends replay_run_id when clicking Replay last run button
+[22m[39mWarning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mcalls GET /api/search when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls POST /api/retrieval/run with correct payload when searching
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstdout[2m | src/features/chat/__tests__/chat-page-device-panel.test.tsx[2m > [22m[2mReq 7 — type '0' to cancel[2m > [22m[2mcalls setPendingRegeneration(null) and does NOT call send()
+[22m[39m[ChatPage] pendingReview from hook: [1mnull[22m
+
+[90mstdout[2m | src/features/chat/__tests__/chat-page-device-panel.test.tsx[2m > [22m[2mReq 8 — invalid input is ignored[2m > [22m[2mdoes not call send or setPendingRegeneration on invalid input
+[22m[39m[ChatPage] pendingReview from hook: [1mnull[22m
+
+[90mstdout[2m | src/features/chat/__tests__/chat-page-device-panel.test.tsx[2m > [22m[2mReq 9 — auto-dismiss on subsequent missing_device_parse[2m > [22m[2mauto-calls setPendingRegeneration(null) when a device was previously selected
+[22m[39m[ChatPage] pendingReview from hook: [1mnull[22m
+
+[90mstdout[2m | src/features/chat/__tests__/chat-page-device-panel.test.tsx[2m > [22m[2mReq 9 — auto-dismiss on subsequent missing_device_parse[2m > [22m[2mauto-calls setPendingRegeneration(null) when a device was previously selected
+[22m[39m[ChatPage] pendingReview from hook: [1mnull[22m
+
+[90mstdout[2m | src/features/chat/__tests__/chat-page-device-panel.test.tsx[2m > [22m[2mReq 10 — auto-dismiss does NOT call send()[2m > [22m[2mauto-dismiss only calls setPendingRegeneration(null), not send()
+[22m[39m[ChatPage] pendingReview from hook: [1mnull[22m
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls with deterministic=false when toggle is off
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls with deterministic=false when toggle is off
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstdout[2m | src/features/chat/__tests__/chat-page-device-panel.test.tsx[2m > [22m[2mReq 10 — auto-dismiss does NOT call send()[2m > [22m[2mauto-dismiss only calls setPendingRegeneration(null), not send()
+[22m[39m[ChatPage] pendingReview from hook: [1mnull[22m
+
+[90mstderr[2m | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx[2m > [22m[2mRetrievalTestPage - Replay Last Run[2m > [22m[2msends replay_run_id when clicking Replay last run button
+[22m[39mWarning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls with deterministic=false when toggle is off
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls with deterministic=false when toggle is off
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mincludes field_weights in the request URL
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls with deterministic=false when toggle is off
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls with deterministic=false when toggle is off
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mcalls with deterministic=false when toggle is off
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstdout[2m | src/features/chat/__tests__/chat-page-device-panel.test.tsx[2m > [22m[2mReq 12 — HIL DeviceSelectionPanel renders[2m > [22m[2mrenders DeviceSelectionPanel when pendingDeviceSelection is set
+[22m[39m[ChatPage] pendingReview from hook: [1mnull[22m
+
+ [32m✓[39m src/features/chat/__tests__/chat-page-device-panel.test.tsx [2m([22m[2m11 tests[22m[2m)[22m[33m 2624[2mms[22m[39m
+   [33m[2m✓[22m[39m Req 1 — confirmation dialog[2m > [22mshows "1. 예" and "2. 아니오" buttons when pendingRegeneration is set [33m1836[2mms[22m[39m
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays results after successful search
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mincludes field_weights in the request URL
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mincludes field_weights in the request URL
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays results after successful search
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mincludes field_weights in the request URL
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays results after successful search
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays results after successful search
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays results after successful search
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mincludes field_weights in the request URL
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mincludes field_weights in the request URL
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays results after successful search
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays configuration info when debug is enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx[2m > [22m[2mRetrievalTestPage - Replay Last Run[2m > [22m[2msends replay_run_id when clicking Replay last run button
+[22m[39mWarning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mdisplays results after successful search
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays configuration info when debug is enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays configuration info when debug is enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays configuration info when debug is enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays configuration info when debug is enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mdisplays results after successful search
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mdisplays results after successful search
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays configuration info when debug is enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mdisplays results after successful search
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mdisplays results after successful search
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mdisplays results after successful search
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx[2m > [22m[2mRetrievalTestPage - Replay Last Run[2m > [22m[2menables Replay button after a successful run
+[22m[39mWarning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays pipeline steps when debug is enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx[2m > [22m[2mRetrievalTestPage - Replay Last Run[2m > [22m[2menables Replay button after a successful run
+[22m[39mWarning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays pipeline steps when debug is enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays pipeline steps when debug is enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays pipeline steps when debug is enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays pipeline steps when debug is enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mshows BM25 mode switch and applies dense_weight=0.0 when enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-page.test.tsx[2m > [22m[2mSearchPage - Canonical Retrieval Endpoint[2m > [22m[2mdisplays pipeline steps when debug is enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mshows BM25 mode switch and applies dense_weight=0.0 when enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+ [32m✓[39m src/features/search/__tests__/search-page.test.tsx [2m([22m[2m8 tests[22m[2m)[22m[33m 2407[2mms[22m[39m
+   [33m[2m✓[22m[39m SearchPage - Canonical Retrieval Endpoint[2m > [22mrenders search input and controls [33m397[2mms[22m[39m
+   [33m[2m✓[22m[39m SearchPage - Canonical Retrieval Endpoint[2m > [22mhas deterministic toggle ON by default [33m331[2mms[22m[39m
+   [33m[2m✓[22m[39m SearchPage - Canonical Retrieval Endpoint[2m > [22mcalls POST /api/retrieval/run with correct payload when searching [33m413[2mms[22m[39m
+   [33m[2m✓[22m[39m SearchPage - Canonical Retrieval Endpoint[2m > [22mcalls with deterministic=false when toggle is off [33m379[2mms[22m[39m
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mshows BM25 mode switch and applies dense_weight=0.0 when enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mshows BM25 mode switch and applies dense_weight=0.0 when enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mshows BM25 mode switch and applies dense_weight=0.0 when enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mshows BM25 mode switch and applies dense_weight=0.0 when enabled
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx[2m > [22m[2mRetrievalTestPage - Replay Last Run[2m > [22m[2menables Replay button after a successful run
+[22m[39mWarning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+
+[90mstderr[2m | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx[2m > [22m[2mRetrievalTestPage - Replay Last Run[2m > [22m[2mdisplays last run_id when available
+[22m[39mWarning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx[2m > [22m[2mRetrievalTestPage - Replay Last Run[2m > [22m[2mdisplays last run_id when available
+[22m[39mWarning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+[90mstderr[2m | src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx[2m > [22m[2mRetrievalTestPage - Replay Last Run[2m > [22m[2mdisplays last run_id when available
+[22m[39mWarning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: InputNumber] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+Warning: [antd: Card] `bordered` is deprecated. Please use `variant` instead.
+
+ [32m✓[39m src/features/retrieval-test/__tests__/retrieval-test-page-replay.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 3167[2mms[22m[39m
+   [33m[2m✓[22m[39m RetrievalTestPage - Replay Last Run[2m > [22msends replay_run_id when clicking Replay last run button [33m1792[2mms[22m[39m
+   [33m[2m✓[22m[39m RetrievalTestPage - Replay Last Run[2m > [22menables Replay button after a successful run [33m835[2mms[22m[39m
+   [33m[2m✓[22m[39m RetrievalTestPage - Replay Last Run[2m > [22mdisplays last run_id when available [33m538[2mms[22m[39m
+[90mstderr[2m | src/features/search/__tests__/search-es-page.test.tsx[2m > [22m[2mSearchESPage - Legacy Elasticsearch Endpoint[2m > [22m[2mallows toggling field weights
+[22m[39mWarning: [antd: Input] `addonAfter` is deprecated. Please use `Space.Compact` instead.
+
+ [32m✓[39m src/features/search/__tests__/search-es-page.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 3287[2mms[22m[39m
+   [33m[2m✓[22m[39m SearchESPage - Legacy Elasticsearch Endpoint[2m > [22mrenders search input and field weight controls [33m524[2mms[22m[39m
+   [33m[2m✓[22m[39m SearchESPage - Legacy Elasticsearch Endpoint[2m > [22mcalls GET /api/search when searching [33m794[2mms[22m[39m
+   [33m[2m✓[22m[39m SearchESPage - Legacy Elasticsearch Endpoint[2m > [22mincludes field_weights in the request URL [33m392[2mms[22m[39m
+   [33m[2m✓[22m[39m SearchESPage - Legacy Elasticsearch Endpoint[2m > [22mdisplays results after successful search [33m502[2mms[22m[39m
+   [33m[2m✓[22m[39m SearchESPage - Legacy Elasticsearch Endpoint[2m > [22mshows BM25 mode switch and applies dense_weight=0.0 when enabled [33m471[2mms[22m[39m
+   [33m[2m✓[22m[39m SearchESPage - Legacy Elasticsearch Endpoint[2m > [22mdisplays error message on failed search [33m372[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m      Tests [22m [1m[32m61 passed[39m[22m[90m (61)[39m
+[2m   Start at [22m 20:21:43
+[2m   Duration [22m 5.77s[2m (transform 1.09s, setup 479ms, collect 6.55s, tests 13.11s, environment 3.76s, prepare 1.11s)[22m
+
+
+EXIT_CODE=0

@@ -1,0 +1,502 @@
+[
+  {
+    "q_id": "A-sop042",
+    "question": "ZEDIUS XP 설비의 \"PRISM\" SOURCE 교체 관련 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_tm_robot",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "robot",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_TM_ROBOT Global SOP No: Revision No : 3 Page : 1/47 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 TM ROBOT 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) TM ROBOT REPLACEMENT ------------------------ 6 page 2) TM ROBOT TEACHING ---------------------------- 19 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_TM_ROBOT Global SOP No: Revision No : 3 Page : 2/47 ## 1. Safety 1) 안전 및 주의사항 - Robot Teaching 시 손가락 및 신체 협착주의 - TM 내부작업 시 머리 등의 신체 부위와의 충돌에 의한 부상 주의 ## 2. Safety Label <!-- Table (47, 421, 962, 908) --> \\begin{tabular}{|l|l|l|} \\hline Safety Label (국문+영문) & 명칭"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "question": "[DEVICE] \"PRISM\" SOURCE 교체 관련 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "doc_device": "PRECIA",
+    "doc_type": "sop",
+    "doc_chapter": "device net board",
+    "doc_content": "```markdown # Global SOP_PRECIA_ALL_EFEM_DEVICE NET BOARD Global SOP No: Revision No: 0 Page: 1/17 ## Scope 이 Global SOP는 PRECIA설비의 EFEM Device Net Board 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Position 6. Revision History 7. Work List 1) EFEM Device Net Board Replacement ------------------------ 6 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_PRECIA_ALL_EFEM_DEVICE NET BOARD Global SOP No: Revision No: 0 Page: 2/17 ## 1. Safety 1) 안전 및 주의사항 - 장비 동작 중 **Cover 개방 금지**. - Device Net Board 교체 시 **전원을 차단하여 Short를 방지한다**. ## 2. Safety Label <!-- Table (53, 420, 969, 751) --> \\begin{tabular}{|l|l|l|} \\hline Safety Label"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "question": "[DEVICE] \"PRISM\" SOURCE 교체 관련 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "doc_device": "PRECIA",
+    "doc_type": "sop",
+    "doc_chapter": "device net board",
+    "doc_content": "```markdown # Global SOP_PRECIA_ALL_PM_DEVICE NET BOARD Global SOP No : 0 Revision No : 0 Page : 1/37 ## Scope 이 Global SOP는 PRECIA 설비의 PM DEVICE NET BOARD 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Revision History 6. Work List 1) PM DEVICE NET BORAD REP----------------- 6 page 2) PM DEVICE NET BOARD S/W----------------- 18 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_PRECIA_ALL_PM_DEVICE NET BOARD Global SOP No : 0 Revision No : 0 Page : 2/37 ## 1. Safety 1) 안전 및 주의사항 - 작업자간 Cable 분리 시 Short로 인한 Part Fail 주의 - PM not disable 에 의한 사고 주의. - Cable 분리 시 감전 주의 ## 2. Safety Label <!-- Table (47, 421, 941, 766) --> \\begin{tabular}{|l|l|l|} \\hli"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "question": "[DEVICE] \"PRISM\" SOURCE 교체 관련 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_n_series_all_pm_device_net_board",
+    "doc_device": "SUPRA_N",
+    "doc_type": "sop",
+    "doc_chapter": "device net board",
+    "doc_content": "```markdown # Global SOP_SUPRA N series_ALL_PM_DEVICE NET BOARD Global SOP No : Revision No: 2 Page: 1/44 ## Scope 이 Global SOP는 SUPRA N series 설비의 PM DEVICE NET BOARD관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) PM Device Net Board Replacement & Calibration ------------------------ 6 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_SUPRA N series_ALL_PM_DEVICE NET BOARD Global SOP No : Revision No: 2 Page: 2/44 ## 1. Safety 1) 안전 및 주의사항 - 작업자간 Cable 분리 시 Short로 인한 Part Fail 주의 - PM Disable 미 진행에 의한 사고 주의. - Cable 분리 시 감전 주의 ## 2. Safety Label <!-- Table (47, 420, 963, 765) --> \\begin{tabular}{|l|l|l|} "
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "question": "[DEVICE] \"PRISM\" SOURCE 교체 관련 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "device net board",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_DEVICE NET BOARD Global SOP No: Revision No: 0 Page: 1/34 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 PM Device net Board 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) PM Device Net Board Replacement ------------------------ 6 page 2) PM AIO Calibration -------------------------------------- 19 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_DEVICE NET BOARD Global SOP No: Revision No: 0 Page: 2/34 ## 1. Safety 1) 안전 및 주의사항 - 작업자간 Cable 분리 시 Short로 인한 Part Fail 주의 - PM not disable 에 의한 사고 주의. - Cable 분리 시 감전 주의 ## 2. Safety Label <!-- Table (47, 420, 962, 765) --> \\begin{tabular}{|l|l|l|} \\hline"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "question": "[DEVICE] \"PRISM\" SOURCE 교체 관련 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "prism source",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE Global SOP No: Revision No : 2 Page : 1/69 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 PRISM SOURCE 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) PRISM SOURCE REPLACEMENT ------------------------ 8 page 2) PRISM SOURCE O-RING REPLACEMENT ----------------- 39 page 3) PRISM SOURCE RF GENERATOR 2-POINTS Calibration ---- 53 page PS-3.20-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE Global SOP No: Revision No : 2 Page : 2/69 ## 1. Safety ### 1) 안전 및 주의사항 - PCW Manual V/V Close를 위한 **사전 작업 절차 준수** - PCW Water Drop에 의한 장비 **감전 주의** - Source 교체 시 **감전 위험 방지** 하기 위해 **Power Cable 분리 후 작업** - Source 교체 시 **Chuck 온도** 에 의한 화상 위험을"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "question": "[DEVICE] \"PRISM\" SOURCE 교체 관련 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3000qc",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "prism source 3000qc",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE 3000QC Global SOP No: Revision No : 2 Page : 1/82 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 PRISM SOURCE 3000QC 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) PRISM SOURCE 3000QC REPLACEMENT ----------------- 8 page 2) PRISM SOURCE 3000QC O-RING & TUBE REPLACEMENT ---- 38 page 3) RF GENERATOR 2-POINTS CALIBRATION ----------------- 54 page 4) PRISM 3000,3100QC SOURCE IGNITION WINDOW CHECK---- 71 page PS-320-R0\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE 3000QC Global SOP No: Revision No : 2 Page : 2/82 ## 1. Safety ### 1) 안전 및 주의사항 - PCW Manual V/V Close를 위한 **사전 작업 절차 준수** - PCW Water Drop에 의한 장비 **감전 주의** - Source 교체 시 **감전 위험 방지** 하기 위해 **Power Cable 분리 후 작업** - Source 교체 시 **Chuck 온도** 에 의한"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "question": "[DEVICE] \"PRISM\" SOURCE 교체 관련 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3100qc",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "prism source 3100qc",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE 3100QC Global SOP No: Revision No : 1 Page : 1/72 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 PRISM SOURCE 3100QC 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) PRISM SOURCE 3100QC REPLACEMENT ----------------- 8 page 2) PRISM SOURCE 3100QC O-RING &TUBE REPLACEMENT ---- 37 page 3) RF GENERATOR 2-POINTS CALIBRATION ---------------- 54 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE 3100QC Global SOP No: Revision No : 1 Page: 2/72 ## 1. Safety ### 1) 안전 및 주의사항 - PCW Manual V/V Close를 위한 **사전 작업 절차 준수** - PCW Water Drop에 의한 장비 **감전 주의** - Source 교체 시 **감전 위험 방지** 하기 위해 **Power Cable 분리 후 작업** - Source 교체 시 **Chuck 온도** 에 의한 "
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "question": "[DEVICE] \"PRISM\" SOURCE 교체 관련 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "device net board",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_TM_DEVICE NET BOARD Global SOP No : Revision No: 2 Page: 1/35 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 TM Device Net Board 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) TM Device Net Board Replacement ------------------------ 6 page 2) TM Device Net Board Analog Calibration ------------------ 18 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_TM_DEVICE NET BOARD Global SOP No : Revision No: 2 Page: 2/35 ## 1. Safety 1) 안전 및 주의사항 - Cable 분리, 연결 시 합선 주의 - TM 하부 작업 간 Cable 간섭에 의한 사고 주의 ## 2. Safety Label <!-- Table (46, 421, 963, 909) --> \\begin{tabular}{|l|l|l|} \\hline \\textbf{Safety Label (영문+국문)} & "
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "question": "[DEVICE] \"PRISM\" SOURCE 교체 관련 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "set_up_manual_ecolite_3000",
+    "doc_device": "ECOLITE_3000",
+    "doc_type": "setup",
+    "doc_chapter": "",
+    "doc_content": "Set up Manual # ECOLITE 3000 제품설치 매뉴얼\n...\n목차 0. Safety 1. Installation Preperation (Layout, etc.) 2. Tool Fab In (Packing List Check) 3. Docking 4. Cable Hook Up 5. Power Turn On 6. Utility Turn On (PCW/GAS/PUMP) 7. Teaching 8. Part Installation 9. Gas Turn On 10. Toxic Gas Turn On 11. Leak Check 12. TTTM (Tool Matching) 13. Customer Certif"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "question": "[DEVICE] \"PRISM\" SOURCE 교체 관련 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "set_up_manual_geneva_stp300_xp_r6",
+    "doc_device": "GENEVA_STP300_XP",
+    "doc_type": "setup",
+    "doc_chapter": "",
+    "doc_content": "```markdown # GENEVA STP 300 XP 제품 설치 매뉴얼 Set up Manual ```\n...\n# 목차 ## 내용 0. Safety................................................오류! 책갈피가 정의되어 있지 않습니다. 1. Install preparation........................................오류! 책갈피가 정의되어 있지 않습니다.4 2. Fab in................................................오류! 책갈피가 정의되어 있지 않습니다.7 3. Docking 및 Leveling....................."
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "question": "[DEVICE] \"PRISM\" SOURCE 교체 관련 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "set_up_manual_supra_n",
+    "doc_device": "SUPRA_N",
+    "doc_type": "setup",
+    "doc_chapter": "",
+    "doc_content": "# SUPRA N 제품설치 매뉴얼 Set up Manual\n...\n# 목차 0. Safety 1. Install Preperation (Layout, etc) 2. Tool Fab in (Packing List Check) 3. Docking 4. Cable Hook Up 5. Power Turn On 6. Utility On (PCW/GAS/PUMP) 7. Teaching 8. Part Installation 9. Gas Turn On 10. Toxic Gas Turn On 11. Leak Check 12. TTTM (Tool Matching) 13. Customer Cerification 14"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "question": "[DEVICE] \"PRISM\" SOURCE 교체 관련 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "set_up_manual_supra_xq",
+    "doc_device": "SUPRA_XQ",
+    "doc_type": "setup",
+    "doc_chapter": "",
+    "doc_content": "Set up Manual # SUPRA XQ 제품설치 매뉴얼\n...\n# 목차 0. Safety 1. Install Preparation (Layout, etc) 2. Tool Fab in (Packing List Check) 3. Docking 4. Cable Hook Up 5. Power Turn On 6. Utility On (PCW/GAS/PUMP) 7. Teaching 8. Part Installation 9. Gas Turn On 10. Toxic Gas Turn On 11. Leak Check 12. TTTM (Tool Matching) 13. Customer Certification 1"
+  },
+  {
+    "q_id": "A-sop044",
+    "question": "ZEDIUS XP 설비의 \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_efem_controller",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "controller",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_EFEM_CONTROLLER Global SOP No: Revision No: 1 Page: 1/46 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 EFEM CONTROLLER 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) EFEM CONTROLLER REPLACEMENT ------------------------ 6 page 2) EDA PC REPLACEMENT ---------------------------------- 28 page PS-320-R0 PSK A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_EFEM_CONTROLLER Global SOP No: Revision No: 1 Page: 2/46 ## 1. Safety 1) 안전 및 주의사항 - 장비 작동 중 Cover 개방에 주의 - 협소한 공간 작업 시 협착 위험 - 고소작업으로 인한 추락 주의 - OHT와의 충돌 위험 ## 2. Safety Label <!-- Table (47, 421, 962, 909) --> \\begin{tabular}{|l|l|l|} \\hline \\textbf{Safety La"
+  },
+  {
+    "q_id": "A-sop044",
+    "question": "ZEDIUS XP 설비의 \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "device net board",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_DEVICE NET BOARD Global SOP No: Revision No: 0 Page: 1/34 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 PM Device net Board 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) PM Device Net Board Replacement ------------------------ 6 page 2) PM AIO Calibration -------------------------------------- 19 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_DEVICE NET BOARD Global SOP No: Revision No: 0 Page: 2/34 ## 1. Safety 1) 안전 및 주의사항 - 작업자간 Cable 분리 시 Short로 인한 Part Fail 주의 - PM not disable 에 의한 사고 주의. - Cable 분리 시 감전 주의 ## 2. Safety Label <!-- Table (47, 420, 962, 765) --> \\begin{tabular}{|l|l|l|} \\hline"
+  },
+  {
+    "q_id": "A-sop044",
+    "question": "ZEDIUS XP 설비의 \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_manometer",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "manometer",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_MANOMETER Global SOP No : Revision No: 1 Page : 1/32 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 Manometer 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) Manometer Replacement----------------------------------------6page 2) Manometer Adjust---------------------------------------------19Page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_MANOMETER Global SOP No : Revision No: 1 Page: 2/32 ## 1. Safety 1) 안전 및 주의사항 - 장비가 작동 중일 때 Cover 개폐 주의 ## 2. Safety Label <!-- Table (47, 421, 962, 611) --> \\begin{tabular}{|l|l|l|} \\hline Safety Label (영문+국문) & 명칭 & 주의 사항 \\\\ \\hline \\begin{tabular}{l} \\text"
+  },
+  {
+    "q_id": "A-sop044",
+    "question": "ZEDIUS XP 설비의 \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_pendulum_valve",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "pendulum valve",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_PENDULUM VALVE Global SOP No : Revision No: 6 Page : 1/26 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 PENDULUM VALVE 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) PENDULUM VALVE Replacement & Clean & Adjustment ----------------- 6page PS-3.20-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_PENDULUM VALVE Global SOP No : Revision No: 6 Page: 2/26 ## 1. SAFETY 1) 안전 및 주의사항 - Chamber not disable 에 의한 사고 주의. - 고온 작업에 의한 화상 주의. - Part 탈/부착 간 손가락 협착 주의 ## 2. Safety Label <!-- Table (47, 388, 962, 840) --> \\begin{tabular}{|l|l|l|} \\hline Safety Label"
+  },
+  {
+    "q_id": "A-sop044",
+    "question": "ZEDIUS XP 설비의 \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_preventive_maintenance",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "preventive maintenance",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_PREVENTIVE MAINTENANCE Global SOP No: Revision No : 13 Page : 1/75 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 PM PREVENTIVE MAINTENANCE관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 확인 Sheet 5. Worker Location 6. Revision History 7. Work List 1) \"PRISM\" SOURCE REPLACEMENT ------------------------ 9 page 2) \"Pendulum Valve\" REPLACEMENT ------------------------ 39 page 3) \"Slot Valve\" REPLACEMENT ------------------------ 60 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_PREVENTIVE MAINTENANCE Global SOP No: Revision No : 13 Page: 2/75 ## 1. Safety 1) 안전 및 주의사항 - PCW Manual V/V 클로즈를 위한 **사전 작업 절차 준수** - PCW Water Drop에 의한 장비 **감전 주의** - Source 교체 시 **감전 위험 방지** 하기 위해 **Power Cable 분리 후 작업** - Source 교체 시 \"**Chuck**\" 온도에 의한 화"
+  },
+  {
+    "q_id": "A-sop044",
+    "question": "ZEDIUS XP 설비의 \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_sub_unit_igs_block",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "unit igs block",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_SUB UNIT_IGS BLOCK Global SOP No : Revision No: 2 Page: 1/71 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 SUB UNIT IGS BLOCK 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) MFC Replacement ------------------------ 6 page 2) Regulator Replacement ------------------- 24 page 3) Manual Valve Replacement ---------------- 42 page 4) Gasket Filter Replacement ---------------- 57 page PS-3.20-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_SUB UNIT_IGS BLOCK Global SOP No : Revision No: 2 Page: 2/71 ## 1. Safety 1) 안전 및 주의사항 - Grating Open간 추락 주의 - 가스 노출 사고 주의 ## 2. Safety Label <!-- Table (47, 421, 941, 621) --> \\begin{tabular}{|l|l|l|} \\hline Safety Label (영문+국문) & 명칭 & 주의 사항 \\\\ \\hline \\begin{t"
+  },
+  {
+    "q_id": "A-sop044",
+    "question": "ZEDIUS XP 설비의 \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "device net board",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_TM_DEVICE NET BOARD Global SOP No : Revision No: 2 Page: 1/35 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 TM Device Net Board 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) TM Device Net Board Replacement ------------------------ 6 page 2) TM Device Net Board Analog Calibration ------------------ 18 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_TM_DEVICE NET BOARD Global SOP No : Revision No: 2 Page: 2/35 ## 1. Safety 1) 안전 및 주의사항 - Cable 분리, 연결 시 합선 주의 - TM 하부 작업 간 Cable 간섭에 의한 사고 주의 ## 2. Safety Label <!-- Table (46, 421, 963, 909) --> \\begin{tabular}{|l|l|l|} \\hline \\textbf{Safety Label (영문+국문)} & "
+  },
+  {
+    "q_id": "A-sop044",
+    "question": "ZEDIUS XP 설비의 \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_valve",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "slot valve",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_TM_SLOT VALVE Global SOP No : Revision No : 5 Page : 1/20 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 TM Slot Valve (PM Side) 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) SLOT VALVE Replacement & Clean ------------------------ 7 Page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_TM_SLOT VALVE Global SOP No : Revision No : 5 Page : 2/20 ## 1. Safety 1) 안전 및 주의사항 - 작업자간 Inform Miss에 의한 Chamber Close로 손가락 및 신체 협착주의 - Chamber Enable 에 의한 사고 주의 - Chamber 고온에 의한 화상 주의 - Focus Adaptor 충돌에 의한 Broken 주의 ## 2. Safety Label <!-- Table (47, 421, 9"
+  },
+  {
+    "q_id": "A-sop044",
+    "question": "ZEDIUS XP 설비의 \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "slot vv housing o-ring",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_TM_SLOT V/V HOUSING Global SOP No: Revision No: 0 Page: 1/38 ## Scope This Global SOP is covering the caution and procedure when operators deal with the O-Ring replacement between slot V/V & PM Chamber equipped in ZEDIUS XP. ## Contents 1. Safety 2. Safety Label 3. Accident case 4. Environmental safety gear 5. Worker location 6. Revision History 7. Work List PS-320-R0 PSK A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_TM_SLOT V/V HOUSING Global SOP No: Revision No: 0 Page: 2/38 ## 1. SAFETY ### 1) Safety & Precautions - Beware of finger and body stenosis due to door valve closing caused by Inform Miss between workers. - Be careful of finger stenosis when working inside LL. -"
+  },
+  {
+    "q_id": "A-sop044",
+    "question": "ZEDIUS XP 설비의 \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "supra_xp_tm_trouble_shooting_guide_trace_slot_valve_abnormal",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "ts",
+    "doc_chapter": "TM_Slot valve abnormal",
+    "doc_content": "```markdown # Trouble Shooting Guide [Trace Slot valve abnormal] Use this guide to diagnose problems with the [Trace Slot valve abnormal]. It describes the following problems. 이 안내서를 사용하여 [Trace Slot valve abnormal]과/에 관련된 문제를 진단합니다. 다음과 같은 문제를 설명합니다. - A. Door valve open / close timeout alarm - B. PM door valve cannot open alarm - Appendix #1 (Global SOP, Set-up Manual) - Appendix #2 (Error code table, Log analysis table) This trouble Shooting guide provides tables that list problems, possible causes. 이 Trouble Shooting Guide는 문제, 가능한 원인들을 나열한 표를 제공합니다. Trouble shooting 발생된 Tool의 도면과 I/O list\n...\n```markdown # Trouble Shooting Guide [Trace Slot valve abnormal] Confidential II <!-- Table (49, 102, 966, 904) --> \\begin{tabular}{|l|l|l|} \\hline \\textbf{Failure symptoms} & \\textbf{Check point} & \\textbf{Key point} \\\\ \\hline Door valve open / & A-1. Door valve & Door valve o-ring check \\\\ Close t"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "question": "[DEVICE] \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_integer_plus_all_am_slot_valve",
+    "doc_device": "INTEGER_PLUS",
+    "doc_type": "sop",
+    "doc_chapter": "slot valve",
+    "doc_content": "```markdown # Global SOP_INTEGER plus_ALL_AM_SLOT VALVE Global SOP No : Revision No : 0 Page : 1 / 39 ## Scope 이 Global SOP는 INTEGER plus 설비의 AM Slot Valve 교체 및 세정 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) AM Slot Valve Replacement ---------------------------------------- 7page 2) AM Slot Valve Cleaning ------------------------------------------- 24page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_INTEGER plus_ALL_AM_SLOT VALVE Global SOP No : Revision No : 0 Page : 2 / 39 ## 1. Safety 1) 안전 및 주의사항 - 작업자간 Inform Miss에 의한 Chamber Close로 손가락 및 신체 협착주의. - 고온에 의한 화상 주의. - Chamber 내부 작업 시 손가락 협착 주의 - Chamber open 시 Top Lid 와 머리 등의 신체 부위와의 충돌에 의한 부상 주의. ## 2. Safety Label <"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "question": "[DEVICE] \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_integer_plus_all_ll_slot_valve",
+    "doc_device": "INTEGER plus",
+    "doc_type": "SOP",
+    "doc_chapter": "2. Safety Label",
+    "doc_content": "```markdown # Global SOP_INTEGER plus_ALL_LL_SLOT VALVE Global SOP No : Revision No : 4 Page : 1/50 ## Scope 이 Global SOP 는 INTEGER plus 설비의 L/L Slot Valve 교체 및 세정 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) L/L Slot Valve Replacement ---------------------------------------- 7page 2) L/L Slot Valve Cleaning ------------------------------------------ 30page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_INTEGER plus_ALL_LL_SLOT VALVE Global SOP No : Revision No : 4 Page : 2/50 ## 1. Safety 1) 안전 및 주의사항 - 작업자간 Inform Miss에 의한 Chamber Close로 손가락 및 신체 협착주의. - Chamber 내부 작업 시 손가락 협착 주의 - Chamber open 시 Top Lid 와 머리 등의 신체 부위와의 충돌에 의한 부상 주의. ## 2. Safety Label | Safety Label (영문+"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "question": "[DEVICE] \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_integer_plus_all_pm_slot_valve",
+    "doc_device": "INTEGER plus",
+    "doc_type": "SOP",
+    "doc_chapter": "2. Safety Label",
+    "doc_content": "```markdown # Global SOP_INTEGER plus_ALL_PM_SLOT VALVE | Global SOP No : | | | --- | --- | | Revision No : 2 | | | Page : 1 / 39 | | ## Scope 이 Global SOP는 INTEGER plus 설비의 PM Slot Valve 교체 및 세정 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) PM Slot Valve Replacement ---------------------------------------- 7page 2) PM Slot Valve Cleaning ------------------------------------------- 24page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_INTEGER plus_ALL_PM_SLOT VALVE Global SOP No : Revision No : 2 Page : 2 / 39 ## 1. Safety 1) 안전 및 주의사항 - 작업자간 Inform Miss에 의한 Chamber Close로 손가락 및 신체 협착주의. - 고온에 의한 화상 주의. - Chamber 내부 작업 시 손가락 협착 주의 - Chamber open 시 Top Lid 와 머리 등의 신체 부위와의 충돌에 의한 부상 주의. ## 2. Safety Label |"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "question": "[DEVICE] \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_precia_all_pm_slot_valve",
+    "doc_device": "PRECIA",
+    "doc_type": "SOP",
+    "doc_chapter": "2. Safety Label",
+    "doc_content": "```markdown # Global SOP_PRECIA_REP_PM_SLOT VALVE(VTEX) Global SOP No : 0 Revision No : 0 Page : 23 / 36 ## 1. 환경 안전 보호구 | 구분 | 상세구분 | 필수보호구 | | :--- | :--- | :--- | | 설비 유지보수 | 설비 유지보수 | 작업모 착용 (상시 휴대 기본용품) | | 설비PM 유기용제취급 | 유기용제 취급 시 (IPA,에탄올) | 안전모, 보안경, 토시, 앞치마, 방독마스크 | | 고소 작업 | 고소 사다리작업 | 안전모, 안전화, 안전대 | | 중량 물 운반 작업 | 5kg 이상 운반 시 | 안전모, 안전화 | | PLEMUM 작업 | 지하 출입작업 시 | 안전모, 안전화, 보안경, 보호가운 | ※ 설비 운용 / 안전사항은 고객사 별 규정에 따라 변경될 수 있다. ## 2. 작업 시간 및 작업 인원 | No | 작업 | 인원 | 시간(min) | Remark | | :--- | :--- | :--- | :--- | :--- | | 1 | 작업 전 | 2명 | 30 | 작업 준비 | | 2 | Slot Valve 교체 | 2명 | 60 | Slot \n...\n```markdown # Global SOP_PRECIA_REP_PM_SLOT VALVE(VTEX) Global SOP No : 0 Revision No : 0 Page : 24 / 36 ## 4. 필요 Tool | | Name | N2 Gun | |---|---|---| | | 용도 | 세정 | | | Remark | - | | | Name | L Wrench Set | |---|---|---| | | 용도 | 조립, 분해 | | | Remark | (mm) | | | Name | Driver(-) | |---|---|---| |"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "question": "[DEVICE] \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_precia_all_tm_slot_valve",
+    "doc_device": "PRECIA",
+    "doc_type": "sop",
+    "doc_chapter": "slot valve",
+    "doc_content": "```markdown # Global SOP_PRECIA_ALL_TM_SLOT VALVE Global SOP No : Revision No: 0 Page : 1/39 ## Scope 이 Global SOP는 PRECIA설비의 TM Slot Valve 교체 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Revision History 6. Work List 1) TM Slot Valve(PRESYS 社)Replacement----------------- 6 page 2) TM Slot Valve(V-TEX 社) Replacement------------------ 22 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_PRECIA_ALL_TM_SLOT VALVE Global SOP No : Revision No: 0 Page: 2/39 ## 1. Safety 1) 안전 및 주의사항 - 작업자간 Inform Miss에 의한 Robot Moving 및 Door Close 동작으로 손가락 및 신체 협착주의 - EFEM Side Door Open작업 시 머리 등의 신체 부위와의 충돌에 의한 부상 주의 (작업모 착용 권장) ## 2. Safety Label <!-- Table (47, 420, 962, 765)"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "question": "[DEVICE] \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "set_up_manual_precia",
+    "doc_device": "PRECIA",
+    "doc_type": "setup",
+    "doc_chapter": "",
+    "doc_content": "Set up Manual # PRECIA 2.0 제품설치 매뉴얼\n...\n목차 1. Safety...................................................4 2. Install Preperation (※환경안전 보호구: 안전모, 안전화)...................21 3. Fab in (Moving) (※환경안전 보호구: 안전모, 안전화)...................22 4. Docking (※환경안전 보호구: 안전모, 안전화)...................25 5. Cable Hook Up (※환경안전 보호구: 안전모, 안전화, 안전대, 보안경 보호가운,"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "question": "[DEVICE] \"Slot Valve\" 교체 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "set_up_manual_zedius_xp_supra_xp",
+    "doc_device": "ZEDIUS_XP",
+    "doc_type": "setup",
+    "doc_chapter": "",
+    "doc_content": "Set up Manual # ZEDIUS XP 제품설치 매뉴얼\n...\n목차 0. Safety ................................................................................................................... 4 1. Install Preperation(※환경안전 보호구 : 안전모, 안전화) ........................................... 16 2. Fab In (Moving) (※환경안전 보호구 : 안전모, 안전화) ..................................."
+  },
+  {
+    "q_id": "A-sop048",
+    "question": "ZEDIUS XP 설비의 PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_efem_ffu",
+    "doc_device": "ZEDIUS XP",
+    "doc_type": "SOP",
+    "doc_chapter": "2. Safety Label",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_EFEM_FFU Global SOP No: Revision No : 1 Page : 2/60 ## 1. Safety 1) 안전 및 주의사항 - FFU Controller & FFU 교체를 위한 **사전 작업 절차 준수** - FFU 교체 작업 간 장비 **감전 주의** ## 2. Safety Label | Safety Label (영문+국문) | 명칭 | 주의 사항 | | :--- | :--- | :--- | | | Electric Shock Hazard 감전 위험 접촉 위험 경고 | FFU 케이블 제거중 감전 위험으로 사전 방지 | | | Heavy Cargo Attention 중량물 취급 주의 | 중량이 존재하는 제품의 취급 시에는 반드시 2인 이상의 작업자가 주의 하면서 작업을 할 것. | | | 추락 위험 | FFU Fan 및 Filter 제거 작업 시 추락에 주의하여 작업 할 것 | PS-320-R0 PSK A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_EFEM_FFU | Global SOP No: | | | --- | --- | | Revision No: 1 | | | Page: 3/60 | | ## 3. 사고 사례 ### 1) 전기 안전의 정의 및 특징 - 전기 안전의 정의 전기 안전이란 전기로 인한 사항재해나 폭발재해 또는 전기설비의 고장이나 사고를 방지하고 전기를 안전하게 사용하기 위한 모든 수단과 방법을 실천하는 것이라 할 수 있다. - 전기 안전의 특징 1. 전기적 위험의 감지가 어렵다. 2. 사망률이"
+  },
+  {
+    "q_id": "A-sop048",
+    "question": "ZEDIUS XP 설비의 PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "device net board",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_DEVICE NET BOARD Global SOP No: Revision No: 0 Page: 1/34 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 PM Device net Board 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) PM Device Net Board Replacement ------------------------ 6 page 2) PM AIO Calibration -------------------------------------- 19 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_DEVICE NET BOARD Global SOP No: Revision No: 0 Page: 2/34 ## 1. Safety 1) 안전 및 주의사항 - 작업자간 Cable 분리 시 Short로 인한 Part Fail 주의 - PM not disable 에 의한 사고 주의. - Cable 분리 시 감전 주의 ## 2. Safety Label <!-- Table (47, 420, 962, 765) --> \\begin{tabular}{|l|l|l|} \\hline"
+  },
+  {
+    "q_id": "A-sop048",
+    "question": "ZEDIUS XP 설비의 PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_heater_chuck",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "heater chuck",
+    "doc_content": "```markdown # Global SOP ZEDIUS XP_ALL_PM_HEATER CHUCK Global SOP No: 0 Revision No: 2 Page: 1/49 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 HEATER CHUCK 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) HEATER CHUCK Replacement ----------------- 8page 2) CERAMIC PLATE Replacement----------------- 29page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP ZEDIUS XP_ALL_PM_HEATER # CHUCK Global SOP No: 0 Revision No: 2 Page: 2/49 ## 1. Safety 1) 안전 및 주의사항 - 작업자간 Inform Miss에 의한 Chamber 클로즈로 손가락 및 신체 협착 주의. - Chamber not disable 에 의한 사고 주의. - 고온 작업에 의한 화상 주의. - Chamber 내부 작업 시 손가락 협착 주의 - Chamber open 시 Top Lid 와 신체 부위와의 충돌에 의한"
+  },
+  {
+    "q_id": "A-sop048",
+    "question": "ZEDIUS XP 설비의 PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_manometer",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "manometer",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_MANOMETER Global SOP No : Revision No: 1 Page : 1/32 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 Manometer 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) Manometer Replacement----------------------------------------6page 2) Manometer Adjust---------------------------------------------19Page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_MANOMETER Global SOP No : Revision No: 1 Page: 2/32 ## 1. Safety 1) 안전 및 주의사항 - 장비가 작동 중일 때 Cover 개폐 주의 ## 2. Safety Label <!-- Table (47, 421, 962, 611) --> \\begin{tabular}{|l|l|l|} \\hline Safety Label (영문+국문) & 명칭 & 주의 사항 \\\\ \\hline \\begin{tabular}{l} \\text"
+  },
+  {
+    "q_id": "A-sop048",
+    "question": "ZEDIUS XP 설비의 PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3000qc",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "prism source 3000qc",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE 3000QC Global SOP No: Revision No : 2 Page : 1/82 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 PRISM SOURCE 3000QC 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) PRISM SOURCE 3000QC REPLACEMENT ----------------- 8 page 2) PRISM SOURCE 3000QC O-RING & TUBE REPLACEMENT ---- 38 page 3) RF GENERATOR 2-POINTS CALIBRATION ----------------- 54 page 4) PRISM 3000,3100QC SOURCE IGNITION WINDOW CHECK---- 71 page PS-320-R0\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE 3000QC Global SOP No: Revision No : 2 Page : 2/82 ## 1. Safety ### 1) 안전 및 주의사항 - PCW Manual V/V Close를 위한 **사전 작업 절차 준수** - PCW Water Drop에 의한 장비 **감전 주의** - Source 교체 시 **감전 위험 방지** 하기 위해 **Power Cable 분리 후 작업** - Source 교체 시 **Chuck 온도** 에 의한"
+  },
+  {
+    "q_id": "A-sop048",
+    "question": "ZEDIUS XP 설비의 PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3100qc",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "prism source 3100qc",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE 3100QC Global SOP No: Revision No : 1 Page : 1/72 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 PRISM SOURCE 3100QC 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) PRISM SOURCE 3100QC REPLACEMENT ----------------- 8 page 2) PRISM SOURCE 3100QC O-RING &TUBE REPLACEMENT ---- 37 page 3) RF GENERATOR 2-POINTS CALIBRATION ---------------- 54 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE 3100QC Global SOP No: Revision No : 1 Page: 2/72 ## 1. Safety ### 1) 안전 및 주의사항 - PCW Manual V/V Close를 위한 **사전 작업 절차 준수** - PCW Water Drop에 의한 장비 **감전 주의** - Source 교체 시 **감전 위험 방지** 하기 위해 **Power Cable 분리 후 작업** - Source 교체 시 **Chuck 온도** 에 의한 "
+  },
+  {
+    "q_id": "A-sop048",
+    "question": "ZEDIUS XP 설비의 PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "device net board",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_TM_DEVICE NET BOARD Global SOP No : Revision No: 2 Page: 1/35 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 TM Device Net Board 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) TM Device Net Board Replacement ------------------------ 6 page 2) TM Device Net Board Analog Calibration ------------------ 18 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_TM_DEVICE NET BOARD Global SOP No : Revision No: 2 Page: 2/35 ## 1. Safety 1) 안전 및 주의사항 - Cable 분리, 연결 시 합선 주의 - TM 하부 작업 간 Cable 간섭에 의한 사고 주의 ## 2. Safety Label <!-- Table (46, 421, 963, 909) --> \\begin{tabular}{|l|l|l|} \\hline \\textbf{Safety Label (영문+국문)} & "
+  },
+  {
+    "q_id": "A-sop048",
+    "question": "ZEDIUS XP 설비의 PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "supra_xp_pm_trouble_shooting_guide_trace_prism_abnormal",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "ts",
+    "doc_chapter": "PM_PRISM abnormal",
+    "doc_content": "```markdown # Trouble Shooting Guide [Trace PRISM abnormal] Use this guide to diagnose problems with the [Trace PRISM abnormal]. It describes the following problems. 이 안내서를 사용하여 [Trace Prism abnormal]과/에 관련된 문제를 진단합니다. 다음과 같은 문제를 설명합니다. - A. Leak rate over - B. Particle down - C. PCW not flow - D. Source Forward Power - E. Source Unready - F. Source Power On Fail Alarm - Appendix #1 (Global SOP, Set-up Manual) - Appendix #2 (Error code table, Log analysis table, Interlock matrix) This trouble Shooting guide provides tables that list problems, possible causes. 이 Trouble Shooting Guide는 문제, 가능한 \n...\n```markdown # Trouble Shooting Guide [Trace PRISM abnormal] Confidential II <!-- Table (40, 101, 957, 888) --> \\begin{tabular}{|l|l|l|} \\hline \\textbf{Failure symptoms} & \\textbf{Check point} & \\textbf{Key point} \\\\ \\hline Leak rate over & A-1. PRISM & $\\triangleright$ GDP check \\\\ & & $\\trianglerig"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "question": "[DEVICE] PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "40036506",
+    "doc_device": "SUPRA Vplus",
+    "doc_type": "myservice",
+    "doc_chapter": "status",
+    "doc_content": "[status] -. EPAGH1 PM3 Pressure Stable Timeout 재발\n...\n[action] - Convectron Guage Test -> Ignition Test 30회 재현안됨 - Leak 강제 생성(Vent Port 부) -> APC Position 및 Pressure 상승. FCIP Power 변화없음 - Ignition 중 APC Angle 0으로 변경 -> Bara 2000까지 상승. Pirani 변화 없음 - Ignition 중 Fast Vent 강제 오픈 -> APC Position 및 Pressure, FCIP Power상승(후 off) -> Alarm 발생시와 유사한 현상 확인 - Ign"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "question": "[DEVICE] PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_integer_plus_all_am_temp_controller",
+    "doc_device": "INTEGER_PLUS",
+    "doc_type": "sop",
+    "doc_chapter": "temp controller",
+    "doc_content": "```markdown # Global SOP_INTEGER plus_ALL_AM_TEMP CONTROLLER Global SOP No: Revision No: 1 Page: 1 / 27 ## Scope 이 Global SOP는 INTEGER plus 설비의 AM Temp Controller 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Position 6. Revision History 7. Work List 1) AM Temp Controller Replacement ---------------------------- 6 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_INTEGER plus_ALL_AM_TEMP CONTROLLER Global SOP No: Revision No: 1 Page: 2 / 27 ## 1. Safety 1) 안전 및 주의사항 - Cable 분리 시 Short로 인한 Part fail 주의 - Cable 분리 시 감전주의 ## 2. Safety Label <!-- Table (47, 467, 962, 645) --> \\begin{tabular}{|l|l|l|} \\hline Safety Label (영문+국문) & 명칭 & 주의"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "question": "[DEVICE] PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_integer_plus_all_pm_temp_controller",
+    "doc_device": "INTEGER plus",
+    "doc_type": "SOP",
+    "doc_chapter": "2. Safety Label",
+    "doc_content": "```markdown # Global SOP_INTEGER plus_ALL_PM_TEMP CONTROLLER | Global_SOP No: | | |---|---| | Revision No: 1 | | | Page: 1 / 27 | | ## Scope 이 Global_SOP는 INTEGER plus 설비의 PM Temp Controller 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global_SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Position 6. Revision History 7. Work List 1) PM Temp Controller Replacement ---------------------------- 6 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_INTEGER plus_ALL_PM_TEMP # CONTROLLER Global_SOP No: Revision No: 1 Page: 2 / 27 ## 1. Safety 1) 안전 및 주의사항 - Cable 분리 시 Short로 인한 Part fail 주의 - Cable 분리 시 감전주의 ## 2. Safety Label | Safety Label (영문+국문) | 명칭 | 주의 사항 | | :--- | :--- | :--- | | | 감전 위험 (ELECTRONIC SHOCK HAZARD"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "question": "[DEVICE] PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_integer_plus_all_pm_wall_temp_controller",
+    "doc_device": "INTEGER_PLUS",
+    "doc_type": "sop",
+    "doc_chapter": "wall temp controller",
+    "doc_content": "```markdown # Global SOP_INTEGER plus_ALL_PM_WALL TEMP CONTROLLER Global SOP No: Revision No: 0 Page: 1/21 ## Scope 이 Global SOP는 INTEGER plus 설비 PM Chamber의 Wall Temp Controller 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Position 6. Revision History 7. Work List 1) PM Wall Temp Controller Replacement ---------------------------- 6 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_INTEGER plus_ALL_PM_WALL TEMP CONTROLLER Global SOP No: Revision No: 0 Page: 2/21 ## 1. SAFETY 1) 안전 및 주의사항 - Wall Temp Controller 교체를 위한 사전 작업 절차 준수 - Cable 분리 시 감전 주의 ## 2. SAFETY LABEL <!-- Table (47, 378, 962, 696) --> \\begin{tabular}{|l|l|l|} \\hline Safety Label (영문+국문)"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "question": "[DEVICE] PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "doc_device": "PRECIA",
+    "doc_type": "sop",
+    "doc_chapter": "device net board",
+    "doc_content": "```markdown # Global SOP_PRECIA_ALL_EFEM_DEVICE NET BOARD Global SOP No: Revision No: 0 Page: 1/17 ## Scope 이 Global SOP는 PRECIA설비의 EFEM Device Net Board 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Position 6. Revision History 7. Work List 1) EFEM Device Net Board Replacement ------------------------ 6 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_PRECIA_ALL_EFEM_DEVICE NET BOARD Global SOP No: Revision No: 0 Page: 2/17 ## 1. Safety 1) 안전 및 주의사항 - 장비 동작 중 **Cover 개방 금지**. - Device Net Board 교체 시 **전원을 차단하여 Short를 방지한다**. ## 2. Safety Label <!-- Table (53, 420, 969, 751) --> \\begin{tabular}{|l|l|l|} \\hline Safety Label"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "question": "[DEVICE] PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_precia_all_tm_device_net_board",
+    "doc_device": "PRECIA",
+    "doc_type": "SOP",
+    "doc_chapter": "2. Safety Label",
+    "doc_content": "```markdown # Global SOP_PRECIA_ALL_TM_DEVICE NET BOARD | Global SOP No : 0 | | | --- | --- | | Revision No : 0 | | | Page : 1/37 | | ## Scope 이 Global SOP는 PRECIA 2.0 설비의 TM DEVICE NET BOARD 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Revision History 6. Work List 1) TM DEVICE NET BORAD REP----------------- 6 page 2) TM DEVICE NET BOARD ADJ----------------- 18 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_PRECIA_ALL_TM_DEVICE NET BOARD Global SOP No : 0 Revision No : 0 Page : 2/37 ## 1. Safety 1) 안전 및 주의사항 - 작업자간 Cable 분리 시 Short로 인한 Part Fail 주의 - TM not disable 에 의한 사고 주의. - Cable 분리 시 감전 주의 ## 2. Safety Label | Safety Label (영문+국문) | 명칭 | 주의 사항 | | :--- | :--- | :--- | | |"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "question": "[DEVICE] PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_n_series_all_tm_ctc",
+    "doc_device": "SUPRA N 시리즈 (SUPRA N, SUPRA Nm, SUPRA Np)",
+    "doc_type": "SOP",
+    "doc_chapter": "2. Safety Label",
+    "doc_content": "```markdown # Global SOP_SUPRA N series_ALL_TM_CTC | Global SOP No : | | | --- | --- | | Revision No: 6 | | | Page : 1/81 | | ## Scope 이 Global SOP는 SUPRA N, SUPRA Nm, SUPRA Np 설비의 CTC 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) CTC Replacement & Setting ----------------------------- 6 page 2) CTC S/W Patch ----------------------------------------- 49 page 3) TM RAID Kit Patch ------------------------------------- 66 page ```\n...\n```markdown # Global SOP_SUPRA N series_ALL_TM_CTC Global SOP No : Revision No: 6 Page: 2/81 ## 1. Safety 1) 안전 및 주의사항 - 장비 동작 중 Cover 개방 금지. - Device Net Board교체 시 전원을 차단하여 Short를 방지한다. ## 2. Safety Label | Safety Label (영문+국문) | 명칭 | 주의 사항 | | :--- | :--- | :--- | | ![](https://i.imgur.com/1234567"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "question": "[DEVICE] PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3000qc",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "prism source 3000qc",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE 3000QC Global SOP No: Revision No : 2 Page : 1/82 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 PRISM SOURCE 3000QC 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) PRISM SOURCE 3000QC REPLACEMENT ----------------- 8 page 2) PRISM SOURCE 3000QC O-RING & TUBE REPLACEMENT ---- 38 page 3) RF GENERATOR 2-POINTS CALIBRATION ----------------- 54 page 4) PRISM 3000,3100QC SOURCE IGNITION WINDOW CHECK---- 71 page PS-320-R0\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE 3000QC Global SOP No: Revision No : 2 Page : 2/82 ## 1. Safety ### 1) 안전 및 주의사항 - PCW Manual V/V Close를 위한 **사전 작업 절차 준수** - PCW Water Drop에 의한 장비 **감전 주의** - Source 교체 시 **감전 위험 방지** 하기 위해 **Power Cable 분리 후 작업** - Source 교체 시 **Chuck 온도** 에 의한"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "question": "[DEVICE] PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3100qc",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "prism source 3100qc",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE 3100QC Global SOP No: Revision No : 1 Page : 1/72 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 PRISM SOURCE 3100QC 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다. ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) PRISM SOURCE 3100QC REPLACEMENT ----------------- 8 page 2) PRISM SOURCE 3100QC O-RING &TUBE REPLACEMENT ---- 37 page 3) RF GENERATOR 2-POINTS CALIBRATION ---------------- 54 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_PM_PRISM SOURCE 3100QC Global SOP No: Revision No : 1 Page: 2/72 ## 1. Safety ### 1) 안전 및 주의사항 - PCW Manual V/V Close를 위한 **사전 작업 절차 준수** - PCW Water Drop에 의한 장비 **감전 주의** - Source 교체 시 **감전 위험 방지** 하기 위해 **Power Cable 분리 후 작업** - Source 교체 시 **Chuck 온도** 에 의한 "
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "question": "[DEVICE] PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "ctc",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_TM_CTC Global SOP No : Revision No: 1 Page: 1/45 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 CTC 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) CTC Replacement & Setting ---------------------------- 6 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_TM_CTC Global SOP No : Revision No: 1 Page: 2/45 ## 1. Safety 1) 안전 및 주의사항 - 장비 동작 중 Cover 개방 금지. - CTC 교체 시 전원을 차단하여 Short를 방지한다. ## 2. Safety Label <!-- Table (53, 420, 969, 751) --> \\begin{tabular}{|l|l|l|} \\hline Safety Label (영문+국문) & 명칭 & 주의 사항 \\\\ \\hline "
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "question": "[DEVICE] PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "sop",
+    "doc_chapter": "device net board",
+    "doc_content": "```markdown # Global SOP_ZEDIUS XP_ALL_TM_DEVICE NET BOARD Global SOP No : Revision No: 2 Page: 1/35 ## Scope 이 Global SOP는 ZEDIUS XP 설비의 TM Device Net Board 관련 작업 시에 필요한 작업 절차와 주의 사항, 준비 사항에 대해서 작성한 Global SOP 입니다 ## Contents 1. Safety 2. Safety Label 3. 사고 사례 4. 환경 안전 보호구 Check Sheet 5. Worker Location 6. Revision History 7. Work List 1) TM Device Net Board Replacement ------------------------ 6 page 2) TM Device Net Board Analog Calibration ------------------ 18 page PS-320-R0 A4(210x297) ```\n...\n```markdown # Global SOP_ZEDIUS XP_ALL_TM_DEVICE NET BOARD Global SOP No : Revision No: 2 Page: 2/35 ## 1. Safety 1) 안전 및 주의사항 - Cable 분리, 연결 시 합선 주의 - TM 하부 작업 간 Cable 간섭에 의한 사고 주의 ## 2. Safety Label <!-- Table (46, 421, 963, 909) --> \\begin{tabular}{|l|l|l|} \\hline \\textbf{Safety Label (영문+국문)} & "
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "question": "[DEVICE] PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "query_device": "SUPRA_XP",
+    "doc_id": "supra_xp_pm_trouble_shooting_guide_trace_prism_abnormal",
+    "doc_device": "SUPRA_XP",
+    "doc_type": "ts",
+    "doc_chapter": "PM_PRISM abnormal",
+    "doc_content": "```markdown # Trouble Shooting Guide [Trace PRISM abnormal] Use this guide to diagnose problems with the [Trace PRISM abnormal]. It describes the following problems. 이 안내서를 사용하여 [Trace Prism abnormal]과/에 관련된 문제를 진단합니다. 다음과 같은 문제를 설명합니다. - A. Leak rate over - B. Particle down - C. PCW not flow - D. Source Forward Power - E. Source Unready - F. Source Power On Fail Alarm - Appendix #1 (Global SOP, Set-up Manual) - Appendix #2 (Error code table, Log analysis table, Interlock matrix) This trouble Shooting guide provides tables that list problems, possible causes. 이 Trouble Shooting Guide는 문제, 가능한 \n...\n```markdown # Trouble Shooting Guide [Trace PRISM abnormal] Confidential II <!-- Table (40, 101, 957, 888) --> \\begin{tabular}{|l|l|l|} \\hline \\textbf{Failure symptoms} & \\textbf{Check point} & \\textbf{Key point} \\\\ \\hline Leak rate over & A-1. PRISM & $\\triangleright$ GDP check \\\\ & & $\\trianglerig"
+  }
+]

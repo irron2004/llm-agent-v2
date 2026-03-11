@@ -1,0 +1,164 @@
+[
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_omnis_sw_all_process_check_eng",
+    "relevance": 1,
+    "reason": "Same device (OMNIS), SOP for process check/PM procedure, but not specifically about Arcing fault or arcing-related part replacement"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_n_series_all_efem_ffu",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and completely different component (EFEM FFU), not related to OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_n_series_all_pm_gas_spring",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and unrelated component (Gas Spring), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_n_series_all_pm_process_kit",
+    "relevance": 0,
+    "reason": "Different device (SUPRA N Series) and different component (Process Kit/Chamber PM), not related to OMNIS Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_n_series_all_sub_unit_temp_controller",
+    "relevance": 0,
+    "reason": "Different device (SUPRA N series) and unrelated component (Temp Controller), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_n_series_all_tm_robot",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and unrelated component (TM Robot), not about OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_xp_all_pm_cip_chamber",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP/ZEDIUS XP) and different component (CIP Source), not about OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_xp_all_pm_heater_chuck",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (Heater Chuck), not about OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_xp_all_pm_preventive_maintenance",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and general PM procedures (PRISM source, Pendulum/Slot Valve), not about OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3000qc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (PRISM Source 3000QC), not about OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3100qc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (PRISM Source 3100QC), not about OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "set_up_manual_ecolite_ii_400",
+    "relevance": 0,
+    "reason": "Different device (ECOLITE_II_400) setup manual, not related to OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "set_up_manual_geneva_stp300_xp_r6",
+    "relevance": 0,
+    "reason": "Different device (GENEVA_STP300_XP) setup manual, not related to OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "set_up_manual_omnis",
+    "relevance": 1,
+    "reason": "Same device (OMNIS) setup manual; covers installation procedures but not Arcing fault or specific part replacement for arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "set_up_manual_supra_np",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_NP) setup manual, not related to OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "40046755",
+    "relevance": 0,
+    "reason": "Different device (SUPRA Nm), content about high-temp process conversion and PM parts, not about Chamber Arcing part replacement"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and unrelated component (EFEM Device Net Board), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and unrelated component (PM Device Net Board), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_precia_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and unrelated component (TM Device Net Board), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_supra_n_series_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and unrelated component (PM Device Net Board), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_cip_chamber",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (CIP Source), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and unrelated component (PM Device Net Board), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_preventive_maintenance",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and general PM procedures, not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3000qc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (PRISM Source 3000QC), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and unrelated component (TM Device Net Board), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "set_up_manual_geneva_stp300_xp_r6",
+    "relevance": 0,
+    "reason": "Different device (GENEVA_STP300_XP) setup manual, not related to Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "set_up_manual_zedius_xp_supra_xp",
+    "relevance": 0,
+    "reason": "Different device (ZEDIUS_XP) setup manual, not related to Chamber Arcing"
+  }
+]

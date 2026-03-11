@@ -1,0 +1,2564 @@
+[
+  {
+    "q_id": "A-gs110",
+    "doc_id": "40035542",
+    "relevance": 0,
+    "reason": "TERA21 device, about signal tower and monitor connection issue - unrelated to OES detect fail endpoint on SUPRA_XP"
+  },
+  {
+    "q_id": "A-gs110",
+    "doc_id": "40038138",
+    "relevance": 0,
+    "reason": "SUPRA N device, about FM Robot communication/RS232 alarm - unrelated to OES detect fail endpoint"
+  },
+  {
+    "q_id": "A-gs110",
+    "doc_id": "40065885",
+    "relevance": 0,
+    "reason": "SUPRA IV device, about CTC freeze and software error - unrelated to OES detect fail endpoint"
+  },
+  {
+    "q_id": "A-gs110",
+    "doc_id": "global_sop_geneva_xp_all_8계통_check",
+    "relevance": 0,
+    "reason": "GENEVA_XP 8-system check SOP - different device and no OES content"
+  },
+  {
+    "q_id": "A-gs110",
+    "doc_id": "global_sop_integer_plus_all_am_vacuum_line",
+    "relevance": 0,
+    "reason": "INTEGER_PLUS vacuum line SOP - different device, no OES endpoint content"
+  },
+  {
+    "q_id": "A-gs110",
+    "doc_id": "global_sop_integer_plus_all_pm_safety_limit_switch",
+    "relevance": 0,
+    "reason": "INTEGER Plus safety limit switch SOP - different device and component"
+  },
+  {
+    "q_id": "A-gs110",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "PRECIA device net board SOP - different device and component, no OES content"
+  },
+  {
+    "q_id": "A-gs110",
+    "doc_id": "global_sop_precia_all_tm_branch_tap",
+    "relevance": 0,
+    "reason": "PRECIA/INTEGER plus TM branch tap SOP - different device and component"
+  },
+  {
+    "q_id": "A-gs110",
+    "doc_id": "global_sop_precia_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "PRECIA TM device net board SOP - different device and component"
+  },
+  {
+    "q_id": "A-gs110",
+    "doc_id": "global_sop_supra_n_all_tm_sensor_board",
+    "relevance": 0,
+    "reason": "SUPRA_N TM sensor board SOP - different device (SUPRA N vs SUPRA_XP) and component, no OES content"
+  },
+  {
+    "q_id": "A-gs110",
+    "doc_id": "global_sop_supra_n_series_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA N series PM device net board SOP - different device and component"
+  },
+  {
+    "q_id": "A-gs110",
+    "doc_id": "global_sop_supra_n_series_all_tm_branch_tap",
+    "relevance": 0,
+    "reason": "SUPRA N series TM branch tap SOP - different device and component, no OES content"
+  },
+  {
+    "q_id": "A-gs110",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_XP device net board SOP - correct device but completely different component/topic from OES endpoint"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "global_sop_geneva_xp_rep_pm_mfc",
+    "relevance": 0,
+    "reason": "GENEVA_XP MFC replacement SOP - different device and component, no Baffle torque spec"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "global_sop_supra_n_all_pm_fcip_r3",
+    "relevance": 0,
+    "reason": "SUPRA_N FCIP R3 SOP - correct device but different component (FCIP not Baffle)"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "global_sop_supra_n_all_pm_fcip_r5",
+    "relevance": 0,
+    "reason": "SUPRA_N FCIP R5 SOP - correct device but different component (FCIP not Baffle)"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "global_sop_supra_n_all_sub_unit_mfc",
+    "relevance": 0,
+    "reason": "SUPRA_N SUB UNIT MFC SOP - correct device but different component (MFC not Baffle)"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "global_sop_supra_n_series_all_pm_gas_spring",
+    "relevance": 0,
+    "reason": "SUPRA N series gas spring SOP - correct device family but different component"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "global_sop_supra_n_series_all_pm_heater_chuck",
+    "relevance": 0,
+    "reason": "SUPRA N series heater chuck SOP - correct device family but different component"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "global_sop_supra_n_series_all_pm_process_kit",
+    "relevance": 1,
+    "reason": "SUPRA N series PM Chamber/process kit SOP - correct device, PM chamber work may reference baffle-related procedures and torque specs, but not specifically about Baffle Screw torque"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "global_sop_supra_n_series_all_pm_top_lid",
+    "relevance": 0,
+    "reason": "SUPRA N series Top Lid SOP - correct device family but different component (top lid not baffle)"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "global_sop_supra_n_series_all_tm_ffu",
+    "relevance": 0,
+    "reason": "SUPRA N series TM FFU SOP - correct device family but different component (FFU not Baffle)"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "global_sop_supra_n_series_all_tm_robot",
+    "relevance": 0,
+    "reason": "SUPRA N series TM Robot SOP - correct device family but completely different component"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "set_up_manual_ecolite_2000",
+    "relevance": 0,
+    "reason": "ECOLITE 2000 setup manual - completely different device, no Baffle torque content"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "set_up_manual_ecolite_3000",
+    "relevance": 0,
+    "reason": "ECOLITE 3000 setup manual - completely different device, no Baffle torque content"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "set_up_manual_ecolite_ii_400",
+    "relevance": 0,
+    "reason": "ECOLITE II 400 setup manual - completely different device, no Baffle torque content"
+  },
+  {
+    "q_id": "A-q006",
+    "doc_id": "set_up_manual_supra_vm",
+    "relevance": 0,
+    "reason": "SUPRA Vm setup manual - different device variant (Vm not N), and setup manual scope does not specifically address Baffle torque spec"
+  },
+  {
+    "q_id": "A-q006_masked",
+    "doc_id": "global_sop_integer_plus_all_am_baffle",
+    "relevance": 1,
+    "reason": "INTEGER_PLUS AM Baffle SOP - same component (Baffle) as query but different device; may contain comparable torque spec as partial reference"
+  },
+  {
+    "q_id": "A-q006_masked",
+    "doc_id": "global_sop_integer_plus_all_am_slot_valve",
+    "relevance": 0,
+    "reason": "INTEGER_PLUS AM Slot Valve SOP - different device and different component"
+  },
+  {
+    "q_id": "A-q006_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_baffle_heater",
+    "relevance": 1,
+    "reason": "INTEGER plus PM Baffle Heater SOP - different device but related Baffle component; may contain adjacent torque/assembly information"
+  },
+  {
+    "q_id": "A-q006_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_slot_valve",
+    "relevance": 0,
+    "reason": "INTEGER plus PM Slot Valve SOP - different device and component from Baffle"
+  },
+  {
+    "q_id": "A-q006_masked",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "relevance": 0,
+    "reason": "PRECIA EFEM device net board SOP - completely different device and component"
+  },
+  {
+    "q_id": "A-q006_masked",
+    "doc_id": "global_sop_supra_n_series_all_pm_heater_chuck",
+    "relevance": 0,
+    "reason": "SUPRA N series Heater Chuck SOP - correct device family but different component"
+  },
+  {
+    "q_id": "A-q006_masked",
+    "doc_id": "global_sop_supra_n_series_all_pm_process_kit",
+    "relevance": 1,
+    "reason": "SUPRA N series PM Chamber/process kit SOP - correct device, chamber work may include baffle-related assembly steps and torque info"
+  },
+  {
+    "q_id": "A-q006_masked",
+    "doc_id": "global_sop_supra_n_series_all_pm_top_lid",
+    "relevance": 0,
+    "reason": "SUPRA N series Top Lid SOP - correct device family but different component"
+  },
+  {
+    "q_id": "A-q006_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_XP PM device net board SOP - different device and different component"
+  },
+  {
+    "q_id": "A-q006_masked",
+    "doc_id": "set_up_manual_ecolite_2000",
+    "relevance": 0,
+    "reason": "ECOLITE 2000 setup manual - completely different device, no Baffle torque content"
+  },
+  {
+    "q_id": "A-q006_masked",
+    "doc_id": "set_up_manual_ecolite_3000",
+    "relevance": 0,
+    "reason": "ECOLITE 3000 setup manual - completely different device, no Baffle torque content"
+  },
+  {
+    "q_id": "A-q006_masked",
+    "doc_id": "set_up_manual_ecolite_ii_400",
+    "relevance": 0,
+    "reason": "ECOLITE II 400 setup manual - completely different device, no Baffle torque content"
+  },
+  {
+    "q_id": "A-q006_masked",
+    "doc_id": "set_up_manual_supra_vm",
+    "relevance": 0,
+    "reason": "SUPRA Vm setup manual - different device variant, setup manual does not specifically address Baffle screw torque spec"
+  },
+  {
+    "q_id": "A-sop002",
+    "doc_id": "40034602",
+    "relevance": 0,
+    "reason": "SUPRA V signal tower replacement record - different device and component, not EFEM controller"
+  },
+  {
+    "q_id": "A-sop002",
+    "doc_id": "40069928",
+    "relevance": 1,
+    "reason": "SUPRA IV EFEM SW Upgrade service record - related EFEM topic but different device (SUPRA IV not XP) and SW upgrade vs controller replacement"
+  },
+  {
+    "q_id": "A-sop002",
+    "doc_id": "global_sop_supra_xp_all_efem_controller",
+    "relevance": 2,
+    "reason": "SUPRA_XP (Zedius XP) EFEM Controller Replacement SOP - exact match for device and component procedure"
+  },
+  {
+    "q_id": "A-sop002",
+    "doc_id": "global_sop_supra_xp_all_efem_ffu",
+    "relevance": 1,
+    "reason": "ZEDIUS XP EFEM FFU SOP - correct device, EFEM-related but different component (FFU vs controller)"
+  },
+  {
+    "q_id": "A-sop002",
+    "doc_id": "global_sop_supra_xp_all_efem_robot_sr8241",
+    "relevance": 2,
+    "reason": "SUPRA_XP EFEM Robot SOP includes 'Robot & Controller Replacement & Adjustment' - directly relevant to EFEM controller replacement on same device"
+  },
+  {
+    "q_id": "A-sop002",
+    "doc_id": "global_sop_supra_xp_all_pm_pin_assy",
+    "relevance": 0,
+    "reason": "SUPRA_XP PM Pin Assy SOP - correct device but completely different component (PM pin assembly vs EFEM controller)"
+  },
+  {
+    "q_id": "A-sop002",
+    "doc_id": "global_sop_supra_xp_all_pm_temp_controller",
+    "relevance": 0,
+    "reason": "SUPRA_XP PM Temp Controller SOP - correct device but different controller type (PM temperature controller vs EFEM controller)"
+  },
+  {
+    "q_id": "A-sop002_masked",
+    "doc_id": "40035345",
+    "relevance": 1,
+    "reason": "SUPRA V EFEM communication/Robot error service record - EFEM-related troubleshooting but different device and not controller replacement procedure"
+  },
+  {
+    "q_id": "A-sop002_masked",
+    "doc_id": "40069928",
+    "relevance": 1,
+    "reason": "SUPRA IV EFEM SW Upgrade record - EFEM related but different device and SW upgrade not controller replacement"
+  },
+  {
+    "q_id": "A-sop002_masked",
+    "doc_id": "global_sop_integer_plus_all_efem_controller",
+    "relevance": 1,
+    "reason": "INTEGER_PLUS EFEM Controller Replacement SOP - same component and procedure type as query but different device; partially relevant as reference for same operation on different device"
+  },
+  {
+    "q_id": "A-sop002_masked",
+    "doc_id": "global_sop_integer_plus_all_efem_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (INTEGER_PLUS) and different component (DeviceNet Board, not controller)"
+  },
+  {
+    "q_id": "A-sop002_masked",
+    "doc_id": "global_sop_integer_plus_all_efem_eda_controller",
+    "relevance": 1,
+    "reason": "Same component (EFEM EDA Controller replacement), but different device (INTEGER_PLUS vs SUPRA_XP)"
+  },
+  {
+    "q_id": "A-sop002_masked",
+    "doc_id": "global_sop_precia_all_efem_controller",
+    "relevance": 1,
+    "reason": "Same component (EFEM Controller replacement), but different device (PRECIA vs SUPRA_XP)"
+  },
+  {
+    "q_id": "A-sop002_masked",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (DeviceNet Board, not controller)"
+  },
+  {
+    "q_id": "A-sop002_masked",
+    "doc_id": "global_sop_supra_n_series_all_efem_controller",
+    "relevance": 1,
+    "reason": "Same component (EFEM Controller replacement), different but related device (SUPRA_N vs SUPRA_XP)"
+  },
+  {
+    "q_id": "A-sop002_masked",
+    "doc_id": "global_sop_supra_n_series_all_efem_ffu",
+    "relevance": 0,
+    "reason": "Different component (EFEM FFU, not controller) and different device (SUPRA_N)"
+  },
+  {
+    "q_id": "A-sop002_masked",
+    "doc_id": "global_sop_supra_xp_all_efem_controller",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP EFEM Controller replacement procedure"
+  },
+  {
+    "q_id": "A-sop002_masked",
+    "doc_id": "global_sop_supra_xp_all_efem_ffu",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP/ZEDIUS XP) but different component (EFEM FFU, not controller)"
+  },
+  {
+    "q_id": "A-sop011",
+    "doc_id": "global_sop_integer_plus_all_ll_mfc",
+    "relevance": 0,
+    "reason": "Different device (INTEGER plus) and different component (LL MFC, not N2 Purge Line Diffuser)"
+  },
+  {
+    "q_id": "A-sop011",
+    "doc_id": "global_sop_integer_plus_all_tm_solenoid_valve",
+    "relevance": 0,
+    "reason": "Different device (INTEGER_PLUS) and completely different component (TM Solenoid Valve)"
+  },
+  {
+    "q_id": "A-sop011",
+    "doc_id": "global_sop_precia_all_pm_mfc",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (PM MFC, not LL N2 Purge Line Diffuser)"
+  },
+  {
+    "q_id": "A-sop011",
+    "doc_id": "global_sop_precia_all_tm_robot",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and completely unrelated component (TM Robot)"
+  },
+  {
+    "q_id": "A-sop011",
+    "doc_id": "global_sop_precia_all_tm_slot_valve",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (TM Slot Valve)"
+  },
+  {
+    "q_id": "A-sop011",
+    "doc_id": "global_sop_supra_xp_all_ll_cip",
+    "relevance": 2,
+    "reason": "Same device (SUPRA_XP) and doc explicitly lists 'LL N2 PURGE LINE DIFFUSER Modify' as a work procedure within this SOP"
+  },
+  {
+    "q_id": "A-sop011",
+    "doc_id": "global_sop_supra_xp_all_ll_pin_modify_eng",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP) and same module (LL), but different component (LL Pin, not N2 Purge Line Diffuser)"
+  },
+  {
+    "q_id": "A-sop011_masked",
+    "doc_id": "global_sop_integer_plus_all_ll_diffuser",
+    "relevance": 1,
+    "reason": "Same component (LL Diffuser), but different device (INTEGER plus vs SUPRA_XP)"
+  },
+  {
+    "q_id": "A-sop011_masked",
+    "doc_id": "global_sop_integer_plus_all_ll_mfc",
+    "relevance": 0,
+    "reason": "Different device (INTEGER plus) and different component (LL MFC, not diffuser)"
+  },
+  {
+    "q_id": "A-sop011_masked",
+    "doc_id": "global_sop_integer_plus_all_tm_solenoid_valve",
+    "relevance": 0,
+    "reason": "Different device (INTEGER_PLUS) and completely different component (TM Solenoid Valve)"
+  },
+  {
+    "q_id": "A-sop011_masked",
+    "doc_id": "global_sop_precia_all_ll_angle_valve",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (LL Angle Valve, not N2 Purge Line Diffuser)"
+  },
+  {
+    "q_id": "A-sop011_masked",
+    "doc_id": "global_sop_precia_all_pm_mfc",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (PM MFC)"
+  },
+  {
+    "q_id": "A-sop011_masked",
+    "doc_id": "global_sop_precia_all_tm_robot",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and unrelated component (TM Robot)"
+  },
+  {
+    "q_id": "A-sop011_masked",
+    "doc_id": "global_sop_precia_all_tm_slot_valve",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (TM Slot Valve)"
+  },
+  {
+    "q_id": "A-sop011_masked",
+    "doc_id": "global_sop_supra_xp_all_ll_cip",
+    "relevance": 2,
+    "reason": "Same device (SUPRA_XP) and doc explicitly lists 'LL N2 PURGE LINE DIFFUSER Modify' as a work procedure"
+  },
+  {
+    "q_id": "A-sop018",
+    "doc_id": "global_sop_supra_xp_all_pm_baratron_gauge",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP/ZEDIUS XP PM Baratron Gauge SOP explicitly includes PM BARATRON GAUGE ADJ procedure"
+  },
+  {
+    "q_id": "A-sop018",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (PM Device Net Board, not Baratron Gauge)"
+  },
+  {
+    "q_id": "A-sop018",
+    "doc_id": "global_sop_supra_xp_all_pm_heater_chuck",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (PM Heater Chuck, not Baratron Gauge)"
+  },
+  {
+    "q_id": "A-sop018",
+    "doc_id": "global_sop_supra_xp_all_pm_manometer",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (PM Manometer, not Baratron Gauge)"
+  },
+  {
+    "q_id": "A-sop018",
+    "doc_id": "global_sop_supra_xp_all_pm_pirani_gauge",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), related PM gauge (Pirani vs Baratron), similar procedure context — partial relevance"
+  },
+  {
+    "q_id": "A-sop018",
+    "doc_id": "global_sop_supra_xp_all_pm_pressure_gauge",
+    "relevance": 2,
+    "reason": "Same device (SUPRA_XP), doc is PM Pressure Gauge which explicitly lists BARATRON GAUGE as work item 1 — directly relevant"
+  },
+  {
+    "q_id": "A-sop018",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different module (TM) and different component (Device Net Board)"
+  },
+  {
+    "q_id": "A-sop018",
+    "doc_id": "global_sop_supra_xp_all_tm_pressure_gauge",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), TM Pressure Gauge SOP lists 'Baratron Gauge' procedures but query is for PM not TM — partial relevance"
+  },
+  {
+    "q_id": "A-sop018",
+    "doc_id": "global_sop_supra_xp_all_tm_robot",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but completely different component (TM Robot)"
+  },
+  {
+    "q_id": "A-sop018_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_vacuum_line",
+    "relevance": 1,
+    "reason": "Different device (INTEGER_PLUS), but PM Vacuum Line SOP explicitly lists 'PM Baratron Gauge Adjust' as first work item — partial relevance"
+  },
+  {
+    "q_id": "A-sop018_masked",
+    "doc_id": "global_sop_precia_all_pm_baratron_gauge",
+    "relevance": 1,
+    "reason": "Same component (PM Baratron Gauge ADJ), but different device (PRECIA vs SUPRA_XP)"
+  },
+  {
+    "q_id": "A-sop018_masked",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (PM Device Net Board, not Baratron Gauge)"
+  },
+  {
+    "q_id": "A-sop018_masked",
+    "doc_id": "global_sop_precia_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different module/component (TM Device Net Board)"
+  },
+  {
+    "q_id": "A-sop018_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_baratron_gauge",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP PM Baratron Gauge SOP with PM BARATRON GAUGE ADJ procedure"
+  },
+  {
+    "q_id": "A-sop031",
+    "doc_id": "global_sop_supra_xp_all_ll_pressure_gauge",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), same module type (pressure gauge), but LL module and Pirani Gauge (not Manometer) — partial relevance"
+  },
+  {
+    "q_id": "A-sop031",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (PM Device Net Board, not Manometer)"
+  },
+  {
+    "q_id": "A-sop031",
+    "doc_id": "global_sop_supra_xp_all_pm_flow_switch",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (PM Flow Switch, not Manometer)"
+  },
+  {
+    "q_id": "A-sop031",
+    "doc_id": "global_sop_supra_xp_all_pm_manometer",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP/ZEDIUS XP PM Manometer SOP explicitly includes Manometer Adjust procedure"
+  },
+  {
+    "q_id": "A-sop031",
+    "doc_id": "global_sop_supra_xp_all_pm_pressure_gauge",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), PM pressure measurement context, but covers Baratron/Pirani, not Manometer"
+  },
+  {
+    "q_id": "A-sop031",
+    "doc_id": "global_sop_supra_xp_all_pm_temp_controller",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (PM Temp Controller, not Manometer)"
+  },
+  {
+    "q_id": "A-sop031",
+    "doc_id": "global_sop_supra_xp_all_tm_mfc",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different module (TM) and different component (MFC, not Manometer)"
+  },
+  {
+    "q_id": "A-sop031",
+    "doc_id": "global_sop_supra_xp_all_tm_pressure_gauge",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), same gauge category (pressure), but TM module and covers Baratron/Pirani not Manometer"
+  },
+  {
+    "q_id": "A-sop031",
+    "doc_id": "global_sop_supra_xp_all_tm_robot",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but completely unrelated component (TM Robot)"
+  },
+  {
+    "q_id": "A-sop031",
+    "doc_id": "supra_xp_sub_unit_trouble_shooting_guide_igs_block_abnormal",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), troubleshooting guide references 'Manometer Adjust Damper' in Gas Exhaust Alarm context — partial relevance"
+  },
+  {
+    "q_id": "A-sop031_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_manometer",
+    "relevance": 1,
+    "reason": "Same component (PM Manometer replacement), but different device (INTEGER plus vs SUPRA_XP)"
+  },
+  {
+    "q_id": "A-sop031_masked",
+    "doc_id": "global_sop_precia_all_pm_manometer",
+    "relevance": 1,
+    "reason": "Same component (PM Manometer), but different device (PRECIA vs SUPRA_XP) and only covers replacement not adjust"
+  },
+  {
+    "q_id": "A-sop031_masked",
+    "doc_id": "global_sop_supra_n_series_all_sub_unit_gas_box_board",
+    "relevance": 0,
+    "reason": "Related device family (SUPRA N vs SUPRA_XP) but completely different component (Sub Unit Gas Box Board, not Manometer)"
+  },
+  {
+    "q_id": "A-sop031_masked",
+    "doc_id": "global_sop_supra_n_series_all_sub_unit_manometer",
+    "relevance": 1,
+    "reason": "Manometer SOP for SUPRA N Series (same component type, different device). Contains Manometer Adjustment section but for N/Nm/Np variants, not XP."
+  },
+  {
+    "q_id": "A-sop031_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_manometer",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP (ZEDIUS XP) PM Manometer SOP, contains Manometer Adjust procedure on page 19. Same device, same component, same operation."
+  },
+  {
+    "q_id": "A-sop031_masked",
+    "doc_id": "set_up_manual_supra_np",
+    "relevance": 0,
+    "reason": "Setup manual for SUPRA_NP (different device), no manometer adjustment content."
+  },
+  {
+    "q_id": "A-sop031_masked",
+    "doc_id": "set_up_manual_supra_xq",
+    "relevance": 0,
+    "reason": "Setup manual for SUPRA_XQ (different device), no manometer adjustment content."
+  },
+  {
+    "q_id": "A-sop033",
+    "doc_id": "global_sop_supra_xp_all_efem_controller",
+    "relevance": 0,
+    "reason": "EFEM Controller SOP for SUPRA_XP. Different component (controller), unrelated to Pendulum Valve replacement."
+  },
+  {
+    "q_id": "A-sop033",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "PM Device Net Board SOP for SUPRA_XP. Different component, unrelated to Pendulum Valve replacement."
+  },
+  {
+    "q_id": "A-sop033",
+    "doc_id": "global_sop_supra_xp_all_pm_manometer",
+    "relevance": 0,
+    "reason": "Manometer SOP for SUPRA_XP. Different component, unrelated to Pendulum Valve replacement."
+  },
+  {
+    "q_id": "A-sop033",
+    "doc_id": "global_sop_supra_xp_all_pm_pendulum_valve",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP PM Pendulum Valve SOP containing Pendulum Valve Replacement & Clean & Adjustment procedure. Same device, same component, same operation."
+  },
+  {
+    "q_id": "A-sop033",
+    "doc_id": "global_sop_supra_xp_all_pm_preventive_maintenance",
+    "relevance": 1,
+    "reason": "SUPRA_XP PM Preventive Maintenance SOP. Same device and contains Pendulum Valve Replacement section (page 39), but it is the general PM doc, not the dedicated Pendulum Valve SOP."
+  },
+  {
+    "q_id": "A-sop033",
+    "doc_id": "global_sop_supra_xp_all_pm_wafer_shut_off_valve",
+    "relevance": 0,
+    "reason": "Water Shut Off Valve SOP for SUPRA_XP. Different valve component, unrelated to Pendulum Valve."
+  },
+  {
+    "q_id": "A-sop033",
+    "doc_id": "global_sop_supra_xp_all_sub_unit_igs_block",
+    "relevance": 0,
+    "reason": "IGS Block SOP for SUPRA_XP. Different component (gas block), unrelated to Pendulum Valve."
+  },
+  {
+    "q_id": "A-sop033",
+    "doc_id": "global_sop_supra_xp_all_tm_robot",
+    "relevance": 0,
+    "reason": "TM Robot SOP for SUPRA_XP. Different component, unrelated to Pendulum Valve replacement."
+  },
+  {
+    "q_id": "A-sop033",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_valve",
+    "relevance": 0,
+    "reason": "TM Slot Valve SOP for SUPRA_XP. Different valve type (slot vs pendulum), unrelated to Pendulum Valve replacement."
+  },
+  {
+    "q_id": "A-sop033_masked",
+    "doc_id": "global_sop_integer_plus_all_am_vacuum_line",
+    "relevance": 1,
+    "reason": "INTEGER_PLUS AM Vacuum Line SOP. Different device, but contains AM Pendulum Valve Adjust section — same component type, different device."
+  },
+  {
+    "q_id": "A-sop033_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_vacuum_line",
+    "relevance": 1,
+    "reason": "INTEGER_PLUS PM Vacuum Line SOP. Different device, but contains PM Pendulum Valve Adjust section — same component type, different device."
+  },
+  {
+    "q_id": "A-sop033_masked",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "relevance": 0,
+    "reason": "PRECIA EFEM Device Net Board SOP. Different device and completely different component, unrelated to Pendulum Valve."
+  },
+  {
+    "q_id": "A-sop033_masked",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "PRECIA PM Device Net Board SOP. Different device and completely different component, unrelated to Pendulum Valve."
+  },
+  {
+    "q_id": "A-sop033_masked",
+    "doc_id": "global_sop_precia_all_pm_pendulum_valve",
+    "relevance": 1,
+    "reason": "PRECIA PM Pendulum Valve SOP. Same component (Pendulum Valve Replacement & Clean & Adjustment), different device (PRECIA vs SUPRA_XP)."
+  },
+  {
+    "q_id": "A-sop033_masked",
+    "doc_id": "global_sop_supra_n_series_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_N PM Device Net Board SOP. Different component, unrelated to Pendulum Valve."
+  },
+  {
+    "q_id": "A-sop033_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_XP PM Device Net Board SOP. Same device but completely different component, unrelated to Pendulum Valve."
+  },
+  {
+    "q_id": "A-sop033_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_pendulum_valve",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP PM Pendulum Valve SOP with Pendulum Valve Replacement procedure. Same device and same component."
+  },
+  {
+    "q_id": "A-sop033_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_preventive_maintenance",
+    "relevance": 1,
+    "reason": "SUPRA_XP PM Preventive Maintenance SOP. Same device and includes Pendulum Valve Replacement section (page 39), but general PM document."
+  },
+  {
+    "q_id": "A-sop033_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_XP TM Device Net Board SOP. Same device but different component, unrelated to Pendulum Valve."
+  },
+  {
+    "q_id": "A-sop038",
+    "doc_id": "global_sop_supra_xp_all_efem_controller",
+    "relevance": 0,
+    "reason": "EFEM Controller SOP for SUPRA_XP. Different component, unrelated to PM Pirani Gauge adjustment."
+  },
+  {
+    "q_id": "A-sop038",
+    "doc_id": "global_sop_supra_xp_all_ll_pressure_gauge",
+    "relevance": 1,
+    "reason": "SUPRA_XP LL Pressure Gauge SOP. Same device, contains Pirani Gauge Adjust procedure but for LL module, not PM module — related component, different chamber location."
+  },
+  {
+    "q_id": "A-sop038",
+    "doc_id": "global_sop_supra_xp_all_pm_baratron_gauge",
+    "relevance": 1,
+    "reason": "SUPRA_XP PM Baratron Gauge SOP. Same device and same chamber (PM), but different gauge type (Baratron vs Pirani)."
+  },
+  {
+    "q_id": "A-sop038",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_XP PM Device Net Board SOP. Different component, unrelated to Pirani Gauge adjustment."
+  },
+  {
+    "q_id": "A-sop038",
+    "doc_id": "global_sop_supra_xp_all_pm_heater_chuck",
+    "relevance": 0,
+    "reason": "SUPRA_XP PM Heater Chuck SOP. Different component, unrelated to Pirani Gauge adjustment."
+  },
+  {
+    "q_id": "A-sop038",
+    "doc_id": "global_sop_supra_xp_all_pm_manometer",
+    "relevance": 0,
+    "reason": "SUPRA_XP PM Manometer SOP. Different component (manometer vs pirani gauge), unrelated to Pirani Gauge adjustment."
+  },
+  {
+    "q_id": "A-sop038",
+    "doc_id": "global_sop_supra_xp_all_pm_pirani_gauge",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP PM Pirani Gauge SOP with PM PIRANI GAUGE ADJ procedure on page 6. Same device, same component, same operation."
+  },
+  {
+    "q_id": "A-sop038",
+    "doc_id": "global_sop_supra_xp_all_pm_pressure_gauge",
+    "relevance": 1,
+    "reason": "SUPRA_XP PM Pressure Gauge SOP. Same device and chamber, contains both Baratron and Pirani Gauge sections — partially relevant as it may contain Pirani Gauge ADJ."
+  },
+  {
+    "q_id": "A-sop038",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_XP TM Device Net Board SOP. Different component, unrelated to Pirani Gauge adjustment."
+  },
+  {
+    "q_id": "A-sop038",
+    "doc_id": "global_sop_supra_xp_all_tm_pressure_gauge",
+    "relevance": 1,
+    "reason": "SUPRA_XP TM Pressure Gauge SOP. Same device, contains Pirani Gauge Adjust section but for TM module, not PM module — related component, different chamber location."
+  },
+  {
+    "q_id": "A-sop038_masked",
+    "doc_id": "40039531",
+    "relevance": 1,
+    "reason": "MyService record about Pirani Gauge Calibration on SUPRA Vplus. Same component (Pirani Gauge ADJ/Calibration), different device — contains real calibration steps."
+  },
+  {
+    "q_id": "A-sop038_masked",
+    "doc_id": "40071809",
+    "relevance": 0,
+    "reason": "MyService record about Pirani gauge installation on TIGMA Vplus. Different device and operation (installation, not ADJ/calibration)."
+  },
+  {
+    "q_id": "A-sop038_masked",
+    "doc_id": "global_sop_integer_plus_all_am_vacuum_line",
+    "relevance": 1,
+    "reason": "INTEGER_PLUS AM Vacuum Line SOP. Different device, but contains AM Pirani Gauge Adjust section — same component, different device."
+  },
+  {
+    "q_id": "A-sop038_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_vacuum_line",
+    "relevance": 1,
+    "reason": "INTEGER_PLUS PM Vacuum Line SOP. Different device, but contains PM Pirani Gauge Adjust section — same component, different device."
+  },
+  {
+    "q_id": "A-sop038_masked",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "PRECIA PM Device Net Board SOP. Different device and completely different component, unrelated to Pirani Gauge adjustment."
+  },
+  {
+    "q_id": "A-sop038_masked",
+    "doc_id": "global_sop_precia_all_pm_pirani_gauge",
+    "relevance": 1,
+    "reason": "PRECIA PM Pirani Gauge SOP. Same component (PM Pirani Gauge Adjust on page 18), different device (PRECIA vs SUPRA_XP)."
+  },
+  {
+    "q_id": "A-sop038_masked",
+    "doc_id": "global_sop_precia_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "PRECIA TM Device Net Board SOP. Different device and completely different component, unrelated to Pirani Gauge adjustment."
+  },
+  {
+    "q_id": "A-sop038_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_pirani_gauge",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP PM Pirani Gauge SOP with PM PIRANI GAUGE ADJ procedure. Same device, same component, same operation."
+  },
+  {
+    "q_id": "A-sop042",
+    "doc_id": "global_sop_supra_xp_all_efem_controller",
+    "relevance": 0,
+    "reason": "SUPRA_XP EFEM Controller SOP. Different component, unrelated to PRISM SOURCE replacement."
+  },
+  {
+    "q_id": "A-sop042",
+    "doc_id": "global_sop_supra_xp_all_pm_cip_chamber",
+    "relevance": 1,
+    "reason": "SUPRA_XP PM CIP Chamber SOP. Same device, covers CIP SOURCE (PRISM 3100) replacement which is a related PRISM source variant — partially relevant."
+  },
+  {
+    "q_id": "A-sop042",
+    "doc_id": "global_sop_supra_xp_all_pm_manometer",
+    "relevance": 0,
+    "reason": "SUPRA_XP PM Manometer SOP. Different component, unrelated to PRISM SOURCE replacement."
+  },
+  {
+    "q_id": "A-sop042",
+    "doc_id": "global_sop_supra_xp_all_pm_preventive_maintenance",
+    "relevance": 1,
+    "reason": "SUPRA_XP PM Preventive Maintenance SOP. Same device and includes PRISM SOURCE REPLACEMENT section (page 9) — contains the procedure but in the general PM document."
+  },
+  {
+    "q_id": "A-sop042",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP PM PRISM SOURCE SOP with PRISM SOURCE REPLACEMENT procedure. Same device, same component, same operation."
+  },
+  {
+    "q_id": "A-sop042",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3000qc",
+    "relevance": 2,
+    "reason": "SUPRA_XP PM PRISM SOURCE 3000QC SOP. Same device, PRISM SOURCE variant (3000QC) replacement procedure — direct answer to PRISM SOURCE replacement query."
+  },
+  {
+    "q_id": "A-sop042",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3100qc",
+    "relevance": 2,
+    "reason": "SUPRA_XP PM PRISM SOURCE 3100QC SOP. Same device, PRISM SOURCE variant (3100QC) replacement procedure — direct answer to PRISM SOURCE replacement query."
+  },
+  {
+    "q_id": "A-sop042",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 0,
+    "reason": "SUPRA_XP TM CTC SOP. Different component (CTC), unrelated to PRISM SOURCE replacement."
+  },
+  {
+    "q_id": "A-sop042",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_XP TM Device Net Board SOP. Different component, unrelated to PRISM SOURCE replacement."
+  },
+  {
+    "q_id": "A-sop042",
+    "doc_id": "global_sop_supra_xp_all_tm_robot",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but covers TM ROBOT replacement, not PRISM SOURCE"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and unrelated component (device net board vs PRISM SOURCE)"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and unrelated component (device net board vs PRISM SOURCE)"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "doc_id": "global_sop_supra_n_series_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and unrelated component (device net board vs PRISM SOURCE)"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but unrelated component (device net board vs PRISM SOURCE)"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source",
+    "relevance": 2,
+    "reason": "Same device (SUPRA_XP) and exact component match (PRISM SOURCE replacement procedure)"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3000qc",
+    "relevance": 2,
+    "reason": "Same device (SUPRA_XP), PRISM SOURCE 3000QC variant - directly relevant to PRISM SOURCE replacement"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3100qc",
+    "relevance": 2,
+    "reason": "Same device (SUPRA_XP), PRISM SOURCE 3100QC variant - directly relevant to PRISM SOURCE replacement"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but unrelated component (TM device net board vs PRISM SOURCE)"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "doc_id": "set_up_manual_ecolite_3000",
+    "relevance": 0,
+    "reason": "Different device (ECOLITE_3000) setup manual, unrelated to PRISM SOURCE query"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "doc_id": "set_up_manual_geneva_stp300_xp_r6",
+    "relevance": 0,
+    "reason": "Different device (GENEVA_STP300_XP) setup manual, unrelated to PRISM SOURCE query"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "doc_id": "set_up_manual_supra_n",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) setup manual, not relevant to SUPRA_XP PRISM SOURCE"
+  },
+  {
+    "q_id": "A-sop042_masked",
+    "doc_id": "set_up_manual_supra_xq",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XQ) setup manual, not relevant to SUPRA_XP PRISM SOURCE"
+  },
+  {
+    "q_id": "A-sop044",
+    "doc_id": "global_sop_supra_xp_all_efem_controller",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but covers EFEM Controller, not Slot Valve"
+  },
+  {
+    "q_id": "A-sop044",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but covers device net board, not Slot Valve"
+  },
+  {
+    "q_id": "A-sop044",
+    "doc_id": "global_sop_supra_xp_all_pm_manometer",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but covers manometer, not Slot Valve"
+  },
+  {
+    "q_id": "A-sop044",
+    "doc_id": "global_sop_supra_xp_all_pm_pendulum_valve",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), different valve type (pendulum valve vs slot valve) - related component category"
+  },
+  {
+    "q_id": "A-sop044",
+    "doc_id": "global_sop_supra_xp_all_pm_preventive_maintenance",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP) preventive maintenance doc may contain slot valve related prep steps"
+  },
+  {
+    "q_id": "A-sop044",
+    "doc_id": "global_sop_supra_xp_all_sub_unit_igs_block",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but covers IGS block sub-unit, unrelated to Slot Valve"
+  },
+  {
+    "q_id": "A-sop044",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but covers TM device net board, not Slot Valve"
+  },
+  {
+    "q_id": "A-sop044",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_valve",
+    "relevance": 2,
+    "reason": "Exact match: same device (SUPRA_XP) and exact component (TM Slot Valve replacement)"
+  },
+  {
+    "q_id": "A-sop044",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+    "relevance": 2,
+    "reason": "Same device (SUPRA_XP), slot valve housing O-ring is directly part of slot valve replacement procedure"
+  },
+  {
+    "q_id": "A-sop044",
+    "doc_id": "supra_xp_tm_trouble_shooting_guide_trace_slot_valve_abnormal",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), slot valve troubleshooting guide - related but query is about replacement not fault diagnosis"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "doc_id": "global_sop_integer_plus_all_am_slot_valve",
+    "relevance": 1,
+    "reason": "Same component (slot valve) but different device (INTEGER_PLUS vs SUPRA_XP)"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "doc_id": "global_sop_integer_plus_all_ll_slot_valve",
+    "relevance": 1,
+    "reason": "Same component (slot valve) but different device (INTEGER_PLUS vs SUPRA_XP)"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_slot_valve",
+    "relevance": 1,
+    "reason": "Same component (slot valve) but different device (INTEGER_PLUS vs SUPRA_XP)"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "doc_id": "global_sop_precia_all_pm_slot_valve",
+    "relevance": 1,
+    "reason": "Same component (slot valve) but different device (PRECIA vs SUPRA_XP)"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "doc_id": "global_sop_precia_all_tm_slot_valve",
+    "relevance": 1,
+    "reason": "Same component (slot valve) but different device (PRECIA vs SUPRA_XP)"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "doc_id": "set_up_manual_precia",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) setup manual, not relevant to slot valve replacement query"
+  },
+  {
+    "q_id": "A-sop044_masked",
+    "doc_id": "set_up_manual_zedius_xp_supra_xp",
+    "relevance": 1,
+    "reason": "Same device (ZEDIUS_XP/SUPRA_XP) setup manual - may contain slot valve installation context"
+  },
+  {
+    "q_id": "A-sop048",
+    "doc_id": "global_sop_supra_xp_all_efem_ffu",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but covers EFEM FFU, unrelated to PRISM SOURCE ignition window check"
+  },
+  {
+    "q_id": "A-sop048",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but covers device net board, unrelated to PRISM SOURCE ignition window check"
+  },
+  {
+    "q_id": "A-sop048",
+    "doc_id": "global_sop_supra_xp_all_pm_heater_chuck",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but covers heater chuck, unrelated to PRISM SOURCE ignition window check"
+  },
+  {
+    "q_id": "A-sop048",
+    "doc_id": "global_sop_supra_xp_all_pm_manometer",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but covers manometer, unrelated to PRISM SOURCE ignition window check"
+  },
+  {
+    "q_id": "A-sop048",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3000qc",
+    "relevance": 2,
+    "reason": "Exact match: same device (SUPRA_XP), PRISM SOURCE 3000QC contains ignition window check procedure"
+  },
+  {
+    "q_id": "A-sop048",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3100qc",
+    "relevance": 2,
+    "reason": "Exact match: same device (SUPRA_XP), PRISM SOURCE 3100QC contains ignition window check procedure"
+  },
+  {
+    "q_id": "A-sop048",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but covers TM device net board, unrelated to PRISM SOURCE ignition window check"
+  },
+  {
+    "q_id": "A-sop048",
+    "doc_id": "supra_xp_pm_trouble_shooting_guide_trace_prism_abnormal",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), PRISM troubleshooting guide covers ignition-related issues - related but query is about window check procedure not fault diagnosis"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "doc_id": "40036506",
+    "relevance": 1,
+    "reason": "Different device (SUPRA Vplus) but content describes ignition window test steps - partially relevant PRISM ignition context"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "doc_id": "global_sop_integer_plus_all_am_temp_controller",
+    "relevance": 0,
+    "reason": "Different device (INTEGER_PLUS) and unrelated component (temp controller vs PRISM SOURCE)"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_temp_controller",
+    "relevance": 0,
+    "reason": "Different device (INTEGER_PLUS) and unrelated component (temp controller vs PRISM SOURCE)"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_wall_temp_controller",
+    "relevance": 0,
+    "reason": "Different device (INTEGER_PLUS) and unrelated component (wall temp controller vs PRISM SOURCE)"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and unrelated component (device net board vs PRISM SOURCE)"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "doc_id": "global_sop_precia_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and unrelated component (device net board vs PRISM SOURCE)"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "doc_id": "global_sop_supra_n_series_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and unrelated component (CTC vs PRISM SOURCE)"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3000qc",
+    "relevance": 2,
+    "reason": "Same device (SUPRA_XP), PRISM SOURCE 3000QC directly covers ignition window check procedure"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3100qc",
+    "relevance": 2,
+    "reason": "Same device (SUPRA_XP), PRISM SOURCE 3100QC directly covers ignition window check procedure"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but covers CTC, unrelated to PRISM SOURCE ignition window check"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but covers TM device net board, unrelated to PRISM SOURCE ignition window check"
+  },
+  {
+    "q_id": "A-sop048_masked",
+    "doc_id": "supra_xp_pm_trouble_shooting_guide_trace_prism_abnormal",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), PRISM troubleshooting guide covers ignition-related issues - related but not a window check procedure"
+  },
+  {
+    "q_id": "A-sop051",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but completely different component (Device Net Board vs PRISM SOURCE 3100QC RF Generator). No overlap with calibration task."
+  },
+  {
+    "q_id": "A-sop051",
+    "doc_id": "global_sop_supra_xp_all_pm_heater_chuck",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but completely different component (Heater Chuck vs PRISM SOURCE 3100QC). No relevance to RF Generator calibration."
+  },
+  {
+    "q_id": "A-sop051",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP) and same parent component (PRISM SOURCE) but generic version, not specifically 3100QC RF GENERATOR calibration. Partially relevant context."
+  },
+  {
+    "q_id": "A-sop051",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3000qc",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), same component family (PRISM SOURCE QC) but different model (3000QC vs 3100QC). Similar procedures may apply but not exact match."
+  },
+  {
+    "q_id": "A-sop051",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3100qc",
+    "relevance": 2,
+    "reason": "Exact match: same device (SUPRA_XP) and exact component (PRISM SOURCE 3100QC). This SOP directly covers the RF GENERATOR 2-POINTS Calibration procedure."
+  },
+  {
+    "q_id": "A-sop051",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but completely different component (TM CTC vs PRISM SOURCE 3100QC RF Generator). No relevance to calibration task."
+  },
+  {
+    "q_id": "A-sop051",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (TM Device Net Board vs PRISM SOURCE 3100QC). No relevance to RF Generator calibration."
+  },
+  {
+    "q_id": "A-sop051",
+    "doc_id": "global_sop_supra_xp_all_tm_robot",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (TM Robot vs PRISM SOURCE 3100QC). No relevance to RF Generator calibration."
+  },
+  {
+    "q_id": "A-sop051_masked",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (Device Net Board vs PRISM SOURCE 3100QC RF Generator). No relevance."
+  },
+  {
+    "q_id": "A-sop051_masked",
+    "doc_id": "global_sop_precia_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (TM Device Net Board vs PRISM SOURCE 3100QC RF Generator). No relevance."
+  },
+  {
+    "q_id": "A-sop051_masked",
+    "doc_id": "global_sop_supra_n_series_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and different component (Device Net Board vs PRISM SOURCE 3100QC RF Generator). No relevance."
+  },
+  {
+    "q_id": "A-sop051_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (Device Net Board vs PRISM SOURCE 3100QC RF Generator). No relevance to calibration."
+  },
+  {
+    "q_id": "A-sop051_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP) and same parent component (PRISM SOURCE). Masked query can't confirm device, but generic PRISM SOURCE SOP provides partial context for 3100QC calibration."
+  },
+  {
+    "q_id": "A-sop051_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3000qc",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), same component family (PRISM SOURCE QC) but different model (3000QC vs 3100QC). Similar RF Generator calibration steps may apply."
+  },
+  {
+    "q_id": "A-sop051_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3100qc",
+    "relevance": 2,
+    "reason": "Exact component match (PRISM SOURCE 3100QC) for SUPRA_XP. Despite device masking, this SOP directly covers the RF GENERATOR 2-POINTS Calibration procedure."
+  },
+  {
+    "q_id": "A-sop051_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (TM Device Net Board vs PRISM SOURCE 3100QC). No relevance to RF Generator calibration."
+  },
+  {
+    "q_id": "A-sop051_masked",
+    "doc_id": "set_up_manual_ecolite_2000",
+    "relevance": 0,
+    "reason": "Different device (ECOLITE_2000) and setup manual, not related to PRISM SOURCE 3100QC RF Generator calibration."
+  },
+  {
+    "q_id": "A-sop051_masked",
+    "doc_id": "set_up_manual_ecolite_ii_400",
+    "relevance": 0,
+    "reason": "Different device (ECOLITE_II_400) and setup manual, not related to PRISM SOURCE 3100QC RF Generator calibration."
+  },
+  {
+    "q_id": "A-sop051_masked",
+    "doc_id": "supra_xp_pm_trouble_shooting_guide_trace_prism_abnormal",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP) and same component (PRISM). Troubleshooting guide for PRISM abnormalities provides useful context, though it covers fault diagnosis rather than RF Generator calibration."
+  },
+  {
+    "q_id": "A-sop057",
+    "doc_id": "global_sop_supra_xp_all_efem_controller",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), related component (EFEM Controller) but different subsystem (EFEM vs PM). Controller replacement procedure may share some steps."
+  },
+  {
+    "q_id": "A-sop057",
+    "doc_id": "global_sop_supra_xp_all_efem_ffu",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (EFEM FFU vs PM Temp Controller). No relevance to Temp Controller replacement."
+  },
+  {
+    "q_id": "A-sop057",
+    "doc_id": "global_sop_supra_xp_all_efem_robot_sr8241",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (EFEM Robot vs PM Temp Controller). No relevance to Temp Controller replacement."
+  },
+  {
+    "q_id": "A-sop057",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (PM Device Net Board vs PM Temp Controller). No relevance to Temp Controller replacement."
+  },
+  {
+    "q_id": "A-sop057",
+    "doc_id": "global_sop_supra_xp_all_pm_manometer",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (Manometer vs Temp Controller). No relevance to Temp Controller replacement."
+  },
+  {
+    "q_id": "A-sop057",
+    "doc_id": "global_sop_supra_xp_all_pm_pin_assy",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (Pin Assembly vs Temp Controller). No relevance to Temp Controller replacement."
+  },
+  {
+    "q_id": "A-sop057",
+    "doc_id": "global_sop_supra_xp_all_pm_temp_controller",
+    "relevance": 2,
+    "reason": "Exact match: same device (SUPRA_XP) and exact component (PM Temp Controller). This SOP directly covers the Temp Controller replacement procedure."
+  },
+  {
+    "q_id": "A-sop057",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (TM Device Net Board vs PM Temp Controller). No relevance."
+  },
+  {
+    "q_id": "A-sop057",
+    "doc_id": "set_up_manual_supra_np",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_NP) and setup manual. Not relevant to SUPRA_XP PM Temp Controller replacement."
+  },
+  {
+    "q_id": "A-sop057",
+    "doc_id": "supra_xp_pm_trouble_shooting_guide_trace_chuck_abnormal",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), related component (Chuck includes Temp Interlock Alarm). Troubleshooting guide for Chuck Abnormal with Temp Interlock provides partial context for temperature controller issues."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "40043536",
+    "relevance": 1,
+    "reason": "Different device (SUPRA Vplus vs SUPRA_XP) but same component (Temp Controller replacement). MyService record describes actual Temp Controller 탈착/장착 procedure - same component, different device."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "40050130",
+    "relevance": 1,
+    "reason": "Different device (SUPRA N vs SUPRA_XP) but same component type (Temp Limit Controller). MyService record for LCD/cable replacement of Temp Controller - same component type, different device."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "global_sop_geneva_xp_rep_pm_temp_controller",
+    "relevance": 1,
+    "reason": "Different device (GENEVA_XP vs SUPRA_XP) but exact same component (PM Temp Controller replacement). SOP covers same procedure for different device - partially relevant."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_temp_controller",
+    "relevance": 1,
+    "reason": "Different device (INTEGER plus vs SUPRA_XP) but same component (PM Temp Controller). SOP covers same component type for different device - partially relevant."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_wall_temp_controller",
+    "relevance": 1,
+    "reason": "Different device (INTEGER_PLUS vs SUPRA_XP) and slightly different component (Wall Temp Controller vs Temp Controller). Related component type on different device - partially relevant."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (EFEM Device Net Board vs PM Temp Controller). No relevance."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (PM Device Net Board vs PM Temp Controller). No relevance."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "global_sop_supra_n_series_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and different component (Device Net Board vs Temp Controller). No relevance."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (PM Device Net Board vs PM Temp Controller). No relevance to Temp Controller replacement."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_temp_controller",
+    "relevance": 2,
+    "reason": "Exact match: same device (SUPRA_XP) and exact component (PM Temp Controller). This SOP directly covers the Temp Controller replacement procedure."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (TM Device Net Board vs PM Temp Controller). No relevance."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "set_up_manual_supra_n",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and setup manual. Not relevant to SUPRA_XP PM Temp Controller replacement."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "set_up_manual_supra_np",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_NP) and setup manual. Not relevant to SUPRA_XP PM Temp Controller replacement."
+  },
+  {
+    "q_id": "A-sop057_masked",
+    "doc_id": "supra_xp_all_trouble_shooting_guide_trace_device_net_abnormal",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (Device Net Abnormal vs PM Temp Controller). Troubleshooting guide for network issues, not temperature controller replacement."
+  },
+  {
+    "q_id": "A-sop058",
+    "doc_id": "global_sop_supra_xp_all_efem_controller",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), related component (EFEM Controller) but different subsystem. Controller adjustment procedure may share some setup/calibration steps with PM Temp Controller."
+  },
+  {
+    "q_id": "A-sop058",
+    "doc_id": "global_sop_supra_xp_all_efem_ffu",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (EFEM FFU vs PM Temp Controller). No relevance to Temp Controller adjustment."
+  },
+  {
+    "q_id": "A-sop058",
+    "doc_id": "global_sop_supra_xp_all_efem_robot_sr8241",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (EFEM Robot vs PM Temp Controller). No relevance to Temp Controller adjustment."
+  },
+  {
+    "q_id": "A-sop058",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (PM Device Net Board vs PM Temp Controller). No relevance to Temp Controller adjustment."
+  },
+  {
+    "q_id": "A-sop058",
+    "doc_id": "global_sop_supra_xp_all_pm_heater_chuck",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), related thermal component (Heater Chuck involves temperature management). May contain useful context for Temp Controller adjustment procedures."
+  },
+  {
+    "q_id": "A-sop058",
+    "doc_id": "global_sop_supra_xp_all_pm_manometer",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (Manometer vs Temp Controller). No relevance to Temp Controller adjustment."
+  },
+  {
+    "q_id": "A-sop058",
+    "doc_id": "global_sop_supra_xp_all_pm_pin_assy",
+    "relevance": 0,
+    "reason": "Same device (SUPRA_XP) but different component (Pin Assembly vs Temp Controller). No relevance to Temp Controller adjustment."
+  },
+  {
+    "q_id": "A-sop058",
+    "doc_id": "global_sop_supra_xp_all_pm_temp_controller",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP PM Temp Controller SOP covering both replacement and adjustment (조정) procedures"
+  },
+  {
+    "q_id": "A-sop058",
+    "doc_id": "set_up_manual_supra_np",
+    "relevance": 0,
+    "reason": "Setup manual for SUPRA_NP (different device); no relation to Temp Controller adjustment on SUPRA_XP"
+  },
+  {
+    "q_id": "A-sop058",
+    "doc_id": "supra_xp_pm_trouble_shooting_guide_trace_chuck_abnormal",
+    "relevance": 0,
+    "reason": "Troubleshooting guide for Chuck Abnormal on SUPRA_XP; different component, not related to Temp Controller"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "40043536",
+    "relevance": 1,
+    "reason": "MyService record for SUPRA Vplus (different device) covering Temp Controller replacement and parameter matching; same component type, different device"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "40050130",
+    "relevance": 1,
+    "reason": "MyService record for SUPRA N (different device) covering Temp Limit Controller LCD issue; same component type, different device"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_geneva_xp_rep_pm_temp_controller",
+    "relevance": 1,
+    "reason": "GENEVA_XP PM Temp Controller replacement SOP; same component (Temp Controller) but different device"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_wall_temp_controller",
+    "relevance": 1,
+    "reason": "INTEGER_PLUS PM Wall Temp Controller SOP; same component category (Temp Controller) but different device"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "PRECIA PM Device Net Board SOP; completely different component and device"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_precia_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "PRECIA TM Device Net Board SOP; completely different component and device"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_supra_n_series_all_efem_ffu",
+    "relevance": 0,
+    "reason": "SUPRA_N EFEM FFU SOP; different component (FFU), not related to Temp Controller"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_supra_n_series_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_N PM Device Net Board SOP; different component, not related to Temp Controller"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_supra_n_series_all_sub_unit_temp_controller",
+    "relevance": 1,
+    "reason": "SUPRA N series Sub Unit Temp Controller SOP; same component type (Temp Controller), different device series"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_XP PM Device Net Board SOP; same device but completely different component (Device Net Board vs Temp Controller)"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_temp_controller",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP PM Temp Controller SOP covering adjustment (조정) procedure — directly answers the query"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "set_up_manual_supra_n",
+    "relevance": 0,
+    "reason": "Setup manual for SUPRA_N (different device); no relation to Temp Controller adjustment"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "set_up_manual_supra_np",
+    "relevance": 0,
+    "reason": "Setup manual for SUPRA_NP (different device); no relation to Temp Controller adjustment"
+  },
+  {
+    "q_id": "A-sop072",
+    "doc_id": "global_sop_supra_xp_all_efem_ionizer",
+    "relevance": 0,
+    "reason": "SUPRA_XP EFEM Ionizer SOP; same device but different component (Ionizer vs TM Robot)"
+  },
+  {
+    "q_id": "A-sop072",
+    "doc_id": "global_sop_supra_xp_all_ll_cip",
+    "relevance": 0,
+    "reason": "SUPRA_XP LL CIP SOP; same device but different component (Load Lock CIP vs TM Robot)"
+  },
+  {
+    "q_id": "A-sop072",
+    "doc_id": "global_sop_supra_xp_all_ll_pin_modify_eng",
+    "relevance": 0,
+    "reason": "SUPRA_XP LL Pin Modify SOP; same device but different component (LL Pin vs TM Robot)"
+  },
+  {
+    "q_id": "A-sop072",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 1,
+    "reason": "SUPRA_XP TM CTC SOP; same device and same TM module — may contain relevant TM context/prep steps, but not Robot replacement specifically"
+  },
+  {
+    "q_id": "A-sop072",
+    "doc_id": "global_sop_supra_xp_all_tm_robot",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP TM Robot SOP — directly covers TM Robot replacement procedure for ZEDIUS XP"
+  },
+  {
+    "q_id": "A-sop072",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+    "relevance": 0,
+    "reason": "SUPRA_XP TM Slot V/V Housing O-Ring SOP; same device and TM section but different component (O-Ring vs Robot)"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "40081285",
+    "relevance": 1,
+    "reason": "MyService record for SUPRA Vplus TM Robot replacement; same component (TM Robot) but different device"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "40097172",
+    "relevance": 1,
+    "reason": "MyService record for SUPRA Vplus TM Robot Communication Alarm with robot replacement steps; same component, different device"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_efem_ionizer",
+    "relevance": 0,
+    "reason": "SUPRA_XP EFEM Ionizer SOP; different component (Ionizer vs TM Robot)"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_ll_cip",
+    "relevance": 0,
+    "reason": "SUPRA_XP LL CIP SOP; different component (Load Lock CIP vs TM Robot)"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_ll_pin_modify_eng",
+    "relevance": 0,
+    "reason": "SUPRA_XP LL Pin Modify SOP; different component (LL Pin vs TM Robot)"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 1,
+    "reason": "SUPRA_XP TM CTC SOP; same device and TM module — may contain useful TM context, but not Robot replacement specifically"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_XP TM Device Net Board SOP; same device/TM section but different component (Device Net Board vs Robot)"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_robot",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP TM Robot SOP — directly covers TM Robot replacement procedure"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+    "relevance": 0,
+    "reason": "SUPRA_XP TM Slot V/V Housing O-Ring SOP; same device/TM section but different component"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_integer_plus_all_am_slot_valve",
+    "relevance": 1,
+    "reason": "INTEGER_PLUS AM Slot Valve SOP covering replacement and cleaning; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_integer_plus_all_ll_slot_valve",
+    "relevance": 1,
+    "reason": "INTEGER plus LL Slot Valve SOP covering replacement and cleaning; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_precia_all_pm_slot_valve",
+    "relevance": 1,
+    "reason": "PRECIA PM Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_precia_all_tm_slot_valve",
+    "relevance": 1,
+    "reason": "PRECIA TM Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_supra_xp_all_pm_preventive_maintenance",
+    "relevance": 1,
+    "reason": "SUPRA_XP PM Preventive Maintenance SOP; same device, may contain prep steps related to Slot Valve O-ring work"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3100qc",
+    "relevance": 0,
+    "reason": "SUPRA_XP PRISM SOURCE 3100QC SOP; same device but completely different component (Prism Source vs Slot V/V Housing O-ring)"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_valve",
+    "relevance": 1,
+    "reason": "SUPRA_XP TM Slot Valve SOP; same device and component type (Slot Valve) but chapter covers TM side, query may focus on housing O-ring specifically — closely related"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP TM Slot V/V Housing O-Ring SOP — directly covers O-Ring replacement and cleaning procedure for ZEDIUS XP"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_geneva_xp_rep_pm_load_lock_o_ring",
+    "relevance": 1,
+    "reason": "GENEVA_XP Load Lock O-Ring SOP; same O-Ring replacement context but different device and different location (Load Lock vs Slot V/V Housing)"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_integer_plus_all_am_slot_valve",
+    "relevance": 1,
+    "reason": "INTEGER_PLUS AM Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_integer_plus_all_ll_slot_valve",
+    "relevance": 1,
+    "reason": "INTEGER plus LL Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_slot_valve",
+    "relevance": 1,
+    "reason": "INTEGER plus PM Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_precia_all_pm_slot_valve",
+    "relevance": 1,
+    "reason": "PRECIA PM Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_precia_all_tm_slot_valve",
+    "relevance": 1,
+    "reason": "PRECIA TM Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_preventive_maintenance",
+    "relevance": 1,
+    "reason": "SUPRA_XP PM Preventive Maintenance SOP; same device, may contain prep steps related to Slot Valve O-ring work"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_valve",
+    "relevance": 1,
+    "reason": "SUPRA_XP TM Slot Valve SOP; same device and closely related component (TM Slot Valve vs Slot V/V Housing O-ring)"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP TM Slot V/V Housing O-Ring SOP — directly covers O-Ring replacement and cleaning procedure"
+  },
+  {
+    "q_id": "A-sop076",
+    "doc_id": "40069928",
+    "relevance": 1,
+    "reason": "MyService record for SUPRA IV EFEM SW Upgrade; same component type (EFEM SW) but different device"
+  },
+  {
+    "q_id": "A-sop076",
+    "doc_id": "global_sop_supra_xp_all_efem_controller",
+    "relevance": 1,
+    "reason": "SUPRA_XP EFEM Controller SOP; same device and EFEM subsystem — closely related to SW Install but covers controller hardware, not SW install specifically"
+  },
+  {
+    "q_id": "A-sop076",
+    "doc_id": "global_sop_supra_xp_all_efem_ffu",
+    "relevance": 1,
+    "reason": "Same device (ZEDIUS XP/SUPRA_XP), same EFEM module but different component (FFU replacement vs SW installation). Partially relevant."
+  },
+  {
+    "q_id": "A-sop076",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP/ZEDIUS XP) but different component (TM CTC vs EFEM SW installation). Partially relevant as same device."
+  },
+  {
+    "q_id": "A-sop076",
+    "doc_id": "global_sop_supra_xp_all_tm_robot",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP) but different component (TM Robot vs EFEM SW installation). Partially relevant as same device."
+  },
+  {
+    "q_id": "A-sop076",
+    "doc_id": "global_sop_supra_xp_sw_all_sw_installation_setting",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP/ZEDIUS XP SW INSTALLATION & SETTING SOP directly covers the EFEM SW Install task."
+  },
+  {
+    "q_id": "A-sop076",
+    "doc_id": "supra_xp_all_trouble_shooting_guide_trace_ctc_abnormal",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP) but different purpose: troubleshooting CTC abnormal vs SW installation procedure."
+  },
+  {
+    "q_id": "A-sop076_masked",
+    "doc_id": "40069928",
+    "relevance": 1,
+    "reason": "EFEM SW Upgrade record on SUPRA IV - same component type (EFEM SW) but different device. Partially relevant."
+  },
+  {
+    "q_id": "A-sop076_masked",
+    "doc_id": "global_sop_integer_plus_all_efem_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (INTEGER_PLUS) and different component (EFEM Device Net Board vs EFEM SW installation). Not relevant."
+  },
+  {
+    "q_id": "A-sop076_masked",
+    "doc_id": "global_sop_precia_all_efem_ctc",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (EFEM CTC vs SW installation). Not relevant."
+  },
+  {
+    "q_id": "A-sop076_masked",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (EFEM Device Net Board vs SW installation). Not relevant."
+  },
+  {
+    "q_id": "A-sop076_masked",
+    "doc_id": "global_sop_supra_n_series_all_efem_ffu",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and different component (EFEM FFU vs SW installation). Not relevant."
+  },
+  {
+    "q_id": "A-sop076_masked",
+    "doc_id": "global_sop_supra_n_series_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA N series) and different component (TM CTC vs EFEM SW installation). Not relevant."
+  },
+  {
+    "q_id": "A-sop076_masked",
+    "doc_id": "global_sop_supra_n_series_sw_all_sw_installation_setting",
+    "relevance": 1,
+    "reason": "Same component type (SW Installation & Setting SOP) but different device (SUPRA_N vs SUPRA_XP). Partially relevant."
+  },
+  {
+    "q_id": "A-sop076_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP) but different component (TM CTC vs EFEM SW installation). Partially relevant as same device."
+  },
+  {
+    "q_id": "A-sop076_masked",
+    "doc_id": "global_sop_supra_xp_sw_all_sw_installation_setting",
+    "relevance": 2,
+    "reason": "Same device (SUPRA_XP) and exact topic match (SW INSTALLATION & SETTING). Highly relevant."
+  },
+  {
+    "q_id": "A-sop077",
+    "doc_id": "global_sop_supra_n_series_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA N series) and different component (TM CTC vs EFEM Device Net Setting). Not relevant."
+  },
+  {
+    "q_id": "A-sop077",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP/ZEDIUS XP), same Device Net Board component but PM module vs EFEM module. Partially relevant."
+  },
+  {
+    "q_id": "A-sop077",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP) but different component (TM CTC vs EFEM Device Net Setting). Partially relevant as same device."
+  },
+  {
+    "q_id": "A-sop077",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP), same Device Net Board component but TM module vs EFEM. Partially relevant."
+  },
+  {
+    "q_id": "A-sop077",
+    "doc_id": "global_sop_supra_xp_sw_all_sw_installation_setting",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP) but different topic (SW Installation vs EFEM Device Net Setting). Partially relevant - may contain device net setting steps."
+  },
+  {
+    "q_id": "A-sop077",
+    "doc_id": "supra_xp_all_trouble_shooting_guide_trace_device_net_abnormal",
+    "relevance": 2,
+    "reason": "Same device (SUPRA_XP) and same component (Device Net). Troubleshooting guide directly addresses Device Net issues relevant to setting work."
+  },
+  {
+    "q_id": "A-sop077_masked",
+    "doc_id": "global_sop_integer_plus_all_efem_device_net_board",
+    "relevance": 1,
+    "reason": "Same component type (EFEM Device Net Board SOP) but different device (INTEGER_PLUS vs SUPRA_XP). Partially relevant."
+  },
+  {
+    "q_id": "A-sop077_masked",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "relevance": 1,
+    "reason": "Same component type (EFEM Device Net Board SOP) but different device (PRECIA vs SUPRA_XP). Partially relevant."
+  },
+  {
+    "q_id": "A-sop077_masked",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different module (PM Device Net Board vs EFEM Device Net Setting). Not relevant."
+  },
+  {
+    "q_id": "A-sop077_masked",
+    "doc_id": "global_sop_precia_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different module (TM Device Net Board vs EFEM Device Net Setting). Not relevant."
+  },
+  {
+    "q_id": "A-sop077_masked",
+    "doc_id": "global_sop_supra_n_series_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA N series) and different component (TM CTC vs EFEM Device Net Setting). Not relevant."
+  },
+  {
+    "q_id": "A-sop077_masked",
+    "doc_id": "global_sop_supra_n_series_sw_all_sw_installation_setting",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and different topic (SW Installation vs EFEM Device Net Setting). Not relevant."
+  },
+  {
+    "q_id": "A-sop077_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP) and same Device Net Board component but PM module vs EFEM module. Partially relevant."
+  },
+  {
+    "q_id": "A-sop077_masked",
+    "doc_id": "global_sop_supra_xp_sw_all_sw_installation_setting",
+    "relevance": 1,
+    "reason": "Same device (SUPRA_XP) but different topic (SW Installation vs Device Net Setting). May contain device net setting steps."
+  },
+  {
+    "q_id": "A-sop077_masked",
+    "doc_id": "supra_n_all_trouble_shooting_guide_trace_device_net_abnormal",
+    "relevance": 1,
+    "reason": "Same component type (Device Net troubleshooting) but different device (SUPRA_N vs SUPRA_XP). Partially relevant."
+  },
+  {
+    "q_id": "A-sop077_masked",
+    "doc_id": "supra_xp_all_trouble_shooting_guide_trace_device_net_abnormal",
+    "relevance": 2,
+    "reason": "Same device (SUPRA_XP) and same component (Device Net). TS guide directly addresses Device Net issues relevant to setting work."
+  },
+  {
+    "q_id": "A-xdev002",
+    "doc_id": "global_sop_geneva_xp_rep_efem_ffu",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) but different component (EFEM FFU vs Loadlock APC Valve replacement). Partially relevant as same device."
+  },
+  {
+    "q_id": "A-xdev002",
+    "doc_id": "global_sop_geneva_xp_rep_pm_apc",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same component type (APC Valve) but different location (PM chamber APC vs Loadlock APC). Closely related but not exact."
+  },
+  {
+    "q_id": "A-xdev002",
+    "doc_id": "global_sop_geneva_xp_rep_pm_chamber_apc_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same component type (APC Valve) but different location (Chamber vs Loadlock). Partially relevant."
+  },
+  {
+    "q_id": "A-xdev002",
+    "doc_id": "global_sop_geneva_xp_rep_pm_loadlock_apc_valve",
+    "relevance": 2,
+    "reason": "Exact match: GENEVA XP Loadlock APC Valve 교체 SOP. Directly answers the query."
+  },
+  {
+    "q_id": "A-xdev002",
+    "doc_id": "global_sop_geneva_xp_rep_pm_mfc",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) but different component (MFC vs Loadlock APC Valve). Partially relevant as same device."
+  },
+  {
+    "q_id": "A-xdev002",
+    "doc_id": "global_sop_supra_xp_all_pm_heater_chuck",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP vs GENEVA_XP) and completely different component (Heater Chuck vs Loadlock APC Valve). Not relevant."
+  },
+  {
+    "q_id": "A-xdev002",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP vs GENEVA_XP) and different component (TM CTC vs Loadlock APC Valve). Not relevant."
+  },
+  {
+    "q_id": "A-xdev002",
+    "doc_id": "set_up_manual_geneva_stp300_xp_r6",
+    "relevance": 1,
+    "reason": "Same device family (GENEVA STP300 XP variant), setup manual. Partially relevant per setup manual rule for same device type."
+  },
+  {
+    "q_id": "A-xdev002_masked",
+    "doc_id": "global_sop_geneva_xp_rep_pm_apc",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP), APC Valve SOP but covers PM chamber APC, not specifically Loadlock APC. Partially relevant."
+  },
+  {
+    "q_id": "A-xdev002_masked",
+    "doc_id": "global_sop_geneva_xp_rep_pm_chamber_apc_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP), APC Valve replacement but Chamber location vs Loadlock. Partially relevant."
+  },
+  {
+    "q_id": "A-xdev002_masked",
+    "doc_id": "global_sop_geneva_xp_rep_pm_loadlock_apc_valve",
+    "relevance": 2,
+    "reason": "Exact match: GENEVA XP Loadlock APC Valve 교체 SOP. Directly answers the query."
+  },
+  {
+    "q_id": "A-xdev002_masked",
+    "doc_id": "global_sop_supra_n_series_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA N series vs GENEVA_XP) and different component (TM CTC vs Loadlock APC Valve). Not relevant."
+  },
+  {
+    "q_id": "A-xdev002_masked",
+    "doc_id": "global_sop_supra_n_series_all_tm_robot",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N vs GENEVA_XP) and different component (TM Robot vs Loadlock APC Valve). Not relevant."
+  },
+  {
+    "q_id": "A-xdev002_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP vs GENEVA_XP) and different component (PM Device Net Board vs Loadlock APC Valve). Not relevant."
+  },
+  {
+    "q_id": "A-xdev002_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP vs GENEVA_XP) and different component (TM CTC vs Loadlock APC Valve). Not relevant."
+  },
+  {
+    "q_id": "A-xdev002_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP vs GENEVA_XP) and different component (TM Device Net Board vs Loadlock APC Valve). Not relevant."
+  },
+  {
+    "q_id": "A-xdev002_masked",
+    "doc_id": "set_up_manual_ecolite_3000",
+    "relevance": 0,
+    "reason": "Different device (ECOLITE_3000 vs GENEVA_XP) and setup manual unrelated to APC Valve. Not relevant."
+  },
+  {
+    "q_id": "A-xdev002_masked",
+    "doc_id": "set_up_manual_geneva_stp300_xp_r6",
+    "relevance": 1,
+    "reason": "Same device family (GENEVA STP300 XP variant), setup manual. Partially relevant per setup manual rule for same device type."
+  },
+  {
+    "q_id": "A-xdev002_masked",
+    "doc_id": "set_up_manual_supra_nm",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_NM vs GENEVA_XP) setup manual. Not relevant."
+  },
+  {
+    "q_id": "A-xdev002_masked",
+    "doc_id": "supra_n_all_trouble_shooting_guide_trace_apc_abnormal",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N vs GENEVA_XP). APC troubleshooting on a completely different device family. Not relevant."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_delivery_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same subsystem (Bubbler Cabinet), but covers Delivery Valve not Drain Valve. Neighboring valve SOP may contain contextual setup steps."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_drain_valve",
+    "relevance": 2,
+    "reason": "Exact match: GENEVA XP Bubbler Cabinet Drain Valve replacement SOP directly answers the query."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_feed_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same subsystem (Bubbler Cabinet), but covers Feed Valve not Drain Valve. Partial context."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_relief_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same subsystem (Bubbler Cabinet), but covers Relief Valve not Drain Valve. Partial context."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_geneva_xp_rep_efem_ffu",
+    "relevance": 0,
+    "reason": "Same device (GENEVA_XP) but completely different component (EFEM FFU vs Bubbler Cabinet Drain Valve). No relevant information."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_geneva_xp_rep_pm_mfc",
+    "relevance": 0,
+    "reason": "Same device (GENEVA_XP) but completely different component (MFC vs Bubbler Cabinet Drain Valve). No relevant information."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_supra_xp_all_pm_heater_chuck",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and completely different component (Heater Chuck). Not relevant."
+  },
+  {
+    "q_id": "A-xdev004",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and completely different component (TM CTC). Not relevant."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_geneva_rep_bubbler_cabinet_vent_valve",
+    "relevance": 1,
+    "reason": "Related device (GENEVA, predecessor/sibling to GENEVA_XP) and same subsystem (Bubbler Cabinet), but covers Vent Valve not Drain Valve. Partial relevance."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_delivery_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same Bubbler Cabinet subsystem, but covers Delivery Valve not Drain Valve. Partial context for masked query."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_drain_valve",
+    "relevance": 2,
+    "reason": "Exact match: GENEVA XP Bubbler Cabinet Drain Valve SOP directly answers the query even when device is masked."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_feed_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same Bubbler Cabinet subsystem, but covers Feed Valve not Drain Valve. Partial context."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_geneva_xp_rep_bubbler_cabinet_relief_valve",
+    "relevance": 1,
+    "reason": "Same device (GENEVA_XP) and same Bubbler Cabinet subsystem, but covers Relief Valve not Drain Valve. Partial context."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_supra_n_series_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device family (SUPRA N series) and completely different component (TM CTC). Not relevant."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_supra_n_series_all_tm_robot",
+    "relevance": 0,
+    "reason": "Different device family (SUPRA_N) and completely different component (TM Robot). Not relevant."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and completely different component (Device Net Board). Not relevant."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and completely different component (TM CTC). Not relevant."
+  },
+  {
+    "q_id": "A-xdev004_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and completely different component (TM Device Net Board). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40034602",
+    "relevance": 0,
+    "reason": "Different device (SUPRA V, not Vplus) and about Signal Tower replacement, not Controller initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40043342",
+    "relevance": 0,
+    "reason": "Different device (SUPRA V) and about TM Robot Servo/EMO issues, not Controller replacement/initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40044732",
+    "relevance": 1,
+    "reason": "Different device (SUPRA V) but covers Pin Motor Controller replacement and parameter initialization (Parameter Back Up, Parameter 변경), which is partially relevant to controller initialization procedure."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40046555",
+    "relevance": 0,
+    "reason": "Different device (SUPRA V) and about FFU/MCB replacement, not Controller initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40054699",
+    "relevance": 1,
+    "reason": "Same device (SUPRA Vplus) and covers TM Robot Controller replacement and post-replacement troubleshooting, partially relevant to Controller replacement/initialization context."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40075928",
+    "relevance": 0,
+    "reason": "Different device (TIGMA Vplus) and about FFU/MCB trips, not Controller initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40076066",
+    "relevance": 1,
+    "reason": "Same device (SUPRA Vplus) and covers PMC (PM Controller) replacement with ignition test, partially relevant to controller replacement/initialization procedure."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "40097172",
+    "relevance": 0,
+    "reason": "Same device (SUPRA Vplus) but about TM Robot communication alarm and full robot replacement, not controller initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "global_sop_supra_n_series_all_efem_controller",
+    "relevance": 1,
+    "reason": "Different device (SUPRA_N) but same component type (EFEM Controller). Controller replacement/initialization procedures may share common steps across N and Vplus series."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "global_sop_supra_n_series_all_efem_ffu",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and different component (EFEM FFU, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "global_sop_supra_n_series_all_sub_unit_temp_controller",
+    "relevance": 1,
+    "reason": "Different device (SUPRA N series) but covers Sub Unit Temp Controller replacement/initialization, which shares controller initialization concepts."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "global_sop_supra_v_modify_all_air_tube",
+    "relevance": 0,
+    "reason": "Related device (SUPRA V) but completely different component (Air Tube modification). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "global_sop_supra_vplus_all_pm_controller",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA Vplus PM Controller SOP directly covers controller replacement and initialization procedures for the queried device."
+  },
+  {
+    "q_id": "A-xdev016",
+    "doc_id": "set_up_manual_supra_vm",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_VM) and setup manual covering initial installation, not controller post-replacement initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "40054699",
+    "relevance": 1,
+    "reason": "Same device (SUPRA Vplus) and covers TM Robot Controller replacement with post-replacement troubleshooting. Partial relevance for masked device query."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_genevaxp_rep_efem_robot_controller",
+    "relevance": 1,
+    "reason": "Different device (GENEVA_XP) but same component type (Robot Controller replacement SOP). Controller replacement procedure may share common initialization steps."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (Device Net Board, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (PM Device Net Board, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_precia_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and different component (TM Device Net Board, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_supra_n_series_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and different component (PM Device Net Board, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (PM Device Net Board, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (TM CTC). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (TM Device Net Board, not Controller). Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "set_up_manual_geneva_stp300_xp_r6",
+    "relevance": 0,
+    "reason": "Different device (GENEVA_STP300_XP) and setup manual for initial installation, not controller initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "set_up_manual_supra_xq",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XQ) and setup manual for initial installation, not controller post-replacement initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "set_up_manual_zedius_xp_supra_xp",
+    "relevance": 0,
+    "reason": "Different device (ZEDIUS_XP) and setup manual for initial installation, not controller initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "supra_n_all_trouble_shooting_guide_trace_device_net_abnormal",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and covers Device Net communication troubleshooting, not Controller replacement/initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev016_masked",
+    "doc_id": "supra_xp_all_trouble_shooting_guide_trace_device_net_abnormal",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and covers Device Net communication troubleshooting, not Controller replacement/initialization. Not relevant."
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "40046755",
+    "relevance": 0,
+    "reason": "Different device (SUPRA Nm) and about high-temperature process setup with Baffle/Focus Adaptor/Applicator Tube, not OMNIS Arcing component replacement. Not relevant."
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_integer_plus_all_ll_mfc",
+    "relevance": 0,
+    "reason": "Different device (INTEGER plus) and different component (LL MFC). No connection to OMNIS Arcing. Not relevant."
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_integer_plus_all_ll_sensor_board",
+    "relevance": 0,
+    "reason": "Different device (INTEGER plus) and different component (LL Sensor Board). No connection to OMNIS Arcing. Not relevant."
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_omnis_plus_all_pm_apc_product_report",
+    "relevance": 1,
+    "reason": "Related device (OMNIS_PLUS, close variant of OMNIS) and PM APC test SOP for the chamber. APC (Adaptive Pressure Control) testing in PM context may share setup/teardown steps relevant to arcing component replacement, but does not directly cover Arcing."
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_omnis_sw_all_process_check_eng",
+    "relevance": 1,
+    "reason": "Same device (OMNIS), SOP for process check/PM procedure, but not specifically about Arcing fault or arcing-related part replacement"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_n_series_all_efem_ffu",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and completely different component (EFEM FFU), not related to OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_n_series_all_pm_gas_spring",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and unrelated component (Gas Spring), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_n_series_all_pm_process_kit",
+    "relevance": 0,
+    "reason": "Different device (SUPRA N Series) and different component (Process Kit/Chamber PM), not related to OMNIS Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_n_series_all_sub_unit_temp_controller",
+    "relevance": 0,
+    "reason": "Different device (SUPRA N series) and unrelated component (Temp Controller), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_n_series_all_tm_robot",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and unrelated component (TM Robot), not about OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_xp_all_pm_cip_chamber",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP/ZEDIUS XP) and different component (CIP Source), not about OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_xp_all_pm_heater_chuck",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (Heater Chuck), not about OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_xp_all_pm_preventive_maintenance",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and general PM procedures (PRISM source, Pendulum/Slot Valve), not about OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3000qc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (PRISM Source 3000QC), not about OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3100qc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (PRISM Source 3100QC), not about OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "set_up_manual_ecolite_ii_400",
+    "relevance": 0,
+    "reason": "Different device (ECOLITE_II_400) setup manual, not related to OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "set_up_manual_geneva_stp300_xp_r6",
+    "relevance": 0,
+    "reason": "Different device (GENEVA_STP300_XP) setup manual, not related to OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "set_up_manual_omnis",
+    "relevance": 1,
+    "reason": "Same device (OMNIS) setup manual; covers installation procedures but not Arcing fault or specific part replacement for arcing"
+  },
+  {
+    "q_id": "A-xdev021",
+    "doc_id": "set_up_manual_supra_np",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_NP) setup manual, not related to OMNIS Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "40046755",
+    "relevance": 0,
+    "reason": "Different device (SUPRA Nm), content about high-temp process conversion and PM parts, not about Chamber Arcing part replacement"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_precia_all_efem_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and unrelated component (EFEM Device Net Board), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and unrelated component (PM Device Net Board), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_precia_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (PRECIA) and unrelated component (TM Device Net Board), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_supra_n_series_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_N) and unrelated component (PM Device Net Board), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_cip_chamber",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (CIP Source), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and unrelated component (PM Device Net Board), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_preventive_maintenance",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and general PM procedures, not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3000qc",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and different component (PRISM Source 3000QC), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "Different device (SUPRA_XP) and unrelated component (TM Device Net Board), not about Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "set_up_manual_geneva_stp300_xp_r6",
+    "relevance": 0,
+    "reason": "Different device (GENEVA_STP300_XP) setup manual, not related to Chamber Arcing"
+  },
+  {
+    "q_id": "A-xdev021_masked",
+    "doc_id": "set_up_manual_zedius_xp_supra_xp",
+    "relevance": 0,
+    "reason": "Different device (ZEDIUS_XP) setup manual, not related to Chamber Arcing"
+  }
+]

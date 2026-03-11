@@ -1,0 +1,110 @@
+q_id,question,allowed_devices,parsed_hard_devices_norm,parsed_hard_devices,mismatch_flag
+A-q001,ECOLITE3000 설비에서 PM Chamber 내부 View Port 쪽에 Local Plasma 및 Arcing이 발생하는 원인은 무엇인가?,ECOLITE_3000,ECOLITE3000,ECOLITE3000,False
+A-q003,SEC SRD 라인의 EPA404 LL 관련해서 점검 이력을 정리해줄 수 있을까?,,,,False
+A-q008,SUPRA III 설비에서 APC Pressure Hunting 발생 시 점검해야 할 포인트는 무엇인가?,SUPRA,SUPRA_III,SUPRA III,True
+A-q010,SUPRA Np에서 발생한 Issue 내용들을 GCB 기반으로 정리해줄 수 있을까?,SUPRA_NP,SUPRA_N,SUPRA N,True
+A-q011,SUPRA V에서 SUPRA Np로 개조된 설비의 설비 호기명은 무엇인가?,SUPRA_NP,SUPRA_N,SUPRA N,True
+A-gs102,SUPRA Vplus Chuck 온도 센서 편차가 기준을 초과할 때 어떻게 조치하나?,SUPRA_VPLUS,SUPRA_V,SUPRA V,True
+A-gs108,Baratron Gauge Zero Calibration 후에도 Base Pressure 이상 시 어떻게 하나?,SUPRA_N,,,False
+A-gs112,"PM 주기 도래 시 Baffle, Focus Adaptor 교체 및 Cleaning 절차는?",INTEGER_PLUS,,,False
+A-gs113,Chamber 내 Arcing 발생으로 Showerhead 교체가 필요한 경우 조치는?,OMNIS,,,False
+A-gs114,ESC Software Home NG 발생 시 순차적 점검 절차는?,SUPRA_N,,,False
+A-gs115,PM Chuck Heater Temperature Drift 현상의 원인과 점검 포인트는?,SUPRA_VM,,,False
+A-gs116,TM Robot Axis Update Error로 Servo Off 되었고 LL 내부에 Wafer가 있을 때 조치는?,SUPRA_XP,,,False
+A-sop009,ZEDIUS XP 설비의 SR8241 EFEM Robot & Controller 교체 작업 및 조정,SUPRA_XP,SUPRA_XP,ZEDIUS XP,False
+A-sop053,ZEDIUS XP 설비의 PRISM SOURCE O-ring교체 관련 작업,SUPRA_XP,SUPRA_XP,ZEDIUS XP,False
+A-q001_masked,[DEVICE] PM Chamber 내부 View Port 쪽에 Local Plasma 및 Arcing이 발생하는 원인은 무엇인가?,ECOLITE_3000,,,False
+A-q008_masked,[DEVICE] APC Pressure Hunting 발생 시 점검해야 할 포인트는 무엇인가?,SUPRA,,,False
+A-q010_masked,[DEVICE]에서 발생한 Issue 내용들을 GCB 기반으로 정리해줄 수 있을까?,SUPRA_NP,,,False
+A-q011_masked,[DEVICE]에서 [DEVICE]로 개조된 설비의 설비 호기명은 무엇인가?,SUPRA_NP,,,False
+A-q014_masked,[DEVICE] APC Sensor의 Part Number는 무엇인가?,SUPRA_VPLUS,,,False
+A-q015_masked,"[DEVICE] PM PIN Motor 교체 시 Pin 높이는 몇으로 설정해야 하며, S/W는 몇 번을 OFF 해야 하는가?",INTEGER_PLUS,,,False
+A-gs102_masked,[DEVICE] Chuck 온도 센서 편차가 기준을 초과할 때 어떻게 조치하나?,SUPRA_VPLUS,,,False
+A-sop017_masked,[DEVICE] Load Lock PIN REPLACEMENT 관련 작업,SUPRA_XP,,,False
+A-sop024_masked,[DEVICE] Dual EPD 교체 작업,SUPRA_XP,,,False
+A-sop055_masked,[DEVICE] PROCESS KIT 교체 및 세정 작업,SUPRA_XP,,,False
+A-amb002,PM Controller 교체 후 초기 설정 절차는?,INTEGER_PLUS|PRECIA|SUPRA_N|SUPRA_VPLUS|SUPRA_XP,,,False
+A-amb003,MFC 교체 및 가스 라인 퍼지 절차는?,GENEVA_XP|INTEGER_PLUS|PRECIA|SUPRA_XP,,,False
+A-amb004,Device Net Board 교체 방법과 점검 사항은?,INTEGER_PLUS|PRECIA|SUPRA_N|SUPRA_XP,,,False
+A-amb008,Slot Valve 교체 시 Leak Check 절차는?,INTEGER_PLUS|PRECIA|SUPRA_XP,,,False
+A-amb010,Sensor Board 교체 후 통신 확인 절차는?,INTEGER_PLUS|PRECIA|SUPRA_N,,,False
+A-amb012,Baratron Gauge 교체 후 Zero Calibration 방법은?,INTEGER_PLUS|SUPRA_N|SUPRA_XP,,,False
+A-amb013,Chamber O-Ring 교체 시 규격 확인 및 교체 절차는?,GENEVA_XP|SUPRA_N|SUPRA_XP,,,False
+A-amb015,Endpoint Detection 이상 시 점검 포인트는?,PRECIA|SUPRA_N|SUPRA_XP,,,False
+A-xdev005,GENEVA XP Support Pin 교체 시 높이 설정은?,GENEVA_XP,GENEVA_XP,GENEVA XP,False
+A-xdev008,INTEGER Plus Chamber Cleaning 주기 및 절차는?,INTEGER_PLUS,INTEGER_PLUS,INTEGER plus,False
+A-xdev009,INTEGER Plus FFU 교체 절차와 차압 확인 방법은?,INTEGER_PLUS,INTEGER_PLUS,INTEGER plus,False
+A-xdev011,PRECIA Showerhead 교체 시 Water Drain 절차는?,PRECIA,PRECIA,PRECIA,False
+A-xdev012,PRECIA Gas Spring 교체 기준 및 작업 절차는?,PRECIA,PRECIA,PRECIA,False
+A-xdev017,SUPRA Vplus BCR Reader 교체 방법은?,SUPRA_VPLUS,SUPRA_V,SUPRA V,True
+A-xdev018,SUPRA Vplus APC Sensor Part Number 확인 방법은?,SUPRA_VPLUS,SUPRA_V,SUPRA V,True
+A-xdev020,SUPRA N APC Position 이상 시 TS 가이드 기반 점검 포인트는?,SUPRA_N,SUPRA_N,SUPRA N,False
+A-xdev025,SUPRA N RF Generator Power Calibration 방법은?,SUPRA_N,SUPRA_N,SUPRA N,False
+A-xdev027,GENEVA XP Temp Controller 교체 절차는?,GENEVA_XP,GENEVA_XP,GENEVA XP,False
+A-xdev029,GENEVA XP Formic Bottle 교체 시 주의사항은?,GENEVA_XP,GENEVA_XP,GENEVA XP,False
+A-xdev030,GENEVA XP Pressure Switch 교체 및 테스트 절차는?,GENEVA_XP,GENEVA_XP,GENEVA XP,False
+A-xdev033,INTEGER Plus Slot Valve Seal 교체 방법은?,INTEGER_PLUS,INTEGER_PLUS,INTEGER plus,False
+A-xdev035,PRECIA 설비의 MFC Zero Calibration 방법은?,PRECIA,PRECIA,PRECIA,False
+A-xdev036,PRECIA Robot Arm Pick/Place 실패 시 점검 사항은?,PRECIA,PRECIA,PRECIA,False
+A-xdev023_masked,[DEVICE] ESC Voltage 설정 및 확인 절차는?,SUPRA_N,,,False
+A-xdev025_masked,[DEVICE] RF Generator Power Calibration 방법은?,SUPRA_N,,,False
+A-xdev026_masked,[DEVICE] Turbo Pump 진동 이상 시 점검 방법은?,SUPRA_N,,,False
+A-xdev027_masked,[DEVICE] Temp Controller 교체 절차는?,GENEVA_XP,,,False
+A-xdev029_masked,[DEVICE] Formic Bottle 교체 시 주의사항은?,GENEVA_XP,,,False
+A-xdev030_masked,[DEVICE] Pressure Switch 교체 및 테스트 절차는?,GENEVA_XP,,,False
+A-xdev035_masked,[DEVICE] MFC Zero Calibration 방법은?,PRECIA,,,False
+A-amb018,ESC Chuck Voltage 교정 절차는?,SUPRA_N|SUPRA_XP|SUPRA_VPLUS|INTEGER_PLUS,,,False
+A-amb022,Gas Box Manual Valve 동작 확인 방법은?,SUPRA_N|PRECIA|INTEGER_PLUS|SUPRA_XP,,,False
+A-amb025,Exhaust Pressure Gauge 교체 및 Calibration 방법은?,INTEGER_PLUS|PRECIA|SUPRA_N,,,False
+A-amb026,Wafer Transfer 실패 시 점검 포인트는?,SUPRA_N|SUPRA_XP|INTEGER_PLUS|PRECIA,,,False
+A-amb028,Vacuum Gauge 교체 후 Zero Adjust 방법은?,SUPRA_N|SUPRA_XP|INTEGER_PLUS|GENEVA_XP,,,False
+A-amb036,Endpoint 미검출 시 Recipe 파라미터 확인 방법은?,SUPRA_N|SUPRA_XP|PRECIA,,,False
+A-amb038,Particle Count 증가 시 Chamber 상태 점검 방법은?,SUPRA_N|SUPRA_XP|SUPRA_VPLUS|PRECIA,,,False
+A-amb039,Selectivity 변화 시 Process 조건 재설정 방법은?,SUPRA_N|SUPRA_XP|PRECIA,,,False
+A-amb044,O-Ring 규격 확인 및 호환 부품 검색 방법은?,SUPRA_N|SUPRA_XP|GENEVA_XP,,,False
+A-amb045,Screw Torque Spec 확인 방법은?,SUPRA_N|SUPRA_XP|INTEGER_PLUS,,,False
+A-amb047,Recipe Download Fail 시 점검 사항은?,SUPRA_N|SUPRA_XP|PRECIA,,,False
+A-amb048,Software Update 후 설비 정상 동작 확인 절차는?,SUPRA_N|SUPRA_XP|SUPRA_VPLUS|INTEGER_PLUS,,,False
+A-amb055,동일 모듈에서 반복 교체된 부품 이력은?,SUPRA_N|SUPRA_XP|PRECIA|INTEGER_PLUS,,,False
+A-amb058,Power Supply Fan Alarm 발생 시 교체 기준은?,SUPRA_N|SUPRA_XP|INTEGER_PLUS|PRECIA,,,False
+A-amb059,Chuck Surface Damage 확인 및 교체 판단 기준은?,SUPRA_N|SUPRA_VPLUS|SUPRA_XP|PRECIA,,,False
+A-amb062,Pin Hole 발생 시 원인 분석 방법은?,SUPRA_N|SUPRA_XP|PRECIA,,,False
+A-amb063,Mass Flow Controller Zero Shift 발생 시 조치는?,SUPRA_N|SUPRA_XP|PRECIA|GENEVA_XP,,,False
+A-amb068,EFEM Robot Teaching 재설정 방법은?,SUPRA_N|SUPRA_XP|SUPRA_VPLUS|INTEGER_PLUS,,,False
+A-amb069,UPS 전환 시 설비 동작 영향 및 점검 사항은?,SUPRA_N|SUPRA_XP|SUPRA_VPLUS|INTEGER_PLUS|PRECIA,,,False
+A-amb072,Process Abort 후 Wafer 복구 절차는?,SUPRA_N|SUPRA_XP|PRECIA|INTEGER_PLUS,,,False
+A-amb076,Chamber Seasoning 후 공정 안정화 확인 방법은?,SUPRA_N|SUPRA_XP|PRECIA|INTEGER_PLUS,,,False
+A-amb078,Servo Motor 이상 진동 발생 시 점검 방법은?,SUPRA_N|SUPRA_XP|INTEGER_PLUS|PRECIA,,,False
+A-xdev005_masked,[DEVICE] Support Pin 교체 시 높이 설정은?,GENEVA_XP,,,False
+A-xdev006_masked,[DEVICE] PM Pin Motor 교체 시 핀 높이 설정값은?,INTEGER_PLUS,,,False
+A-xdev007_masked,[DEVICE] 설비에서 D-Net Board 통신 에러 발생 시 조치 방법은?,INTEGER_PLUS,,,False
+A-xdev008_masked,[DEVICE] Chamber Cleaning 주기 및 절차는?,INTEGER_PLUS,,,False
+A-xdev011_masked,[DEVICE] Showerhead 교체 시 Water Drain 절차는?,PRECIA,,,False
+A-xdev013_masked,[DEVICE] Solenoid Valve 누설 점검 방법은?,PRECIA,,,False
+A-xdev014_masked,[DEVICE] Endpoint Detection Fail 시 점검 사항은?,PRECIA,,,False
+A-xdev018_masked,[DEVICE] APC Sensor Part Number 확인 방법은?,SUPRA_VPLUS,,,False
+A-imp003,Endpoint 신호 약해질 때 OES Window 점검 방법은?,SUPRA_N|SUPRA_XP|PRECIA,,,False
+A-imp004,Gas 유량 편차 발생 시 MFC 점검 순서는?,SUPRA_N|SUPRA_XP|PRECIA|GENEVA_XP,,,False
+A-imp006,Servo Alarm 해제 후 Robot Teaching 재설정 방법은?,SUPRA_N|SUPRA_XP|INTEGER_PLUS,,,False
+A-imp008,LP Transfer 에러 발생 시 초기 점검 항목은?,SUPRA_N|SUPRA_XP|SUPRA_VPLUS|INTEGER_PLUS,,,False
+A-eq502,EPRS754에서 wafer 이송 중 에러가 발생할 때 점검 사항은?,TERA21,,,False
+A-eq506,UDES93 장비의 정기 PM 절차와 주기는?,ECOLITE_3000,,,False
+A-eq511,SGGVLF0300에서 lot 처리 중 주의사항은?,GENEVA_STP300_XP,,,False
+A-eq518,PSX4700 장비의 정기 PM 절차와 주기는?,SUPRA_XP,,,False
+A-eq521,DES31에서 센서 캘리브레이션 절차는?,ECOLITE_III,,,False
+A-eq522,RFL001 장비의 recipe 설정 방법은?,GENEVA_STP300,,,False
+A-eq524,SP201 장비의 스펙 한계값은 얼마인가?,ECOLITE_II_T,,,False
+A-eq526,WDBVEC05에서 wafer 이송 중 에러가 발생할 때 점검 사항은?,PRECIA,,,False
+A-eq531,LWRFL07의 chamber cleaning 절차를 알려줘,GENEVA_XP,,,False
+A-eq532,WPSK411700 장비의 파츠 교체 주기와 방법은?,OMNIS,,,False
+A-eq534,DPCHZ09 장비의 recipe 설정 방법은?,INTEGER_PLUS,,,False
+A-eq535,CSTN61에서 lot 처리 중 주의사항은?,INTEGER_XP,,,False
+A-eq543,EPRS753의 chamber cleaning 절차를 알려줘,TERA_21,,,False
+A-eq545,AEPR03에서 센서 캘리브레이션 절차는?,EVOLITE_II,,,False
+A-eq553,WPSKAD4A00 장비에서 통신 에러가 발생하는 원인은?,OMNIS_PLUS,,,False
+A-eq568,DES105 장비의 파츠 교체 주기와 방법은?,ECOLITE_II,,,False
+A-eq579,SFP701의 chamber cleaning 절차를 알려줘,SUPRA_VPLUS,,,False
+A-eq581,AASHD01에서 센서 캘리브레이션 절차는?,SUPRA_N,,,False
+A-eq583,DES202에서 lot 처리 중 주의사항은?,ECOLITE_XPL,,,False
+A-eq589,EPAS16 장비에서 통신 에러가 발생하는 원인은?,SUPRA_VM,,,False
+A-eq591,PDK30704의 chamber cleaning 절차를 알려줘,DAS2000,,,False

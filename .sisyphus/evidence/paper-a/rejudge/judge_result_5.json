@@ -1,0 +1,302 @@
+[
+  {
+    "q_id": "A-sop058",
+    "doc_id": "global_sop_supra_xp_all_pm_temp_controller",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP PM Temp Controller SOP covering both replacement and adjustment (조정) procedures"
+  },
+  {
+    "q_id": "A-sop058",
+    "doc_id": "set_up_manual_supra_np",
+    "relevance": 0,
+    "reason": "Setup manual for SUPRA_NP (different device); no relation to Temp Controller adjustment on SUPRA_XP"
+  },
+  {
+    "q_id": "A-sop058",
+    "doc_id": "supra_xp_pm_trouble_shooting_guide_trace_chuck_abnormal",
+    "relevance": 0,
+    "reason": "Troubleshooting guide for Chuck Abnormal on SUPRA_XP; different component, not related to Temp Controller"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "40043536",
+    "relevance": 1,
+    "reason": "MyService record for SUPRA Vplus (different device) covering Temp Controller replacement and parameter matching; same component type, different device"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "40050130",
+    "relevance": 1,
+    "reason": "MyService record for SUPRA N (different device) covering Temp Limit Controller LCD issue; same component type, different device"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_geneva_xp_rep_pm_temp_controller",
+    "relevance": 1,
+    "reason": "GENEVA_XP PM Temp Controller replacement SOP; same component (Temp Controller) but different device"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_wall_temp_controller",
+    "relevance": 1,
+    "reason": "INTEGER_PLUS PM Wall Temp Controller SOP; same component category (Temp Controller) but different device"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_precia_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "PRECIA PM Device Net Board SOP; completely different component and device"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_precia_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "PRECIA TM Device Net Board SOP; completely different component and device"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_supra_n_series_all_efem_ffu",
+    "relevance": 0,
+    "reason": "SUPRA_N EFEM FFU SOP; different component (FFU), not related to Temp Controller"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_supra_n_series_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_N PM Device Net Board SOP; different component, not related to Temp Controller"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_supra_n_series_all_sub_unit_temp_controller",
+    "relevance": 1,
+    "reason": "SUPRA N series Sub Unit Temp Controller SOP; same component type (Temp Controller), different device series"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_XP PM Device Net Board SOP; same device but completely different component (Device Net Board vs Temp Controller)"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_temp_controller",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP PM Temp Controller SOP covering adjustment (조정) procedure — directly answers the query"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "set_up_manual_supra_n",
+    "relevance": 0,
+    "reason": "Setup manual for SUPRA_N (different device); no relation to Temp Controller adjustment"
+  },
+  {
+    "q_id": "A-sop058_masked",
+    "doc_id": "set_up_manual_supra_np",
+    "relevance": 0,
+    "reason": "Setup manual for SUPRA_NP (different device); no relation to Temp Controller adjustment"
+  },
+  {
+    "q_id": "A-sop072",
+    "doc_id": "global_sop_supra_xp_all_efem_ionizer",
+    "relevance": 0,
+    "reason": "SUPRA_XP EFEM Ionizer SOP; same device but different component (Ionizer vs TM Robot)"
+  },
+  {
+    "q_id": "A-sop072",
+    "doc_id": "global_sop_supra_xp_all_ll_cip",
+    "relevance": 0,
+    "reason": "SUPRA_XP LL CIP SOP; same device but different component (Load Lock CIP vs TM Robot)"
+  },
+  {
+    "q_id": "A-sop072",
+    "doc_id": "global_sop_supra_xp_all_ll_pin_modify_eng",
+    "relevance": 0,
+    "reason": "SUPRA_XP LL Pin Modify SOP; same device but different component (LL Pin vs TM Robot)"
+  },
+  {
+    "q_id": "A-sop072",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 1,
+    "reason": "SUPRA_XP TM CTC SOP; same device and same TM module — may contain relevant TM context/prep steps, but not Robot replacement specifically"
+  },
+  {
+    "q_id": "A-sop072",
+    "doc_id": "global_sop_supra_xp_all_tm_robot",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP TM Robot SOP — directly covers TM Robot replacement procedure for ZEDIUS XP"
+  },
+  {
+    "q_id": "A-sop072",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+    "relevance": 0,
+    "reason": "SUPRA_XP TM Slot V/V Housing O-Ring SOP; same device and TM section but different component (O-Ring vs Robot)"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "40081285",
+    "relevance": 1,
+    "reason": "MyService record for SUPRA Vplus TM Robot replacement; same component (TM Robot) but different device"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "40097172",
+    "relevance": 1,
+    "reason": "MyService record for SUPRA Vplus TM Robot Communication Alarm with robot replacement steps; same component, different device"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_efem_ionizer",
+    "relevance": 0,
+    "reason": "SUPRA_XP EFEM Ionizer SOP; different component (Ionizer vs TM Robot)"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_ll_cip",
+    "relevance": 0,
+    "reason": "SUPRA_XP LL CIP SOP; different component (Load Lock CIP vs TM Robot)"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_ll_pin_modify_eng",
+    "relevance": 0,
+    "reason": "SUPRA_XP LL Pin Modify SOP; different component (LL Pin vs TM Robot)"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_ctc",
+    "relevance": 1,
+    "reason": "SUPRA_XP TM CTC SOP; same device and TM module — may contain useful TM context, but not Robot replacement specifically"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_device_net_board",
+    "relevance": 0,
+    "reason": "SUPRA_XP TM Device Net Board SOP; same device/TM section but different component (Device Net Board vs Robot)"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_robot",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP TM Robot SOP — directly covers TM Robot replacement procedure"
+  },
+  {
+    "q_id": "A-sop072_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+    "relevance": 0,
+    "reason": "SUPRA_XP TM Slot V/V Housing O-Ring SOP; same device/TM section but different component"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_integer_plus_all_am_slot_valve",
+    "relevance": 1,
+    "reason": "INTEGER_PLUS AM Slot Valve SOP covering replacement and cleaning; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_integer_plus_all_ll_slot_valve",
+    "relevance": 1,
+    "reason": "INTEGER plus LL Slot Valve SOP covering replacement and cleaning; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_precia_all_pm_slot_valve",
+    "relevance": 1,
+    "reason": "PRECIA PM Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_precia_all_tm_slot_valve",
+    "relevance": 1,
+    "reason": "PRECIA TM Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_supra_xp_all_pm_preventive_maintenance",
+    "relevance": 1,
+    "reason": "SUPRA_XP PM Preventive Maintenance SOP; same device, may contain prep steps related to Slot Valve O-ring work"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_supra_xp_all_pm_prism_source_3100qc",
+    "relevance": 0,
+    "reason": "SUPRA_XP PRISM SOURCE 3100QC SOP; same device but completely different component (Prism Source vs Slot V/V Housing O-ring)"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_valve",
+    "relevance": 1,
+    "reason": "SUPRA_XP TM Slot Valve SOP; same device and component type (Slot Valve) but chapter covers TM side, query may focus on housing O-ring specifically — closely related"
+  },
+  {
+    "q_id": "A-sop075",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP TM Slot V/V Housing O-Ring SOP — directly covers O-Ring replacement and cleaning procedure for ZEDIUS XP"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_geneva_xp_rep_pm_load_lock_o_ring",
+    "relevance": 1,
+    "reason": "GENEVA_XP Load Lock O-Ring SOP; same O-Ring replacement context but different device and different location (Load Lock vs Slot V/V Housing)"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_integer_plus_all_am_slot_valve",
+    "relevance": 1,
+    "reason": "INTEGER_PLUS AM Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_integer_plus_all_ll_slot_valve",
+    "relevance": 1,
+    "reason": "INTEGER plus LL Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_integer_plus_all_pm_slot_valve",
+    "relevance": 1,
+    "reason": "INTEGER plus PM Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_precia_all_pm_slot_valve",
+    "relevance": 1,
+    "reason": "PRECIA PM Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_precia_all_tm_slot_valve",
+    "relevance": 1,
+    "reason": "PRECIA TM Slot Valve SOP; same component type (Slot Valve) but different device"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_supra_xp_all_pm_preventive_maintenance",
+    "relevance": 1,
+    "reason": "SUPRA_XP PM Preventive Maintenance SOP; same device, may contain prep steps related to Slot Valve O-ring work"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_valve",
+    "relevance": 1,
+    "reason": "SUPRA_XP TM Slot Valve SOP; same device and closely related component (TM Slot Valve vs Slot V/V Housing O-ring)"
+  },
+  {
+    "q_id": "A-sop075_masked",
+    "doc_id": "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+    "relevance": 2,
+    "reason": "Exact match: SUPRA_XP TM Slot V/V Housing O-Ring SOP — directly covers O-Ring replacement and cleaning procedure"
+  },
+  {
+    "q_id": "A-sop076",
+    "doc_id": "40069928",
+    "relevance": 1,
+    "reason": "MyService record for SUPRA IV EFEM SW Upgrade; same component type (EFEM SW) but different device"
+  },
+  {
+    "q_id": "A-sop076",
+    "doc_id": "global_sop_supra_xp_all_efem_controller",
+    "relevance": 1,
+    "reason": "SUPRA_XP EFEM Controller SOP; same device and EFEM subsystem — closely related to SW Install but covers controller hardware, not SW install specifically"
+  }
+]

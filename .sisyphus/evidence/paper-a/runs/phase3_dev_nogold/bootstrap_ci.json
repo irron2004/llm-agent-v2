@@ -1,0 +1,114 @@
+{
+  "comparisons": [
+    {
+      "ci_lower": -0.13636363636363635,
+      "ci_upper": 0.0,
+      "delta_mean": -0.045454545454545456,
+      "metric": "adj_cont@5",
+      "n_queries": 22,
+      "system_a": "B3",
+      "system_b": "B4"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "hit@5",
+      "n_queries": 22,
+      "system_a": "B3",
+      "system_b": "B4"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "mrr",
+      "n_queries": 22,
+      "system_a": "B3",
+      "system_b": "B4"
+    },
+    {
+      "ci_lower": -0.8287878787878789,
+      "ci_upper": -0.5840909090909091,
+      "delta_mean": -0.7159090909090909,
+      "metric": "adj_cont@5",
+      "n_queries": 22,
+      "system_a": "B4",
+      "system_b": "B4.5"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "hit@5",
+      "n_queries": 22,
+      "system_a": "B4",
+      "system_b": "B4.5"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "mrr",
+      "n_queries": 22,
+      "system_a": "B4",
+      "system_b": "B4.5"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "adj_cont@5",
+      "n_queries": 22,
+      "system_a": "B4.5",
+      "system_b": "P1"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "hit@5",
+      "n_queries": 22,
+      "system_a": "B4.5",
+      "system_b": "P1"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "mrr",
+      "n_queries": 22,
+      "system_a": "B4.5",
+      "system_b": "P1"
+    },
+    {
+      "ci_lower": -0.8287878787878789,
+      "ci_upper": -0.5840909090909091,
+      "delta_mean": -0.7159090909090909,
+      "metric": "adj_cont@5",
+      "n_queries": 22,
+      "system_a": "B4",
+      "system_b": "P1"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "hit@5",
+      "n_queries": 22,
+      "system_a": "B4",
+      "system_b": "P1"
+    },
+    {
+      "ci_lower": 0.0,
+      "ci_upper": 0.0,
+      "delta_mean": 0.0,
+      "metric": "mrr",
+      "n_queries": 22,
+      "system_a": "B4",
+      "system_b": "P1"
+    }
+  ],
+  "samples": 2000,
+  "seed": 20260305
+}

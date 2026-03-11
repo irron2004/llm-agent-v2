@@ -1,0 +1,24 @@
+q_id,question,allowed_devices,parsed_hard_devices_norm,parsed_hard_devices,mismatch_flag
+A-q001,ECOLITE3000 설비에서 PM Chamber 내부 View Port 쪽에 Local Plasma 및 Arcing이 발생하는 원인은 무엇인가?,ECOLITE_3000,ECOLITE3000,ECOLITE3000,False
+A-q003,SEC SRD 라인의 EPA404 LL 관련해서 점검 이력을 정리해줄 수 있을까?,,,,False
+A-q001_masked,[DEVICE] PM Chamber 내부 View Port 쪽에 Local Plasma 및 Arcing이 발생하는 원인은 무엇인가?,ECOLITE_3000,,,False
+A-amb002,PM Controller 교체 후 초기 설정 절차는?,INTEGER_PLUS|PRECIA|SUPRA_N|SUPRA_VPLUS|SUPRA_XP,,,False
+A-amb026,Wafer Transfer 실패 시 점검 포인트는?,SUPRA_N|SUPRA_XP|INTEGER_PLUS|PRECIA,,,False
+A-amb039,Selectivity 변화 시 Process 조건 재설정 방법은?,SUPRA_N|SUPRA_XP|PRECIA,,,False
+A-amb044,O-Ring 규격 확인 및 호환 부품 검색 방법은?,SUPRA_N|SUPRA_XP|GENEVA_XP,,,False
+A-amb045,Screw Torque Spec 확인 방법은?,SUPRA_N|SUPRA_XP|INTEGER_PLUS,,,False
+A-amb047,Recipe Download Fail 시 점검 사항은?,SUPRA_N|SUPRA_XP|PRECIA,,,False
+A-amb048,Software Update 후 설비 정상 동작 확인 절차는?,SUPRA_N|SUPRA_XP|SUPRA_VPLUS|INTEGER_PLUS,,,False
+A-amb055,동일 모듈에서 반복 교체된 부품 이력은?,SUPRA_N|SUPRA_XP|PRECIA|INTEGER_PLUS,,,False
+A-amb058,Power Supply Fan Alarm 발생 시 교체 기준은?,SUPRA_N|SUPRA_XP|INTEGER_PLUS|PRECIA,,,False
+A-amb059,Chuck Surface Damage 확인 및 교체 판단 기준은?,SUPRA_N|SUPRA_VPLUS|SUPRA_XP|PRECIA,,,False
+A-amb062,Pin Hole 발생 시 원인 분석 방법은?,SUPRA_N|SUPRA_XP|PRECIA,,,False
+A-amb063,Mass Flow Controller Zero Shift 발생 시 조치는?,SUPRA_N|SUPRA_XP|PRECIA|GENEVA_XP,,,False
+A-amb068,EFEM Robot Teaching 재설정 방법은?,SUPRA_N|SUPRA_XP|SUPRA_VPLUS|INTEGER_PLUS,,,False
+A-imp003,Endpoint 신호 약해질 때 OES Window 점검 방법은?,SUPRA_N|SUPRA_XP|PRECIA,,,False
+A-eq511,SGGVLF0300에서 lot 처리 중 주의사항은?,GENEVA_STP300_XP,,,False
+A-eq522,RFL001 장비의 recipe 설정 방법은?,GENEVA_STP300,,,False
+A-eq524,SP201 장비의 스펙 한계값은 얼마인가?,ECOLITE_II_T,,,False
+A-eq543,EPRS753의 chamber cleaning 절차를 알려줘,TERA_21,,,False
+A-eq545,AEPR03에서 센서 캘리브레이션 절차는?,EVOLITE_II,,,False
+A-eq583,DES202에서 lot 처리 중 주의사항은?,ECOLITE_XPL,,,False

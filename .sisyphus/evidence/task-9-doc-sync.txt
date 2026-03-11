@@ -1,0 +1,13 @@
+Task 9 evidence (2026-03-11)
+
+Updated document:
+- docs/2026-03-11-rrf-문제해결.md
+
+Added section:
+- Post-fix actual status (2026-03-11)
+
+Includes:
+- Fixed path summary table
+- New test file reference: backend/tests/test_chat_flow_rrf_eval_runner.py
+- Runner path reference: scripts/evaluation/run_chat_flow_retrieval_rrf_eval.py
+- Verification commands and runner usage command

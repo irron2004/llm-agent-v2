@@ -1,0 +1,48 @@
+{
+  "total": 79,
+  "failures": 0,
+  "env": {
+    "AGENT_SECOND_STAGE_DOC_RETRIEVE_ENABLED": "",
+    "AGENT_EARLY_PAGE_PENALTY_ENABLED": "",
+    "AGENT_EARLY_PAGE_PENALTY_MAX_PAGE": "",
+    "AGENT_EARLY_PAGE_PENALTY_FACTOR": "",
+    "AGENT_SECOND_STAGE_MAX_DOC_IDS": "",
+    "AGENT_SECOND_STAGE_TOP_K": ""
+  },
+  "doc_hit": {
+    "@1": {
+      "count": 31,
+      "ratio": 0.3924050632911392
+    },
+    "@3": {
+      "count": 42,
+      "ratio": 0.5316455696202531
+    },
+    "@5": {
+      "count": 51,
+      "ratio": 0.6455696202531646
+    },
+    "@10": {
+      "count": 54,
+      "ratio": 0.6835443037974683
+    }
+  },
+  "page_hit": {
+    "@1": {
+      "count": 24,
+      "ratio": 0.3037974683544304
+    },
+    "@3": {
+      "count": 35,
+      "ratio": 0.4430379746835443
+    },
+    "@5": {
+      "count": 42,
+      "ratio": 0.5316455696202531
+    },
+    "@10": {
+      "count": 50,
+      "ratio": 0.6329113924050633
+    }
+  }
+}

@@ -1,0 +1,897 @@
+{
+  "A-gs110": {
+    "strict": [],
+    "loose": [],
+    "question": "OES detect fail endpoint 발생 시 점검 사항은?",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-q006": {
+    "strict": [],
+    "loose": [
+      "global_sop_supra_n_series_all_pm_process_kit"
+    ],
+    "question": "SUPRA N Baffle 장착 시 Screw 체결 토크 스펙은 얼마인가?",
+    "device": "SUPRA_N",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_n_series_all_efem_fluorescent_lamp",
+      "global_sop_supra_n_series_sw_all_sw_installation_setting",
+      "global_sop_supra_n_series_all_tm_wafer_sensor",
+      "global_sop_supra_n_series_all_pm_isolation_valve",
+      "global_sop_supra_n_series_all_pcw_turn_on"
+    ]
+  },
+  "A-q006_masked": {
+    "strict": [],
+    "loose": [
+      "global_sop_integer_plus_all_am_baffle",
+      "global_sop_integer_plus_all_pm_baffle_heater",
+      "global_sop_supra_n_series_all_pm_process_kit"
+    ],
+    "question": "[DEVICE] Baffle 장착 시 Screw 체결 토크 스펙은 얼마인가?",
+    "device": "SUPRA_N",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_n_series_all_efem_fluorescent_lamp",
+      "global_sop_supra_n_series_sw_all_sw_installation_setting",
+      "global_sop_supra_n_series_all_tm_wafer_sensor",
+      "global_sop_supra_n_series_all_pm_isolation_valve",
+      "global_sop_supra_n_series_all_pcw_turn_on"
+    ]
+  },
+  "A-sop002": {
+    "strict": [
+      "global_sop_supra_xp_all_efem_controller",
+      "global_sop_supra_xp_all_efem_robot_sr8241"
+    ],
+    "loose": [
+      "40069928",
+      "global_sop_supra_xp_all_efem_controller",
+      "global_sop_supra_xp_all_efem_ffu",
+      "global_sop_supra_xp_all_efem_robot_sr8241"
+    ],
+    "question": "Zedius xp 의 EFEM controller replacement 작업 방법",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop002_masked": {
+    "strict": [
+      "global_sop_supra_xp_all_efem_controller"
+    ],
+    "loose": [
+      "40035345",
+      "40069928",
+      "global_sop_integer_plus_all_efem_controller",
+      "global_sop_integer_plus_all_efem_eda_controller",
+      "global_sop_precia_all_efem_controller",
+      "global_sop_supra_n_series_all_efem_controller",
+      "global_sop_supra_xp_all_efem_controller"
+    ],
+    "question": "[DEVICE] 의 EFEM controller replacement 작업 방법",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop011": {
+    "strict": [
+      "global_sop_supra_xp_all_ll_cip"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_ll_pin_modify_eng"
+    ],
+    "question": "work procedure, precaution, and preparation required in works\nrelated to LL N2 PURGE LINE DIFFUSER of SUPRA XP",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop011_masked": {
+    "strict": [
+      "global_sop_supra_xp_all_ll_cip"
+    ],
+    "loose": [
+      "global_sop_integer_plus_all_ll_diffuser",
+      "global_sop_supra_xp_all_ll_cip"
+    ],
+    "question": "work procedure, precaution, and preparation required in works\nrelated to LL N2 PURGE LINE DIFFUSER of [DEVICE]",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop018": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_baratron_gauge",
+      "global_sop_supra_xp_all_pm_pressure_gauge"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_pm_baratron_gauge",
+      "global_sop_supra_xp_all_pm_pirani_gauge",
+      "global_sop_supra_xp_all_pm_pressure_gauge",
+      "global_sop_supra_xp_all_tm_pressure_gauge"
+    ],
+    "question": "ZEDIUS XP 설비의 PM Baratron Gauge ADJ 작업",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop018_masked": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_baratron_gauge"
+    ],
+    "loose": [
+      "global_sop_integer_plus_all_pm_vacuum_line",
+      "global_sop_precia_all_pm_baratron_gauge",
+      "global_sop_supra_xp_all_pm_baratron_gauge"
+    ],
+    "question": "[DEVICE] PM Baratron Gauge ADJ 작업",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop031": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_manometer"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_ll_pressure_gauge",
+      "global_sop_supra_xp_all_pm_manometer",
+      "global_sop_supra_xp_all_pm_pressure_gauge",
+      "global_sop_supra_xp_all_tm_pressure_gauge",
+      "supra_xp_sub_unit_trouble_shooting_guide_igs_block_abnormal"
+    ],
+    "question": "ZEDIUS XP 설비의 Manometer Adjust 작업",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop031_masked": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_manometer"
+    ],
+    "loose": [
+      "global_sop_integer_plus_all_pm_manometer",
+      "global_sop_precia_all_pm_manometer",
+      "global_sop_supra_n_series_all_sub_unit_manometer",
+      "global_sop_supra_xp_all_pm_manometer"
+    ],
+    "question": "[DEVICE] Manometer Adjust 작업",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop033": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_pm_pendulum_valve",
+      "global_sop_supra_xp_all_pm_preventive_maintenance"
+    ],
+    "question": "ZEDIUS XP 설비의 PENDULUM VALVE 교체 작업",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop033_masked": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ],
+    "loose": [
+      "global_sop_integer_plus_all_am_vacuum_line",
+      "global_sop_integer_plus_all_pm_vacuum_line",
+      "global_sop_precia_all_pm_pendulum_valve",
+      "global_sop_supra_xp_all_pm_pendulum_valve",
+      "global_sop_supra_xp_all_pm_preventive_maintenance"
+    ],
+    "question": "[DEVICE] PENDULUM VALVE 교체 작업",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop038": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_pirani_gauge"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_ll_pressure_gauge",
+      "global_sop_supra_xp_all_pm_baratron_gauge",
+      "global_sop_supra_xp_all_pm_pirani_gauge",
+      "global_sop_supra_xp_all_pm_pressure_gauge",
+      "global_sop_supra_xp_all_tm_pressure_gauge"
+    ],
+    "question": "ZEDIUS XP 설비의 PM Pirani Gauge ADJ 작업",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop038_masked": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_pirani_gauge"
+    ],
+    "loose": [
+      "40039531",
+      "global_sop_integer_plus_all_am_vacuum_line",
+      "global_sop_integer_plus_all_pm_vacuum_line",
+      "global_sop_precia_all_pm_pirani_gauge",
+      "global_sop_supra_xp_all_pm_pirani_gauge"
+    ],
+    "question": "[DEVICE] PM Pirani Gauge ADJ 작업",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop042": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_prism_source",
+      "global_sop_supra_xp_all_pm_prism_source_3000qc",
+      "global_sop_supra_xp_all_pm_prism_source_3100qc"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_pm_cip_chamber",
+      "global_sop_supra_xp_all_pm_preventive_maintenance",
+      "global_sop_supra_xp_all_pm_prism_source",
+      "global_sop_supra_xp_all_pm_prism_source_3000qc",
+      "global_sop_supra_xp_all_pm_prism_source_3100qc"
+    ],
+    "question": "ZEDIUS XP 설비의 \"PRISM\" SOURCE 교체 관련 작업",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop042_masked": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_prism_source",
+      "global_sop_supra_xp_all_pm_prism_source_3000qc",
+      "global_sop_supra_xp_all_pm_prism_source_3100qc"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_pm_prism_source",
+      "global_sop_supra_xp_all_pm_prism_source_3000qc",
+      "global_sop_supra_xp_all_pm_prism_source_3100qc"
+    ],
+    "question": "[DEVICE] \"PRISM\" SOURCE 교체 관련 작업",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop044": {
+    "strict": [
+      "global_sop_supra_xp_all_tm_slot_valve",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_pm_pendulum_valve",
+      "global_sop_supra_xp_all_pm_preventive_maintenance",
+      "global_sop_supra_xp_all_tm_slot_valve",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "supra_xp_tm_trouble_shooting_guide_trace_slot_valve_abnormal"
+    ],
+    "question": "ZEDIUS XP 설비의 \"Slot Valve\" 교체 작업",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop044_masked": {
+    "strict": [],
+    "loose": [
+      "global_sop_integer_plus_all_am_slot_valve",
+      "global_sop_integer_plus_all_ll_slot_valve",
+      "global_sop_integer_plus_all_pm_slot_valve",
+      "global_sop_precia_all_pm_slot_valve",
+      "global_sop_precia_all_tm_slot_valve",
+      "set_up_manual_zedius_xp_supra_xp"
+    ],
+    "question": "[DEVICE] \"Slot Valve\" 교체 작업",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop048": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_prism_source_3000qc",
+      "global_sop_supra_xp_all_pm_prism_source_3100qc"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_pm_prism_source_3000qc",
+      "global_sop_supra_xp_all_pm_prism_source_3100qc",
+      "supra_xp_pm_trouble_shooting_guide_trace_prism_abnormal"
+    ],
+    "question": "ZEDIUS XP 설비의 PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop048_masked": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_prism_source_3000qc",
+      "global_sop_supra_xp_all_pm_prism_source_3100qc"
+    ],
+    "loose": [
+      "40036506",
+      "global_sop_supra_xp_all_pm_prism_source_3000qc",
+      "global_sop_supra_xp_all_pm_prism_source_3100qc",
+      "supra_xp_pm_trouble_shooting_guide_trace_prism_abnormal"
+    ],
+    "question": "[DEVICE] PRISM 3000, 3100QC SOURCE IGNITION WINDOW CHECK 작업",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop051": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_prism_source_3100qc"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_pm_prism_source",
+      "global_sop_supra_xp_all_pm_prism_source_3000qc",
+      "global_sop_supra_xp_all_pm_prism_source_3100qc"
+    ],
+    "question": "ZEDIUS XP 설비의 PRISM SOURCE 3100QC RF GENERATOR 2-POINTS Calibration 관련 작업",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop051_masked": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_prism_source_3100qc"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_pm_prism_source",
+      "global_sop_supra_xp_all_pm_prism_source_3000qc",
+      "global_sop_supra_xp_all_pm_prism_source_3100qc",
+      "supra_xp_pm_trouble_shooting_guide_trace_prism_abnormal"
+    ],
+    "question": "[DEVICE] PRISM SOURCE 3100QC RF GENERATOR 2-POINTS Calibration 관련 작업",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop057": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_temp_controller"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_efem_controller",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "supra_xp_pm_trouble_shooting_guide_trace_chuck_abnormal"
+    ],
+    "question": "ZEDIUS XP 설비의 PM Temp Controller 교체 작업",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop057_masked": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_temp_controller"
+    ],
+    "loose": [
+      "40043536",
+      "40050130",
+      "global_sop_geneva_xp_rep_pm_temp_controller",
+      "global_sop_integer_plus_all_pm_temp_controller",
+      "global_sop_integer_plus_all_pm_wall_temp_controller",
+      "global_sop_supra_xp_all_pm_temp_controller"
+    ],
+    "question": "[DEVICE] PM Temp Controller 교체 작업",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop058": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_temp_controller"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_efem_controller",
+      "global_sop_supra_xp_all_pm_heater_chuck",
+      "global_sop_supra_xp_all_pm_temp_controller"
+    ],
+    "question": "ZEDIUS XP 설비의 PM Temp Controller 조정 작업",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop058_masked": {
+    "strict": [
+      "global_sop_supra_xp_all_pm_temp_controller"
+    ],
+    "loose": [
+      "40043536",
+      "40050130",
+      "global_sop_geneva_xp_rep_pm_temp_controller",
+      "global_sop_integer_plus_all_pm_wall_temp_controller",
+      "global_sop_supra_n_series_all_sub_unit_temp_controller",
+      "global_sop_supra_xp_all_pm_temp_controller"
+    ],
+    "question": "[DEVICE] PM Temp Controller 조정 작업",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop072": {
+    "strict": [
+      "global_sop_supra_xp_all_tm_robot"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_tm_ctc",
+      "global_sop_supra_xp_all_tm_robot"
+    ],
+    "question": "procedure when operators deal with the TM Robot replacement equipped in ZEDIUS XP",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop072_masked": {
+    "strict": [
+      "global_sop_supra_xp_all_tm_robot"
+    ],
+    "loose": [
+      "40081285",
+      "40097172",
+      "global_sop_supra_xp_all_tm_ctc",
+      "global_sop_supra_xp_all_tm_robot"
+    ],
+    "question": "procedure when operators deal with the TM Robot replacement equipped in [DEVICE]",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop075": {
+    "strict": [
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring"
+    ],
+    "loose": [
+      "global_sop_integer_plus_all_am_slot_valve",
+      "global_sop_integer_plus_all_ll_slot_valve",
+      "global_sop_precia_all_pm_slot_valve",
+      "global_sop_precia_all_tm_slot_valve",
+      "global_sop_supra_xp_all_pm_preventive_maintenance",
+      "global_sop_supra_xp_all_tm_slot_valve",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring"
+    ],
+    "question": "ZEDIUS XP 설비의 SLOT V/V Housing O-ring 교체 및 세정 작업",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop075_masked": {
+    "strict": [
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring"
+    ],
+    "loose": [
+      "global_sop_geneva_xp_rep_pm_load_lock_o_ring",
+      "global_sop_integer_plus_all_am_slot_valve",
+      "global_sop_integer_plus_all_ll_slot_valve",
+      "global_sop_integer_plus_all_pm_slot_valve",
+      "global_sop_precia_all_pm_slot_valve",
+      "global_sop_precia_all_tm_slot_valve",
+      "global_sop_supra_xp_all_pm_preventive_maintenance",
+      "global_sop_supra_xp_all_tm_slot_valve",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring"
+    ],
+    "question": "[DEVICE] SLOT V/V Housing O-ring 교체 및 세정 작업",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop076": {
+    "strict": [
+      "global_sop_supra_xp_sw_all_sw_installation_setting"
+    ],
+    "loose": [
+      "40069928",
+      "global_sop_supra_xp_all_efem_controller",
+      "global_sop_supra_xp_all_efem_ffu",
+      "global_sop_supra_xp_all_tm_ctc",
+      "global_sop_supra_xp_all_tm_robot",
+      "global_sop_supra_xp_sw_all_sw_installation_setting",
+      "supra_xp_all_trouble_shooting_guide_trace_ctc_abnormal"
+    ],
+    "question": "ZEDIUS XP 설비 EFEM SW Install 작업",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop076_masked": {
+    "strict": [
+      "global_sop_supra_xp_sw_all_sw_installation_setting"
+    ],
+    "loose": [
+      "40069928",
+      "global_sop_supra_n_series_sw_all_sw_installation_setting",
+      "global_sop_supra_xp_all_tm_ctc",
+      "global_sop_supra_xp_sw_all_sw_installation_setting"
+    ],
+    "question": "[DEVICE] EFEM SW Install 작업",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop077": {
+    "strict": [
+      "supra_xp_all_trouble_shooting_guide_trace_device_net_abnormal"
+    ],
+    "loose": [
+      "global_sop_supra_xp_all_pm_device_net_board",
+      "global_sop_supra_xp_all_tm_ctc",
+      "global_sop_supra_xp_all_tm_device_net_board",
+      "global_sop_supra_xp_sw_all_sw_installation_setting",
+      "supra_xp_all_trouble_shooting_guide_trace_device_net_abnormal"
+    ],
+    "question": "ZEDIUS XP 설비 EFEM DEVICE NET SETTING 작업",
+    "device": "SUPRA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-sop077_masked": {
+    "strict": [
+      "supra_xp_all_trouble_shooting_guide_trace_device_net_abnormal"
+    ],
+    "loose": [
+      "global_sop_integer_plus_all_efem_device_net_board",
+      "global_sop_precia_all_efem_device_net_board",
+      "global_sop_supra_xp_all_pm_device_net_board",
+      "global_sop_supra_xp_sw_all_sw_installation_setting",
+      "supra_n_all_trouble_shooting_guide_trace_device_net_abnormal",
+      "supra_xp_all_trouble_shooting_guide_trace_device_net_abnormal"
+    ],
+    "question": "[DEVICE] EFEM DEVICE NET SETTING 작업",
+    "device": "SUPRA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_xp_all_ll_cip",
+      "global_sop_supra_xp_all_tm_slot_vv_housing_o_ring",
+      "global_sop_supra_xp_all_pm_temp_controller",
+      "global_sop_supra_xp_all_pm_process_kit",
+      "global_sop_supra_xp_all_pm_pendulum_valve"
+    ]
+  },
+  "A-xdev002": {
+    "strict": [
+      "global_sop_geneva_xp_rep_pm_loadlock_apc_valve"
+    ],
+    "loose": [
+      "global_sop_geneva_xp_rep_efem_ffu",
+      "global_sop_geneva_xp_rep_pm_apc",
+      "global_sop_geneva_xp_rep_pm_chamber_apc_valve",
+      "global_sop_geneva_xp_rep_pm_loadlock_apc_valve",
+      "global_sop_geneva_xp_rep_pm_mfc",
+      "set_up_manual_geneva_stp300_xp_r6"
+    ],
+    "question": "GENEVA XP Loadlock APC Valve 교체 방법은?",
+    "device": "GENEVA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_geneva_xp_cln_bubbler_cabinet_canister",
+      "global_sop_geneva_xp_rep_pm_load_lock",
+      "global_sop_geneva_xp_rep_pm_insulation_heater",
+      "global_sop_geneva_xp_rep_pm_mfc",
+      "global_sop_geneva_xp_rep_pm_vacuum_pressure_switch"
+    ]
+  },
+  "A-xdev002_masked": {
+    "strict": [
+      "global_sop_geneva_xp_rep_pm_loadlock_apc_valve"
+    ],
+    "loose": [
+      "global_sop_geneva_xp_rep_pm_apc",
+      "global_sop_geneva_xp_rep_pm_chamber_apc_valve",
+      "global_sop_geneva_xp_rep_pm_loadlock_apc_valve",
+      "set_up_manual_geneva_stp300_xp_r6"
+    ],
+    "question": "[DEVICE] Loadlock APC Valve 교체 방법은?",
+    "device": "GENEVA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_geneva_xp_cln_bubbler_cabinet_canister",
+      "global_sop_geneva_xp_rep_pm_load_lock",
+      "global_sop_geneva_xp_rep_pm_insulation_heater",
+      "global_sop_geneva_xp_rep_pm_mfc",
+      "global_sop_geneva_xp_rep_pm_vacuum_pressure_switch"
+    ]
+  },
+  "A-xdev004": {
+    "strict": [
+      "global_sop_geneva_xp_rep_bubbler_cabinet_drain_valve"
+    ],
+    "loose": [
+      "global_sop_geneva_xp_rep_bubbler_cabinet_delivery_valve",
+      "global_sop_geneva_xp_rep_bubbler_cabinet_drain_valve",
+      "global_sop_geneva_xp_rep_bubbler_cabinet_feed_valve",
+      "global_sop_geneva_xp_rep_bubbler_cabinet_relief_valve"
+    ],
+    "question": "GENEVA XP Bubbler Cabinet Drain Valve 교체 방법은?",
+    "device": "GENEVA_XP",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_geneva_xp_cln_bubbler_cabinet_canister",
+      "global_sop_geneva_xp_rep_pm_load_lock",
+      "global_sop_geneva_xp_rep_pm_insulation_heater",
+      "global_sop_geneva_xp_rep_pm_mfc",
+      "global_sop_geneva_xp_rep_pm_vacuum_pressure_switch"
+    ]
+  },
+  "A-xdev004_masked": {
+    "strict": [
+      "global_sop_geneva_xp_rep_bubbler_cabinet_drain_valve"
+    ],
+    "loose": [
+      "global_sop_geneva_rep_bubbler_cabinet_vent_valve",
+      "global_sop_geneva_xp_rep_bubbler_cabinet_delivery_valve",
+      "global_sop_geneva_xp_rep_bubbler_cabinet_drain_valve",
+      "global_sop_geneva_xp_rep_bubbler_cabinet_feed_valve",
+      "global_sop_geneva_xp_rep_bubbler_cabinet_relief_valve"
+    ],
+    "question": "[DEVICE] Bubbler Cabinet Drain Valve 교체 방법은?",
+    "device": "GENEVA_XP",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_geneva_xp_cln_bubbler_cabinet_canister",
+      "global_sop_geneva_xp_rep_pm_load_lock",
+      "global_sop_geneva_xp_rep_pm_insulation_heater",
+      "global_sop_geneva_xp_rep_pm_mfc",
+      "global_sop_geneva_xp_rep_pm_vacuum_pressure_switch"
+    ]
+  },
+  "A-xdev016": {
+    "strict": [
+      "global_sop_supra_vplus_all_pm_controller"
+    ],
+    "loose": [
+      "40044732",
+      "40054699",
+      "40076066",
+      "global_sop_supra_n_series_all_efem_controller",
+      "global_sop_supra_n_series_all_sub_unit_temp_controller",
+      "global_sop_supra_vplus_all_pm_controller"
+    ],
+    "question": "SUPRA Vplus Controller 교체 후 초기화 절차는?",
+    "device": "SUPRA_VPLUS",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_supra_vplus_all_pm_controller",
+      "global_sop_supra_vplus_adj_all_undocking",
+      "global_sop_supra_vplus_adj_all_power_turn_on_off",
+      "global_sop_supra_vplus_adj_all_io_check"
+    ]
+  },
+  "A-xdev016_masked": {
+    "strict": [],
+    "loose": [
+      "40054699",
+      "global_sop_genevaxp_rep_efem_robot_controller"
+    ],
+    "question": "[DEVICE] Controller 교체 후 초기화 절차는?",
+    "device": "SUPRA_VPLUS",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_supra_vplus_all_pm_controller",
+      "global_sop_supra_vplus_adj_all_undocking",
+      "global_sop_supra_vplus_adj_all_power_turn_on_off",
+      "global_sop_supra_vplus_adj_all_io_check"
+    ]
+  },
+  "A-xdev021": {
+    "strict": [],
+    "loose": [
+      "global_sop_omnis_plus_all_pm_apc_product_report",
+      "global_sop_omnis_sw_all_process_check_eng",
+      "set_up_manual_omnis"
+    ],
+    "question": "OMNIS Chamber 내 Arcing 발생 시 부품 교체 절차는?",
+    "device": "OMNIS",
+    "obs": "explicit_device",
+    "old_gold": [
+      "global_sop_omnis_plus_all_pm_apc_product_report",
+      "global_sop_omnis_sw_all_process_check_eng",
+      "set_up_manual_omnis"
+    ]
+  },
+  "A-xdev021_masked": {
+    "strict": [],
+    "loose": [],
+    "question": "[DEVICE] Chamber 내 Arcing 발생 시 부품 교체 절차는?",
+    "device": "OMNIS",
+    "obs": "implicit",
+    "old_gold": [
+      "global_sop_omnis_plus_all_pm_apc_product_report",
+      "global_sop_omnis_sw_all_process_check_eng",
+      "set_up_manual_omnis"
+    ]
+  }
+}

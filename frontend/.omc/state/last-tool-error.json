@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"curl -s http://localhost:11434/ 2>&1\",\"description\":\"Test Ollama root endpoint\"}",
+  "error": "Exit code 7",
+  "timestamp": "2026-03-11T06:53:13.866Z",
+  "retry_count": 1
+}
