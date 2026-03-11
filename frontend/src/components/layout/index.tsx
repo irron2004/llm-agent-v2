@@ -1234,33 +1234,61 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
     return typeof url === 'string' && url.trim().length > 0;
   };
 
-  // 모든 문서를 미리보기 배열로 생성 (이미지 또는 텍스트)
+  // 모든 문서의 모든 페이지를 평탄화하여 미리보기 배열 생성
   const previewImages: ImagePreviewItem[] = useMemo(() => {
-    return docs.map((doc) => {
-      // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
+    const items: ImagePreviewItem[] = [];
+    for (const doc of docs) {
       const docType = doc.metadata?.doc_type as string | undefined;
       const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
       const displayTitle = isSpecialDocType
         ? `${docType}_${doc.id}`
         : (doc.title || undefined);
 
-      return {
-        url: hasValidImageUrl(doc.page_image_url) ? doc.page_image_url : undefined,
-        content: doc.snippet || undefined,
-        title: displayTitle,
-        page: doc.page || undefined,
-        docId: doc.id,
-      };
-    });
+      const expandedUrls = doc.expanded_page_urls?.filter((u) => hasValidImageUrl(u)) ?? [];
+      const expandedPages = doc.expanded_pages ?? [];
+
+      if (expandedUrls.length > 0) {
+        for (let i = 0; i < expandedUrls.length; i++) {
+          items.push({
+            url: expandedUrls[i],
+            content: doc.snippet || undefined,
+            title: displayTitle,
+            page: expandedPages[i] ?? doc.page ?? undefined,
+            docId: doc.id,
+          });
+        }
+      } else {
+        items.push({
+          url: hasValidImageUrl(doc.page_image_url) ? doc.page_image_url : undefined,
+          content: doc.snippet || undefined,
+          title: displayTitle,
+          page: doc.page || undefined,
+          docId: doc.id,
+        });
+      }
+    }
+    return items;
+  }, [docs]);
+
+  // 각 doc의 첫 번째 항목이 previewImages에서 몇 번째인지 매핑
+  const docStartIndex: number[] = useMemo(() => {
+    const indices: number[] = [];
+    let offset = 0;
+    for (const doc of docs) {
+      indices.push(offset);
+      const expandedUrls = doc.expanded_page_urls?.filter((u) => hasValidImageUrl(u)) ?? [];
+      offset += expandedUrls.length > 0 ? expandedUrls.length : 1;
+    }
+    return indices;
   }, [docs]);
 
   const handleDocClick = (docIndex: number) => {
-    setPreviewIndex(docIndex);
+    setPreviewIndex(docStartIndex[docIndex] ?? 0);
     setPreviewVisible(true);
   };
 
-  const handleImageClick = (docIndex: number, _pageIndex: number) => {
-    setPreviewIndex(docIndex);
+  const handleImageClick = (docIndex: number, pageIndex: number) => {
+    setPreviewIndex((docStartIndex[docIndex] ?? 0) + pageIndex);
     setPreviewVisible(true);
   };
 

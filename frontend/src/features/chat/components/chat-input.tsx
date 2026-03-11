@@ -68,7 +68,7 @@ export function ChatInput({
   return (
     <div className="input-wrapper">
       {hasFilterBar && (
-        <div style={{ display: "flex", gap: 8, padding: "8px 0", flexWrap: "wrap", alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, padding: "8px 0 4px", flexWrap: "wrap", alignItems: "center" }}>
           {docTypeOptions && onDocTypesChange && (
             <Select
               mode="multiple"
@@ -116,27 +116,29 @@ export function ChatInput({
           )}
         </div>
       )}
-      <textarea
-        ref={textareaRef}
-        className="input-textarea"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        onKeyDown={handleKeyDown}
-        placeholder={placeholder}
-        disabled={disabled}
-        rows={1}
-      />
-      {isStreaming ? (
-        <button className="send-button" onClick={onStop} style={{ backgroundColor: "var(--color-error)" }}>
-          <StopOutlined />
-          <span>Stop</span>
-        </button>
-      ) : (
-        <button className="send-button" onClick={handleSend} disabled={!value.trim() || disabled}>
-          <SendOutlined />
-          <span>Send</span>
-        </button>
-      )}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 0 }}>
+        <textarea
+          ref={textareaRef}
+          className="input-textarea"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          disabled={disabled}
+          rows={1}
+        />
+        {isStreaming ? (
+          <button className="send-button" onClick={onStop} style={{ backgroundColor: "var(--color-error)" }}>
+            <StopOutlined />
+            <span>Stop</span>
+          </button>
+        ) : (
+          <button className="send-button" onClick={handleSend} disabled={!value.trim() || disabled}>
+            <SendOutlined />
+            <span>Send</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 }

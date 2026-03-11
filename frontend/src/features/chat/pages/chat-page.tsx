@@ -58,11 +58,15 @@ export default function ChatPage() {
       { label: "절차검색 (SOP + Setup)", value: "__preset_sop", isPreset: true },
       { label: "이슈검색 (myservice + gcb + TS)", value: "__preset_issue", isPreset: true },
     ];
-    const individual = (catalog?.doc_types ?? [])
-      .filter((dt) => dt.name !== "sample")
-      .map((dt) => ({ label: dt.name, value: dt.name }));
+    const individual = [
+      { label: "myservice", value: "myservice" },
+      { label: "SOP", value: "SOP" },
+      { label: "gcb", value: "gcb" },
+      { label: "set_up_manual", value: "set_up_manual" },
+      { label: "trouble_shooting_guide", value: "trouble_shooting_guide" },
+    ];
     return [...presets, ...individual];
-  }, [catalog]);
+  }, []);
 
   const modelOptions = useMemo(() =>
     (catalog?.devices ?? []).map((d) => ({ label: d.name, value: d.name })),
