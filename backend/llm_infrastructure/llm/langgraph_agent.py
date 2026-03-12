@@ -435,11 +435,7 @@ _EMOJI_NUMERAL_RE = re.compile(r"[0-9]️⃣")
 _MARKDOWN_TABLE_LINE_RE = re.compile(r"(?m)^\|.*\|\s*$")
 
 _REQUIRED_SECTIONS_KO = [
-    "## 준비/안전",
     "## 작업 절차",
-    "## 복구/확인",
-    "## 주의사항",
-    "## 참고문헌",
 ]
 
 
@@ -468,12 +464,14 @@ def _validate_answer_format(
     missing_sections = [s for s in _REQUIRED_SECTIONS_KO if s not in text]
     has_emoji_numbering = bool(_EMOJI_NUMERAL_RE.search(text))
     has_markdown_table = "|---|" in text or bool(_MARKDOWN_TABLE_LINE_RE.search(text))
-    numbering_ok = bool(re.search(r"(?s)## 작업 절차\s*\n\s*1\.\s+", text))
+    # 번호 목록(1. )이 있으면 OK — 섹션 헤딩 유무는 불문
+    numbering_ok = bool(re.search(r"(?m)^\s*1\.\s+", text))
     citations_ok = True
     references_ok = True
     if has_refs:
         citations_ok = bool(_CITATION_RE.search(text))
-        references_ok = "## 참고문헌" in text
+        # 참고문헌 섹션은 선택 — 없어도 통과
+        references_ok = True
     language_ok = _answer_language_ok(text, target_language)
 
     ok = (
@@ -483,7 +481,6 @@ def _validate_answer_format(
         and not has_emoji_numbering
         and not has_markdown_table
         and citations_ok
-        and references_ok
         and language_ok
     )
     return {
@@ -2190,16 +2187,36 @@ def expand_related_docs_node(
                 max_pages=20,
             )
             if section_hits:
-                related_docs = [
+                all_section_docs = [
                     hit.to_retrieval_result() if hasattr(hit, "to_retrieval_result") else hit
                     for hit in section_hits
                 ]
-                for rd in related_docs:
-                    rd_meta = rd.metadata if isinstance(rd.metadata, dict) else {}
-                    rd_page = _extract_page_value(rd_meta)
-                    if rd_page is not None and rd_page not in expanded_pages:
-                        expanded_pages.append(rd_page)
-                expanded_pages.sort()
+                # 연속 페이지 그룹만 유지: 같은 chapter라도 비연속이면 분리
+                hit_page = _extract_page_value(meta)
+                all_section_pages = sorted(set(
+                    p for rd in all_section_docs
+                    for p in [_extract_page_value(rd.metadata if isinstance(rd.metadata, dict) else {})]
+                    if p is not None
+                ))
+                # hit_page를 포함하는 연속 구간만 선택
+                contiguous_group: List[int] = []
+                if hit_page is not None and all_section_pages:
+                    current_group: List[int] = [all_section_pages[0]]
+                    for i in range(1, len(all_section_pages)):
+                        if all_section_pages[i] - all_section_pages[i - 1] <= 1:
+                            current_group.append(all_section_pages[i])
+                        else:
+                            if hit_page in current_group:
+                                break
+                            current_group = [all_section_pages[i]]
+                    if hit_page in current_group:
+                        contiguous_group = current_group
+                allowed_pages = set(contiguous_group) if contiguous_group else set(all_section_pages)
+                related_docs = [
+                    rd for rd in all_section_docs
+                    if _extract_page_value(rd.metadata if isinstance(rd.metadata, dict) else {}) in allowed_pages
+                ]
+                expanded_pages = sorted(allowed_pages)
             elif page_fetcher is not None:
                 # Fallback to page window if section fetch fails
                 page = _extract_page_value(meta)
