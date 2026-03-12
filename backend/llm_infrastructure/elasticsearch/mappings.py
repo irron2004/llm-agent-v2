@@ -566,9 +566,22 @@ def get_chunk_v3_content_mapping() -> dict[str, Any]:
             "lang": {"type": "keyword", "doc_values": True},
             "content": {"type": "text", "analyzer": "nori"},
             "search_text": {"type": "text", "analyzer": "nori"},
+            "chunk_summary": {"type": "text", "index": True},
+            "chunk_keywords": {
+                "type": "keyword",
+                "doc_values": True,
+                "fields": {
+                    "text": {
+                        "type": "text",
+                        "analyzer": "standard",
+                    }
+                },
+            },
             "doc_type": {"type": "keyword", "doc_values": True},
             "device_name": {"type": "keyword", "doc_values": True},
             "equip_id": {"type": "keyword", "doc_values": True},
+            "tenant_id": {"type": "keyword", "doc_values": True},
+            "project_id": {"type": "keyword", "doc_values": True},
             "chapter": {"type": "keyword", "doc_values": True},
             "section_chapter": {"type": "keyword", "doc_values": True},
             "section_number": {"type": "integer"},
@@ -601,9 +614,14 @@ def get_chunk_v3_embed_mapping(
         "dynamic": False,
         "properties": {
             "chunk_id": {"type": "keyword", "doc_values": True},
+            "doc_id": {"type": "keyword", "doc_values": True},
             "content_hash": {"type": "keyword", "doc_values": True},
             "doc_type": {"type": "keyword", "doc_values": True},
             "device_name": {"type": "keyword", "doc_values": True},
+            "equip_id": {"type": "keyword", "doc_values": True},
+            "lang": {"type": "keyword", "doc_values": True},
+            "tenant_id": {"type": "keyword", "doc_values": True},
+            "project_id": {"type": "keyword", "doc_values": True},
             "chapter": {"type": "keyword", "doc_values": True},
             "embedding": {
                 "type": "dense_vector",

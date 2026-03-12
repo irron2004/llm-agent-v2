@@ -1,25 +1,25 @@
 """FastAPI dependency providers for heavy objects."""
 
+from collections.abc import Callable
 from functools import lru_cache
 from pathlib import Path
-from typing import Callable
+from typing import Any, Protocol
 
 from backend.config.settings import api_settings, ollama_settings, rag_settings, vllm_settings
 from backend.llm_infrastructure.embedding import get_embedder
 from backend.llm_infrastructure.embedding.base import BaseEmbedder
 from backend.llm_infrastructure.llm import get_llm
-from backend.llm_infrastructure.llm.langgraph_agent import load_prompt_spec
 from backend.llm_infrastructure.llm.base import BaseLLM
+from backend.llm_infrastructure.llm.langgraph_agent import load_prompt_spec
 from backend.llm_infrastructure.preprocessing import get_preprocessor
 from backend.llm_infrastructure.preprocessing.base import BasePreprocessor
-from backend.llm_infrastructure.reranking import get_reranker as _get_reranker
-from backend.llm_infrastructure.reranking.base import BaseReranker
 from backend.llm_infrastructure.query_expansion import get_query_expander as _get_query_expander
 from backend.llm_infrastructure.query_expansion.base import BaseQueryExpander
-from backend.llm_infrastructure.retrieval.base import BaseRetriever
+from backend.llm_infrastructure.reranking import get_reranker as _get_reranker
+from backend.llm_infrastructure.reranking.base import BaseReranker
+from backend.llm_infrastructure.retrieval.base import BaseRetriever, RetrievalResult
 from backend.services.chat_service import ChatService
-from backend.services.rag_service import RAGService, RAGResponse
-from backend.services.search_service import SearchService
+from backend.services.rag_service import RAGResponse, RAGService
 
 
 @lru_cache
@@ -80,7 +80,7 @@ def get_default_retriever() -> BaseRetriever:
     """Placeholder retriever until an indexed corpus is wired."""
 
     class _UnconfiguredRetriever(BaseRetriever):
-        def retrieve(self, query: str, top_k: int = 10, **_: object):
+        def retrieve(self, query: str, top_k: int = 10, **_: object) -> list[RetrievalResult]:
             msg = (
                 "Default retriever is not configured yet. "
                 "Wire a concrete retriever (dense/bm25/hybrid) once a corpus is available."
@@ -90,10 +90,22 @@ def get_default_retriever() -> BaseRetriever:
     return _UnconfiguredRetriever()
 
 
+class SearchServiceLike(Protocol):
+    """Minimal search-service contract used by API dependency wiring."""
+
+    def search(
+        self,
+        query: str,
+        top_k: int | None = None,
+        **kwargs: Any,
+    ) -> list[RetrievalResult]: ...
+
+
 class _NotConfiguredSearchService:
     """Fallback search service that raises a helpful error."""
 
-    def search(self, *_: object, **__: object):
+    def search(self, query: str, top_k: int | None = None, **kwargs: Any) -> list[RetrievalResult]:
+        _ = (query, top_k, kwargs)
         msg = (
             "Search service is not configured. "
             "Provide a concrete SearchService via dependency override or wire an indexed corpus."
@@ -112,26 +124,26 @@ class _NotConfiguredRAGService:
         raise RuntimeError(msg)
 
 
-_search_service_instance: SearchService | None = None
+_search_service_instance: SearchServiceLike | None = None
 
 
-def set_search_service(service: SearchService) -> None:
+def set_search_service(service: SearchServiceLike) -> None:
     """Override the default search service (e.g., at app startup)."""
     global _search_service_instance
     _search_service_instance = service
     # Reset cache so future calls return the new instance
     try:
-        get_search_service.cache_clear()  # type: ignore[attr-defined]
+        get_search_service.cache_clear()
     except AttributeError:
         pass
 
 
 @lru_cache
-def get_search_service() -> SearchService:
+def get_search_service() -> SearchServiceLike:
     """Provide a search service (override in tests or when a corpus is available)."""
     if _search_service_instance is not None:
         return _search_service_instance
-    return _NotConfiguredSearchService()  # type: ignore[return-value]
+    return _NotConfiguredSearchService()
 
 
 @lru_cache
@@ -187,7 +199,7 @@ def get_default_llm() -> BaseLLM:
 
 
 @lru_cache
-def get_prompt_spec_cached():
+def get_prompt_spec_cached() -> object:
     """Cache된 LangGraph 프롬프트 스펙."""
     return load_prompt_spec(version=rag_settings.prompt_spec_version)
 

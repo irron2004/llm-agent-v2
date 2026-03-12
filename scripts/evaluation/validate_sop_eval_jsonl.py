@@ -38,21 +38,92 @@ def _validate_schema_version(
     return errors
 
 
-def _validate_required_keys(row: dict[str, Any], line_no: int, path: Path) -> list[str]:
+def _validate_required_keys(
+    row: dict[str, Any], line_no: int, path: Path, *, is_rich: bool
+) -> list[str]:
     """Validate required top-level keys for both thin and rich rows."""
     errors = []
-    required = [
+    required: list[str] = [
         "idx",
         "question",
         "filter",
+        "filter_doc_types",
         "gold_doc",
+        "gold_pages",
         "hit_doc",
         "hit_page",
+        "hit_rank",
+        "hit_at_1",
+        "hit_at_3",
+        "hit_at_5",
+        "hit_at_10",
+        "match_debug",
         "elapsed_ms",
+        "error",
     ]
+    if is_rich:
+        required.extend(["request_payload", "response_metadata", "top_docs", "answer"])
     for key in required:
         if key not in row:
             errors.append(f"{path}:{line_no}: missing required key '{key}'")
+    return errors
+
+
+def _validate_types(
+    row: dict[str, Any], line_no: int, path: Path, *, is_rich: bool
+) -> list[str]:
+    errors: list[str] = []
+    if not isinstance(row.get("idx"), int):
+        errors.append(f"{path}:{line_no}: idx must be int")
+    if not isinstance(row.get("question"), str):
+        errors.append(f"{path}:{line_no}: question must be str")
+    if not isinstance(row.get("filter"), str):
+        errors.append(f"{path}:{line_no}: filter must be str")
+
+    filter_doc_types = row.get("filter_doc_types")
+    if not isinstance(filter_doc_types, list) or not all(
+        isinstance(x, str) for x in filter_doc_types
+    ):
+        errors.append(f"{path}:{line_no}: filter_doc_types must be list[str]")
+
+    for key in ("gold_doc", "gold_pages"):
+        if not isinstance(row.get(key), str):
+            errors.append(f"{path}:{line_no}: {key} must be str")
+
+    for key in (
+        "hit_doc",
+        "hit_page",
+        "hit_at_1",
+        "hit_at_3",
+        "hit_at_5",
+        "hit_at_10",
+    ):
+        if not isinstance(row.get(key), bool):
+            errors.append(f"{path}:{line_no}: {key} must be bool")
+
+    hit_rank = row.get("hit_rank")
+    if hit_rank is not None and not isinstance(hit_rank, int):
+        errors.append(f"{path}:{line_no}: hit_rank must be int or null")
+
+    if not isinstance(row.get("match_debug"), dict):
+        errors.append(f"{path}:{line_no}: match_debug must be dict")
+
+    if not isinstance(row.get("elapsed_ms"), (int, float)):
+        errors.append(f"{path}:{line_no}: elapsed_ms must be number")
+
+    err = row.get("error")
+    if err is not None and not isinstance(err, str):
+        errors.append(f"{path}:{line_no}: error must be str or null")
+
+    if is_rich:
+        if not isinstance(row.get("request_payload"), dict):
+            errors.append(f"{path}:{line_no}: request_payload must be dict")
+        if not isinstance(row.get("response_metadata"), dict):
+            errors.append(f"{path}:{line_no}: response_metadata must be dict")
+        if not isinstance(row.get("top_docs"), list):
+            errors.append(f"{path}:{line_no}: top_docs must be list")
+        if not isinstance(row.get("answer"), str):
+            errors.append(f"{path}:{line_no}: answer must be str")
     return errors
 
 
@@ -220,14 +291,19 @@ def main() -> int:
 
             # Run validations
             row_errors.extend(_validate_schema_version(row, line_no, path))
-            row_errors.extend(_validate_required_keys(row, line_no, path))
+            row_errors.extend(
+                _validate_required_keys(row, line_no, path, is_rich=is_rich)
+            )
+            row_errors.extend(_validate_types(row, line_no, path, is_rich=is_rich))
 
             if is_rich:
                 row_errors.extend(_validate_rich_fields(row, line_no, path))
 
             # Validate answer is not empty for rich rows without errors
             if is_rich:
-                has_error = row.get("error") is not None and str(row.get("error")).strip()
+                has_error = (
+                    row.get("error") is not None and str(row.get("error")).strip()
+                )
                 answer = str(row.get("answer", "")).strip()
                 if not has_error and not answer:
                     row_errors.append(
@@ -249,41 +325,47 @@ def main() -> int:
                     "valid": len(row_errors) == 0,
                     "errors": row_errors,
                     "checks": row_checks,
+                    "is_rich": is_rich,
+                    "has_error": bool(
+                        row.get("error") is not None and str(row.get("error")).strip()
+                    ),
                 }
             )
 
     if total == 0:
         raise RuntimeError(f"No JSONL rows found: {path}")
 
-    # Aggregate check results for rich rows
+    rich_results = [r for r in results if bool(r.get("is_rich"))]
+
     ref_ok_count = sum(
-        1 for r in results if r.get("checks", {}).get("references_ok", True)
+        1 for r in rich_results if r.get("checks", {}).get("references_ok", True)
     )
     cit_ok_count = sum(
-        1 for r in results if r.get("checks", {}).get("citations_ok", True)
+        1 for r in rich_results if r.get("checks", {}).get("citations_ok", True)
     )
     lang_ok_count = sum(
-        1 for r in results if r.get("checks", {}).get("language_ok", True)
+        1 for r in rich_results if r.get("checks", {}).get("language_ok", True)
     )
     format_ok_count = sum(
-        1 for r in results
+        1
+        for r in rich_results
         if r.get("checks", {}).get("references_ok", True)
         and r.get("checks", {}).get("citations_ok", True)
         and r.get("checks", {}).get("language_ok", True)
     )
 
     # Build summary
+    error_count = sum(1 for r in results if bool(r.get("has_error")))
     summary = {
         "ok": invalid == 0,
         "rows": total,
         "invalid": invalid,
         "thin_rows": thin_count,
         "rich_rows": rich_count,
+        "errors": error_count,
     }  # type: dict[str, Any]
 
     if rich_count > 0:
-
-
         summary["checks"] = {
             "references_ok": f"{ref_ok_count}/{rich_count}",
             "citations_ok": f"{cit_ok_count}/{rich_count}",

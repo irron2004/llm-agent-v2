@@ -197,21 +197,21 @@
     },
     {
       "path": "src",
-      "accessCount": 1,
-      "lastAccessed": 1773211583559,
+      "accessCount": 2,
+      "lastAccessed": 1773313577981,
       "type": "directory"
+    },
+    {
+      "path": "src/features/chat/api.ts",
+      "accessCount": 2,
+      "lastAccessed": 1773313582116,
+      "type": "file"
     },
     {
       "path": "src/features/chat",
       "accessCount": 1,
       "lastAccessed": 1773211584503,
       "type": "directory"
-    },
-    {
-      "path": "src/features/chat/api.ts",
-      "accessCount": 1,
-      "lastAccessed": 1773211588659,
-      "type": "file"
     },
     {
       "path": "src/features/chat/types.ts",

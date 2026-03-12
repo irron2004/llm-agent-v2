@@ -1,0 +1,2825 @@
+{
+  "summary": {
+    "rows_total": 578,
+    "topics_cross_device": 74,
+    "trap_ready_topics": 68,
+    "output_format": "normalized topic groups with device pairs and per-device doc ids"
+  },
+  "candidates": [
+    {
+      "topic_normalized": "controller",
+      "raw_topics": [
+        "CONTROLLER",
+        "Controller",
+        "controller"
+      ],
+      "n_devices": 6,
+      "devices": [
+        "GENEVA XP",
+        "INTEGER plus",
+        "PRECIA",
+        "SUPRA N",
+        "SUPRA Vplus",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "GENEVA XP",
+          "INTEGER plus"
+        ],
+        [
+          "GENEVA XP",
+          "PRECIA"
+        ],
+        [
+          "GENEVA XP",
+          "SUPRA N"
+        ],
+        [
+          "GENEVA XP",
+          "SUPRA Vplus"
+        ],
+        [
+          "GENEVA XP",
+          "ZEDIUS XP"
+        ],
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA Vplus"
+        ],
+        [
+          "INTEGER plus",
+          "ZEDIUS XP"
+        ],
+        [
+          "PRECIA",
+          "SUPRA N"
+        ],
+        [
+          "PRECIA",
+          "SUPRA Vplus"
+        ],
+        [
+          "PRECIA",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA N",
+          "SUPRA Vplus"
+        ],
+        [
+          "SUPRA N",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA Vplus",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 15,
+      "docs_by_device": {
+        "GENEVA XP": [
+          "global_sop_geneva_xp_rep_pm_controller"
+        ],
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_efem_controller"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_efem_controller"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_efem_controller"
+        ],
+        "SUPRA Vplus": [
+          "40097172",
+          "40097857",
+          "global_sop_supra_vplus_all_pm_controller"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_efem_controller"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "ffu",
+      "raw_topics": [
+        "ffu"
+      ],
+      "n_devices": 6,
+      "devices": [
+        "GENEVA XP",
+        "INTEGER plus",
+        "PRECIA",
+        "SUPRA N",
+        "SUPRA N series",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "GENEVA XP",
+          "INTEGER plus"
+        ],
+        [
+          "GENEVA XP",
+          "PRECIA"
+        ],
+        [
+          "GENEVA XP",
+          "SUPRA N"
+        ],
+        [
+          "GENEVA XP",
+          "SUPRA N series"
+        ],
+        [
+          "GENEVA XP",
+          "ZEDIUS XP"
+        ],
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA N series"
+        ],
+        [
+          "INTEGER plus",
+          "ZEDIUS XP"
+        ],
+        [
+          "PRECIA",
+          "SUPRA N"
+        ],
+        [
+          "PRECIA",
+          "SUPRA N series"
+        ],
+        [
+          "PRECIA",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA N",
+          "SUPRA N series"
+        ],
+        [
+          "SUPRA N",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA N series",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 15,
+      "docs_by_device": {
+        "GENEVA XP": [
+          "global_sop_geneva_xp_rep_efem_ffu"
+        ],
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_efem_ffu"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_efem_ffu"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_tm_ffu"
+        ],
+        "SUPRA N series": [
+          "global_sop_supra_n_series_all_efem_ffu"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_efem_ffu"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "device net board",
+      "raw_topics": [
+        "DEVICE NET BOARD",
+        "device net board"
+      ],
+      "n_devices": 5,
+      "devices": [
+        "INTEGER plus",
+        "PRECIA",
+        "SUPRA N series",
+        "SUPRA XP",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA N series"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA XP"
+        ],
+        [
+          "INTEGER plus",
+          "ZEDIUS XP"
+        ],
+        [
+          "PRECIA",
+          "SUPRA N series"
+        ],
+        [
+          "PRECIA",
+          "SUPRA XP"
+        ],
+        [
+          "PRECIA",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA N series",
+          "SUPRA XP"
+        ],
+        [
+          "SUPRA N series",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA XP",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 10,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_efem_device_net_board"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_efem_device_net_board",
+          "global_sop_precia_all_pm_device_net_board",
+          "global_sop_precia_all_tm_device_net_board"
+        ],
+        "SUPRA N series": [
+          "global_sop_supra_n_series_all_pm_device_net_board"
+        ],
+        "SUPRA XP": [
+          "supra_n_all_trouble_shooting_guide_trace_device_net_abnormal"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_pm_device_net_board",
+          "global_sop_supra_xp_all_tm_device_net_board"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "gas spring",
+      "raw_topics": [
+        "GAS SPRING",
+        "gas spring"
+      ],
+      "n_devices": 5,
+      "devices": [
+        "INTEGER plus",
+        "PRECIA",
+        "SUPRA N",
+        "SUPRA Vplus",
+        "TIGMA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA Vplus"
+        ],
+        [
+          "INTEGER plus",
+          "TIGMA Vplus"
+        ],
+        [
+          "PRECIA",
+          "SUPRA N"
+        ],
+        [
+          "PRECIA",
+          "SUPRA Vplus"
+        ],
+        [
+          "PRECIA",
+          "TIGMA Vplus"
+        ],
+        [
+          "SUPRA N",
+          "SUPRA Vplus"
+        ],
+        [
+          "SUPRA N",
+          "TIGMA Vplus"
+        ],
+        [
+          "SUPRA Vplus",
+          "TIGMA Vplus"
+        ]
+      ],
+      "n_device_pairs": 10,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_am_gas_spring",
+          "global_sop_integer_plus_all_pm_gas_spring"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_pm_gas_spring"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_pm_gas_spring"
+        ],
+        "SUPRA Vplus": [
+          "40055385"
+        ],
+        "TIGMA Vplus": [
+          "40061012"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "robot",
+      "raw_topics": [
+        "ROBOT",
+        "robot"
+      ],
+      "n_devices": 5,
+      "devices": [
+        "INTEGER plus",
+        "PRECIA",
+        "SUPRA N",
+        "SUPRA Vplus",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA Vplus"
+        ],
+        [
+          "INTEGER plus",
+          "ZEDIUS XP"
+        ],
+        [
+          "PRECIA",
+          "SUPRA N"
+        ],
+        [
+          "PRECIA",
+          "SUPRA Vplus"
+        ],
+        [
+          "PRECIA",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA N",
+          "SUPRA Vplus"
+        ],
+        [
+          "SUPRA N",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA Vplus",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 10,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_efem_robot",
+          "global_sop_integer_plus_all_tm_robot"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_efem_robot",
+          "global_sop_precia_all_tm_robot"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_tm_robot"
+        ],
+        "SUPRA Vplus": [
+          "40097172"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_tm_robot"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "ctc",
+      "raw_topics": [
+        "CTC",
+        "ctc"
+      ],
+      "n_devices": 4,
+      "devices": [
+        "GENEVA XP",
+        "PRECIA",
+        "SUPRA N",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "GENEVA XP",
+          "PRECIA"
+        ],
+        [
+          "GENEVA XP",
+          "SUPRA N"
+        ],
+        [
+          "GENEVA XP",
+          "ZEDIUS XP"
+        ],
+        [
+          "PRECIA",
+          "SUPRA N"
+        ],
+        [
+          "PRECIA",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA N",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 6,
+      "docs_by_device": {
+        "GENEVA XP": [
+          "global_sop_geneva_rep_ctc"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_efem_ctc"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_tm_ctc"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_tm_ctc"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "epd",
+      "raw_topics": [
+        "EPD",
+        "epd"
+      ],
+      "n_devices": 4,
+      "devices": [
+        "OMNIS plus",
+        "SUPRA N",
+        "SUPRA Vplus",
+        "TIGMA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "OMNIS plus",
+          "SUPRA N"
+        ],
+        [
+          "OMNIS plus",
+          "SUPRA Vplus"
+        ],
+        [
+          "OMNIS plus",
+          "TIGMA Vplus"
+        ],
+        [
+          "SUPRA N",
+          "SUPRA Vplus"
+        ],
+        [
+          "SUPRA N",
+          "TIGMA Vplus"
+        ],
+        [
+          "SUPRA Vplus",
+          "TIGMA Vplus"
+        ]
+      ],
+      "n_device_pairs": 6,
+      "docs_by_device": {
+        "OMNIS plus": [
+          "global_sop_omnis_plus_adj_pm_epd_eng"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_pm_epd"
+        ],
+        "SUPRA Vplus": [
+          "40055736"
+        ],
+        "TIGMA Vplus": [
+          "40087198"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "heater chuck",
+      "raw_topics": [
+        "HEATER CHUCK",
+        "heater chuck"
+      ],
+      "n_devices": 4,
+      "devices": [
+        "INTEGER plus",
+        "SUPRA N series",
+        "TIGMA Vplus",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "SUPRA N series"
+        ],
+        [
+          "INTEGER plus",
+          "TIGMA Vplus"
+        ],
+        [
+          "INTEGER plus",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA N series",
+          "TIGMA Vplus"
+        ],
+        [
+          "SUPRA N series",
+          "ZEDIUS XP"
+        ],
+        [
+          "TIGMA Vplus",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 6,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_am_heater_chuck"
+        ],
+        "SUPRA N series": [
+          "global_sop_supra_n_series_all_pm_heater_chuck"
+        ],
+        "TIGMA Vplus": [
+          "40055252",
+          "40074275"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_pm_heater_chuck"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "manometer",
+      "raw_topics": [
+        "MANOMETER",
+        "manometer"
+      ],
+      "n_devices": 4,
+      "devices": [
+        "INTEGER plus",
+        "PRECIA",
+        "SUPRA Vplus",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA Vplus"
+        ],
+        [
+          "INTEGER plus",
+          "ZEDIUS XP"
+        ],
+        [
+          "PRECIA",
+          "SUPRA Vplus"
+        ],
+        [
+          "PRECIA",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA Vplus",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 6,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_pm_manometer"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_pm_manometer"
+        ],
+        "SUPRA Vplus": [
+          "40097172"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_pm_manometer"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "mfc",
+      "raw_topics": [
+        "mfc"
+      ],
+      "n_devices": 4,
+      "devices": [
+        "GENEVA XP",
+        "INTEGER plus",
+        "PRECIA",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "GENEVA XP",
+          "INTEGER plus"
+        ],
+        [
+          "GENEVA XP",
+          "PRECIA"
+        ],
+        [
+          "GENEVA XP",
+          "ZEDIUS XP"
+        ],
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ],
+        [
+          "INTEGER plus",
+          "ZEDIUS XP"
+        ],
+        [
+          "PRECIA",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 6,
+      "docs_by_device": {
+        "GENEVA XP": [
+          "global_sop_geneva_xp_rep_pm_mfc"
+        ],
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_ll_mfc"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_pm_mfc"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_tm_mfc"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "pirani gauge",
+      "raw_topics": [
+        "PIRANI GAUGE",
+        "pirani gauge"
+      ],
+      "n_devices": 4,
+      "devices": [
+        "PRECIA",
+        "SUPRA Vplus",
+        "TIGMA Vplus",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "PRECIA",
+          "SUPRA Vplus"
+        ],
+        [
+          "PRECIA",
+          "TIGMA Vplus"
+        ],
+        [
+          "PRECIA",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA Vplus",
+          "TIGMA Vplus"
+        ],
+        [
+          "SUPRA Vplus",
+          "ZEDIUS XP"
+        ],
+        [
+          "TIGMA Vplus",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 6,
+      "docs_by_device": {
+        "PRECIA": [
+          "global_sop_precia_all_pm_pirani_gauge"
+        ],
+        "SUPRA Vplus": [
+          "40039531"
+        ],
+        "TIGMA Vplus": [
+          "40071809"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_pm_pirani_gauge"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "pressure switch",
+      "raw_topics": [
+        "PRESSURE SWITCH",
+        "Pressure switch",
+        "pressure switch"
+      ],
+      "n_devices": 4,
+      "devices": [
+        "GENEVA XP",
+        "PRECIA",
+        "SUPRA Vplus",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "GENEVA XP",
+          "PRECIA"
+        ],
+        [
+          "GENEVA XP",
+          "SUPRA Vplus"
+        ],
+        [
+          "GENEVA XP",
+          "ZEDIUS XP"
+        ],
+        [
+          "PRECIA",
+          "SUPRA Vplus"
+        ],
+        [
+          "PRECIA",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA Vplus",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 6,
+      "docs_by_device": {
+        "GENEVA XP": [
+          "global_sop_geneva_xp_rep_pm_pressure_switch"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_tm_pressure_switch"
+        ],
+        "SUPRA Vplus": [
+          "40097857"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_efem_pressure_switch"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "solenoid valve",
+      "raw_topics": [
+        "SOLENOID VALVE",
+        "solenoid valve"
+      ],
+      "n_devices": 4,
+      "devices": [
+        "INTEGER plus",
+        "PRECIA",
+        "SUPRA N",
+        "SUPRA N series"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA N series"
+        ],
+        [
+          "PRECIA",
+          "SUPRA N"
+        ],
+        [
+          "PRECIA",
+          "SUPRA N series"
+        ],
+        [
+          "SUPRA N",
+          "SUPRA N series"
+        ]
+      ],
+      "n_device_pairs": 6,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_am_solenoid_valve",
+          "global_sop_integer_plus_all_pm_solenoid_valve",
+          "global_sop_integer_plus_all_tm_solenoid_valve"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_pm_solenoid_valve",
+          "global_sop_precia_all_tm_solenoid_valve"
+        ],
+        "SUPRA N": [
+          "supra_n_tm_trouble_shooting_guide_trace_bm_module_abnormal"
+        ],
+        "SUPRA N series": [
+          "global_sop_supra_n_series_all_tm_solenoid_valve"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "undocking",
+      "raw_topics": [
+        "UNDOCKING",
+        "undocking"
+      ],
+      "n_devices": 4,
+      "devices": [
+        "PRECIA",
+        "SUPRA N",
+        "SUPRA Vm",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "PRECIA",
+          "SUPRA N"
+        ],
+        [
+          "PRECIA",
+          "SUPRA Vm"
+        ],
+        [
+          "PRECIA",
+          "SUPRA Vplus"
+        ],
+        [
+          "SUPRA N",
+          "SUPRA Vm"
+        ],
+        [
+          "SUPRA N",
+          "SUPRA Vplus"
+        ],
+        [
+          "SUPRA Vm",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 6,
+      "docs_by_device": {
+        "PRECIA": [
+          "global_sop_precia_adj_all_undocking"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_adj_all_undocking"
+        ],
+        "SUPRA Vm": [
+          "40032612"
+        ],
+        "SUPRA Vplus": [
+          "global_sop_supra_vplus_adj_all_undocking"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "baratron gauge",
+      "raw_topics": [
+        "BARATRON GAUGE",
+        "baratron gauge"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "PRECIA",
+        "SUPRA Vplus",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "PRECIA",
+          "SUPRA Vplus"
+        ],
+        [
+          "PRECIA",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA Vplus",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "PRECIA": [
+          "global_sop_precia_all_pm_baratron_gauge"
+        ],
+        "SUPRA Vplus": [
+          "40036506",
+          "40046425"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_pm_baratron_gauge"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "door valve",
+      "raw_topics": [
+        "DOOR VALVE",
+        "door valve"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "PRECIA",
+        "SUPRA N",
+        "TIGMA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "PRECIA",
+          "SUPRA N"
+        ],
+        [
+          "PRECIA",
+          "TIGMA Vplus"
+        ],
+        [
+          "SUPRA N",
+          "TIGMA Vplus"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "PRECIA": [
+          "global_sop_precia_all_efem_door_valve"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_pm_door_valve"
+        ],
+        "TIGMA Vplus": [
+          "40045896",
+          "40082345"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "ffu controller",
+      "raw_topics": [
+        "FFU CONTROLLER",
+        "ffu controller"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "GENEVA XP",
+        "SUPRA Vplus",
+        "TIGMA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "GENEVA XP",
+          "SUPRA Vplus"
+        ],
+        [
+          "GENEVA XP",
+          "TIGMA Vplus"
+        ],
+        [
+          "SUPRA Vplus",
+          "TIGMA Vplus"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "GENEVA XP": [
+          "global_sop_geneva_xp_rep_efem_ffu_controller"
+        ],
+        "SUPRA Vplus": [
+          "40097172"
+        ],
+        "TIGMA Vplus": [
+          "40075928"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "ffu filter",
+      "raw_topics": [
+        "FFU FILTER",
+        "ffu filter"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "GENEVA XP",
+        "SUPRA V",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "GENEVA XP",
+          "SUPRA V"
+        ],
+        [
+          "GENEVA XP",
+          "SUPRA Vplus"
+        ],
+        [
+          "SUPRA V",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "GENEVA XP": [
+          "global_sop_geneva_xp_rep_efem_ffu_filter"
+        ],
+        "SUPRA V": [
+          "40046555"
+        ],
+        "SUPRA Vplus": [
+          "40059539"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "flow switch",
+      "raw_topics": [
+        "FLOW SWITCH",
+        "flow switch"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "INTEGER plus",
+        "TIGMA Vplus",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "TIGMA Vplus"
+        ],
+        [
+          "INTEGER plus",
+          "ZEDIUS XP"
+        ],
+        [
+          "TIGMA Vplus",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_pm_flow_switch"
+        ],
+        "TIGMA Vplus": [
+          "40040783"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_ll_flow_switch",
+          "global_sop_supra_xp_all_pm_flow_switch"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "fluorescent lamp",
+      "raw_topics": [
+        "fluorescent lamp"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "PRECIA",
+        "SUPRA N",
+        "SUPRA N series"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "PRECIA",
+          "SUPRA N"
+        ],
+        [
+          "PRECIA",
+          "SUPRA N series"
+        ],
+        [
+          "SUPRA N",
+          "SUPRA N series"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "PRECIA": [
+          "global_sop_precia_all_efem_fluorescent_lamp"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_tm_fluorescent_lamp"
+        ],
+        "SUPRA N series": [
+          "global_sop_supra_n_series_all_efem_fluorescent_lamp"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "isolation valve",
+      "raw_topics": [
+        "ISOLATION VALVE",
+        "isolation valve"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "PRECIA",
+        "SUPRA N series",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "PRECIA",
+          "SUPRA N series"
+        ],
+        [
+          "PRECIA",
+          "SUPRA Vplus"
+        ],
+        [
+          "SUPRA N series",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "PRECIA": [
+          "global_sop_precia_all_tm_isolation_valve"
+        ],
+        "SUPRA N series": [
+          "global_sop_supra_n_series_all_pm_isolation_valve"
+        ],
+        "SUPRA Vplus": [
+          "40097177"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "pneumatic valve",
+      "raw_topics": [
+        "PNEUMATIC VALVE",
+        "pneumatic valve"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "INTEGER plus",
+        "PRECIA",
+        "TIGMA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ],
+        [
+          "INTEGER plus",
+          "TIGMA Vplus"
+        ],
+        [
+          "PRECIA",
+          "TIGMA Vplus"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_pm_pneumatic_valve"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_pm_pneumatic_valve",
+          "global_sop_precia_all_tm_pneumatic_valve"
+        ],
+        "TIGMA Vplus": [
+          "40073159"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "robot sr8240",
+      "raw_topics": [
+        "ROBOT SR8240",
+        "robot sr8240"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "GENEVA XP",
+        "SUPRA N",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "GENEVA XP",
+          "SUPRA N"
+        ],
+        [
+          "GENEVA XP",
+          "SUPRA Vplus"
+        ],
+        [
+          "SUPRA N",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "GENEVA XP": [
+          "global_sop_geneva_xp_rep_efem_robot_sr8240"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_all_efem_robot_sr8240"
+        ],
+        "SUPRA Vplus": [
+          "40044522"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "sensor board",
+      "raw_topics": [
+        "SENSOR BOARD",
+        "sensor board"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "INTEGER plus",
+        "PRECIA",
+        "SUPRA N"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ],
+        [
+          "PRECIA",
+          "SUPRA N"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_ll_sensor_board"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_efem_sensor_board",
+          "global_sop_precia_all_tm_sensor_board"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_all_tm_sensor_board",
+          "supra_n_tm_trouble_shooting_guide_trace_bm_module_abnormal"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "slot valve",
+      "raw_topics": [
+        "slot valve"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "INTEGER plus",
+        "PRECIA",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ],
+        [
+          "INTEGER plus",
+          "ZEDIUS XP"
+        ],
+        [
+          "PRECIA",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_am_slot_valve",
+          "global_sop_integer_plus_all_ll_slot_valve",
+          "global_sop_integer_plus_all_pm_slot_valve"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_pm_slot_valve",
+          "global_sop_precia_all_tm_slot_valve"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_tm_slot_valve"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "temp controller",
+      "raw_topics": [
+        "TEMP CONTROLLER",
+        "temp controller"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "GENEVA XP",
+        "INTEGER plus",
+        "SUPRA XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "GENEVA XP",
+          "INTEGER plus"
+        ],
+        [
+          "GENEVA XP",
+          "SUPRA XP"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA XP"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "GENEVA XP": [
+          "global_sop_geneva_xp_rep_pm_temp_controller"
+        ],
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_am_temp_controller",
+          "global_sop_integer_plus_all_pm_temp_controller"
+        ],
+        "SUPRA XP": [
+          "global_sop_supra_xp_all_pm_temp_controller"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "top lid",
+      "raw_topics": [
+        "TOP LID",
+        "top lid"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "INTEGER plus",
+        "SUPRA N",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA Vplus"
+        ],
+        [
+          "SUPRA N",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_tm_top_lid"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_pm_top_lid"
+        ],
+        "SUPRA Vplus": [
+          "40066068"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "unit gas box board",
+      "raw_topics": [
+        "UNIT GAS BOX BOARD",
+        "unit gas box board"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "SUPRA N series",
+        "SUPRA Vplus",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N series",
+          "SUPRA Vplus"
+        ],
+        [
+          "SUPRA N series",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA Vplus",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "SUPRA N series": [
+          "global_sop_supra_n_series_all_sub_unit_gas_box_board"
+        ],
+        "SUPRA Vplus": [
+          "40033941"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_sub_unit_gas_box_board"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "baffle",
+      "raw_topics": [
+        "BAFFLE",
+        "baffle"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_am_baffle"
+        ],
+        "SUPRA Vplus": [
+          "40097172"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "branch tap",
+      "raw_topics": [
+        "branch tap"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "SUPRA N"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_precia_all_tm_branch_tap"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_tm_branch_tap"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "chamber hinge",
+      "raw_topics": [
+        "CHAMBER HINGE",
+        "chamber hinge"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N series",
+        "TIGMA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N series",
+          "TIGMA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N series": [
+          "global_sop_supra_n_series_all_pm_chamber_hinge"
+        ],
+        "TIGMA Vplus": [
+          "40073691"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "ctc controller",
+      "raw_topics": [
+        "CTC CONTROLLER",
+        "ctc controller"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "SUPRA N"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_tm_ctc_controller"
+        ],
+        "SUPRA N": [
+          "supra_n_tm_trouble_shooting_guide_trace_bm_module_abnormal"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "dc cooling fan motor",
+      "raw_topics": [
+        "dc cooling fan motor"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "PRECIA"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_pm_dc_cooling_fan_motor"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_efem_dc_cooling_fan_motor"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "devicenet board",
+      "raw_topics": [
+        "devicenet board"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "SUPRA N"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_am_devicenet_board",
+          "global_sop_integer_plus_all_tm_devicenet_board"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_tm_devicenet_board"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "docking",
+      "raw_topics": [
+        "DOCKING",
+        "docking"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "OMNIS plus",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "OMNIS plus",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "OMNIS plus": [
+          "global_sop_omnis_plus_set_up_pm_docking_eng"
+        ],
+        "SUPRA Vplus": [
+          "40097172"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "dual epd",
+      "raw_topics": [
+        "dual epd"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_pm_dual_epd"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_pm_dual_epd"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "epc",
+      "raw_topics": [
+        "epc"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "PRECIA"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_tm_epc"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_tm_epc"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "fcip",
+      "raw_topics": [
+        "FCIP",
+        "fcip"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N": [
+          "global_sop_supra_n_all_pm_fcip_r3",
+          "global_sop_supra_n_all_pm_fcip_r5"
+        ],
+        "SUPRA Vplus": [
+          "40060043"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "focus adaptor",
+      "raw_topics": [
+        "FOCUS ADAPTOR"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA Vplus",
+        "TIGMA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA Vplus",
+          "TIGMA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA Vplus": [
+          "40035680"
+        ],
+        "TIGMA Vplus": [
+          "40074275"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "gap sensor",
+      "raw_topics": [
+        "gap sensor"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "OMNIS plus",
+        "PRECIA"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "OMNIS plus",
+          "PRECIA"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "OMNIS plus": [
+          "global_sop_omnis_plus_pm_gap_sensor_eng"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_pm_gap_sensor"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "gas feed through",
+      "raw_topics": [
+        "GAS FEED THROUGH",
+        "gas feed through"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "SUPRA N"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_pm_gas_line"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_pm_gas_feed_through"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "hook lifter servo motor",
+      "raw_topics": [
+        "HOOK LIFTER SERVO MOTOR",
+        "hook lifter servo motor"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N",
+        "TIGMA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N",
+          "TIGMA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_pm_hook_lifter_servo_motor"
+        ],
+        "TIGMA Vplus": [
+          "40086282"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "ib flow",
+      "raw_topics": [
+        "IB FLOW",
+        "ib flow"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_tm_ib_flow"
+        ],
+        "SUPRA Vplus": [
+          "40066837"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "interface board",
+      "raw_topics": [
+        "interface board"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "PRECIA"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_am_interface_board"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_efem_interface_board",
+          "global_sop_precia_all_tm_interface_board"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "load port",
+      "raw_topics": [
+        "LOAD PORT",
+        "load port"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "GENEVA XP",
+        "SUPRA N"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "GENEVA XP",
+          "SUPRA N"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "GENEVA XP": [
+          "global_sop_geneva_xp_rep_efem_load_port"
+        ],
+        "SUPRA N": [
+          "supra_n_all_trouble_shooting_guide_trace_loadport_abnormal"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "load port leveling",
+      "raw_topics": [
+        "LOAD PORT LEVELING",
+        "load port leveling"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "PRECIA",
+        "SUPRA N"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "PRECIA",
+          "SUPRA N"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "PRECIA": [
+          "global_sop_precia_all_efem_load_port_leveling"
+        ],
+        "SUPRA N": [
+          "supra_xp_efem_trouble_shooting_guide_trace_loadport_abnormal"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "multi port",
+      "raw_topics": [
+        "MULTI PORT",
+        "multi port"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N",
+        "SUPRA XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N",
+          "SUPRA XP"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N": [
+          "40038138",
+          "global_sop_supra_n_series_all_tm_multi_port"
+        ],
+        "SUPRA XP": [
+          "global_sop_supra_xp_all_tm_multi_port"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "pcw manual valve",
+      "raw_topics": [
+        "PCW MANUAL VALVE",
+        "pcw manual valve"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "TIGMA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "TIGMA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_pm_pcw_manual_valve",
+          "global_sop_integer_plus_all_tm_pcw_manual_valve"
+        ],
+        "TIGMA Vplus": [
+          "40036536"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "pendulum valve",
+      "raw_topics": [
+        "pendulum valve"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "PRECIA",
+        "SUPRA XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "PRECIA",
+          "SUPRA XP"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "PRECIA": [
+          "global_sop_precia_all_pm_pendulum_valve"
+        ],
+        "SUPRA XP": [
+          "global_sop_supra_xp_all_pm_pendulum_valve"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "pio sensor board",
+      "raw_topics": [
+        "PIO SENSOR BOARD",
+        "pio sensor board"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_efem_pio_sensor_board"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_efem_pio_sensor_board"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "power turn on off",
+      "raw_topics": [
+        "POWER TURN ON\uff0fOFF",
+        "power turn on\uff0foff"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N": [
+          "global_sop_supra_n_adj_all_power_turn_on_off"
+        ],
+        "SUPRA Vplus": [
+          "global_sop_supra_vplus_adj_all_power_turn_on_off"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "pressure gauge",
+      "raw_topics": [
+        "pressure gauge"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N series",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N series",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N series": [
+          "global_sop_supra_n_series_all_pm_pressure_gauge"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_ll_pressure_gauge",
+          "global_sop_supra_xp_all_pm_pressure_gauge",
+          "global_sop_supra_xp_all_tm_pressure_gauge"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "pressure relief valve",
+      "raw_topics": [
+        "pressure relief valve"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "PRECIA",
+        "SUPRA N"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "PRECIA",
+          "SUPRA N"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "PRECIA": [
+          "global_sop_precia_all_efem_pressure_relief_valve",
+          "global_sop_precia_all_tm_pressure_relief_valve"
+        ],
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_tm_pressure_relief_valve"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "process kit",
+      "raw_topics": [
+        "process kit"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N",
+        "SUPRA XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N",
+          "SUPRA XP"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_pm_process_kit"
+        ],
+        "SUPRA XP": [
+          "global_sop_supra_xp_all_pm_process_kit"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "rfid assy",
+      "raw_topics": [
+        "rfid assy"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_efem_rfid_assy"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_efem_rfid_assy"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "robot controller",
+      "raw_topics": [
+        "ROBOT CONTROLLER",
+        "Robot controller"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "GENEVA XP",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "GENEVA XP",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "GENEVA XP": [
+          "global_sop_genevaxp_rep_efem_robot_controller"
+        ],
+        "SUPRA Vplus": [
+          "40054699",
+          "40097172"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "robot teaching",
+      "raw_topics": [
+        "ROBOT TEACHING",
+        "robot teaching"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "GENEVA XP",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "GENEVA XP",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "GENEVA XP": [
+          "global_sop_geneva_xp_adj_efem_robot_teaching"
+        ],
+        "SUPRA Vplus": [
+          "40043406"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "signal tower",
+      "raw_topics": [
+        "signal tower"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "PRECIA"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "PRECIA"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_efem_signal_tower"
+        ],
+        "PRECIA": [
+          "global_sop_precia_all_efem_signal_tower"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "source box board",
+      "raw_topics": [
+        "source box board"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_pm_source_box_board"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_pm_source_box_board"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "sw installation setting",
+      "raw_topics": [
+        "sw installation & setting"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N series",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N series",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N series": [
+          "global_sop_supra_n_series_sw_all_sw_installation_setting"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_sw_all_sw_installation_setting"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "tc wafer",
+      "raw_topics": [
+        "TC WAFER",
+        "tc wafer"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_pm_tc_wafer"
+        ],
+        "SUPRA Vplus": [
+          "40062036"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "unit flow switch",
+      "raw_topics": [
+        "UNIT FLOW SWITCH",
+        "unit flow switch"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N",
+        "TIGMA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N",
+          "TIGMA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N": [
+          "global_sop_supra_n_series_all_sub_unit_flow_switch"
+        ],
+        "TIGMA Vplus": [
+          "40085764"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "unit igs block",
+      "raw_topics": [
+        "unit igs block"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N": [
+          "global_sop_supra_n_all_sub_unit_igs_block"
+        ],
+        "ZEDIUS XP": [
+          "global_sop_supra_xp_all_sub_unit_igs_block"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "unit mfc",
+      "raw_topics": [
+        "UNIT MFC",
+        "unit mfc"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N": [
+          "global_sop_supra_n_all_sub_unit_mfc"
+        ],
+        "SUPRA Vplus": [
+          "40097172"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "unit temp controller",
+      "raw_topics": [
+        "UNIT TEMP CONTROLLER",
+        "unit temp controller"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N series",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "SUPRA N series",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N series": [
+          "global_sop_supra_n_series_all_sub_unit_temp_controller"
+        ],
+        "SUPRA Vplus": [
+          "40097172"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "vacuum line",
+      "raw_topics": [
+        "vacuum line"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER XP",
+        "INTEGER plus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER XP",
+          "INTEGER plus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER XP": [
+          "global_sop_integer_plus_all_pm_vacuum_line"
+        ],
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_am_vacuum_line",
+          "global_sop_integer_plus_all_ll_vacuum_line",
+          "global_sop_integer_plus_all_tm_vacuum_line"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "view quartz",
+      "raw_topics": [
+        "VIEW QUARTZ",
+        "view quartz"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_am_view_quartz",
+          "global_sop_integer_plus_all_pm_view_quartz"
+        ],
+        "SUPRA Vplus": [
+          "40043020"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "water shut off valve",
+      "raw_topics": [
+        "WATER SHUT OFF VALVE",
+        "water shut off valve"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "SUPRA Vplus"
+      ],
+      "trap_ready": true,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "SUPRA Vplus"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "global_sop_integer_plus_all_pm_water_shut_off_valve"
+        ],
+        "SUPRA Vplus": [
+          "40055238"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "leak rate over",
+      "raw_topics": [
+        "leak rate over"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "INTEGER plus",
+        "SUPRA N",
+        "ZEDIUS XP"
+      ],
+      "trap_ready": false,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ],
+        [
+          "INTEGER plus",
+          "ZEDIUS XP"
+        ],
+        [
+          "SUPRA N",
+          "ZEDIUS XP"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "integer_plus_all_trouble_shooting_guide_trace_leak_rate_over"
+        ],
+        "SUPRA N": [
+          "supra_n_all_trouble_shooting_guide_trace_leak_rate_over"
+        ],
+        "ZEDIUS XP": [
+          "supra_xp_pm_trouble_shooting_guide_trace_leak_rate_over"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "pin move abnormal",
+      "raw_topics": [
+        "Pin Move Abnormal",
+        "Pin move abnormal"
+      ],
+      "n_devices": 3,
+      "devices": [
+        "INTEGER plus",
+        "SUPRA N",
+        "SUPRA XP"
+      ],
+      "trap_ready": false,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ],
+        [
+          "INTEGER plus",
+          "SUPRA XP"
+        ],
+        [
+          "SUPRA N",
+          "SUPRA XP"
+        ]
+      ],
+      "n_device_pairs": 3,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "integer_plus_all_trouble_shooting_guide_trace_pin_move_abnormal"
+        ],
+        "SUPRA N": [
+          "supra_n_all_trouble_shooting_guide_trace_pin_move_abnormal"
+        ],
+        "SUPRA XP": [
+          "supra_xp_pm_trouble_shooting_guide_trace_pin_move_abnormal"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "chuck abnormal",
+      "raw_topics": [
+        "Chuck Abnormal"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "PRECIA",
+        "SUPRA XP"
+      ],
+      "trap_ready": false,
+      "device_pairs": [
+        [
+          "PRECIA",
+          "SUPRA XP"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "PRECIA": [
+          "precia_pm_trouble_shooting_guide_chuck_abnormal"
+        ],
+        "SUPRA XP": [
+          "supra_xp_pm_trouble_shooting_guide_trace_chuck_abnormal"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "efem robot abnormal",
+      "raw_topics": [
+        "EFEM Robot Abnormal"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "SUPRA N"
+      ],
+      "trap_ready": false,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "SUPRA N"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "integer_plus_all_trouble_shooting_guide_trace_efem_robot_abnormal"
+        ],
+        "SUPRA N": [
+          "supra_n_all_trouble_shooting_guide_trace_efem_robot_abnormal"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "epd abnormal",
+      "raw_topics": [
+        "EPD Abnormal"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "SUPRA N",
+        "SUPRA XP"
+      ],
+      "trap_ready": false,
+      "device_pairs": [
+        [
+          "SUPRA N",
+          "SUPRA XP"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "SUPRA N": [
+          "supra_n_pm_trouble_shooting_guide_trace_epd_abnormal"
+        ],
+        "SUPRA XP": [
+          "supra_xp_pm_trouble_shooting_guide_trace_epd_abnormal"
+        ]
+      }
+    },
+    {
+      "topic_normalized": "tm robot abnormal",
+      "raw_topics": [
+        "TM Robot Abnormal",
+        "TM Robot abnormal"
+      ],
+      "n_devices": 2,
+      "devices": [
+        "INTEGER plus",
+        "SUPRA XP"
+      ],
+      "trap_ready": false,
+      "device_pairs": [
+        [
+          "INTEGER plus",
+          "SUPRA XP"
+        ]
+      ],
+      "n_device_pairs": 1,
+      "docs_by_device": {
+        "INTEGER plus": [
+          "integer_plus_all_trouble_shooting_guide_trace_tm_robot_abnormal"
+        ],
+        "SUPRA XP": [
+          "supra_n_all_trouble_shooting_guide_trace_tm_robot_abnormal",
+          "supra_xp_tm_trouble_shooting_guide_trace_tm_robot_abnormal"
+        ]
+      }
+    }
+  ]
+}

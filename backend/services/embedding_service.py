@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 import numpy as np
 
 from backend.config.settings import rag_settings
+from backend.llm_infrastructure.embedding.base import BaseEmbedder
 from backend.llm_infrastructure.embedding.registry import get_embedder
 
 
@@ -16,12 +17,12 @@ class EmbeddingService:
     def __init__(
         self,
         *,
-        method: Optional[str] = None,
-        version: Optional[str] = None,
-        device: Optional[str] = None,
-        use_cache: Optional[bool] = None,
-        cache_dir: Optional[str] = None,
-        model_name: Optional[str] = None,
+        method: str | None = None,
+        version: str | None = None,
+        device: str | None = None,
+        use_cache: bool | None = None,
+        cache_dir: str | None = None,
+        model_name: str | None = None,
     ) -> None:
         self.method = method or rag_settings.embedding_method
         self.version = version or rag_settings.embedding_version
@@ -29,9 +30,9 @@ class EmbeddingService:
         self.use_cache = use_cache if use_cache is not None else rag_settings.embedding_use_cache
         self.cache_dir = cache_dir or rag_settings.embedding_cache_dir
         self.model_name = model_name
-        self._embedder = None
+        self._embedder: BaseEmbedder | None = None
 
-    def _get_embedder(self):
+    def _get_embedder(self) -> BaseEmbedder:
         if self._embedder is None:
             self._embedder = get_embedder(
                 self.method,
@@ -55,7 +56,7 @@ class EmbeddingService:
         """임베딩 차원."""
         return self._get_embedder().get_dimension()
 
-    def get_raw_embedder(self):
+    def get_raw_embedder(self) -> BaseEmbedder:
         """레지스트리에서 생성된 실제 임베더 인스턴스를 반환한다."""
         return self._get_embedder()
 

@@ -178,9 +178,13 @@ def ingest_content(
         "lang",
         "content",
         "search_text",
+        "chunk_summary",
+        "chunk_keywords",
         "doc_type",
         "device_name",
         "equip_id",
+        "tenant_id",
+        "project_id",
         "chapter",
         "section_chapter",
         "section_number",
@@ -202,6 +206,24 @@ def ingest_content(
                 raise ValueError(
                     f"Unexpected top-level chunk fields: {sorted(unknown)} in {chunk.chunk_id}"
                 )
+            extra_meta = (
+                doc.get("extra_meta") if isinstance(doc.get("extra_meta"), dict) else {}
+            )
+            raw_keywords = extra_meta.get("chunk_keywords", [])
+            chunk_keywords = (
+                [
+                    str(keyword).strip()
+                    for keyword in raw_keywords
+                    if str(keyword).strip()
+                ]
+                if isinstance(raw_keywords, list)
+                else []
+            )
+
+            doc["chunk_summary"] = str(extra_meta.get("chunk_summary", "") or "")
+            doc["chunk_keywords"] = chunk_keywords
+            doc["tenant_id"] = str(extra_meta.get("tenant_id", "") or "")
+            doc["project_id"] = str(extra_meta.get("project_id", "") or "")
             doc["created_at"] = created_at
             yield {
                 "_index": content_index,
@@ -281,10 +303,16 @@ def ingest_embeddings(
     content_meta: dict[str, dict[str, Any]] = {}
     chunks = load_chunks_jsonl(chunks_path)
     for chunk in chunks:
+        extra_meta = chunk.extra_meta if isinstance(chunk.extra_meta, dict) else {}
         content_meta[chunk.chunk_id] = {
             "chunk_id": chunk.chunk_id,
+            "doc_id": chunk.doc_id,
             "doc_type": chunk.doc_type,
             "device_name": chunk.device_name,
+            "equip_id": chunk.equip_id,
+            "lang": chunk.lang,
+            "tenant_id": str(extra_meta.get("tenant_id", "") or ""),
+            "project_id": str(extra_meta.get("project_id", "") or ""),
             "chapter": chunk.chapter,
             "content_hash": chunk.content_hash,
         }
@@ -319,9 +347,14 @@ def ingest_embeddings(
                 "_id": cid,
                 "_source": {
                     "chunk_id": cid,
+                    "doc_id": str(meta.get("doc_id", "") or ""),
                     "content_hash": str(meta.get("content_hash", "") or ""),
                     "doc_type": str(meta.get("doc_type", "") or ""),
                     "device_name": str(meta.get("device_name", "") or ""),
+                    "equip_id": str(meta.get("equip_id", "") or ""),
+                    "lang": str(meta.get("lang", "") or ""),
+                    "tenant_id": str(meta.get("tenant_id", "") or ""),
+                    "project_id": str(meta.get("project_id", "") or ""),
                     "chapter": str(meta.get("chapter", "") or ""),
                     "embedding": vec.tolist(),
                 },

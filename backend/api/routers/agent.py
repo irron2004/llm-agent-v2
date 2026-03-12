@@ -22,7 +22,12 @@ from backend.api.dependencies import (
 )
 from backend.config.settings import agent_settings
 from backend.domain.doc_type_mapping import expand_doc_type_selection, group_doc_type_buckets
-from backend.llm_infrastructure.llm.langgraph_agent import ParsedQuery, _detect_language_rule_based
+from backend.llm_infrastructure.llm.langgraph_agent import (
+    ParsedQuery,
+    _detect_language_rule_based,
+    _extract_devices_from_query,
+)
+from backend.services.device_cache import get_device_cache
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
 from backend.services.agents.langgraph_rag_agent import LangGraphRAGAgent
 from backend.services.search_service import SearchService
@@ -190,10 +195,24 @@ def _build_state_overrides(req: "AgentRequest") -> Dict[str, Any]:
 
     # Override/regeneration 경로는 auto_parse 노드를 건너뛰므로
     # 답변 언어 템플릿 선택을 위해 최소 언어 감지를 보정한다.
+    # 장비 필터가 없으면 질문에서 장비도 파싱한다.
     if overrides:
         detected_lang = _detect_language_rule_based(req.message or "")
         overrides["detected_language"] = detected_lang
+        overrides["target_language"] = detected_lang
         pq_fields["detected_language"] = detected_lang
+
+        # 장비 필터가 명시되지 않은 경우, 질문에서 장비를 파싱
+        if "selected_devices" not in overrides and req.message:
+            cache = get_device_cache()
+            if cache.is_initialized:
+                detected_devices = _extract_devices_from_query(
+                    cache.device_names, req.message
+                )
+                if detected_devices:
+                    overrides["selected_devices"] = detected_devices[:1]
+                    pq_fields["selected_devices"] = detected_devices[:1]
+
         overrides["parsed_query"] = pq_fields
 
     return overrides
@@ -767,6 +786,16 @@ def _build_response_metadata(
             result.get("guardrail_final_count", len(final_search_queries)) or 0
         ),
     }
+
+    answer_format = result.get("answer_format")
+    if isinstance(answer_format, dict):
+        metadata["answer_format"] = answer_format
+    retries_raw = result.get("answer_format_retries")
+    if retries_raw is not None:
+        try:
+            metadata["answer_format_retries"] = int(retries_raw or 0)
+        except (TypeError, ValueError):
+            metadata["answer_format_retries"] = 0
     search_queries_raw = _sanitize_search_queries_raw(result)
     if search_queries_raw:
         metadata["search_queries_raw"] = search_queries_raw

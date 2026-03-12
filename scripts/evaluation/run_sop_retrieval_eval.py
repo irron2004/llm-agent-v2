@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import cast
 
 API_BASE_URL = "http://localhost:8001"
-TIMEOUT = 60.0
+TIMEOUT = 180.0
 
 DEVICE_ALIASES = {
     "SUPRA XP": ["SUPRA XP", "ZEDIUS XP"],

@@ -75,9 +75,7 @@ class TmuxAdapter:
         return argv
 
     def get_current_session(self) -> str | None:
-        result = self._run(
-            ["display-message", "-p", "#{session_name}"], check=False
-        )
+        result = self._run(["display-message", "-p", "#{session_name}"], check=False)
         if result.returncode != 0:
             return None
         name = result.stdout.strip()
@@ -137,7 +135,11 @@ class TmuxAdapter:
         return pane_id
 
     def split_window(
-        self, session_name: str, command: str, *, cwd: str | None = None,
+        self,
+        session_name: str,
+        command: str,
+        *,
+        cwd: str | None = None,
         horizontal: bool = True,
     ) -> str:
         self._validate_session_name(session_name)
@@ -160,9 +162,7 @@ class TmuxAdapter:
 
     def select_layout(self, session_name: str, layout: str = "even-horizontal") -> None:
         self._validate_session_name(session_name)
-        self._run(
-            ["select-layout", "-t", session_name, layout], check=True
-        )
+        self._run(["select-layout", "-t", session_name, layout], check=True)
 
     def set_session_workspace_id(self, session_name: str, workspace_id: str) -> None:
         self._validate_session_name(session_name)
@@ -182,9 +182,7 @@ class TmuxAdapter:
             "#{pane_current_command}\t#{pane_title}\t#{@ai_role}\t"
             "#{pane_pid}\t#{pane_dead_status}\t#{pane_start_command}"
         )
-        result = self._run(
-            ["list-panes", "-t", session_name, "-F", fmt], check=False
-        )
+        result = self._run(["list-panes", "-t", session_name, "-F", fmt], check=False)
         if result.returncode != 0:
             self._raise("Failed to list tmux panes", result)
 
@@ -243,9 +241,7 @@ class TmuxAdapter:
         main_height_percent: int = 70,
     ) -> None:
         self._validate_session_name(session_name)
-        self._run(
-            ["select-layout", "-t", session_name, "main-horizontal"], check=False
-        )
+        self._run(["select-layout", "-t", session_name, "main-horizontal"], check=False)
         if active_pane_id:
             self._run(
                 ["swap-pane", "-s", active_pane_id, "-t", f"{session_name}.0"],
@@ -277,13 +273,25 @@ class TmuxAdapter:
             home_session = self.get_current_session()
             if home_session:
                 self._run(
-                    ["set-option", "-t", session_name,
-                     "@ai_workbench_home", home_session],
+                    [
+                        "set-option",
+                        "-t",
+                        session_name,
+                        "@ai_workbench_home",
+                        home_session,
+                    ],
                     check=False,
                 )
                 self._run(
-                    ["bind-key", "-T", "prefix", "B",
-                     "switch-client", "-t", home_session],
+                    [
+                        "bind-key",
+                        "-T",
+                        "prefix",
+                        "B",
+                        "switch-client",
+                        "-t",
+                        home_session,
+                    ],
                     check=False,
                 )
             self._run(["switch-client", "-t", session_name], check=True)
@@ -308,11 +316,17 @@ class TmuxAdapter:
     def configure_workspace_bar(self, session_name: str) -> None:
         self._validate_session_name(session_name)
         python = sys.executable
-        statusbar_cmd = f"#({python} -m ai_workbench statusbar --session '#{{session_name}}')"
+        statusbar_cmd = (
+            f"#({python} -m ai_workbench statusbar --session '#{{session_name}}')"
+        )
         cycle_next = f"{python} -m ai_workbench cycle --direction next"
         cycle_prev = f"{python} -m ai_workbench cycle --direction prev"
         quick_create = f"{python} -m ai_workbench quick-create"
         add_pane = f"{python} -m ai_workbench add-pane --session '#{{session_name}}'"
+        go_home = (
+            "home='#{@ai_workbench_home}'; "
+            '[ -n "$home" ] && tmux switch-client -t "=$home" || tmux detach-client'
+        )
 
         # Status bar: top, showing workspace tabs
         for opt, val in [
@@ -324,22 +338,18 @@ class TmuxAdapter:
             ("status-style", "bg=colour235,fg=colour248"),
             ("status-interval", "3"),
         ]:
-            self._run(
-                ["set-option", "-t", session_name, opt, val], check=False
-            )
+            self._run(["set-option", "-t", session_name, opt, val], check=False)
 
         # Keybindings (root table = no prefix needed)
         bindings: list[tuple[str, str]] = [
             ("C-Tab", cycle_next),
             ("C-S-Tab", cycle_prev),
-            ("C-t", quick_create),     # Ctrl+T: new workspace
-            ("M-t", add_pane),         # Alt+T: add terminal pane
+            ("C-t", quick_create),  # Ctrl+T: new workspace
+            ("M-t", add_pane),  # Alt+T: add terminal pane
+            ("M-0", go_home),
         ]
-        # Ctrl+1..9 to switch workspace by index
         for i in range(1, 10):
-            bindings.append(
-                (f"C-{i}", f"{python} -m ai_workbench cycle --index {i}")
-            )
+            bindings.append((f"M-{i}", f"{python} -m ai_workbench cycle --index {i}"))
 
         for key, cmd in bindings:
             self._run(

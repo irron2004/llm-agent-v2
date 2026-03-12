@@ -1,0 +1,42 @@
+{
+  "sop_only_results.jsonl": {
+    "ok": true,
+    "rows": 1,
+    "invalid": 0,
+    "thin_rows": 1,
+    "rich_rows": 0
+  },
+  "sop_only_results.rich.jsonl": {
+    "ok": true,
+    "rows": 1,
+    "invalid": 0,
+    "thin_rows": 0,
+    "rich_rows": 1,
+    "checks": {
+      "references_ok": "1/1",
+      "citations_ok": "1/1",
+      "language_ok": "1/1",
+      "format_ok": "1/1"
+    }
+  },
+  "절차검색_results.jsonl": {
+    "ok": true,
+    "rows": 1,
+    "invalid": 0,
+    "thin_rows": 1,
+    "rich_rows": 0
+  },
+  "절차검색_results.rich.jsonl": {
+    "ok": true,
+    "rows": 1,
+    "invalid": 0,
+    "thin_rows": 0,
+    "rich_rows": 1,
+    "checks": {
+      "references_ok": "1/1",
+      "citations_ok": "1/1",
+      "language_ok": "1/1",
+      "format_ok": "1/1"
+    }
+  }
+}

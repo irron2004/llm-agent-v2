@@ -31,3 +31,20 @@ def test_tmux_adapter_dry_run_prints_commands(capsys) -> None:
     captured = capsys.readouterr()
     assert "tmux" in captured.out
     assert "new-session" in captured.out
+
+
+def test_configure_workspace_bar_uses_alt_bindings(capsys) -> None:
+    adapter = TmuxAdapter(dry_run=True, print_tmux=True)
+    adapter.configure_workspace_bar("aiwb-demo")
+
+    captured = capsys.readouterr()
+    output = captured.out
+
+    for index in range(1, 10):
+        assert f"bind-key -T root M-{index} run-shell" in output
+        assert f"cycle --index {index}" in output
+        assert f"bind-key -T root C-{index} run-shell" not in output
+
+    assert "bind-key -T root M-0 run-shell" in output
+    assert "@ai_workbench_home" in output
+    assert "detach-client" in output

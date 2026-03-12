@@ -6,10 +6,12 @@ Configuration is loaded from:
 3. Default values (lowest priority)
 """
 
-from pydantic import AliasChoices, Field
-from .settings_vlm import vlm_settings  # noqa: F401  (optional VLM settings import)
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Literal
+
+from pydantic import AliasChoices, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+from .settings_vlm import vlm_settings  # noqa: F401  (optional VLM settings import)
 
 
 class RAGSettings(BaseSettings):
@@ -54,7 +56,9 @@ class RAGSettings(BaseSettings):
     retrieval_version: str = Field(default="v1", description="Retrieval method version")
     prompt_spec_version: str = Field(
         default="v1",
-        description="Prompt specification version for LangGraph YAML templates (RAG_PROMPT_SPEC_VERSION)",
+        description=(
+            "Prompt specification version for LangGraph YAML templates (RAG_PROMPT_SPEC_VERSION)"
+        ),
     )
 
     retrieval_top_k: int = Field(default=10, description="Number of documents to retrieve")
@@ -285,8 +289,13 @@ class OllamaSettings(BaseSettings):
     temperature: float = Field(default=0.7, description="Sampling temperature")
     max_tokens: int = Field(default=30000, description="Maximum tokens to generate")
     timeout: int = Field(default=60, description="Request timeout in seconds")
-    repeat_penalty: float = Field(default=1.3, description="Repetition penalty (1.0=off, >1.0=penalize)")
-    repeat_last_n: int = Field(default=256, description="Token window for repeat penalty (default ollama=64, 0=disabled, -1=ctx_size)")
+    repeat_penalty: float = Field(
+        default=1.3, description="Repetition penalty (1.0=off, >1.0=penalize)"
+    )
+    repeat_last_n: int = Field(
+        default=256,
+        description="Token window for repeat penalty (default ollama=64, 0=disabled, -1=ctx_size)",
+    )
 
 
 class VlmClientSettings(BaseSettings):
@@ -520,7 +529,9 @@ class SearchSettings(BaseSettings):
     )
     es_index: str = Field(
         default="",
-        description="Elasticsearch index name for vector search (legacy, use es_index_* for new setup)",
+        description=(
+            "Elasticsearch index name for vector search (legacy, use es_index_* for new setup)"
+        ),
     )
     es_user: str = Field(
         default="",
@@ -546,6 +557,31 @@ class SearchSettings(BaseSettings):
     es_embedding_dims: int = Field(
         default=768,
         description="Embedding vector dimensions (768 for BGE-base, 1024 for KoE5/multilingual-e5)",
+    )
+    chunk_version: Literal["v2", "v3"] = Field(
+        default="v2",
+        description=(
+            "Search runtime chunk layout version (v2=single index alias, v3=content+embed split)"
+        ),
+    )
+    v2_alias: str = Field(
+        default="",
+        description=(
+            "Optional alias override for v2 search index "
+            "(default: {es_index_prefix}_{es_env}_current)"
+        ),
+    )
+    v3_content_index: str = Field(
+        default="chunk_v3_content",
+        description="Content index name for v3 split-index retrieval",
+    )
+    v3_embed_index: str = Field(
+        default="",
+        description="Embedding index name for v3 split-index retrieval",
+    )
+    v3_embed_model_key: str = Field(
+        default="",
+        description="Optional v3 embed model key used to build index name chunk_v3_embed_{key}_v1",
     )
 
 
@@ -575,6 +611,37 @@ class AgentSettings(BaseSettings):
         gt=0.0,
         le=5.0,
         description="Score multiplier for SOP docs when SOP intent detected (1.0 = no boost)",
+    )
+    procedure_boost_enabled: bool = True
+    procedure_boost_factor: float = Field(
+        default=1.40,
+        gt=0.0,
+        le=5.0,
+        description="Score multiplier for Work Procedure/Flow Chart pages when query contains procedure keywords",
+    )
+    scope_penalty_enabled: bool = True
+    scope_penalty_factor: float = Field(
+        default=0.25,
+        gt=0.0,
+        le=1.0,
+        description="Score multiplier for Scope/Contents/TOC pages (penalize non-procedure pages)",
+    )
+    device_aliases: dict[str, list[str]] = Field(
+        default={
+            "SUPRA XP": ["SUPRA XP", "ZEDIUS XP"],
+            "ZEDIUS XP": ["SUPRA XP", "ZEDIUS XP"],
+        },
+        description="Device name aliases: key → list of equivalent device names for search expansion",
+    )
+    score_threshold: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Minimum RRF score threshold (0.0-1.0). Documents below this score are filtered out. 0.0 = no filtering.",
+    )
+    dedupe_by_doc_id: bool = Field(
+        default=True,
+        description="Deduplicate results by base doc_id, keeping only the highest-scoring page per document.",
     )
 
 

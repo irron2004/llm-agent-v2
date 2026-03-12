@@ -11,7 +11,10 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from backend.llm_infrastructure.elasticsearch.mappings import get_chunk_v3_content_mapping
+from backend.llm_infrastructure.elasticsearch.mappings import (
+    get_chunk_v3_content_mapping,
+    get_chunk_v3_embed_mapping,
+)
 from scripts.chunk_v3.chunkers import chunk_gcb, chunk_myservice, chunk_vlm_parsed
 from scripts.chunk_v3.common import canonicalize_doc_type
 from scripts.chunk_v3.run_embedding import embed_model
@@ -159,6 +162,29 @@ def test_run_embedding_embed_model_uses_batch_api(monkeypatch: pytest.MonkeyPatc
 def test_chunk_v3_content_mapping_guardrails() -> None:
     mapping = get_chunk_v3_content_mapping()
     assert mapping.get("dynamic") is False
-    extra_meta = mapping.get("properties", {}).get("extra_meta", {})
+    properties = mapping.get("properties", {})
+    extra_meta = properties.get("extra_meta", {})
     assert extra_meta.get("type") == "object"
     assert extra_meta.get("enabled") is False
+    assert "chunk_summary" in properties
+    assert "chunk_keywords" in properties
+    assert "tenant_id" in properties
+    assert "project_id" in properties
+
+
+def test_chunk_v3_embed_mapping_filter_fields() -> None:
+    mapping = get_chunk_v3_embed_mapping(dims=1024)
+    assert mapping.get("dynamic") is False
+    properties = mapping.get("properties", {})
+    assert properties.get("embedding", {}).get("dims") == 1024
+    for required in [
+        "chunk_id",
+        "doc_id",
+        "doc_type",
+        "device_name",
+        "equip_id",
+        "lang",
+        "tenant_id",
+        "project_id",
+    ]:
+        assert required in properties

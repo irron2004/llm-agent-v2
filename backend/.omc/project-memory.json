@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1773203351588,
+  "lastScanned": 1773313034231,
   "projectRoot": "/home/hskim/work/llm-agent-v2/backend",
   "techStack": {
     "languages": [
@@ -54,17 +54,18 @@
     "__pycache__": {
       "path": "__pycache__",
       "purpose": null,
-      "fileCount": 1,
-      "lastAccessed": 1773203351582,
+      "fileCount": 2,
+      "lastAccessed": 1773313034225,
       "keyFiles": [
-        "__init__.cpython-312.pyc"
+        "__init__.cpython-312.pyc",
+        "usercustomize.cpython-312.pyc"
       ]
     },
     "api": {
       "path": "api",
       "purpose": "API routes",
       "fileCount": 3,
-      "lastAccessed": 1773203351583,
+      "lastAccessed": 1773313034225,
       "keyFiles": [
         "__init__.py",
         "dependencies.py",
@@ -75,7 +76,7 @@
       "path": "config",
       "purpose": "Configuration files",
       "fileCount": 4,
-      "lastAccessed": 1773203351585,
+      "lastAccessed": 1773313034225,
       "keyFiles": [
         "__init__.py",
         "preset_loader.py",
@@ -87,7 +88,7 @@
       "path": "domain",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1773203351585,
+      "lastAccessed": 1773313034227,
       "keyFiles": [
         "__init__.py",
         "doc_type_mapping.py"
@@ -97,7 +98,7 @@
       "path": "elasticsearch",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1773203351585,
+      "lastAccessed": 1773313034229,
       "keyFiles": [
         "Dockerfile"
       ]
@@ -106,7 +107,7 @@
       "path": "llm_infrastructure",
       "purpose": null,
       "fileCount": 2,
-      "lastAccessed": 1773203351586,
+      "lastAccessed": 1773313034229,
       "keyFiles": [
         "__init__.py",
         "text_quality.py"
@@ -115,8 +116,8 @@
     "services": {
       "path": "services",
       "purpose": "Business logic services",
-      "fileCount": 18,
-      "lastAccessed": 1773203351586,
+      "fileCount": 19,
+      "lastAccessed": 1773313034229,
       "keyFiles": [
         "__init__.py",
         "chat_history_service.py",
@@ -128,8 +129,8 @@
     "tests": {
       "path": "tests",
       "purpose": "Test files",
-      "fileCount": 49,
-      "lastAccessed": 1773203351586,
+      "fileCount": 56,
+      "lastAccessed": 1773313034230,
       "keyFiles": [
         "conftest.py",
         "test_agent_additional_device_search_flag.py",

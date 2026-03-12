@@ -24,11 +24,19 @@ def main() -> int:
     if not args:
         return 0
 
+    known_sessions = {
+        "aiwb-demo",
+        "renamed-session",
+        "aiwb-11111111",
+        "aiwb-22222222",
+    }
+    known_targets = known_sessions | {f"={name}" for name in known_sessions}
+
     command = args[0]
 
     if command == "has-session":
         target = read_value(args, "-t")
-        if target in {"=aiwb-demo", "=renamed-session", "=aiwb-11111111", "=aiwb-22222222"}:
+        if target in known_targets:
             return 0
         print("can't find session", file=sys.stderr)
         return 1
@@ -42,7 +50,7 @@ def main() -> int:
 
     if command == "list-panes":
         target = read_value(args, "-t")
-        if target in {"=aiwb-demo", "=renamed-session", "=aiwb-11111111", "=aiwb-22222222"}:
+        if target in known_targets:
             print("%1\t0\t1\t0\tbash\tAIWB claude\tclaude\t1234\t\tbash -lc claude")
             print("%2\t1\t0\t0\tbash\tAIWB codex\tcodex\t1235\t\tbash -lc codex")
             print("%3\t2\t0\t0\tbash\tAIWB opencode\topencode\t1236\t\tbash -lc opencode")

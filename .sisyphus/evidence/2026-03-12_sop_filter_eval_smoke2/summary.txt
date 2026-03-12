@@ -1,0 +1,1 @@
+  sop_only    : doc_hit=1/1 (100.0%) | page_hit=1/1 (100.0%) | errors=0 | avg=41495ms

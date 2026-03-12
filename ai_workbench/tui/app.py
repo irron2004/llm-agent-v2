@@ -23,6 +23,18 @@ class WorkbenchApp(App[None]):
         height: 100%;
     }
 
+    #workspace-tabs {
+        height: 3;
+        margin: 0 1;
+        border: round $panel;
+    }
+
+    #workspace-toolbar {
+        margin: 0 1;
+        height: 1;
+        color: $text-muted;
+    }
+
     #workspace-search {
         margin: 0 1;
     }
@@ -32,10 +44,16 @@ class WorkbenchApp(App[None]):
         height: 1;
     }
 
+    #pane-tabs {
+        height: 3;
+        margin: 0 1;
+        border: round $panel;
+    }
+
     #preview-stack {
         layout: vertical;
         height: 1fr;
-        margin: 0 1;
+        margin: 0 1 1 1;
     }
 
     PanePreview {

@@ -7,7 +7,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
 from textual.screen import Screen
-from textual.widgets import Footer, Input, Static
+from textual.widgets import Footer, Input, Static, Tab, Tabs
 
 from ai_workbench.core.health_service import HealthService
 from ai_workbench.core.layout_engine import compute_stack_rows, layout_mode
@@ -85,17 +85,23 @@ class DashboardScreen(Screen[None]):
         self._preview_widgets: dict[str, PanePreview] = {}
         self._preview_role_order: tuple[str, ...] = ()
         self._tabs_cache = ""
+        self._pane_tabs_cache = ""
         self._summary_cache = ""
+        self._toolbar_cache = ""
+        self._tabs_syncing = False
+        self._pane_tabs_syncing = False
 
     def compose(self) -> ComposeResult:
         with Vertical(id="dashboard-root"):
-            yield Static("No Workspaces", id="workspace-tabs")
+            yield Tabs(id="workspace-tabs")
+            yield Static("", id="workspace-toolbar")
             yield Input(
                 placeholder="Search workspace",
                 id="workspace-search",
                 disabled=True,
             )
             yield Static("No workspace", id="workspace-summary")
+            yield Tabs(id="pane-tabs")
             yield Vertical(id="preview-stack")
             yield NoteDrawer(id="note-drawer")
             yield Footer()
@@ -131,7 +137,8 @@ class DashboardScreen(Screen[None]):
         else:
             self.workspace_index = 0
 
-        self._render_tabs()
+        await self._render_tabs()
+        self._update_toolbar()
 
         current = self.current_workspace
         if current is None:
@@ -140,6 +147,7 @@ class DashboardScreen(Screen[None]):
             if summary_text != self._summary_cache:
                 self.query_one("#workspace-summary", Static).update(summary_text)
                 self._summary_cache = summary_text
+            await self._render_pane_tabs()
             await self._render_preview_stack()
             return
 
@@ -170,6 +178,8 @@ class DashboardScreen(Screen[None]):
         )
 
         self._update_summary()
+        self._update_toolbar()
+        await self._render_pane_tabs()
         await self._render_preview_stack()
         self._sync_note_drawer()
 
@@ -187,28 +197,106 @@ class DashboardScreen(Screen[None]):
         self.pane_index = max(0, min(self.pane_index, len(workspace.pane_profiles) - 1))
         return workspace.pane_profiles[self.pane_index].role
 
-    def _render_tabs(self) -> None:
-        tabs = self.query_one("#workspace-tabs", Static)
-        if not self.workspaces:
-            next_text = "No Workspaces | +"
-            if next_text != self._tabs_cache:
-                tabs.update(next_text)
-                self._tabs_cache = next_text
+    async def _render_tabs(self) -> None:
+        if self._tabs_syncing:
             return
 
-        labels: list[str] = []
-        for index, workspace in enumerate(self.workspaces):
-            label = workspace.name
-            if workspace.pinned:
-                label = f"* {label}"
-            if index == self.workspace_index:
-                label = f"[{label}]"
-            labels.append(label)
-        labels.append("+")
-        next_text = " | ".join(labels)
-        if next_text != self._tabs_cache:
-            tabs.update(next_text)
-            self._tabs_cache = next_text
+        tabs = self.query_one("#workspace-tabs", Tabs)
+        self._tabs_syncing = True
+        try:
+
+            async def _reset_tabs() -> None:
+                for tab in list(tabs.query(Tab)):
+                    await tab.remove()
+
+            if not self.workspaces:
+                await _reset_tabs()
+                await tabs.add_tab(Tab("No Workspaces", id="workspace-empty"))
+                tabs.active = "workspace-empty"
+                self._tabs_cache = ""
+                return
+
+            labels: list[tuple[str, str]] = []
+            for index, workspace in enumerate(self.workspaces):
+                label = workspace.name
+                if workspace.pinned:
+                    label = f"* {label}"
+                labels.append((f"workspace-{index}", label))
+
+            cache_key = "|".join(f"{tab_id}:{title}" for tab_id, title in labels)
+            if cache_key != self._tabs_cache:
+                await _reset_tabs()
+                for tab_id, title in labels:
+                    await tabs.add_tab(Tab(title, id=tab_id))
+                await tabs.add_tab(Tab("+", id="workspace-new"))
+                self._tabs_cache = cache_key
+
+            active_id = f"workspace-{self.workspace_index}"
+            if tabs.active != active_id:
+                tabs.active = active_id
+        finally:
+            self._tabs_syncing = False
+
+    def _update_toolbar(self) -> None:
+        toolbar = self.query_one("#workspace-toolbar", Static)
+        workspace = self.current_workspace
+
+        if workspace is None:
+            text = "Workspace 0/0 | Pane 0/0 | n:new  t:add-terminal  Enter:attach"
+        else:
+            workspace_total = len(self.workspaces)
+            workspace_pos = self.workspace_index + 1
+            pane_total = len(workspace.pane_profiles)
+            pane_pos = self.pane_index + 1 if pane_total else 0
+            text = (
+                f"Workspace {workspace_pos}/{workspace_total} | "
+                f"Pane {pane_pos}/{pane_total} | "
+                "n:new  t:add-terminal  Enter:attach  r:restore  x:archive"
+            )
+
+        if text != self._toolbar_cache:
+            toolbar.update(text)
+            self._toolbar_cache = text
+
+    async def _render_pane_tabs(self) -> None:
+        if self._pane_tabs_syncing:
+            return
+
+        tabs = self.query_one("#pane-tabs", Tabs)
+        self._pane_tabs_syncing = True
+        try:
+
+            async def _reset_tabs() -> None:
+                for tab in list(tabs.query(Tab)):
+                    await tab.remove()
+
+            workspace = self.current_workspace
+            if workspace is None or not workspace.pane_profiles:
+                await _reset_tabs()
+                await tabs.add_tab(Tab("No Panes", id="pane-empty"))
+                tabs.active = "pane-empty"
+                self._pane_tabs_cache = ""
+                return
+
+            labels: list[tuple[str, str]] = []
+            for index, profile in enumerate(workspace.pane_profiles):
+                labels.append((f"pane-{index}", profile.role))
+
+            cache_key = "|".join(f"{tab_id}:{title}" for tab_id, title in labels)
+            if cache_key != self._pane_tabs_cache:
+                await _reset_tabs()
+                for tab_id, title in labels:
+                    await tabs.add_tab(Tab(title, id=tab_id))
+                self._pane_tabs_cache = cache_key
+
+            self.pane_index = max(
+                0, min(self.pane_index, len(workspace.pane_profiles) - 1)
+            )
+            active_id = f"pane-{self.pane_index}"
+            if tabs.active != active_id:
+                tabs.active = active_id
+        finally:
+            self._pane_tabs_syncing = False
 
     def _update_summary(self) -> None:
         summary = self.query_one("#workspace-summary", Static)
@@ -308,6 +396,69 @@ class DashboardScreen(Screen[None]):
         event.input.disabled = True
         self.set_focus(None)
 
+    @on(Tabs.TabActivated, "#workspace-tabs")
+    async def on_workspace_tab_activated(self, event: Tabs.TabActivated) -> None:
+        if self._tabs_syncing:
+            return
+
+        tab = event.tab
+        if tab is None or tab.id is None:
+            return
+
+        if tab.id == "workspace-new":
+            await self.action_new_workspace()
+            return
+
+        if not tab.id.startswith("workspace-"):
+            return
+
+        index_text = tab.id.removeprefix("workspace-")
+        if not index_text.isdigit():
+            return
+
+        index = int(index_text)
+        if index < 0 or index >= len(self.workspaces):
+            return
+        if index == self.workspace_index:
+            return
+
+        self.workspace_index = index
+        self.pane_index = 0
+        workspace = self.current_workspace
+        if workspace is not None:
+            self.workspace_service.set_active_workspace(workspace.id)
+        await self.refresh_from_services()
+
+    @on(Tabs.TabActivated, "#pane-tabs")
+    async def on_pane_tab_activated(self, event: Tabs.TabActivated) -> None:
+        if self._pane_tabs_syncing:
+            return
+
+        tab = event.tab
+        if tab is None or tab.id is None:
+            return
+        if not tab.id.startswith("pane-"):
+            return
+
+        index_text = tab.id.removeprefix("pane-")
+        if not index_text.isdigit():
+            return
+
+        workspace = self.current_workspace
+        if workspace is None or not workspace.pane_profiles:
+            return
+
+        index = int(index_text)
+        if index < 0 or index >= len(workspace.pane_profiles):
+            return
+        if index == self.pane_index:
+            return
+
+        self.pane_index = index
+        workspace.active_role = workspace.pane_profiles[self.pane_index].role
+        self.workspace_service.update_workspace(workspace)
+        await self.refresh_from_services()
+
     async def action_next_workspace(self) -> None:
         if not self.workspaces:
             return
@@ -398,7 +549,9 @@ class DashboardScreen(Screen[None]):
         self._upsert_local_workspace(updated)
         self.pane_index = len(updated.pane_profiles) - 1
         if self._refreshing:
-            self._render_tabs()
+            await self._render_tabs()
+            await self._render_pane_tabs()
+            self._update_toolbar()
             self._update_summary()
             await self._render_preview_stack()
         else:
@@ -431,7 +584,9 @@ class DashboardScreen(Screen[None]):
                 self.pane_index = 0
                 break
         self._tabs_cache = ""
+        self._pane_tabs_cache = ""
         self._summary_cache = ""
+        self._toolbar_cache = ""
         self._queue_refresh()
 
     async def action_attach_workspace(self) -> None:
@@ -467,7 +622,7 @@ class DashboardScreen(Screen[None]):
         if inside_tmux and home_session:
             self.app.notify(
                 f"Switched to {session_name}. "
-                f"Return: prefix+B or prefix+L (last session)",
+                f"Return: Alt+0 or prefix+B (home) / prefix+L (last session)",
             )
 
     async def action_restore_workspace(self) -> None:
@@ -580,7 +735,7 @@ class DashboardScreen(Screen[None]):
 
     def action_help_overlay(self) -> None:
         self.app.notify(
-            "Keys: Tab h/l j/k Enter m e Ctrl+S / n t r R x z q Ctrl+C Ctrl+Q"
+            "Keys: Tab h/l j/k Enter m e Ctrl+S / n t r R x z q Ctrl+C Ctrl+Q | tmux: Alt+1..9 switch, Alt+0 home"
         )
 
     async def action_close_overlay(self) -> None:

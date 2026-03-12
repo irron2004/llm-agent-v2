@@ -254,10 +254,17 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
     auto_parse = _try_load_prompt("auto_parse", version)
     translate = _try_load_prompt("translate", version)
 
-    # Load language-specific answer prompts (optional)
-    setup_ans_en = _try_load_prompt("setup_ans_en", version)
-    setup_ans_zh = _try_load_prompt("setup_ans_zh", version)
-    setup_ans_ja = _try_load_prompt("setup_ans_ja", version)
+    # Load language-specific answer prompts (optional, prefer v3 over v2)
+    def _load_lang_prompt(name: str, ver: str) -> PromptTemplate | None:
+        if ver == "v2":
+            v3 = _try_load_prompt(name, "v3")
+            if v3 is not None:
+                return v3
+        return _try_load_prompt(name, ver)
+
+    setup_ans_en = _load_lang_prompt("setup_ans_en", version)
+    setup_ans_zh = _load_lang_prompt("setup_ans_zh", version)
+    setup_ans_ja = _load_lang_prompt("setup_ans_ja", version)
     ts_ans_en = _try_load_prompt("ts_ans_en", version)
     ts_ans_zh = _try_load_prompt("ts_ans_zh", version)
     ts_ans_ja = _try_load_prompt("ts_ans_ja", version)
@@ -354,7 +361,7 @@ MAX_REF_CHARS_REVIEW = 200  # 검색 결과 리뷰용
 MAX_REF_CHARS_ANSWER = 1200  # 답변 생성용
 RELATED_PAGE_WINDOW = 2  # 인접 페이지 범위 (±N)
 DOC_TYPES_SAME_DOC = {"gcb", "myservice", "pems"}
-EXPAND_TOP_K = 8  # 확장 대상 최대 개수 (rerank 상위)
+EXPAND_TOP_K = 10  # 확장 대상 최대 개수 (rerank 상위)
 REPETITION_MIN_BLOCK_LEN = 40  # 반복 감지 최소 블록 길이 (문자)
 REPETITION_MAX_REPEATS = 2  # 같은 블록 최대 허용 반복 횟수
 
@@ -1676,6 +1683,19 @@ def retrieve_node(
     # No need to add bilingual queries here
     query_en = _normalize_query_text(state.get("query_en") or "")
 
+    # Expand device aliases (e.g., SUPRA XP ↔ ZEDIUS XP)
+    _device_aliases = agent_settings.device_aliases
+    expanded_devices: List[str] = []
+    for d in selected_devices:
+        expanded_devices.append(d)
+        aliases = _device_aliases.get(d, [])
+        for alias in aliases:
+            if alias not in expanded_devices:
+                expanded_devices.append(alias)
+    if len(expanded_devices) > len(selected_devices):
+        logger.info("retrieve_node: device alias expansion %s -> %s", selected_devices, expanded_devices)
+        selected_devices = expanded_devices
+
     selected_device_set = {
         _normalize_device_name(d) for d in selected_devices if _normalize_device_name(d)
     }
@@ -1918,6 +1938,57 @@ def retrieve_node(
                 boosted_docs.append(doc)
         all_docs = boosted_docs
 
+    # --- Procedure boost & Scope penalty ---
+    _PROCEDURE_KEYWORDS = {"교체", "절차", "작업", "방법", "replacement", "procedure", "how to", "install", "설치", "수리", "repair"}
+    _PROCEDURE_CHAPTERS = {"work procedure", "flow chart", "work 절차"}
+    _SCOPE_MARKERS = {"scope", "contents", "목차", "table of contents", "revision history"}
+
+    query_lower = original_query.lower()
+    has_procedure_intent = any(kw in query_lower for kw in _PROCEDURE_KEYWORDS)
+
+    if sop_only_predicate and all_docs:
+        proc_boost = float(agent_settings.procedure_boost_factor) if agent_settings.procedure_boost_enabled else 1.0
+        scope_pen = float(agent_settings.scope_penalty_factor) if agent_settings.scope_penalty_enabled else 1.0
+        should_apply = (has_procedure_intent and proc_boost != 1.0) or scope_pen != 1.0
+
+        if should_apply:
+            adjusted_docs: List[RetrievalResult] = []
+            proc_boosted = 0
+            scope_penalized = 0
+            for doc in all_docs:
+                meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+                chapter = str(meta.get("section_chapter", "") or "").lower()
+                content_preview = (doc.content or "")[:300].lower()
+                score = float(doc.score)
+
+                # Boost Work Procedure / Flow Chart pages when query has procedure intent
+                if has_procedure_intent and proc_boost != 1.0 and any(pc in chapter for pc in _PROCEDURE_CHAPTERS):
+                    score *= proc_boost
+                    proc_boosted += 1
+                # Penalize Scope/Contents/TOC pages (low-value for procedure questions)
+                elif agent_settings.scope_penalty_enabled and scope_pen != 1.0:
+                    is_scope = any(sm in content_preview for sm in _SCOPE_MARKERS)
+                    page = _extract_page_value(meta)
+                    # Also penalize chapter_ok=false non-procedure pages
+                    if is_scope or (page is not None and page <= 1):
+                        score *= scope_pen
+                        scope_penalized += 1
+
+                adjusted_docs.append(
+                    RetrievalResult(
+                        doc_id=doc.doc_id,
+                        content=doc.content,
+                        score=score,
+                        metadata=doc.metadata,
+                        raw_text=doc.raw_text,
+                    )
+                )
+            all_docs = adjusted_docs
+            logger.info(
+                "retrieve_node: procedure_boost=%d scope_penalty=%d (query_procedure_intent=%s)",
+                proc_boosted, scope_penalized, has_procedure_intent,
+            )
+
     stage1_ranked_docs = sorted(all_docs, key=_stable_tie_break_key)[:candidate_k]
 
     stage2_enabled = bool(agent_settings.second_stage_doc_retrieve_enabled)
@@ -1986,6 +2057,45 @@ def retrieve_node(
     else:
         # No reranker: just take top final_top_k by score
         docs = sorted(all_docs, key=_stable_tie_break_key)[:final_top_k]
+
+    # Score threshold: filter out docs below minimum score
+    score_threshold = float(agent_settings.score_threshold)
+    if score_threshold > 0.0 and docs:
+        before_count = len(docs)
+        docs = [d for d in docs if float(d.score) >= score_threshold]
+        filtered_count = before_count - len(docs)
+        if filtered_count > 0:
+            logger.info(
+                "retrieve_node: score_threshold=%.3f filtered %d/%d docs",
+                score_threshold, filtered_count, before_count,
+            )
+
+    # Deduplicate by base doc_id (keep highest-scoring page per document)
+    if agent_settings.dedupe_by_doc_id and docs:
+        def _base_doc_id(doc_id: str) -> str:
+            """Extract base doc_id by removing page/chunk suffix (#0010, :chunk_3, etc.)."""
+            s = str(doc_id).strip()
+            for sep in ("#", ":chunk_", ":"):
+                idx = s.find(sep)
+                if idx > 0:
+                    return s[:idx]
+            return s
+
+        before_count = len(docs)
+        seen_base: dict[str, int] = {}  # base_doc_id -> index in deduped list
+        deduped: List[RetrievalResult] = []
+        for doc in docs:
+            base = _base_doc_id(doc.doc_id)
+            if base not in seen_base:
+                seen_base[base] = len(deduped)
+                deduped.append(doc)
+            # else: skip duplicate (first occurrence has highest score after sort)
+        if len(deduped) < before_count:
+            logger.info(
+                "retrieve_node: dedupe_by_doc_id removed %d duplicates (%d -> %d)",
+                before_count - len(deduped), before_count, len(deduped),
+            )
+        docs = deduped
 
     # Section expansion: expand top groups by fetching full section chunks
     if rag_settings.section_expand_enabled and docs and hasattr(retriever, "es_engine"):
@@ -3365,7 +3475,10 @@ def auto_parse_node(
     detected_language = _detect_language_rule_based(query)
     detected_devices = _extract_devices_from_query(device_names, query)
     detected_doc_types = _extract_doc_types_from_query(query)
-    detected_equip_ids = _extract_equip_ids_from_query(query, known_equip_ids=equip_id_set)
+    # equip_id 추출 비활성화: 모델명(SR8241, 3000QC 등)을 equip_id로 오인하여
+    # 검색 결과가 0건이 되는 문제 방지 (2026-03-12)
+    # detected_equip_ids = _extract_equip_ids_from_query(query, known_equip_ids=equip_id_set)
+    detected_equip_ids: list[str] = []
 
     chat_history = state.get("chat_history") or []
     needs_history = bool(state.get("needs_history"))
@@ -3450,12 +3563,15 @@ def auto_parse_node(
         selected_doc_types = prev_doc_types
     else:
         selected_doc_types = doc_types[:2]
-    selected_equip_ids = equip_ids[:1]
+    # equip_id auto-parse 비활성화 (모델명 오인 방지)
+    # selected_equip_ids = equip_ids[:1]
+    selected_equip_ids: list[str] = []
 
     # ParsedQuery 생성
     pq = ParsedQuery(
         device_names=devices,
-        equip_ids=equip_ids,
+        # equip_ids=equip_ids,  # 비활성화
+        equip_ids=[],
         doc_types=doc_types,
         detected_language=detected_language,
         selected_devices=selected_devices,

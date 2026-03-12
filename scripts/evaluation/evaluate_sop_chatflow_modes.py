@@ -9,7 +9,7 @@ import time
 from collections import Counter
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ROOT = ROOT / "backend"
@@ -18,11 +18,19 @@ if str(ROOT) not in sys.path:
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from backend.api.dependencies import get_default_llm, get_prompt_spec_cached, get_search_service
+from backend.api.dependencies import (
+    get_default_llm,
+    get_prompt_spec_cached,
+    get_search_service,
+)
 from backend.api.main import _configure_search_service
 from backend.domain.doc_type_mapping import expand_doc_type_selection
-from backend.llm_infrastructure.llm.langgraph_agent import _detect_language_rule_based
+from backend.llm_infrastructure.llm.langgraph_agent import (
+    PromptSpec,
+    _detect_language_rule_based,
+)
 from backend.services.agents.langgraph_rag_agent import LangGraphRAGAgent
+from backend.services.search_service import SearchService
 
 
 @dataclass(frozen=True)
@@ -106,13 +114,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _normalize(text: str) -> str:
-    return (
-        text.lower()
-        .strip()
-        .replace(" ", "_")
-        .replace("-", "_")
-        .replace("/", "_")
-    )
+    return text.lower().strip().replace(" ", "_").replace("-", "_").replace("/", "_")
 
 
 def _parse_pages(raw: str) -> set[int]:
@@ -143,7 +145,9 @@ def _doc_matches(gold_doc: str, doc_id: str) -> bool:
     return gold in candidate or candidate in gold
 
 
-def _compute_hits(gold_doc: str, gold_pages: str, docs: list[dict[str, Any]]) -> tuple[bool, bool]:
+def _compute_hits(
+    gold_doc: str, gold_pages: str, docs: list[dict[str, Any]]
+) -> tuple[bool, bool]:
     gold_page_set = _parse_pages(gold_pages)
     hit_doc = False
     hit_page = False
@@ -294,7 +298,7 @@ def _run_retrieval_eval(
             print(
                 f"[retrieval {idx}/{total}] {case.qid} {mode:<13s} "
                 f"doc={'Y' if hit_doc else 'N'} page={'Y' if hit_page else 'N'} "
-                f"{elapsed_ms/1000:.1f}s top1={docs[0]['doc_id'] if docs else '-'}",
+                f"{elapsed_ms / 1000:.1f}s top1={docs[0]['doc_id'] if docs else '-'}",
                 flush=True,
             )
 
@@ -305,6 +309,9 @@ def _pick_answer_samples(
     retrieval_results: dict[str, list[RetrievalEval]],
     limit: int,
 ) -> list[str]:
+    if limit <= 0:
+        return []
+
     filter_map = {row.qid: row for row in retrieval_results["sop_filter"]}
     task_map = {row.qid: row for row in retrieval_results["task_mode_sop"]}
 
@@ -358,7 +365,9 @@ def _run_answer_samples(
                 state_overrides=state,
             )
             elapsed_ms = (time.perf_counter() - started) * 1000.0
-            docs = _summarize_docs(result.get("retrieved_docs") or result.get("docs") or [])
+            docs = _summarize_docs(
+                result.get("retrieved_docs") or result.get("docs") or []
+            )
             hit_doc, hit_page = _compute_hits(case.gold_doc, case.gold_pages, docs)
             answer_row = AnswerEval(
                 qid=case.qid,
@@ -380,7 +389,7 @@ def _run_answer_samples(
             print(
                 f"[answer {idx}/{total}] {case.qid} {mode:<13s} "
                 f"doc={'Y' if hit_doc else 'N'} faithful={answer_row.judge.get('faithful')} "
-                f"{elapsed_ms/1000:.1f}s",
+                f"{elapsed_ms / 1000:.1f}s",
                 flush=True,
             )
     return results
@@ -396,8 +405,10 @@ def _variant_breakdown(rows: list[RetrievalEval]) -> dict[str, dict[str, float]]
         total = len(items)
         breakdown[variant] = {
             "count": total,
-            "doc_hit_at_10": sum(1 for item in items if item.hit_doc_at_10) / max(total, 1),
-            "page_hit_at_10": sum(1 for item in items if item.hit_page_at_10) / max(total, 1),
+            "doc_hit_at_10": sum(1 for item in items if item.hit_doc_at_10)
+            / max(total, 1),
+            "page_hit_at_10": sum(1 for item in items if item.hit_page_at_10)
+            / max(total, 1),
             "avg_elapsed_ms": sum(item.elapsed_ms for item in items) / max(total, 1),
         }
     return breakdown
@@ -429,22 +440,38 @@ def _write_summary(
         page_hits = sum(1 for row in rows if row.hit_page_at_10)
         avg_elapsed = sum(row.elapsed_ms for row in rows) / max(total, 1)
         lines.append(f"## {mode}")
-        lines.append(f"- doc_hit@10: {doc_hits}/{total} ({doc_hits/max(total,1)*100:.2f}%)")
-        lines.append(f"- page_hit@10: {page_hits}/{total} ({page_hits/max(total,1)*100:.2f}%)")
+        lines.append(
+            f"- doc_hit@10: {doc_hits}/{total} ({doc_hits / max(total, 1) * 100:.2f}%)"
+        )
+        lines.append(
+            f"- page_hit@10: {page_hits}/{total} ({page_hits / max(total, 1) * 100:.2f}%)"
+        )
         lines.append(f"- avg_elapsed_ms: {avg_elapsed:.0f}")
         lines.append("- variant_breakdown:")
         for variant, stats in _variant_breakdown(rows).items():
             lines.append(
-                f"  - {variant}: doc@10={stats['doc_hit_at_10']*100:.2f}% "
-                f"page@10={stats['page_hit_at_10']*100:.2f}% avg={stats['avg_elapsed_ms']:.0f}ms"
+                f"  - {variant}: doc@10={stats['doc_hit_at_10'] * 100:.2f}% "
+                f"page@10={stats['page_hit_at_10'] * 100:.2f}% avg={stats['avg_elapsed_ms']:.0f}ms"
             )
         lines.append("")
 
     filter_map = {row.qid: row for row in retrieval_results["sop_filter"]}
     task_map = {row.qid: row for row in retrieval_results["task_mode_sop"]}
-    better_task = [qid for qid, row in filter_map.items() if task_map[qid].hit_doc_at_10 and not row.hit_doc_at_10]
-    better_filter = [qid for qid, row in filter_map.items() if row.hit_doc_at_10 and not task_map[qid].hit_doc_at_10]
-    both_miss = [qid for qid, row in filter_map.items() if (not row.hit_doc_at_10) and (not task_map[qid].hit_doc_at_10)]
+    better_task = [
+        qid
+        for qid, row in filter_map.items()
+        if task_map[qid].hit_doc_at_10 and not row.hit_doc_at_10
+    ]
+    better_filter = [
+        qid
+        for qid, row in filter_map.items()
+        if row.hit_doc_at_10 and not task_map[qid].hit_doc_at_10
+    ]
+    both_miss = [
+        qid
+        for qid, row in filter_map.items()
+        if (not row.hit_doc_at_10) and (not task_map[qid].hit_doc_at_10)
+    ]
 
     lines.append("## Comparison")
     lines.append(f"- task_mode_sop_only_better: {len(better_task)}")
@@ -480,15 +507,19 @@ def main() -> int:
 
     _configure_search_service()
     llm = get_default_llm()
-    search_service = get_search_service()
-    prompt_spec = get_prompt_spec_cached()
+    search_service = cast(SearchService, cast(object, get_search_service()))
+    prompt_spec = cast(PromptSpec, get_prompt_spec_cached())
+    chatflow_mode = "verified"
+    chatflow_final_top_k = 20
+    chatflow_retrieval_top_k = 50
 
     retrieval_filter_agent = LangGraphRAGAgent(
         llm=llm,
         search_service=search_service,
         prompt_spec=prompt_spec,
-        top_k=10,
-        mode="base",
+        top_k=chatflow_final_top_k,
+        retrieval_top_k=chatflow_retrieval_top_k,
+        mode=chatflow_mode,
         ask_user_after_retrieve=True,
         auto_parse_enabled=False,
         use_canonical_retrieval=False,
@@ -497,8 +528,9 @@ def main() -> int:
         llm=llm,
         search_service=search_service,
         prompt_spec=prompt_spec,
-        top_k=10,
-        mode="base",
+        top_k=chatflow_final_top_k,
+        retrieval_top_k=chatflow_retrieval_top_k,
+        mode=chatflow_mode,
         ask_user_after_retrieve=True,
         auto_parse_enabled=True,
         use_canonical_retrieval=False,
@@ -507,8 +539,9 @@ def main() -> int:
         llm=llm,
         search_service=search_service,
         prompt_spec=prompt_spec,
-        top_k=10,
-        mode="base",
+        top_k=chatflow_final_top_k,
+        retrieval_top_k=chatflow_retrieval_top_k,
+        mode=chatflow_mode,
         ask_user_after_retrieve=False,
         auto_parse_enabled=False,
         use_canonical_retrieval=False,
@@ -518,8 +551,9 @@ def main() -> int:
         llm=llm,
         search_service=search_service,
         prompt_spec=prompt_spec,
-        top_k=10,
-        mode="base",
+        top_k=chatflow_final_top_k,
+        retrieval_top_k=chatflow_retrieval_top_k,
+        mode=chatflow_mode,
         ask_user_after_retrieve=False,
         auto_parse_enabled=True,
         use_canonical_retrieval=False,
@@ -531,8 +565,12 @@ def main() -> int:
         filter_agent=retrieval_filter_agent,
         task_agent=retrieval_task_agent,
     )
-    _write_jsonl(out_dir / "retrieval_sop_filter.jsonl", retrieval_results["sop_filter"])
-    _write_jsonl(out_dir / "retrieval_task_mode_sop.jsonl", retrieval_results["task_mode_sop"])
+    _write_jsonl(
+        out_dir / "retrieval_sop_filter.jsonl", retrieval_results["sop_filter"]
+    )
+    _write_jsonl(
+        out_dir / "retrieval_task_mode_sop.jsonl", retrieval_results["task_mode_sop"]
+    )
 
     sample_qids = _pick_answer_samples(retrieval_results, args.answer_samples)
     answer_rows = _run_answer_samples(

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from backend.llm_infrastructure.llm.base import BaseLLM, LLMResponse
 from backend.llm_infrastructure.llm.langgraph_agent import PromptSpec, answer_node, load_prompt_spec
@@ -102,7 +103,11 @@ def test_answer_node_uses_lower_temperature_for_setup_route() -> None:
 
 
 def test_answer_node_postprocesses_setup_artifacts() -> None:
-    llm = CaptureAnswerLLM(response_text="1️⃣ 점검 후 교체합니다 【1】 EFIM […]")
+    llm = CaptureAnswerLLM(
+        response_text=(
+            "| 단계 | 내용 |\n|---|---|\n| 1️⃣ | 점검 후 교체 【[1] p2】 EFIM [...] REFS TBD |\n"
+        )
+    )
     spec = _spec()
     state = {
         "route": "setup",
@@ -116,18 +121,24 @@ def test_answer_node_postprocesses_setup_artifacts() -> None:
 
     assert "1️⃣" not in answer
     assert "【1】" not in answer
+    assert "【[1] p2】" not in answer
     assert "EFIM" not in answer
-    assert "[…]" not in answer
-    assert "1." in answer
+    assert "[...]" not in answer
+    assert "|---|" not in answer
+    assert "REFS" not in answer
+    assert "TBD" not in answer
     assert "[1]" in answer
+    assert "### 작업 절차" in answer
+    assert "1." in answer
     assert "EFEM" in answer
 
 
-def test_setup_ans_v2_prompt_includes_procedure_first_constraints() -> None:
+def test_setup_ans_v2_runtime_uses_v3_prompt_with_procedure_first_constraints() -> None:
     spec = load_prompt_spec("v2")
     system = spec.setup_ans.system
 
-    assert "답변 우선순위" in system
+    assert spec.setup_ans.version == "v3"
+    assert "근거 사용 우선순위" in system
     assert "Work Procedure" in system
     assert "### 작업 절차" in system
     assert "이모지 번호" in system

@@ -1,0 +1,2 @@
+  sop_only    : doc_hit=0/0 (0.0%) | page_hit=0/0 (0.0%) | errors=1 | avg=93ms
+  절차검색        : doc_hit=0/0 (0.0%) | page_hit=0/0 (0.0%) | errors=1 | avg=2ms

@@ -1,0 +1,16 @@
+{
+  "task": "task-01-normalization",
+  "scenario": "ampersand punctuation tolerance",
+  "gold_doc_raw": "Pump & Valve SOP.pdf",
+  "candidate_doc_raw": "pump-valve sop",
+  "normalized": {
+    "gold": "pump_valve_sop",
+    "candidate": "pump_valve_sop"
+  },
+  "match_expected": {
+    "hit_doc": true,
+    "matched_field": "title",
+    "rank": 1,
+    "reason": "Both names normalize to the same tokenized form after stripping extension and punctuation"
+  }
+}

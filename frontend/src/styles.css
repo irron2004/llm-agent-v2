@@ -1003,6 +1003,7 @@ a:hover {
 
 .input-wrapper {
   display: flex;
+  flex-direction: column;
   gap: var(--spacing-sm);
   padding: var(--spacing-md);
   background-color: var(--color-bg-base);
