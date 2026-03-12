@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState } from "react";
 import { LeftOutlined, RightOutlined, CloseOutlined, CheckOutlined } from "@ant-design/icons";
+import { createPortal } from "react-dom";
 import { MarkdownContent } from "../features/chat/components/markdown-content";
 import "./image-preview-modal.css";
 
@@ -31,7 +32,10 @@ export function ImagePreviewModal({
   onClose,
   onToggleSelect,
 }: ImagePreviewModalProps) {
-  const currentImage = images[currentIndex];
+  const safeIndex = images.length > 0
+    ? Math.min(Math.max(currentIndex, 0), images.length - 1)
+    : 0;
+  const currentImage = images[safeIndex];
   const isSelectionMode = Boolean(onToggleSelect && selectedRanks);
   const isCurrentSelected = currentImage?.rank !== undefined && selectedRanks?.includes(currentImage.rank);
   const hasImageUrl = Boolean(currentImage?.url);
@@ -42,22 +46,22 @@ export function ImagePreviewModal({
   // 인덱스 변경 시 이미지 로드 실패 상태 초기화
   useEffect(() => {
     setImageLoadFailed(false);
-  }, [currentIndex]);
+  }, [safeIndex]);
 
   // 실제로 이미지를 표시할지 결정 (URL이 있고 로드 실패하지 않은 경우)
   const shouldShowImage = hasImageUrl && !imageLoadFailed;
 
   const handlePrev = useCallback(() => {
-    if (currentIndex > 0) {
-      onIndexChange(currentIndex - 1);
+    if (safeIndex > 0) {
+      onIndexChange(safeIndex - 1);
     }
-  }, [currentIndex, onIndexChange]);
+  }, [safeIndex, onIndexChange]);
 
   const handleNext = useCallback(() => {
-    if (currentIndex < images.length - 1) {
-      onIndexChange(currentIndex + 1);
+    if (safeIndex < images.length - 1) {
+      onIndexChange(safeIndex + 1);
     }
-  }, [currentIndex, images.length, onIndexChange]);
+  }, [safeIndex, images.length, onIndexChange]);
 
   const handleToggleSelect = useCallback(() => {
     if (onToggleSelect && currentImage?.rank !== undefined) {
@@ -113,7 +117,7 @@ export function ImagePreviewModal({
 
   if (!shouldRender) return null;
 
-  return (
+  const modalContent = (
     <div className="image-preview-modal-overlay" onClick={onClose}>
       <div className="image-preview-modal" onClick={(e) => e.stopPropagation()}>
         {/* 헤더 */}
@@ -126,7 +130,7 @@ export function ImagePreviewModal({
             <CloseOutlined />
           </button>
           <span className="image-preview-modal-counter">
-            {currentIndex + 1} / {images.length}
+            {safeIndex + 1} / {images.length}
           </span>
         </div>
 
@@ -135,7 +139,7 @@ export function ImagePreviewModal({
           <button
             className="image-preview-modal-nav prev"
             onClick={handlePrev}
-            disabled={currentIndex === 0}
+            disabled={safeIndex === 0}
             aria-label="이전"
           >
             <LeftOutlined />
@@ -159,7 +163,7 @@ export function ImagePreviewModal({
           <button
             className="image-preview-modal-nav next"
             onClick={handleNext}
-            disabled={currentIndex === images.length - 1}
+            disabled={safeIndex === images.length - 1}
             aria-label="다음"
           >
             <RightOutlined />
@@ -197,4 +201,6 @@ export function ImagePreviewModal({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

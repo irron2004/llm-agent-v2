@@ -1231,7 +1231,10 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
 
   // 이미지 URL이 유효한지 확인
   const hasValidImageUrl = (url: string | null | undefined): url is string => {
-    return typeof url === 'string' && url.trim().length > 0;
+    if (typeof url !== "string") return false;
+    const trimmed = url.trim();
+    if (trimmed.length === 0 || trimmed === "null" || trimmed === "undefined") return false;
+    return true;
   };
 
   // 모든 문서의 모든 페이지를 평탄화하여 미리보기 배열 생성
@@ -1283,12 +1286,23 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
   }, [docs]);
 
   const handleDocClick = (docIndex: number) => {
-    setPreviewIndex(docStartIndex[docIndex] ?? 0);
+    const maxIndex = Math.max(previewImages.length - 1, 0);
+    const nextIndex = Math.min(Math.max(docStartIndex[docIndex] ?? 0, 0), maxIndex);
+    setPreviewIndex(nextIndex);
     setPreviewVisible(true);
   };
 
-  const handleImageClick = (docIndex: number, pageIndex: number) => {
-    setPreviewIndex((docStartIndex[docIndex] ?? 0) + pageIndex);
+  const handleImageClick = (docIndex: number, pageIndex: number, imageUrl: string) => {
+    const docId = docs[docIndex]?.id;
+    const matchedIndex = previewImages.findIndex(
+      (item) => item.docId === docId && item.url === imageUrl,
+    );
+    const fallbackIndex = (docStartIndex[docIndex] ?? 0) + pageIndex;
+    const maxIndex = Math.max(previewImages.length - 1, 0);
+    const nextIndex = matchedIndex >= 0
+      ? matchedIndex
+      : Math.min(Math.max(fallbackIndex, 0), maxIndex);
+    setPreviewIndex(nextIndex);
     setPreviewVisible(true);
   };
 
@@ -1351,7 +1365,7 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
                         alt={`${displayTitle || "Document"} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
                         className="retrieved-doc-image"
                         style={{ cursor: "pointer" }}
-                        onClick={() => handleImageClick(index, pageIdx)}
+                        onClick={() => handleImageClick(index, pageIdx, url)}
                         onLoad={(e) => {
                           // 이미지 로드 성공 시 텍스트 숨기기
                           const wrapper = e.currentTarget.closest(".retrieved-doc-content-wrapper");
