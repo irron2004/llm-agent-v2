@@ -47,6 +47,32 @@ def _normalize_doc_types_to_v3_groups(doc_types: list[str] | None) -> list[str] 
     return result or None
 
 
+def _normalize_device_names_to_v3(device_names: list[str] | None) -> list[str] | None:
+    """Normalize device names to v3 format (spaces → underscores, uppercase).
+
+    v3 indices store device_name as 'SUPRA_XP', but runtime sends 'SUPRA XP'.
+    Include both original and normalized forms so the filter matches either format.
+    """
+    if not device_names:
+        return device_names
+    result: list[str] = []
+    seen: set[str] = set()
+    for name in device_names:
+        name = str(name).strip()
+        if not name:
+            continue
+        # original form
+        if name not in seen:
+            seen.add(name)
+            result.append(name)
+        # v3 normalized form: spaces → underscores, uppercase
+        v3_name = name.replace(" ", "_").upper()
+        if v3_name not in seen:
+            seen.add(v3_name)
+            result.append(v3_name)
+    return result or None
+
+
 def _l2_normalize(vec: np.ndarray, eps: float = 1e-12) -> np.ndarray:
     norm = float(np.linalg.norm(vec))
     if norm < eps:
@@ -548,6 +574,7 @@ class EsChunkV3SearchService:
 
         v3_doc_types = _normalize_doc_types_to_v3_groups(doc_types)
         v3_doc_type = _normalize_doc_types_to_v3_groups([doc_type])[0] if doc_type else None
+        v3_device_names = _normalize_device_names_to_v3(device_names)
 
         filters = self.es_engine.build_filter(
             tenant_id=tenant_id,
@@ -557,7 +584,7 @@ class EsChunkV3SearchService:
             doc_ids=doc_ids,
             equip_ids=equip_ids,
             lang=lang,
-            device_names=device_names,
+            device_names=v3_device_names,
         )
 
         dense_candidates = self._dense_search_candidates(

@@ -227,6 +227,16 @@ def _try_load_prompt(name: str, version: str) -> Optional[PromptTemplate]:
         return None
 
 
+def _load_setup_answer_prompt(version: str) -> PromptTemplate:
+    """Load setup answer prompt with v3 override for v2 runtime."""
+    if version == "v2":
+        setup_ans_v3 = _try_load_prompt("setup_ans", "v3")
+        if setup_ans_v3 is not None:
+            logger.info("Using setup_ans_v3 prompt while running prompt spec v2")
+            return setup_ans_v3
+    return load_prompt_template("setup_ans", version)
+
+
 def load_prompt_spec(version: str = "v1") -> PromptSpec:
     """Load required prompts from YAML (router/MQ/gate/answer)."""
 
@@ -236,7 +246,7 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
     general_mq = load_prompt_template("general_mq", version)
     st_gate = load_prompt_template("st_gate", version)
     st_mq = load_prompt_template("st_mq", version)
-    setup_ans = load_prompt_template("setup_ans", version)
+    setup_ans = _load_setup_answer_prompt(version)
     ts_ans = load_prompt_template("ts_ans", version)
     general_ans = load_prompt_template("general_ans", version)
 
@@ -295,6 +305,9 @@ class SearchServiceRetriever:
     def __init__(self, search_service: SearchService, *, top_k: int = 8) -> None:
         self.search_service = search_service
         self.top_k = top_k
+        es_engine = getattr(search_service, "es_engine", None)
+        if es_engine is not None:
+            self.es_engine = es_engine
 
     def retrieve(
         self,
@@ -407,6 +420,76 @@ TEMP_TRANSLATION = 0.0  # translate
 TEMP_QUERY_GEN = 0.3  # mq, st_mq, refine_queries
 TEMP_ANSWER = 0.5  # answer
 TEMP_ANSWER_SETUP = 0.2  # answer (setup)
+
+MAX_ANSWER_FORMAT_RETRIES = 2
+
+_CITATION_RE = re.compile(r"\[[0-9]+\]")
+_EMOJI_NUMERAL_RE = re.compile(r"[0-9]️⃣")
+_MARKDOWN_TABLE_LINE_RE = re.compile(r"(?m)^\|.*\|\s*$")
+
+_REQUIRED_SECTIONS_KO = [
+    "## 준비/안전",
+    "## 작업 절차",
+    "## 복구/확인",
+    "## 주의사항",
+    "## 참고문헌",
+]
+
+
+def _answer_language_ok(answer: str, target_language: str) -> bool:
+    text = (answer or "").strip()
+    if not text:
+        return False
+    lang = (target_language or "").strip().lower()
+    if lang == "ko":
+        return bool(re.search(r"[가-힣]", text))
+    if lang == "en":
+        non_ascii = sum(1 for c in text if ord(c) > 127)
+        return (non_ascii / max(len(text), 1)) < 0.2
+    return True
+
+
+def _validate_answer_format(
+    answer: str,
+    *,
+    target_language: str,
+    has_refs: bool,
+) -> Dict[str, Any]:
+    text = answer or ""
+    stripped = text.lstrip()
+    title_ok = stripped.startswith("# ")
+    missing_sections = [s for s in _REQUIRED_SECTIONS_KO if s not in text]
+    has_emoji_numbering = bool(_EMOJI_NUMERAL_RE.search(text))
+    has_markdown_table = "|---|" in text or bool(_MARKDOWN_TABLE_LINE_RE.search(text))
+    numbering_ok = bool(re.search(r"(?s)## 작업 절차\s*\n\s*1\.\s+", text))
+    citations_ok = True
+    references_ok = True
+    if has_refs:
+        citations_ok = bool(_CITATION_RE.search(text))
+        references_ok = "## 참고문헌" in text
+    language_ok = _answer_language_ok(text, target_language)
+
+    ok = (
+        title_ok
+        and not missing_sections
+        and numbering_ok
+        and not has_emoji_numbering
+        and not has_markdown_table
+        and citations_ok
+        and references_ok
+        and language_ok
+    )
+    return {
+        "ok": ok,
+        "title_ok": title_ok,
+        "missing_sections": missing_sections,
+        "numbering_ok": numbering_ok,
+        "citations_ok": citations_ok,
+        "references_ok": references_ok,
+        "language_ok": language_ok,
+        "has_emoji_numbering": has_emoji_numbering,
+        "has_markdown_table": has_markdown_table,
+    }
 
 
 def resolve_querygen_temperature(state: AgentState, *, mq_invoked: bool = False) -> float:
@@ -987,8 +1070,29 @@ def _postprocess_setup_answer_text(answer: str) -> str:
     for emoji, number_token in STEP_EMOJI_TO_NUMBER.items():
         normalized = normalized.replace(emoji, number_token)
 
-    normalized = re.sub(r"【\s*\[?(\d+)\]?(?:†[^】]*)?】", r"[\1]", normalized)
+    normalized = re.sub(r"【\s*\[?(\d+)\]?[^】]*】", r"[\1]", normalized)
+    normalized = re.sub(r"\[\s*\[(\d+)\]\s*\]", r"[\1]", normalized)
     normalized = re.sub(r"\[\s*(?:…|\.\.\.)\s*\]", "", normalized)
+    normalized = normalized.replace("REFS", "").replace("TBD", "")
+
+    lines: list[str] = []
+    for line in normalized.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("|") and stripped.endswith("|") and stripped.count("|") >= 2:
+            cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+            if all(re.fullmatch(r":?-{3,}:?", cell or "") for cell in cells):
+                continue
+            cells = [cell for cell in cells if cell]
+            if cells:
+                lines.append(" - ".join(cells))
+            continue
+        lines.append(line)
+    normalized = "\n".join(lines)
+
+    if "### 작업 절차" not in normalized and re.search(r"(?m)^\s*1\.\s+", normalized):
+        normalized = "### 작업 절차\n" + normalized
+
+    normalized = re.sub(r"\n{3,}", "\n\n", normalized).strip()
     normalized = re.sub(r"\bEFIM\b", "EFEM", normalized)
     return normalized
 
@@ -1000,7 +1104,9 @@ def _normalize_doc_type(doc_type: str | None) -> str:
 def _normalize_device_name(device_name: str | None) -> str:
     if not device_name:
         return ""
-    return str(device_name).strip().lower()
+    # v3 stores underscored names (SUPRA_XP), v2 uses spaces (SUPRA XP)
+    # Normalize both to spaces for consistent matching
+    return str(device_name).strip().lower().replace("_", " ")
 
 
 def _extract_page_value(metadata: Dict[str, Any] | None) -> int | None:
@@ -1581,6 +1687,12 @@ def retrieve_node(
     selected_doc_type_set = {
         _normalize_doc_type(dt) for dt in selected_doc_type_filters if _normalize_doc_type(dt)
     }
+    # v3 stores canonical group names (sop, setup, ts, gcb, myservice).
+    # Add group names so post-retrieval filtering accepts v3 doc_type values.
+    for group_name, variants in DOC_TYPE_GROUPS.items():
+        variant_set = {normalize_doc_type(v) for v in variants}
+        if selected_doc_type_set & variant_set:
+            selected_doc_type_set.add(normalize_doc_type(group_name))
 
     candidate_k = max(retrieval_top_k, final_top_k * 2, 20)
 
@@ -1906,6 +2018,7 @@ def expand_related_docs_node(
     *,
     page_fetcher: Any = None,
     doc_fetcher: Any = None,
+    section_fetcher: Any = None,
     page_window: int = RELATED_PAGE_WINDOW,
     max_ref_chars: int = MAX_REF_CHARS_ANSWER,
 ) -> Dict[str, Any]:
@@ -1928,6 +2041,7 @@ def expand_related_docs_node(
     total_docs = len(docs)
     same_doc_targets = 0
     page_targets = 0
+    section_targets = 0
     skipped_targets = 0
     fetched_related_total = 0
     expanded_count = 0
@@ -1952,6 +2066,41 @@ def expand_related_docs_node(
                 if rd_page is not None and rd_page not in expanded_pages:
                     expanded_pages.append(rd_page)
             expanded_pages.sort()
+        elif (
+            section_fetcher is not None
+            and bool(meta.get("chapter_ok", False))
+            and str(meta.get("section_chapter", "") or "")
+        ):
+            # Chapter-based expansion: fetch all pages in the same section
+            section_targets += 1
+            section_chapter = str(meta.get("section_chapter", ""))
+            section_hits = section_fetcher(
+                doc_id=str(doc.doc_id),
+                section_chapter=section_chapter,
+                max_pages=20,
+            )
+            if section_hits:
+                related_docs = [
+                    hit.to_retrieval_result() if hasattr(hit, "to_retrieval_result") else hit
+                    for hit in section_hits
+                ]
+                for rd in related_docs:
+                    rd_meta = rd.metadata if isinstance(rd.metadata, dict) else {}
+                    rd_page = _extract_page_value(rd_meta)
+                    if rd_page is not None and rd_page not in expanded_pages:
+                        expanded_pages.append(rd_page)
+                expanded_pages.sort()
+            elif page_fetcher is not None:
+                # Fallback to page window if section fetch fails
+                page = _extract_page_value(meta)
+                if page is not None:
+                    page_targets += 1
+                    section_targets -= 1
+                    page_min = max(1, page - page_window)
+                    page_max = page + page_window
+                    pages = list(range(page_min, page_max + 1))
+                    expanded_pages = pages
+                    related_docs = page_fetcher(doc.doc_id, pages)
         elif page_fetcher is not None:
             page = _extract_page_value(meta)
             if page is not None:
@@ -2003,11 +2152,12 @@ def expand_related_docs_node(
 
     summary = (
         "expand_related: total_docs=%d expand_top_k=%d same_doc_targets=%d "
-        "page_targets=%d skipped_targets=%d fetched_related=%d expanded=%d"
+        "section_targets=%d page_targets=%d skipped_targets=%d fetched_related=%d expanded=%d"
         % (
             total_docs,
             min(total_docs, max_expand),
             same_doc_targets,
+            section_targets,
             page_targets,
             skipped_targets,
             fetched_related_total,
@@ -2318,7 +2468,73 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
         len(reasoning) if reasoning else 0,
         answer[:500] if answer else "(empty)",
     )
-    return {"answer": answer, "reasoning": reasoning}
+
+    enforce_format = str(answer_language).strip().lower() == "ko"
+    if not enforce_format:
+        return {
+            "answer": answer,
+            "reasoning": reasoning,
+            "answer_format": {"ok": True, "skipped": True, "target_language": answer_language},
+            "answer_format_retries": 0,
+        }
+
+    has_refs = bool(ref_items)
+    format_result = _validate_answer_format(answer, target_language="ko", has_refs=has_refs)
+    retries = 0
+    while not bool(format_result.get("ok")) and retries < MAX_ANSWER_FORMAT_RETRIES:
+        retries += 1
+        violations: List[str] = []
+        if not bool(format_result.get("title_ok")):
+            violations.append("- 첫 줄에 '# {제목}' 타이틀이 필요합니다.")
+        missing = format_result.get("missing_sections")
+        if isinstance(missing, list) and missing:
+            violations.append("- 누락 섹션: " + ", ".join(str(x) for x in missing))
+        if not bool(format_result.get("numbering_ok")):
+            violations.append("- '## 작업 절차' 아래에 '1.' 번호 목록이 필요합니다.")
+        if bool(format_result.get("has_emoji_numbering")):
+            violations.append("- 이모지 번호(1️⃣ 등)는 금지입니다.")
+        if bool(format_result.get("has_markdown_table")):
+            violations.append("- 마크다운 테이블은 금지입니다.")
+        if has_refs and not bool(format_result.get("citations_ok")):
+            violations.append("- REFS가 있으면 본문에 [1] 같은 인용이 최소 1개 필요합니다.")
+        if has_refs and not bool(format_result.get("references_ok")):
+            violations.append("- REFS가 있으면 '## 참고문헌' 섹션이 필요합니다.")
+        if not bool(format_result.get("language_ok")):
+            violations.append("- target_language=ko에 맞는 언어(한국어)로 작성해야 합니다.")
+
+        fix_system = (
+            "\n\n[FORMAT FIX]\n"
+            "아래 템플릿을 정확히 준수하여 답변 전체를 다시 작성하세요. "
+            "금지 사항(이모지 번호, 마크다운 테이블, 혼합 언어 제목)을 절대 사용하지 마세요.\n"
+            "위반 사항:\n" + ("\n".join(violations) if violations else "- 템플릿 미준수") + "\n"
+        )
+
+        answer_retry, reasoning_retry = _invoke_llm_with_reasoning(
+            llm,
+            tmpl.system + fix_system,
+            user,
+            max_tokens=MAX_TOKENS_ANSWER,
+            temperature=answer_temperature,
+        )
+        answer_retry = _truncate_repetition(answer_retry)
+        if route == "setup":
+            answer_retry = _postprocess_setup_answer_text(answer_retry)
+        answer = answer_retry
+        reasoning = reasoning_retry
+        format_result = _validate_answer_format(answer, target_language="ko", has_refs=has_refs)
+        logger.warning(
+            "answer_node: format retry %d/%d ok=%s",
+            retries,
+            MAX_ANSWER_FORMAT_RETRIES,
+            bool(format_result.get("ok")),
+        )
+
+    return {
+        "answer": answer,
+        "reasoning": reasoning,
+        "answer_format": format_result,
+        "answer_format_retries": retries,
+    }
 
 
 def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:

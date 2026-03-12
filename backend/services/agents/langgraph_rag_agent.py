@@ -94,6 +94,9 @@ class LangGraphRAGAgent:
         self.reranker = search_service.reranker  # Use reranker from search_service
         self.page_fetcher = getattr(search_service, "fetch_doc_pages", None)
         self.doc_fetcher = getattr(search_service, "fetch_doc_chunks", None)
+        # section_fetcher for chapter-based expansion (v3)
+        _es_engine = getattr(search_service, "es_engine", None)
+        self.section_fetcher = getattr(_es_engine, "fetch_section_chunks", None)
         self.mode = mode
         self.ask_user_after_retrieve = ask_user_after_retrieve
         self.ask_device_selection = ask_device_selection
@@ -491,6 +494,7 @@ class LangGraphRAGAgent:
                     expand_related_docs_node,
                     page_fetcher=self.page_fetcher,
                     doc_fetcher=self.doc_fetcher,
+                    section_fetcher=self.section_fetcher,
                 ),
             ),
         )
