@@ -16,12 +16,14 @@ DEFAULT_MODELS = {
     "koe5": "nlpai-lab/KoE5",
     "multilingual_e5": "intfloat/multilingual-e5-large",
     "bge_base": "BAAI/bge-base-en-v1.5",
+    "bge_m3": "BAAI/bge-m3",
 }
 
 
 @register_embedder("koe5", version="v1")
 @register_embedder("multilingual_e5", version="v1")
 @register_embedder("bge_base", version="v1")
+@register_embedder("bge_m3", version="v1")
 class SentenceEmbedderAdapter(BaseEmbedder):
     """레지스트리용 SentenceTransformer 어댑터."""
 
