@@ -341,12 +341,16 @@ MAX_REF_CHARS_REVIEW = 200  # 검색 결과 리뷰용
 MAX_REF_CHARS_ANSWER = 1200  # 답변 생성용
 RELATED_PAGE_WINDOW = 2  # 인접 페이지 범위 (±N)
 DOC_TYPES_SAME_DOC = {"gcb", "myservice", "pems"}
-EXPAND_TOP_K = 20  # 확장 대상 최대 개수 (rerank 상위)
+EXPAND_TOP_K = 8  # 확장 대상 최대 개수 (rerank 상위)
 REPETITION_MIN_BLOCK_LEN = 40  # 반복 감지 최소 블록 길이 (문자)
 REPETITION_MAX_REPEATS = 2  # 같은 블록 최대 허용 반복 횟수
 
 
-def _truncate_repetition(text: str, min_block_len: int = REPETITION_MIN_BLOCK_LEN, max_repeats: int = REPETITION_MAX_REPEATS) -> str:
+def _truncate_repetition(
+    text: str,
+    min_block_len: int = REPETITION_MIN_BLOCK_LEN,
+    max_repeats: int = REPETITION_MAX_REPEATS,
+) -> str:
     """텍스트에서 반복되는 블록을 감지하고 절삭한다.
 
     긴 블록(min_block_len 이상)이 max_repeats회를 초과하여 연속 반복되면,
@@ -378,7 +382,11 @@ def _truncate_repetition(text: str, min_block_len: int = REPETITION_MIN_BLOCK_LE
                 truncated = before + kept + after
                 logger.info(
                     "_truncate_repetition: %d → %d chars (block=%d, repeats=%d→%d)",
-                    len(text), len(truncated), block_len, count, max_repeats,
+                    len(text),
+                    len(truncated),
+                    block_len,
+                    count,
+                    max_repeats,
                 )
                 # 재귀: 추가 반복이 있을 수 있음
                 return _truncate_repetition(truncated, min_block_len, max_repeats)
@@ -398,6 +406,7 @@ TEMP_TRANSLATION = 0.0  # translate
 # 생성 노드: 약간의 다양성 허용
 TEMP_QUERY_GEN = 0.3  # mq, st_mq, refine_queries
 TEMP_ANSWER = 0.5  # answer
+TEMP_ANSWER_SETUP = 0.2  # answer (setup)
 
 
 def resolve_querygen_temperature(state: AgentState, *, mq_invoked: bool = False) -> float:
@@ -411,6 +420,12 @@ def resolve_querygen_temperature(state: AgentState, *, mq_invoked: bool = False)
     if mq_mode in {"off", "fallback"} and attempts < 2:
         return TEMP_CLASSIFICATION
     return TEMP_QUERY_GEN
+
+
+def resolve_answer_temperature(route: Route) -> float:
+    if route == "setup":
+        return TEMP_ANSWER_SETUP
+    return TEMP_ANSWER
 
 
 def _invoke_llm(llm: BaseLLM, system: str, user: str, **kwargs: Any) -> str:
@@ -861,6 +876,121 @@ def ref_json_to_text(ref_json: List[Dict[str, Any]]) -> str:
 
         lines.append(f"[{rank}] {doc_id}{tag}: {content}")
     return "\n".join(lines)
+
+
+PROCEDURE_FIRST_KEYWORDS: tuple[str, ...] = (
+    "work procedure",
+    "workflow",
+    "procedure",
+    "작업 절차",
+    "절차",
+    "교체",
+    "replacement",
+    "설치",
+    "install",
+    "installation",
+    "조정",
+    "adjust",
+    "adjustment",
+    "setting",
+    "셋업",
+    "setup",
+)
+
+CAUTION_KEYWORDS: tuple[str, ...] = (
+    "warning",
+    "caution",
+    "note",
+    "주의",
+    "경고",
+)
+
+OVERVIEW_KEYWORDS: tuple[str, ...] = (
+    "scope",
+    "overview",
+    "purpose",
+    "background",
+    "개요",
+    "목적",
+    "배경",
+)
+
+STEP_EMOJI_TO_NUMBER: dict[str, str] = {
+    "0️⃣": "1.",
+    "1️⃣": "1.",
+    "2️⃣": "2.",
+    "3️⃣": "3.",
+    "4️⃣": "4.",
+    "5️⃣": "5.",
+    "6️⃣": "6.",
+    "7️⃣": "7.",
+    "8️⃣": "8.",
+    "9️⃣": "9.",
+}
+
+
+def _contains_any_keyword(text: str, keywords: tuple[str, ...]) -> bool:
+    lowered = text.lower()
+    return any(keyword in lowered for keyword in keywords)
+
+
+def _score_setup_ref_priority(text: str) -> int:
+    if _contains_any_keyword(text, PROCEDURE_FIRST_KEYWORDS):
+        return 0
+    if _contains_any_keyword(text, CAUTION_KEYWORDS):
+        return 1
+    if _contains_any_keyword(text, OVERVIEW_KEYWORDS):
+        return 3
+    return 2
+
+
+def _prioritize_setup_answer_refs(ref_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not ref_items:
+        return ref_items
+
+    scored_items: list[tuple[int, int, int, Dict[str, Any]]] = []
+    for idx, item in enumerate(ref_items):
+        content = str(item.get("content") or "")
+        metadata_raw = item.get("metadata")
+        metadata = metadata_raw if isinstance(metadata_raw, dict) else {}
+        extra = " ".join(
+            str(metadata.get(key) or "") for key in ("section_type", "chapter", "title", "source")
+        )
+        priority = _score_setup_ref_priority(f"{content}\n{extra}")
+
+        rank_raw = item.get("rank")
+        try:
+            original_rank = int(str(rank_raw))
+        except (TypeError, ValueError):
+            original_rank = idx + 1
+
+        scored_items.append((priority, original_rank, idx, item))
+
+    sorted_items = [
+        item
+        for _, _, _, item in sorted(
+            scored_items,
+            key=lambda row: (row[0], row[1], row[2]),
+        )
+    ]
+
+    reordered: List[Dict[str, Any]] = []
+    for new_rank, item in enumerate(sorted_items, start=1):
+        updated = dict(item)
+        updated["rank"] = new_rank
+        reordered.append(updated)
+    return reordered
+
+
+def _postprocess_setup_answer_text(answer: str) -> str:
+    normalized = answer
+    for emoji, number_token in STEP_EMOJI_TO_NUMBER.items():
+        normalized = normalized.replace(emoji, number_token)
+
+    normalized = re.sub(r"【\s*\[?(\d+)\]?(?:†[^】]*)?】", r"[\1]", normalized)
+    normalized = re.sub(r"\[\s*(?:…|\.\.\.)\s*\]", "", normalized)
+    normalized = re.sub(r"\bEFIM\b", "EFEM", normalized)
+    return normalized
 
 
 def _normalize_doc_type(doc_type: str | None) -> str:
@@ -2086,6 +2216,8 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     route = state["route"]
     answer_language = state.get("target_language") or state.get("detected_language") or "ko"
     ref_items = state.get("answer_ref_json") or state.get("ref_json", [])
+    if route == "setup":
+        ref_items = _prioritize_setup_answer_refs(ref_items)
     ref_text = ref_json_to_text(ref_items)
     logger.info(
         "answer_node: route=%s, answer_language=%s, refs_chars=%d, docs=%d",
@@ -2151,8 +2283,13 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     logger.info(
         "answer_node: user_prompt_chars=%d, system_prompt_chars=%d", len(user), len(tmpl.system)
     )
+    answer_temperature = resolve_answer_temperature(route)
     answer, reasoning = _invoke_llm_with_reasoning(
-        llm, tmpl.system, user, max_tokens=MAX_TOKENS_ANSWER, temperature=TEMP_ANSWER
+        llm,
+        tmpl.system,
+        user,
+        max_tokens=MAX_TOKENS_ANSWER,
+        temperature=answer_temperature,
     )
     # 반복 블록 감지 및 절삭 (안전망)
     original_len = len(answer)
@@ -2161,8 +2298,20 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
         logger.warning(
             "answer_node: [REPETITION_FALLBACK] 반복 절삭 발생! %d → %d chars (%.0f%% 제거). "
             "repeat_penalty/repeat_last_n 설정 점검 필요.",
-            original_len, len(answer), (1 - len(answer) / original_len) * 100,
+            original_len,
+            len(answer),
+            (1 - len(answer) / original_len) * 100,
         )
+
+    if route == "setup":
+        post_processed = _postprocess_setup_answer_text(answer)
+        if post_processed != answer:
+            logger.info(
+                "answer_node: setup post-process applied (%d -> %d chars)",
+                len(answer),
+                len(post_processed),
+            )
+        answer = post_processed
     logger.info(
         "answer_node: answer_chars=%d, reasoning_chars=%d, answer_preview=%s",
         len(answer),
@@ -2228,7 +2377,7 @@ def should_retry(
     """Determine retry strategy based on attempt count.
 
     Retry strategies:
-    - 1st unfaithful (attempt 0→1): retry_expand - use more docs (20→40)
+    - 1st unfaithful (attempt 0→1): retry_expand - use more docs (8→20)
     - 2nd unfaithful (attempt 1→2): retry - refine queries
     - 3rd unfaithful (attempt 2→3): retry_mq - regenerate multi-query from scratch
     """
@@ -2277,16 +2426,16 @@ def retry_bump_node(state: AgentState) -> Dict[str, Any]:
 
 
 def retry_expand_node(state: AgentState) -> Dict[str, Any]:
-    """1st retry strategy: increase expand_top_k from 20 to 40.
+    """1st retry strategy: increase expand_top_k from 8 to 20.
 
     This doesn't re-retrieve docs, just uses more of the already retrieved docs
     for answer generation.
     """
     attempts = int(state.get("attempts", 0)) + 1
-    logger.info("retry_expand_node: increasing expand_top_k to 40 (attempt %d)", attempts)
+    logger.info("retry_expand_node: increasing expand_top_k to 20 (attempt %d)", attempts)
     return {
         "attempts": attempts,
-        "expand_top_k": 40,
+        "expand_top_k": 20,
         "retry_strategy": "expand_more",
     }
 

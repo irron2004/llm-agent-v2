@@ -638,7 +638,7 @@ class LangGraphRAGAgent:
             )
 
         # verified: add retry/human with different strategies
-        # retry_expand: 1st retry - use more docs (20→40)
+        # retry_expand: 1st retry - use more docs (8→20)
         builder.add_node("retry_expand", self._wrap_node("retry_expand", retry_expand_node))
         # retry_bump + refine_queries: 2nd retry - refine queries and re-retrieve
         builder.add_node("retry_bump", self._wrap_node("retry_bump", retry_bump_node))

@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """SOP retrieval-only evaluation: check if gold docs are retrieved (no LLM answer)."""
+
 from __future__ import annotations
 
 import csv
 import hashlib
 import http.client
 import json
+import re
 import sys
 import time
 import urllib.error
@@ -45,7 +47,11 @@ def _post_json(url: str, payload: dict, *, timeout: float) -> tuple[dict, float]
 
 
 def _normalize(name: str) -> str:
-    return name.lower().strip().replace(" ", "_").replace("-", "_").replace(".pdf", "").replace(".pdf", "")
+    normalized = str(name or "").lower().strip()
+    normalized = re.sub(r"\.(pdf|docx|doc|txt)$", "", normalized)
+    normalized = re.sub(r"[^a-z0-9]+", "_", normalized)
+    normalized = re.sub(r"_+", "_", normalized).strip("_")
+    return normalized
 
 
 def _parse_pages(pages_str: str) -> set[int]:
@@ -64,14 +70,24 @@ def _parse_pages(pages_str: str) -> set[int]:
     return pages
 
 
-def _check_hit(docs: list[dict], gold_doc: str, gold_pages: str) -> tuple[bool, bool, int | None]:
+def _check_hit(
+    docs: list[dict], gold_doc: str, gold_pages: str
+) -> tuple[bool, bool, int | None]:
     gold_norm = _normalize(gold_doc)
     gold_page_set = _parse_pages(gold_pages)
 
-    for rank, doc in enumerate(docs):
+    first_match_rank: int | None = None
+    page_match_found = False
+
+    for rank, doc in enumerate(docs, start=1):
         doc_id = _normalize(str(doc.get("doc_id") or doc.get("id") or ""))
         title = _normalize(str(doc.get("title") or ""))
-        source = _normalize(str((doc.get("metadata") or {}).get("source") or (doc.get("metadata") or {}).get("file_name") or ""))
+        source = ""
+        metadata_obj = doc.get("metadata")
+        if isinstance(metadata_obj, dict):
+            source = _normalize(
+                str(metadata_obj.get("source") or metadata_obj.get("file_name") or "")
+            )
 
         matched = False
         for candidate in [doc_id, title, source]:
@@ -79,18 +95,28 @@ def _check_hit(docs: list[dict], gold_doc: str, gold_pages: str) -> tuple[bool, 
                 matched = True
                 break
 
-        if matched:
-            page = doc.get("page")
-            if page is not None:
-                try:
-                    page_int = int(page)
-                except (ValueError, TypeError):
-                    page_int = -1
-                if page_int in gold_page_set:
-                    return True, True, rank + 1
-            return True, False, rank + 1
+        if not matched:
+            continue
 
-    return False, False, None
+        if first_match_rank is None:
+            first_match_rank = rank
+
+        page = doc.get("page")
+        if page is None:
+            continue
+
+        try:
+            page_int = int(page)
+        except (ValueError, TypeError):
+            continue
+
+        if page_int in gold_page_set:
+            page_match_found = True
+            break
+
+    if first_match_rank is None:
+        return False, False, None
+    return True, page_match_found, first_match_rank
 
 
 def main():
@@ -113,9 +139,9 @@ def main():
     all_results: dict[str, list[dict]] = {}
 
     for label, doc_types in configs:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Running: {label} (filter_doc_types={doc_types})")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         results = []
 
         for row in rows:
@@ -126,7 +152,9 @@ def main():
             gold_pages = row.get("정답 페이지", "").strip()
 
             devices = DEVICE_ALIASES.get(device, [device]) if device else []
-            thread_id = f"ret-eval-{hashlib.sha1(f'{idx}-{label}'.encode()).hexdigest()[:10]}"
+            thread_id = (
+                f"ret-eval-{hashlib.sha1(f'{idx}-{label}'.encode()).hexdigest()[:10]}"
+            )
 
             payload = {
                 "message": question,
@@ -139,7 +167,9 @@ def main():
                 "target_language": "ko",
             }
 
-            response, elapsed = _post_json(f"{API_BASE_URL}/api/agent/run", payload, timeout=TIMEOUT)
+            response, elapsed = _post_json(
+                f"{API_BASE_URL}/api/agent/run", payload, timeout=TIMEOUT
+            )
 
             error = None
             docs = []
@@ -157,15 +187,27 @@ def main():
             pstatus = "p✓" if hit_page else "p✗"
             rank_str = f"@{hit_rank}" if hit_rank else ""
             err_str = f" ERR:{error[:40]}" if error else ""
-            print(f"  [{idx+1}/{len(rows)}] {question[:50]:50s} {status} {pstatus} {rank_str:4s} docs={len(docs)} {elapsed:.0f}ms{err_str}")
+            print(
+                f"  [{idx + 1}/{len(rows)}] {question[:50]:50s} {status} {pstatus} {rank_str:4s} docs={len(docs)} {elapsed:.0f}ms{err_str}"
+            )
 
             result = {
-                "idx": idx, "question": question, "device": device,
-                "filter": label, "filter_doc_types": doc_types,
-                "gold_doc": gold_doc, "gold_pages": gold_pages,
-                "hit_doc": hit_doc, "hit_page": hit_page, "hit_rank": hit_rank,
-                "n_docs": len(docs), "elapsed_ms": elapsed, "error": error,
-                "retrieved_doc_ids": [d.get("doc_id") or d.get("id") for d in docs[:20]],
+                "idx": idx,
+                "question": question,
+                "device": device,
+                "filter": label,
+                "filter_doc_types": doc_types,
+                "gold_doc": gold_doc,
+                "gold_pages": gold_pages,
+                "hit_doc": hit_doc,
+                "hit_page": hit_page,
+                "hit_rank": hit_rank,
+                "n_docs": len(docs),
+                "elapsed_ms": elapsed,
+                "error": error,
+                "retrieved_doc_ids": [
+                    d.get("doc_id") or d.get("id") for d in docs[:20]
+                ],
                 "retrieved_pages": [d.get("page") for d in docs[:20]],
             }
             results.append(result)
@@ -178,9 +220,9 @@ def main():
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
     # Summary
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("SUMMARY")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     for label, results in all_results.items():
         total = len(results)
         errors = sum(1 for r in results if r["error"])
@@ -191,9 +233,11 @@ def main():
         ranks = [r["hit_rank"] for r in results if r["hit_rank"]]
         avg_rank = sum(ranks) / len(ranks) if ranks else 0
 
-        print(f"  {label:12s}: doc_hit={doc_hits}/{valid} ({doc_hits/max(valid,1)*100:.1f}%) | "
-              f"page_hit={page_hits}/{valid} ({page_hits/max(valid,1)*100:.1f}%) | "
-              f"avg_rank={avg_rank:.1f} | errors={errors} | avg={avg_elapsed:.0f}ms")
+        print(
+            f"  {label:12s}: doc_hit={doc_hits}/{valid} ({doc_hits / max(valid, 1) * 100:.1f}%) | "
+            f"page_hit={page_hits}/{valid} ({page_hits / max(valid, 1) * 100:.1f}%) | "
+            f"avg_rank={avg_rank:.1f} | errors={errors} | avg={avg_elapsed:.0f}ms"
+        )
 
     # Detailed comparison
     if len(configs) == 2:
@@ -201,19 +245,23 @@ def main():
         ra, rb = all_results[la], all_results[lb]
 
         print(f"\n  Missed docs (both miss):")
-        both_miss = [(a, b) for a, b in zip(ra, rb) if not a["hit_doc"] and not b["hit_doc"]]
+        both_miss = [
+            (a, b) for a, b in zip(ra, rb) if not a["hit_doc"] and not b["hit_doc"]
+        ]
         for a, _ in both_miss[:15]:
-            print(f"    [{a['idx']+1}] {a['question'][:50]} | gold={a['gold_doc'][:40]}")
+            print(
+                f"    [{a['idx'] + 1}] {a['question'][:50]} | gold={a['gold_doc'][:40]}"
+            )
 
         print(f"\n  {la} only hits:")
         for a, b in zip(ra, rb):
             if a["hit_doc"] and not b["hit_doc"]:
-                print(f"    [{a['idx']+1}] {a['question'][:50]}")
+                print(f"    [{a['idx'] + 1}] {a['question'][:50]}")
 
         print(f"\n  {lb} only hits:")
         for a, b in zip(ra, rb):
             if not a["hit_doc"] and b["hit_doc"]:
-                print(f"    [{a['idx']+1}] {a['question'][:50]}")
+                print(f"    [{a['idx'] + 1}] {a['question'][:50]}")
 
     with (out_dir / "summary.txt").open("w", encoding="utf-8") as f:
         for label, results in all_results.items():
@@ -222,7 +270,9 @@ def main():
             valid = total - errors
             doc_hits = sum(1 for r in results if r["hit_doc"])
             page_hits = sum(1 for r in results if r["hit_page"])
-            f.write(f"{label}: doc_hit={doc_hits}/{valid} page_hit={page_hits}/{valid} errors={errors}\n")
+            f.write(
+                f"{label}: doc_hit={doc_hits}/{valid} page_hit={page_hits}/{valid} errors={errors}\n"
+            )
 
     print(f"\nResults saved to {out_dir}/")
 

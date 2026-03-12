@@ -32,9 +32,9 @@ def _make_doc(
 class TestExpandTopKLimit:
     """상위 K개 확장 제한 테스트"""
 
-    def test_expand_top_k_constant_is_20(self):
-        """EXPAND_TOP_K 상수가 20인지 확인"""
-        assert EXPAND_TOP_K == 20
+    def test_expand_top_k_constant_is_8(self):
+        """EXPAND_TOP_K 상수가 8인지 확인"""
+        assert EXPAND_TOP_K == 8
 
     def test_expand_only_top_k_docs(self):
         """문서 수가 top_k를 초과하면 상위 top_k만 확장 시도"""
@@ -99,7 +99,9 @@ class TestRemainingDocsPreserved:
     def test_remaining_docs_have_original_content(self):
         """6번째 이후 문서는 원본 content 유지"""
         # Given: 7개 문서, 각각 고유 content
-        docs = [_make_doc(f"doc_{i}", page=i + 1, content=f"original_content_{i}") for i in range(7)]
+        docs = [
+            _make_doc(f"doc_{i}", page=i + 1, content=f"original_content_{i}") for i in range(7)
+        ]
         state = {"docs": docs}
 
         # page_fetcher가 빈 결과 반환 -> 확장 안됨
@@ -127,9 +129,7 @@ class TestDocTypeBasedExpansion:
         doc_fetcher = MagicMock(return_value=[])
 
         # When
-        expand_related_docs_node(
-            state, page_fetcher=page_fetcher, doc_fetcher=doc_fetcher
-        )
+        expand_related_docs_node(state, page_fetcher=page_fetcher, doc_fetcher=doc_fetcher)
 
         # Then
         doc_fetcher.assert_called_once_with("gcb_doc")
@@ -144,9 +144,7 @@ class TestDocTypeBasedExpansion:
         doc_fetcher = MagicMock(return_value=[])
 
         # When
-        expand_related_docs_node(
-            state, page_fetcher=page_fetcher, doc_fetcher=doc_fetcher
-        )
+        expand_related_docs_node(state, page_fetcher=page_fetcher, doc_fetcher=doc_fetcher)
 
         # Then
         doc_fetcher.assert_called_once_with("myservice_doc")
@@ -161,9 +159,7 @@ class TestDocTypeBasedExpansion:
         doc_fetcher = MagicMock()
 
         # When
-        expand_related_docs_node(
-            state, page_fetcher=page_fetcher, doc_fetcher=doc_fetcher
-        )
+        expand_related_docs_node(state, page_fetcher=page_fetcher, doc_fetcher=doc_fetcher)
 
         # Then: page 5 기준 ±2 -> [3, 4, 5, 6, 7]
         page_fetcher.assert_called_once()
@@ -241,9 +237,7 @@ class TestEdgeCases:
         doc_fetcher = MagicMock(return_value=[])
 
         # When
-        expand_related_docs_node(
-            state, page_fetcher=page_fetcher, doc_fetcher=doc_fetcher
-        )
+        expand_related_docs_node(state, page_fetcher=page_fetcher, doc_fetcher=doc_fetcher)
 
         # Then
         # gcb, myservice -> doc_fetcher (2회)
