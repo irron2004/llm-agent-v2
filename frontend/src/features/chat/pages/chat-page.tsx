@@ -346,6 +346,16 @@ export default function ChatPage() {
     return (assistantId: string) => queryMap.get(assistantId) || "";
   }, [messages]);
 
+  const pendingRegenerationMessage = useMemo(
+    () => messages.find((msg) => msg.id === pendingRegeneration?.messageId && msg.role === "assistant"),
+    [messages, pendingRegeneration?.messageId],
+  );
+
+  const shouldShowMissingDevicePrompt =
+    pendingRegeneration?.reason === "missing_device_parse" &&
+    !lastSelectedDevice &&
+    !pendingRegenerationMessage?.content?.trim();
+
   return (
     <div className="chat-layout">
       <main className="chat-main">
@@ -383,7 +393,7 @@ export default function ChatPage() {
             </MessageList>
           )}
 
-          {pendingRegeneration?.reason === "missing_device_parse" && !lastSelectedDevice && (
+          {shouldShowMissingDevicePrompt && (
             <div style={{ margin: "16px 0 8px", padding: "12px 16px", borderRadius: 8, border: "1px solid var(--color-border)", background: "var(--color-bg-secondary)", maxWidth: 480 }}>
               {!showSuggestedDevicePanel && (
                 <>

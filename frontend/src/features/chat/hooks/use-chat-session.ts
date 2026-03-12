@@ -102,17 +102,17 @@ type GuidedOption = {
 
 const toGuidedOptions = (value: unknown): GuidedOption[] => {
   if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => {
-      const src = isRecord(item) ? item : null;
-      const v = typeof src?.value === "string" ? src.value : "";
-      if (!v) return null;
-      return {
-        value: v,
-        recommended: Boolean(src?.recommended),
-      } satisfies GuidedOption;
-    })
-    .filter((x): x is GuidedOption => Boolean(x));
+  const options: GuidedOption[] = [];
+  for (const item of value) {
+    const src = isRecord(item) ? item : null;
+    const v = typeof src?.value === "string" ? src.value.trim() : "";
+    if (!v) continue;
+    options.push({
+      value: v,
+      ...(src?.recommended === true ? { recommended: true } : {}),
+    });
+  }
+  return options;
 };
 
 const normalizeTaskMode = (value: unknown): "sop" | "issue" | "all" => {
@@ -501,13 +501,16 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       const shouldSuggestAdditionalDeviceSearch = typeof res.suggest_additional_device_search === "boolean"
         ? (res.suggest_additional_device_search || fallbackSuggest)
         : fallbackSuggest;
+      const hasCompletedAnswer = typeof res.answer === "string" && res.answer.trim().length > 0;
+      const shouldShowMissingDevicePrompt =
+        shouldSuggestAdditionalDeviceSearch && !hasCompletedAnswer;
 
       updateMessage(assistantId, (m) => ({
         ...m,
-        suggestAdditionalDeviceSearch: shouldSuggestAdditionalDeviceSearch,
+        suggestAdditionalDeviceSearch: shouldShowMissingDevicePrompt,
       }));
 
-      if (shouldSuggestAdditionalDeviceSearch) {
+      if (shouldShowMissingDevicePrompt) {
         setPendingRegeneration({
           messageId: assistantId,
           originalQuery: res.query || fallbackQuestion,
@@ -521,6 +524,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
             : [],
           reason: "missing_device_parse",
         });
+      } else {
+        setPendingRegeneration(null);
       }
 
       // Save turn to backend
@@ -665,11 +670,31 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         const hasUserFilters = Boolean(overrides?.filterDevices?.length || overrides?.filterDocTypes?.length);
         const autoParseEnabled = hasUserFilters ? false : (overrides?.autoParse ?? !Boolean(overrides));
         const guidedConfirmEnabled = !isResume && autoParseEnabled && !hasUserFilters;
+        const resumePayload: Partial<AgentRequest> = isHilResume
+          ? {
+              thread_id: resumeThreadId,
+              resume_decision: decision,
+              auto_parse: false,
+              ask_user_after_retrieve: true,
+            }
+          : isGuidedResume
+            ? {
+                thread_id: resumeThreadId,
+                resume_decision: decision,
+                auto_parse: false,
+                ask_user_after_retrieve: false,
+              }
+            : {};
+
         const payload: AgentRequest = {
           message: requestMessage,
-          auto_parse: autoParseEnabled,  // 자동 파싱 모드 활성화 (기본값)
-          guided_confirm: guidedConfirmEnabled,
-          ask_user_after_retrieve: false,  // 문서 선택 UI 비활성화
+          ...(!isResume
+            ? {
+                auto_parse: autoParseEnabled,  // 자동 파싱 모드 활성화 (기본값)
+                guided_confirm: guidedConfirmEnabled,
+                ask_user_after_retrieve: false,  // 문서 선택 UI 비활성화
+              }
+            : {}),
           ...(chatHistory ? { chat_history: chatHistory } : {}),
           ...(overrides ? {
             filter_devices: overrides.filterDevices,
@@ -677,21 +702,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
             search_queries: overrides.searchQueries,
             selected_doc_ids: overrides.selectedDocIds,
           } : {}),
-          ...(isHilResume
-            ? {
-                thread_id: resumeThreadId,
-                resume_decision: decision,
-                auto_parse: false,
-                ask_user_after_retrieve: true,
-              }
-            : isGuidedResume
-              ? {
-                  thread_id: resumeThreadId,
-                  resume_decision: decision,
-                  auto_parse: false,
-                  ask_user_after_retrieve: false,
-                }
-              : {}),
+          ...resumePayload,
           ...(!isResume && threadIdRef.current
             ? { thread_id: threadIdRef.current }
             : {}),

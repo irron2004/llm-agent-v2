@@ -26,6 +26,29 @@ describe("Req 1 — confirmation dialog", () => {
   });
 });
 
+describe("Issue 1 regression — hide prompt after answer", () => {
+  it("does not show missing-device prompt when the linked assistant message already has an answer", async () => {
+    const pending = makePendingRegeneration({ messageId: "assistant-answered" });
+
+    await renderChatPage({
+      pendingRegeneration: pending,
+      chatSession: {
+        messages: [
+          {
+            id: "assistant-answered",
+            role: "assistant",
+            content: "답변이 이미 완료되었습니다.",
+          },
+        ],
+      },
+    });
+
+    expect(
+      screen.queryByText("장비를 자동으로 파싱하지 못했습니다. 기기를 검색하시겠습니까?"),
+    ).not.toBeInTheDocument();
+  });
+});
+
 // ── Req 2: "1" 입력 → 기기 목록 로드 ──
 
 describe("Req 2 — type '1' to load device list", () => {
