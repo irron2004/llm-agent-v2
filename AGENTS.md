@@ -3,6 +3,16 @@
 Practical guidance for autonomous coding agents in `llm-agent-v2`.
 All commands and conventions below are derived from current repo files.
 
+New agent entrypoint:
+- Start with `docs/2026-03-14-agent-개발-운영.md` section `0) 신규 agent 5분 온보딩 (필독)` before any non-trivial change.
+- Cross-agent kickoff skill source: `docs/agent-skills/task-start-kickoff.md`.
+- Runtime wrappers:
+  - OMC: `.omc/skills/task-start-kickoff/SKILL.md`
+  - OpenCode: `.opencode/skills/task-start-kickoff/SKILL.md`
+  - Claude: `.claude/skills/task-start-kickoff/SKILL.md`
+  - Codex: `.codex/skills/task-start-kickoff/SKILL.md`
+- If local skill auto-loading is unavailable, execute the kickoff checklist from the canonical source manually.
+
 ## 1) Rule Sources and Priority
 Follow instructions in this order:
 1. Direct user task instructions.
@@ -47,6 +57,13 @@ cd backend && uv run pytest tests/test_retrieval_pipeline.py -v
 Run one backend test by name pattern:
 ```bash
 cd backend && uv run pytest tests/test_retrieval_pipeline.py -v -k "deterministic"
+```
+
+Run root-level API contract/regression tests:
+```bash
+uv run pytest tests/api -v
+uv run pytest tests/api/test_agent_response_metadata_contract.py -v
+uv run pytest tests/api/test_agent_interrupt_resume_regression.py -v
 ```
 
 Lint/format/type-check:
@@ -138,15 +155,37 @@ Observed error-handling pattern:
 - Keep routers thin (validation/orchestration) and place business logic in services.
 - Align with existing LangGraph/RAG flow in `backend/services/agents/langgraph_rag_agent.py` unless task explicitly requires redesign.
 
-## 6) Agent Checklist
+## 6) Change Safety Protocol
+- For full multi-agent operating flow, read `docs/2026-03-14-agent-개발-운영.md` before substantial parallel work.
+- For non-trivial task judgment, use the single source of truth: `docs/2026-03-14-agent-개발-운영.md` section `5.5 비사소 작업 판정 기준`.
+- For substantial work, read `docs/contracts/product-contract.md` before editing.
+- For multi-step or multi-file work, create or update a task document under `docs/tasks/` from `docs/tasks/TASK_TEMPLATE.md`.
+- Task docs must list:
+  - protected contract IDs to preserve,
+  - allowed files,
+  - explicit verification commands,
+  - any contract IDs that intentionally change.
+- Do not silently change behavior covered by the product contract. Update the contract doc and linked tests in the same task if behavior must change.
+- Do not run multiple coding agents in the same git worktree. Use separate branches or `git worktree` instances for parallel work.
+- When `git status` shows unrelated dirty files, treat them as user-owned changes and do not overwrite or refactor through them unless the task explicitly requires it.
+- If a task grows beyond its allowed files, update the task doc first and then edit code.
+- Prefer protecting behavior with regression tests in `tests/api`, `backend/tests`, or frontend `__tests__` rather than relying on prose alone.
+
+## 7) Agent Checklist
 Before edits:
+- Run `git status --short` and note unrelated dirty files.
 - Find and follow nearby code patterns in the same layer.
 - Confirm backend/frontend impact and plan matching verification scope.
+- Identify the relevant contract IDs from `docs/contracts/product-contract.md`.
+- If the task is non-trivial, create or update the active task doc before editing files.
 
 After edits:
+- Compare the final diff against the task doc's allowed files.
 - Run targeted tests first, then broader tests as needed.
 - Run backend Ruff + MyPy for Python changes.
 - Run frontend build + tests for TS/TSX changes.
+- Run the verification commands listed in the task doc.
 - Keep changes scoped; avoid unrelated refactors unless requested.
+- If protected behavior changed, update `docs/contracts/product-contract.md` and the linked tests in the same change.
 
 When uncertain, prefer existing repository conventions over generic framework defaults.

@@ -2,6 +2,12 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Task Start Kickoff Skill
+
+- Canonical checklist: `docs/agent-skills/task-start-kickoff.md`
+- Claude wrapper: `.claude/skills/task-start-kickoff/SKILL.md`
+- If auto skill loading is unavailable, read the canonical checklist and execute it manually before non-trivial edits.
+
 ## Project Overview
 
 PE(Process Engineering) 트러블슈팅을 위한 RAG 기반 에이전트 시스템. 반도체 장비 문서(SOP, PEMS, 매뉴얼 등)를 검색·분석하여 답변을 생성한다.
