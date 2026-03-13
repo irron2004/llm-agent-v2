@@ -1069,6 +1069,42 @@ def _prioritize_setup_answer_refs(ref_items: List[Dict[str, Any]]) -> List[Dict[
     return reordered
 
 
+MAX_SETUP_DOC_TRIES = 5  # 적합성 판정 최대 문서 수
+MAX_ANSWER_REFS = 5  # 답변 생성 시 최대 REFS 수
+
+
+def _group_refs_by_doc_id(
+    ref_items: List[Dict[str, Any]],
+) -> List[Tuple[str, List[Dict[str, Any]]]]:
+    """ref_items를 doc_id별로 그룹핑. 첫 등장 순서 유지."""
+    from collections import OrderedDict
+
+    groups: OrderedDict[str, List[Dict[str, Any]]] = OrderedDict()
+    for item in ref_items:
+        doc_id = str(item.get("doc_id", "unknown"))
+        groups.setdefault(doc_id, []).append(item)
+    return list(groups.items())
+
+
+def _check_doc_relevance(
+    query: str,
+    doc_ref_text: str,
+    *,
+    llm: "BaseLLM",
+) -> bool:
+    """문서가 질문에 답할 수 있는 절차/작업 정보를 포함하는지 가볍게 판정."""
+    system = (
+        "You are a relevance checker. Determine if the document contains "
+        "procedure/work steps that can answer the user's question. "
+        "Reply ONLY 'yes' or 'no'."
+    )
+    user = f"Question: {query}\nDocument:\n{doc_ref_text[:2000]}"
+    raw = _invoke_llm(llm, system, user, max_tokens=10, temperature=TEMP_CLASSIFICATION)
+    result = "yes" in (raw or "").lower()
+    logger.info("_check_doc_relevance: raw=%r → %s", (raw or "")[:50], result)
+    return result
+
+
 def _postprocess_setup_answer_text(answer: str) -> str:
     normalized = answer
     for emoji, number_token in STEP_EMOJI_TO_NUMBER.items():
@@ -2495,6 +2531,57 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     ref_items = state.get("answer_ref_json") or state.get("ref_json", [])
     if route == "setup":
         ref_items = _prioritize_setup_answer_refs(ref_items)
+    # 답변 생성 시 REFS 수 제한
+    if len(ref_items) > MAX_ANSWER_REFS:
+        ref_items = ref_items[:MAX_ANSWER_REFS]
+
+    # Use original query for non-English answers to avoid language drift.
+    if answer_language == "en":
+        query_for_prompt = state.get("query_en") or state["query"]
+    else:
+        query_for_prompt = state["query"]
+
+    # Setup route: 문서별 적합성 판정 후 적합한 문서만 선택
+    if route == "setup" and ref_items:
+        doc_groups = _group_refs_by_doc_id(ref_items)
+        if len(doc_groups) > 1:
+            import time as _time
+
+            selected_refs = None
+            checks_done = 0
+            for i, (doc_id, group_refs) in enumerate(doc_groups[:MAX_SETUP_DOC_TRIES]):
+                t0 = _time.time()
+                group_text = ref_json_to_text(group_refs)
+                relevant = _check_doc_relevance(query_for_prompt, group_text, llm=llm)
+                elapsed = _time.time() - t0
+                checks_done = i + 1
+                logger.info(
+                    "answer_node: setup relevance check %d/%d doc=%s relevant=%s (%.1fs)",
+                    i + 1,
+                    min(len(doc_groups), MAX_SETUP_DOC_TRIES),
+                    doc_id[:50],
+                    relevant,
+                    elapsed,
+                )
+                if relevant:
+                    selected_refs = group_refs
+                    break
+
+            if selected_refs is not None:
+                ref_items = selected_refs
+                logger.info(
+                    "answer_node: setup selected doc=%s after %d checks",
+                    selected_refs[0].get("doc_id", "?")[:50],
+                    checks_done,
+                )
+            else:
+                # 전부 부적합 → 첫 번째 문서로 fallback
+                ref_items = doc_groups[0][1]
+                logger.info(
+                    "answer_node: no relevant doc found, fallback to first doc=%s",
+                    doc_groups[0][0][:50],
+                )
+
     ref_text = ref_json_to_text(ref_items)
     logger.info(
         "answer_node: route=%s, answer_language=%s, refs_chars=%d, docs=%d",
@@ -2504,12 +2591,6 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
         len(ref_items),
     )
 
-    # Use original query for non-English answers to avoid language drift.
-    # (e.g., zh/ja prompts receiving an English-translated query can bias output to English)
-    if answer_language == "en":
-        query_for_prompt = state.get("query_en") or state["query"]
-    else:
-        query_for_prompt = state["query"]
     mapping = {"sys.query": query_for_prompt, "ref_text": ref_text}
 
     # Select language-specific template

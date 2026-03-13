@@ -206,9 +206,7 @@ def _build_state_overrides(req: "AgentRequest") -> Dict[str, Any]:
         if "selected_devices" not in overrides and req.message:
             cache = get_device_cache()
             if cache.is_initialized:
-                detected_devices = _extract_devices_from_query(
-                    cache.device_names, req.message
-                )
+                detected_devices = _extract_devices_from_query(cache.device_names, req.message)
                 if detected_devices:
                     overrides["selected_devices"] = detected_devices[:1]
                     pq_fields["selected_devices"] = detected_devices[:1]
@@ -334,6 +332,10 @@ class AgentRequest(BaseModel):
     use_canonical_retrieval: bool = Field(
         False,
         description="검색 단계에서 canonical retrieval pipeline 사용 여부 (기본값: False)",
+    )
+    retrieval_only: bool = Field(
+        False,
+        description="답변 생성 전 문서 검색 단계까지만 수행 (전체 문서 대상)",
     )
 
 
@@ -853,8 +855,29 @@ async def run_agent(
         chat_state["chat_history"] = [h.model_dump() for h in req.chat_history]
 
     try:
+        if req.retrieval_only and not is_resume:
+            retrieval_only_agent = LangGraphRAGAgent(
+                llm=llm,
+                search_service=search_service,
+                prompt_spec=prompt_spec,
+                top_k=req.top_k,
+                retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
+                mode="base",
+                ask_user_after_retrieve=True,
+                ask_device_selection=False,
+                auto_parse_enabled=False,
+                use_canonical_retrieval=req.use_canonical_retrieval,
+                checkpointer=None,
+            )
+            result = retrieval_only_agent.run(
+                req.message,
+                attempts=0,
+                max_attempts=req.max_attempts,
+                thread_id=tid,
+                state_overrides={"mq_mode": effective_mq_mode},
+            )
         # Auto-parse 모드 (기본값: True), skip when overrides are provided
-        if (
+        elif (
             req.auto_parse
             and not is_resume
             and not req.ask_user_after_retrieve
@@ -1004,6 +1027,7 @@ async def run_agent(
                     index_name,
                 ),
                 "trace": trace_context.model_dump(exclude_none=True),
+                "response_mode": "retrieval_only" if req.retrieval_only else "full",
             },
             interrupted=True,
             interrupt_payload=payload,
@@ -1035,6 +1059,7 @@ async def run_agent(
                 index_name,
             ),
             "trace": trace_context.model_dump(exclude_none=True),
+            "response_mode": "retrieval_only" if req.retrieval_only else "full",
         },
         interrupted=False,
         interrupt_payload=None,
@@ -1105,8 +1130,30 @@ async def run_agent_stream(
 
     def _worker() -> None:
         try:
+            if req.retrieval_only and not is_resume:
+                retrieval_only_agent = LangGraphRAGAgent(
+                    llm=llm,
+                    search_service=search_service,
+                    prompt_spec=prompt_spec,
+                    top_k=req.top_k,
+                    retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
+                    mode="base",
+                    ask_user_after_retrieve=True,
+                    ask_device_selection=False,
+                    auto_parse_enabled=False,
+                    use_canonical_retrieval=req.use_canonical_retrieval,
+                    checkpointer=None,
+                    event_sink=_enqueue,
+                )
+                result = retrieval_only_agent.run(
+                    req.message,
+                    attempts=0,
+                    max_attempts=req.max_attempts,
+                    thread_id=tid,
+                    state_overrides={"mq_mode": effective_mq_mode},
+                )
             # Auto-parse 모드 (기본값: True), skip when overrides are provided
-            if (
+            elif (
                 req.auto_parse
                 and not is_resume
                 and not req.ask_user_after_retrieve
@@ -1257,6 +1304,7 @@ async def run_agent_stream(
                             index_name,
                         ),
                         "trace": trace_payload,
+                        "response_mode": "retrieval_only" if req.retrieval_only else "full",
                     },
                     interrupted=True,
                     interrupt_payload=payload,
@@ -1289,6 +1337,7 @@ async def run_agent_stream(
                             index_name,
                         ),
                         "trace": trace_payload,
+                        "response_mode": "retrieval_only" if req.retrieval_only else "full",
                     },
                     interrupted=False,
                     interrupt_payload=None,

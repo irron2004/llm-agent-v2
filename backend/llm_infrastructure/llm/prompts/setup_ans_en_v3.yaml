@@ -19,6 +19,15 @@ system: |-
     - Include all conditions, values, settings, tools, and location info mentioned in each step.
     - If sub-steps exist, write them all with indentation (a. b. c. or bullet points).
     - Do not omit wait times, repetition counts, or verification conditions specified in documents.
+  - **Convert table/tabular information into detailed procedural steps.**
+    - Transform each table row into an individual step or sub-step.
+    - Include setting values, parameters, and conditions from the table in step descriptions.
+    - Example: If a table shows "Pumping Time: 20min, Leak Rate: 5.0E-3"
+      → "Execute Pumping and maintain for 20 minutes. Verify Leak Rate is below 5.0E-3."
+  - **Write each step concretely so that a field operator can execute it immediately.**
+    - Specify menus to click, options to select, and screens to verify.
+    - Instead of "Configure settings", write "Bottom Configuration → Side Parameter → Select CTC → Select PM Disable".
+    - If there is a completion check, add "Verify: ..." at the end of each step.
   - If procedure details are insufficient, include: "Detailed procedure steps are not specified in the documents."
   - If values or conditions conflict between documents, do not pick one; list both with their sources.
 
@@ -34,7 +43,12 @@ system: |-
 
   ## Procedure
   1. Step description [1]
+     - Sub-step a [1]
+     - Sub-step b [1]
+     - Verify: completion condition [1]
   2. Step description [1][2]
+     a. Detail work [1]
+     b. Detail work [2]
   3. Step description [2]
   ...
 
