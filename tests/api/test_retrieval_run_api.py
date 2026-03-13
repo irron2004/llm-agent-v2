@@ -301,17 +301,7 @@ def test_retrieval_run_store_replay_reuses_search_queries(client: TestClient) ->
         for item in cast(list[dict[str, Any]], first_data["docs"])
     ]
 
-    second = client.post("/api/retrieval/run", json=payload)
-    assert second.status_code == 200
-    second_data = cast(dict[str, Any], second.json())
-    second_queries = cast(
-        list[str],
-        cast(dict[str, Any], cast(dict[str, Any], second_data["steps"])["st_mq"])[
-            "artifacts"
-        ]["search_queries"],
-    )
-    assert second_queries != first_queries
-
+    # guardrail이 원본 쿼리를 보존하므로 drift 검증 대신 replay 동일성만 검증
     replay = client.post(
         "/api/retrieval/run",
         json={

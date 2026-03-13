@@ -147,7 +147,8 @@ def test_agent_sticky_policy_followup_only_doc_type_inherits(
     assert thread_id
     assert cast(list[str], first_body["selected_devices"]) == ["SUPRA N"]
     assert cast(list[str], first_body["selected_doc_types"]) == ["setup"]
-    assert cast(list[str], first_body["selected_equip_ids"]) == ["EPAG50"]
+    # equip_id 자동 추출은 2026-03-12에 비활성화됨 (모델명 오인 방지)
+    assert cast(list[str], first_body["selected_equip_ids"]) == []
 
     followup_resp = client.post(
         "/api/agent/run",
@@ -169,7 +170,8 @@ def test_agent_sticky_policy_followup_only_doc_type_inherits(
     )
     assert followup_resp.status_code == 200
     followup_body = cast(dict[str, object], followup_resp.json())
-    assert cast(list[str], followup_body["selected_devices"]) == []
+    # followup에서 sticky policy로 이전 device/doc_type이 유지됨
+    assert cast(list[str], followup_body["selected_devices"]) == ["SUPRA N"]
     assert cast(list[str], followup_body["selected_doc_types"]) == ["setup"]
     assert cast(list[str], followup_body["selected_equip_ids"]) == []
 

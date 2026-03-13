@@ -71,9 +71,10 @@ def _install_agent_overrides(client: TestClient, monkeypatch) -> None:
         prompt_spec: Any,
         *,
         top_k: int,
+        use_canonical_retrieval: bool = False,
         event_sink: Any = None,
     ) -> _FakeAgent:
-        del llm, search_service, prompt_spec, top_k
+        del llm, search_service, prompt_spec, top_k, use_canonical_retrieval
         return _FakeAgent(event_sink=event_sink)
 
     monkeypatch.setattr(

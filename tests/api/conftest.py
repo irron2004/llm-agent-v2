@@ -58,7 +58,7 @@ class FakeSearchService:
             ),
         ]
 
-    def search(self, query: str, top_k: int = 10):
+    def search(self, query: str, top_k: int = 10, **kwargs):
         # 단순히 상위 top_k 반환 (정렬된 상태 가정)
         return self._results[:top_k]
 
