@@ -20,6 +20,7 @@ from backend.config.settings import rag_settings
 from backend.llm_infrastructure.llm.base import BaseLLM
 from backend.llm_infrastructure.llm.langgraph_agent import (
     AgentState,
+    ISSUE_CASE_EMPTY_MESSAGE,
     PromptSpec,
     Retriever,
     SearchServiceRetriever,
@@ -31,6 +32,10 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     expand_related_docs_node,
     history_check_node,
     human_review_node,
+    issue_case_selection_node,
+    issue_confirm_node,
+    issue_detail_answer_node,
+    issue_sop_confirm_node,
     judge_node,
     load_prompt_spec,
     mq_node,
@@ -506,6 +511,23 @@ class LangGraphRAGAgent:
             "judge",
             self._wrap_node("judge", functools.partial(judge_node, llm=self.llm, spec=self.spec)),
         )
+        builder.add_node("done", self._wrap_node("done", lambda s: {}))
+        builder.add_node("issue_confirm", self._wrap_node("issue_confirm", issue_confirm_node))
+        builder.add_node(
+            "issue_case_selection",
+            self._wrap_node("issue_case_selection", issue_case_selection_node),
+        )
+        builder.add_node(
+            "issue_detail_answer",
+            self._wrap_node(
+                "issue_detail_answer",
+                functools.partial(issue_detail_answer_node, llm=self.llm, spec=self.spec),
+            ),
+        )
+        builder.add_node(
+            "issue_sop_confirm",
+            self._wrap_node("issue_sop_confirm", issue_sop_confirm_node),
+        )
 
         def _route_after_node(state: AgentState) -> str:
             mq_mode = state.get("mq_mode")
@@ -633,10 +655,28 @@ class LangGraphRAGAgent:
 
         builder.add_edge("expand_related", "answer")
 
-        builder.add_edge("answer", "judge")
+        def _after_answer(state: AgentState) -> str:
+            task_mode = str(state.get("task_mode") or "").strip().lower()
+            if task_mode == "issue":
+                if state.get("answer") == ISSUE_CASE_EMPTY_MESSAGE:
+                    return "done"
+                return "issue_confirm"
+            return "judge"
+
+        builder.add_conditional_edges(
+            "answer",
+            _after_answer,
+            {
+                "issue_confirm": "issue_confirm",
+                "judge": "judge",
+                "done": "done",
+            },
+        )
+        builder.add_edge("issue_detail_answer", "issue_sop_confirm")
 
         if mode == "base":
             builder.add_edge("judge", END)
+            builder.add_edge("done", END)
             return builder.compile(
                 checkpointer=self.checkpointer if self.ask_user_after_retrieve else None
             )
@@ -663,8 +703,6 @@ class LangGraphRAGAgent:
         builder.add_node("human_review", self._wrap_node("human_review", human_review_node))
         # 호환성을 위해 'retry' 별칭을 두고 바로 retry_bump로 연결
         builder.add_node("retry", self._wrap_node("retry", lambda s: {}))
-        builder.add_node("done", self._wrap_node("done", lambda s: {}))
-
         # Conditional edges based on retry strategy
         # - retry_expand: 1st unfaithful → expand more docs (no re-retrieval)
         # - retry: 2nd unfaithful → refine queries and re-retrieve

@@ -4,5 +4,8 @@ export { ChatContainer, MessageList, InputArea } from "./chat-container";
 export { ChatInput } from "./chat-input";
 export { DeviceSelectionPanel } from "./device-selection-panel";
 export { GuidedSelectionPanel } from "./guided-selection-panel";
+export { IssueConfirmPanel } from "./issue-confirm-panel";
+export { IssueCaseSelectionPanel } from "./issue-case-selection-panel";
+export { IssueSopConfirmPanel } from "./issue-sop-confirm-panel";
 export { RatingStars } from "./rating-stars";
 export { FeedbackForm } from "./feedback-form";

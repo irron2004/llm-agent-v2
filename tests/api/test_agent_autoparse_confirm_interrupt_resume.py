@@ -295,7 +295,9 @@ def test_resume_applies_task_mode_scope(
             },
         },
     )
-    assert issue_resume["interrupted"] is False
+    assert issue_resume["interrupted"] is True
+    interrupt_payload = cast(dict[str, Any], issue_resume["interrupt_payload"])
+    assert interrupt_payload["type"] == "issue_confirm"
     issue_calls = [
         call
         for call in _real_flow_overrides.calls
@@ -336,6 +338,71 @@ def test_target_language_metadata(
     )
     metadata = cast(dict[str, Any], resumed["metadata"])
     assert metadata["target_language"] == "en"
+
+
+def test_filter_doc_types_issue_scope_forces_issue_mode(
+    client: TestClient,
+    _real_flow_overrides: _FakeSearchService,
+) -> None:
+    _real_flow_overrides.calls.clear()
+    result = _run(
+        client,
+        payload={
+            "guided_confirm": False,
+            "filter_doc_types": ["myservice", "gcb", "ts"],
+        },
+    )
+
+    assert result["interrupted"] is True
+    interrupt_payload = cast(dict[str, Any], result["interrupt_payload"])
+    assert interrupt_payload["type"] == "issue_confirm"
+
+    metadata = cast(dict[str, Any], result["metadata"])
+    assert metadata.get("selected_task_mode") == "issue"
+    assert metadata.get("route") == "general"
+
+    issue_expected = set(expand_doc_type_selection(["myservice", "gcb", "ts"]))
+    issue_calls = [
+        call
+        for call in _real_flow_overrides.calls
+        if (
+            (doc_types := set(cast(list[str], call["kwargs"].get("doc_types") or [])))
+            and doc_types.issubset(issue_expected)
+        )
+    ]
+    assert issue_calls
+
+
+def test_filter_doc_types_issue_scope_interrupt_is_resumable(
+    client: TestClient,
+    _real_flow_overrides: _FakeSearchService,
+) -> None:
+    first = _run(
+        client,
+        payload={
+            "guided_confirm": False,
+            "thread_id": f"issue-filter-{uuid4().hex}",
+            "filter_doc_types": ["myservice", "gcb", "ts"],
+        },
+    )
+    assert first["interrupted"] is True
+    first_payload = cast(dict[str, Any], first["interrupt_payload"])
+    assert first_payload["type"] == "issue_confirm"
+
+    resumed = _run(
+        client,
+        payload={
+            "thread_id": cast(str, first["thread_id"]),
+            "resume_decision": {
+                "type": "issue_confirm",
+                "nonce": first_payload["nonce"],
+                "stage": "post_summary",
+                "confirm": False,
+            },
+        },
+    )
+
+    assert resumed["interrupted"] is False
 
 
 def test_missing_checkpoint_400(

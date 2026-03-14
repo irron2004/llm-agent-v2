@@ -11,6 +11,9 @@ import {
   ChatInput,
   DeviceSelectionPanel,
   GuidedSelectionPanel,
+  IssueCaseSelectionPanel,
+  IssueConfirmPanel,
+  IssueSopConfirmPanel,
 } from "../components";
 import type { RegeneratePayload } from "../components/message-item";
 import { fetchDeviceCatalog } from "../api";
@@ -99,8 +102,14 @@ export default function ChatPage() {
     pendingReview,
     pendingDeviceSelection,
     pendingGuidedSelection,
+    pendingIssueConfirm,
+    pendingIssueCaseSelection,
+    pendingIssueSopConfirm,
     submitGuidedSelectionNumber,
     submitGuidedSelectionFinal,
+    submitIssueConfirm,
+    submitIssueCaseSelection,
+    submitIssueSopConfirm,
     submitReview,
     submitSearchQueries,
     submitDeviceSelection,
@@ -446,6 +455,36 @@ export default function ChatPage() {
             />
           )}
 
+          {pendingIssueConfirm && (
+            <IssueConfirmPanel
+              question={pendingIssueConfirm.question}
+              instruction={pendingIssueConfirm.instruction}
+              prompt={pendingIssueConfirm.payload.prompt}
+              stage={pendingIssueConfirm.payload.stage}
+              onConfirm={submitIssueConfirm}
+            />
+          )}
+
+          {pendingIssueCaseSelection && (
+            <IssueCaseSelectionPanel
+              question={pendingIssueCaseSelection.question}
+              instruction={pendingIssueCaseSelection.instruction}
+              cases={pendingIssueCaseSelection.payload.cases}
+              onSelect={submitIssueCaseSelection}
+            />
+          )}
+
+          {pendingIssueSopConfirm && (
+            <IssueSopConfirmPanel
+              question={pendingIssueSopConfirm.question}
+              instruction={pendingIssueSopConfirm.instruction}
+              prompt={pendingIssueSopConfirm.payload.prompt}
+              hasSopRef={pendingIssueSopConfirm.payload.has_sop_ref}
+              sopHint={pendingIssueSopConfirm.payload.sop_hint}
+              onConfirm={submitIssueSopConfirm}
+            />
+          )}
+
           {pendingDeviceSelection && (
             (pendingDeviceSelection.devices && pendingDeviceSelection.devices.length > 0) ||
             (pendingDeviceSelection.docTypes && pendingDeviceSelection.docTypes.length > 0)
@@ -469,7 +508,7 @@ export default function ChatPage() {
               onStop={stop}
               isStreaming={isStreaming}
               placeholder={inputPlaceholder}
-              disabled={isLoadingSession || !!pendingGuidedSelection}
+              disabled={isLoadingSession || !!pendingGuidedSelection || !!pendingIssueCaseSelection || !!pendingIssueConfirm || !!pendingIssueSopConfirm}
               docTypeOptions={docTypeOptions}
               selectedDocTypes={selectedDocTypes}
               onDocTypesChange={handleDocTypesChange}

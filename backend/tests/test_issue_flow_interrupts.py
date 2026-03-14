@@ -11,6 +11,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from backend.llm_infrastructure.llm.base import BaseLLM, LLMResponse
+from backend.llm_infrastructure.llm import langgraph_agent as langgraph_agent_module
 from backend.llm_infrastructure.llm.langgraph_agent import ISSUE_CASE_EMPTY_MESSAGE, PromptSpec
 from backend.llm_infrastructure.llm.prompt_loader import PromptTemplate
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
@@ -150,7 +151,10 @@ def test_issue_flow_interrupt_ordering_and_loop() -> None:
     )
     payload3 = _interrupt_payload(result3)
     assert payload3["type"] == "issue_sop_confirm"
-    assert result3.get("answer") == "detail answer"
+    detail_answer = str(result3.get("answer") or "")
+    assert "detail answer" in detail_answer
+    assert "## 이슈 내용" in detail_answer
+    assert "## 해결 방안" in detail_answer
 
     result4 = agent._graph.invoke(
         Command(
@@ -197,3 +201,43 @@ def test_issue_flow_no_docs_returns_graceful_answer_without_interrupt() -> None:
     )
     assert not result.get("__interrupt__")
     assert result.get("answer") == ISSUE_CASE_EMPTY_MESSAGE
+
+
+def test_device_selection_issue_doc_types_sets_task_mode_and_route(
+    monkeypatch: Any,
+) -> None:
+    def _fake_interrupt(_payload: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "type": "device_selection",
+            "selected_devices": ["SUPRA N"],
+            "selected_doc_types": ["myservice", "gcb", "ts"],
+        }
+
+    monkeypatch.setattr(langgraph_agent_module, "interrupt", _fake_interrupt)
+
+    state: dict[str, Any] = {
+        "query": "door open alarm",
+        "route": "setup",
+        "mq_mode": "off",
+    }
+
+    command = langgraph_agent_module.device_selection_node(
+        state,
+        device_fetcher=lambda: {
+            "devices": [{"name": "SUPRA N", "doc_count": 1}],
+            "doc_types": [
+                {"name": "myservice", "doc_count": 1},
+                {"name": "gcb", "doc_count": 1},
+                {"name": "ts", "doc_count": 1},
+            ],
+        },
+    )
+
+    assert isinstance(command, Command)
+    assert command.goto == "prepare_retrieve"
+    update = command.update or {}
+    assert update.get("task_mode") == "issue"
+    assert update.get("route") == "general"
+    parsed_query = update.get("parsed_query") or {}
+    assert parsed_query.get("task_mode") == "issue"
+    assert parsed_query.get("route") == "general"

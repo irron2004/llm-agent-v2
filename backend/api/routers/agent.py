@@ -21,7 +21,12 @@ from backend.api.dependencies import (
     get_search_service,
 )
 from backend.config.settings import agent_settings
-from backend.domain.doc_type_mapping import expand_doc_type_selection, group_doc_type_buckets
+from backend.domain.doc_type_mapping import (
+    DOC_TYPE_GROUPS,
+    expand_doc_type_selection,
+    group_doc_type_buckets,
+    normalize_doc_type,
+)
 from backend.llm_infrastructure.llm.langgraph_agent import (
     ParsedQuery,
     _detect_language_rule_based,
@@ -138,15 +143,32 @@ def _create_device_fetcher(search_service):
     return _fetch_devices
 
 
-SOP_DOC_TYPES = {"sop", "setup", "set_up_manual"}
-ISSUE_DOC_TYPES = {"myservice", "gcb", "pems", "ts", "trouble_shooting_guide"}
+def _build_mode_variants(*group_names: str) -> set[str]:
+    variants: set[str] = set()
+    for group_name in group_names:
+        variants.add(normalize_doc_type(group_name))
+        for raw in DOC_TYPE_GROUPS.get(group_name, []):
+            normalized = normalize_doc_type(raw)
+            if normalized:
+                variants.add(normalized)
+    return variants
+
+
+SOP_DOC_TYPES = _build_mode_variants("SOP", "setup")
+ISSUE_DOC_TYPES = _build_mode_variants("myservice", "gcb", "ts") | {
+    normalize_doc_type("pems"),
+    normalize_doc_type("trouble_shooting_guide"),
+    normalize_doc_type("trouble shooting guide"),
+}
 
 
 def _infer_task_mode(doc_types: list[str] | None) -> str | None:
     """Infer task_mode from filter_doc_types selection."""
     if not doc_types:
         return None
-    types_set = {dt.lower() for dt in doc_types}
+    types_set = {normalize_doc_type(dt) for dt in doc_types if normalize_doc_type(dt)}
+    if not types_set:
+        return None
     if types_set <= SOP_DOC_TYPES:
         return "sop"
     if types_set <= ISSUE_DOC_TYPES:
@@ -173,6 +195,11 @@ def _build_state_overrides(req: "AgentRequest") -> Dict[str, Any]:
             overrides["selected_doc_types_strict"] = True
             pq_fields["selected_doc_types"] = expanded
             pq_fields["doc_types_strict"] = True
+
+            inferred_task_mode = _infer_task_mode(doc_types) or _infer_task_mode(expanded)
+            if inferred_task_mode:
+                overrides["task_mode"] = inferred_task_mode
+                pq_fields["task_mode"] = inferred_task_mode
 
     if req.filter_equip_ids is not None:
         equip_ids = [str(e).strip().upper() for e in req.filter_equip_ids if str(e).strip()]
@@ -349,6 +376,31 @@ class AutoParseConfirmDecision(BaseModel):
     model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
 
 
+class IssueConfirmDecision(BaseModel):
+    type: Literal["issue_confirm"] = Field(..., description="resume decision type")
+    nonce: str = Field(..., description="interrupt nonce")
+    stage: Literal["post_summary", "post_detail"] = Field(..., description="issue flow stage")
+    confirm: bool = Field(..., description="confirm decision")
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+
+class IssueCaseSelectionDecision(BaseModel):
+    type: Literal["issue_case_selection"] = Field(..., description="resume decision type")
+    nonce: str = Field(..., description="interrupt nonce")
+    selected_doc_id: str = Field(..., description="selected issue document id")
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+
+class IssueSopConfirmDecision(BaseModel):
+    type: Literal["issue_sop_confirm"] = Field(..., description="resume decision type")
+    nonce: str = Field(..., description="interrupt nonce")
+    confirm: bool = Field(..., description="confirm decision")
+
+    model_config: ClassVar[ConfigDict] = ConfigDict(extra="forbid")
+
+
 class RetrievedDoc(BaseModel):
     id: str
     title: str
@@ -430,6 +482,20 @@ def _is_auto_parse_confirm_resume(req: AgentRequest) -> bool:
     return req.resume_decision.get("type") == "auto_parse_confirm"
 
 
+def _is_guided_resume(req: AgentRequest) -> bool:
+    if req.resume_decision is None or req.thread_id is None:
+        return False
+    if not isinstance(req.resume_decision, dict):
+        return False
+    decision_type = req.resume_decision.get("type")
+    return decision_type in {
+        "auto_parse_confirm",
+        "issue_confirm",
+        "issue_case_selection",
+        "issue_sop_confirm",
+    }
+
+
 def _validated_auto_parse_confirm_decision(decision: Any) -> Dict[str, Any]:
     try:
         return AutoParseConfirmDecision.model_validate(decision).model_dump()
@@ -437,6 +503,34 @@ def _validated_auto_parse_confirm_decision(decision: Any) -> Dict[str, Any]:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid auto_parse_confirm resume_decision: {exc.errors()}",
+        ) from exc
+
+
+def _validated_guided_resume_decision(decision: Any) -> Dict[str, Any]:
+    if not isinstance(decision, dict):
+        raise HTTPException(
+            status_code=400, detail="Invalid guided resume_decision: expected object"
+        )
+    decision_type = decision.get("type")
+
+    model_map: Dict[str, type[BaseModel]] = {
+        "auto_parse_confirm": AutoParseConfirmDecision,
+        "issue_confirm": IssueConfirmDecision,
+        "issue_case_selection": IssueCaseSelectionDecision,
+        "issue_sop_confirm": IssueSopConfirmDecision,
+    }
+    model_cls = model_map.get(str(decision_type))
+    if model_cls is None:
+        raise HTTPException(
+            status_code=400, detail="Invalid guided resume_decision: unsupported type"
+        )
+
+    try:
+        return model_cls.model_validate(decision).model_dump()
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {decision_type} resume_decision: {exc.errors()}",
         ) from exc
 
 
@@ -834,11 +928,9 @@ async def run_agent(
 
     tid = req.thread_id or str(uuid.uuid4())
     is_resume = req.resume_decision is not None and req.thread_id is not None
-    is_auto_parse_confirm_resume = _is_auto_parse_confirm_resume(req)
-    validated_auto_parse_confirm_decision = (
-        _validated_auto_parse_confirm_decision(req.resume_decision)
-        if is_auto_parse_confirm_resume
-        else None
+    is_guided_resume = _is_guided_resume(req)
+    validated_guided_resume_decision = (
+        _validated_guided_resume_decision(req.resume_decision) if is_guided_resume else None
     )
     trace_context = _resolve_trace_context(traceparent, tracestate)
     effective_mq_mode = req.mq_mode or agent_settings.mq_mode_default
@@ -918,7 +1010,7 @@ async def run_agent(
                 mode=req.mode,
                 ask_user_after_retrieve=False,
                 use_canonical_retrieval=req.use_canonical_retrieval,
-                checkpointer=None,
+                checkpointer=_checkpointer,
             )
             result = agent.run(
                 req.message,
@@ -929,7 +1021,7 @@ async def run_agent(
             )
         # HIL 모드 (ask_user 또는 resume)
         elif req.ask_user_after_retrieve or is_resume:
-            if is_resume and is_auto_parse_confirm_resume:
+            if is_resume and is_guided_resume:
                 agent = _new_guided_confirm_agent(
                     llm,
                     search_service,
@@ -959,9 +1051,7 @@ async def run_agent(
 
                 logger.info(f"[resume] next={state.next}, keys={list(state.values.keys())}")
                 resume_payload = (
-                    validated_auto_parse_confirm_decision
-                    if is_auto_parse_confirm_resume
-                    else req.resume_decision
+                    validated_guided_resume_decision if is_guided_resume else req.resume_decision
                 )
                 result = agent._graph.invoke(Command(resume=resume_payload), config)
             else:
@@ -1090,11 +1180,9 @@ async def run_agent_stream(
 
     tid = req.thread_id or str(uuid.uuid4())
     is_resume = req.resume_decision is not None and req.thread_id is not None
-    is_auto_parse_confirm_resume = _is_auto_parse_confirm_resume(req)
-    validated_auto_parse_confirm_decision = (
-        _validated_auto_parse_confirm_decision(req.resume_decision)
-        if is_auto_parse_confirm_resume
-        else None
+    is_guided_resume = _is_guided_resume(req)
+    validated_guided_resume_decision = (
+        _validated_guided_resume_decision(req.resume_decision) if is_guided_resume else None
     )
     trace_context = _resolve_trace_context(traceparent, tracestate)
     trace_payload = trace_context.model_dump(exclude_none=True)
@@ -1196,7 +1284,7 @@ async def run_agent_stream(
                     mode=req.mode,
                     ask_user_after_retrieve=False,
                     use_canonical_retrieval=req.use_canonical_retrieval,
-                    checkpointer=None,
+                    checkpointer=_checkpointer,
                     event_sink=_enqueue,
                 )
                 result = agent.run(
@@ -1207,7 +1295,7 @@ async def run_agent_stream(
                     state_overrides=state_overrides or None,
                 )
             elif req.ask_user_after_retrieve or is_resume:
-                if is_resume and is_auto_parse_confirm_resume:
+                if is_resume and is_guided_resume:
                     agent = _new_guided_confirm_agent(
                         llm,
                         search_service,
@@ -1238,8 +1326,8 @@ async def run_agent_stream(
                         )
                         return
                     resume_payload = (
-                        validated_auto_parse_confirm_decision
-                        if is_auto_parse_confirm_resume
+                        validated_guided_resume_decision
+                        if is_guided_resume
                         else req.resume_decision
                     )
                     result = agent._graph.invoke(Command(resume=resume_payload), config)

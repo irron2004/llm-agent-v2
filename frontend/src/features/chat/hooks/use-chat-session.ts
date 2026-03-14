@@ -37,6 +37,9 @@ type InterruptKind =
   | "device_selection"
   | "retrieval_review"
   | "human_review"
+  | "issue_confirm"
+  | "issue_case_selection"
+  | "issue_sop_confirm"
   | "unknown";
 
 type DeviceInfo = {
@@ -92,6 +95,48 @@ type PendingGuidedSelection = {
     selected_device?: string | null;
     selected_equip_id?: string | null;
     task_mode?: "sop" | "issue" | "all";
+  };
+};
+
+type IssueCase = {
+  doc_id: string;
+  title: string;
+  summary: string;
+};
+
+type PendingIssueConfirm = {
+  threadId: string;
+  question: string;
+  instruction: string;
+  payload: {
+    type: "issue_confirm";
+    nonce: string;
+    stage: "post_summary" | "post_detail";
+    prompt: string;
+  };
+};
+
+type PendingIssueCaseSelection = {
+  threadId: string;
+  question: string;
+  instruction: string;
+  payload: {
+    type: "issue_case_selection";
+    nonce: string;
+    cases: IssueCase[];
+  };
+};
+
+type PendingIssueSopConfirm = {
+  threadId: string;
+  question: string;
+  instruction: string;
+  payload: {
+    type: "issue_sop_confirm";
+    nonce: string;
+    prompt: string;
+    has_sop_ref: boolean;
+    sop_hint?: string | null;
   };
 };
 
@@ -157,11 +202,28 @@ const resolveInterruptKind = (payload?: Record<string, unknown> | null): Interru
   if (payload?.type === "device_selection") return "device_selection";
   if (payload?.type === "retrieval_review") return "retrieval_review";
   if (payload?.type === "human_review") return "human_review";
+  if (payload?.type === "issue_confirm") return "issue_confirm";
+  if (payload?.type === "issue_case_selection") return "issue_case_selection";
+  if (payload?.type === "issue_sop_confirm") return "issue_sop_confirm";
   return "unknown";
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
   return typeof value === "object" && value !== null;
+};
+
+const toIssueCases = (value: unknown): IssueCase[] => {
+  if (!Array.isArray(value)) return [];
+  const result: IssueCase[] = [];
+  for (const item of value) {
+    const src = isRecord(item) ? item : null;
+    const doc_id = typeof src?.doc_id === "string" ? src.doc_id.trim() : "";
+    if (!doc_id) continue;
+    const title = typeof src?.title === "string" && src.title.trim() ? src.title.trim() : doc_id;
+    const summary = typeof src?.summary === "string" ? src.summary : "";
+    result.push({ doc_id, title, summary });
+  }
+  return result;
 };
 
 // Type guard for AgentResponse - checks required fields
@@ -260,6 +322,9 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   const [error, setError] = useState<string | null>(null);
   const [pendingInterrupt, setPendingInterrupt] = useState<PendingInterrupt | null>(null);
   const [pendingGuidedSelection, setPendingGuidedSelection] = useState<PendingGuidedSelection | null>(null);
+  const [pendingIssueConfirm, setPendingIssueConfirm] = useState<PendingIssueConfirm | null>(null);
+  const [pendingIssueCaseSelection, setPendingIssueCaseSelection] = useState<PendingIssueCaseSelection | null>(null);
+  const [pendingIssueSopConfirm, setPendingIssueSopConfirm] = useState<PendingIssueSopConfirm | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const isFirstMessageRef = useRef(true);
@@ -357,10 +422,119 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
             });
           }
           setPendingInterrupt(null);
+          setPendingIssueConfirm(null);
+          setPendingIssueCaseSelection(null);
+          setPendingIssueSopConfirm(null);
 
           updateMessage(assistantId, (m) => ({
             ...m,
             content: instruction,
+            retrievedDocs: res.retrieved_docs || [],
+            rawAnswer: JSON.stringify(res, null, 2),
+            currentNode: null,
+            sessionId,
+            searchQueries: effectiveSearchQueries.length > 0 ? effectiveSearchQueries : null,
+          }));
+          setIsStreaming(false);
+          return;
+        }
+
+        if (kind === "issue_confirm") {
+          const nonce = typeof payload?.nonce === "string" ? payload.nonce : "";
+          const stage = payload?.stage === "post_detail" ? "post_detail" : "post_summary";
+          const prompt = typeof payload?.prompt === "string" && payload.prompt.trim()
+            ? payload.prompt
+            : "상세히 보고싶은 문서가 있습니까?";
+          if (threadId && nonce) {
+            setPendingIssueConfirm({
+              threadId,
+              question,
+              instruction,
+              payload: {
+                type: "issue_confirm",
+                nonce,
+                stage,
+                prompt,
+              },
+            });
+          }
+          setPendingIssueCaseSelection(null);
+          setPendingIssueSopConfirm(null);
+          setPendingInterrupt(null);
+          setPendingGuidedSelection(null);
+          updateMessage(assistantId, (m) => ({
+            ...m,
+            content: res.answer?.trim() ? res.answer : buildInterruptPrompt(kind, instruction),
+            retrievedDocs: res.retrieved_docs || [],
+            rawAnswer: JSON.stringify(res, null, 2),
+            currentNode: null,
+            sessionId,
+            searchQueries: effectiveSearchQueries.length > 0 ? effectiveSearchQueries : null,
+          }));
+          setIsStreaming(false);
+          return;
+        }
+
+        if (kind === "issue_case_selection") {
+          const nonce = typeof payload?.nonce === "string" ? payload.nonce : "";
+          const cases = toIssueCases(payload?.cases);
+          if (threadId && nonce) {
+            setPendingIssueCaseSelection({
+              threadId,
+              question,
+              instruction,
+              payload: {
+                type: "issue_case_selection",
+                nonce,
+                cases,
+              },
+            });
+          }
+          setPendingIssueConfirm(null);
+          setPendingIssueSopConfirm(null);
+          setPendingInterrupt(null);
+          setPendingGuidedSelection(null);
+          updateMessage(assistantId, (m) => ({
+            ...m,
+            content: res.answer?.trim() ? res.answer : buildInterruptPrompt(kind, instruction),
+            retrievedDocs: res.retrieved_docs || [],
+            rawAnswer: JSON.stringify(res, null, 2),
+            currentNode: null,
+            sessionId,
+            searchQueries: effectiveSearchQueries.length > 0 ? effectiveSearchQueries : null,
+          }));
+          setIsStreaming(false);
+          return;
+        }
+
+        if (kind === "issue_sop_confirm") {
+          const nonce = typeof payload?.nonce === "string" ? payload.nonce : "";
+          const prompt = typeof payload?.prompt === "string" && payload.prompt.trim()
+            ? payload.prompt
+            : "SOP 확인으로 이어가시겠습니까?";
+          const hasSopRef = Boolean(payload?.has_sop_ref);
+          const sopHint = typeof payload?.sop_hint === "string" ? payload.sop_hint : null;
+          if (threadId && nonce) {
+            setPendingIssueSopConfirm({
+              threadId,
+              question,
+              instruction,
+              payload: {
+                type: "issue_sop_confirm",
+                nonce,
+                prompt,
+                has_sop_ref: hasSopRef,
+                sop_hint: sopHint,
+              },
+            });
+          }
+          setPendingIssueConfirm(null);
+          setPendingIssueCaseSelection(null);
+          setPendingInterrupt(null);
+          setPendingGuidedSelection(null);
+          updateMessage(assistantId, (m) => ({
+            ...m,
+            content: res.answer?.trim() ? res.answer : buildInterruptPrompt(kind, instruction),
             retrievedDocs: res.retrieved_docs || [],
             rawAnswer: JSON.stringify(res, null, 2),
             currentNode: null,
@@ -431,6 +605,9 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       // Conversation completed - clear logs and set retrieved docs
       setPendingInterrupt(null);
       setPendingGuidedSelection(null);
+      setPendingIssueConfirm(null);
+      setPendingIssueCaseSelection(null);
+      setPendingIssueSopConfirm(null);
       guidedThreadIdRef.current = null;
       guidedQuestionRef.current = null;
       clearLogs();
@@ -583,13 +760,21 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       const decisionRecord = isRecord(decisionOverride) ? decisionOverride : null;
       const decisionType = typeof decisionRecord?.type === "string" ? decisionRecord.type : "";
       const isGuidedResume = decisionType === "auto_parse_confirm" && Boolean(guidedThreadIdRef.current);
+      const issueThreadId = pendingIssueConfirm?.threadId ?? pendingIssueCaseSelection?.threadId ?? pendingIssueSopConfirm?.threadId ?? null;
+      const isIssueResume = (
+        decisionType === "issue_confirm" ||
+        decisionType === "issue_case_selection" ||
+        decisionType === "issue_sop_confirm"
+      ) && Boolean(issueThreadId);
       const isHilResume = Boolean(hilPending);
-      const isResume = isHilResume || isGuidedResume;
+      const isResume = isHilResume || isGuidedResume || isIssueResume;
 
       const resumeThreadId = isHilResume
         ? (hilPending?.threadId ?? "")
         : isGuidedResume
           ? (guidedThreadIdRef.current ?? "")
+          : isIssueResume
+            ? (issueThreadId ?? "")
           : "";
       if (isResume && !resumeThreadId) {
         setError("thread_id가 없어 검색 결과 확인을 이어갈 수 없습니다.");
@@ -620,12 +805,16 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         ? (hilPending?.question ?? text)
         : isGuidedResume
           ? (guidedQuestionRef.current ?? text)
+          : isIssueResume
+            ? (pendingIssueConfirm?.question ?? pendingIssueCaseSelection?.question ?? pendingIssueSopConfirm?.question ?? text)
           : text;
 
       const decision = isHilResume
         ? (decisionOverride ?? resolveDecision(text))
         : isGuidedResume
           ? decisionRecord
+          : isIssueResume
+            ? decisionRecord
           : undefined;
 
       appendMessage({
@@ -684,6 +873,13 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
                 auto_parse: false,
                 ask_user_after_retrieve: false,
               }
+            : isIssueResume
+              ? {
+                  thread_id: resumeThreadId,
+                  resume_decision: decision,
+                  auto_parse: false,
+                  ask_user_after_retrieve: false,
+                }
             : {};
 
         const payload: AgentRequest = {
@@ -859,6 +1055,9 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       handleAgentResponse,
       pendingInterrupt,
       pendingGuidedSelection,
+      pendingIssueConfirm,
+      pendingIssueCaseSelection,
+      pendingIssueSopConfirm,
       sessionId,
       addLog,
       clearLogs,
@@ -1075,12 +1274,69 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     [pendingGuidedSelection, send]
   );
 
+  const submitIssueConfirm = useCallback(
+    (confirm: boolean) => {
+      if (!pendingIssueConfirm) return;
+      const decision = {
+        type: "issue_confirm" as const,
+        nonce: pendingIssueConfirm.payload.nonce,
+        stage: pendingIssueConfirm.payload.stage,
+        confirm,
+      };
+      setPendingIssueConfirm(null);
+      send({
+        text: `이슈 확인: ${confirm ? "예" : "아니오"}`,
+        decisionOverride: decision,
+      });
+    },
+    [pendingIssueConfirm, send]
+  );
+
+  const submitIssueCaseSelection = useCallback(
+    (selectedDocId: string) => {
+      if (!pendingIssueCaseSelection) return;
+      const trimmed = selectedDocId.trim();
+      if (!trimmed) return;
+      const decision = {
+        type: "issue_case_selection" as const,
+        nonce: pendingIssueCaseSelection.payload.nonce,
+        selected_doc_id: trimmed,
+      };
+      setPendingIssueCaseSelection(null);
+      send({
+        text: `이슈 사례 선택: ${trimmed}`,
+        decisionOverride: decision,
+      });
+    },
+    [pendingIssueCaseSelection, send]
+  );
+
+  const submitIssueSopConfirm = useCallback(
+    (confirm: boolean) => {
+      if (!pendingIssueSopConfirm) return;
+      const decision = {
+        type: "issue_sop_confirm" as const,
+        nonce: pendingIssueSopConfirm.payload.nonce,
+        confirm,
+      };
+      setPendingIssueSopConfirm(null);
+      send({
+        text: `SOP 확인: ${confirm ? "예" : "아니오"}`,
+        decisionOverride: decision,
+      });
+    },
+    [pendingIssueSopConfirm, send]
+  );
+
   const reset = useCallback(() => {
     stop();
     setMessages([]);
     setError(null);
     setPendingInterrupt(null);
     setPendingGuidedSelection(null);
+    setPendingIssueConfirm(null);
+    setPendingIssueCaseSelection(null);
+    setPendingIssueSopConfirm(null);
     guidedThreadIdRef.current = null;
     guidedQuestionRef.current = null;
     streamedAutoParseRef.current = {};
@@ -1271,6 +1527,9 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         setSessionId(targetSessionId);
         setMessages(loadedMessages);
         setPendingInterrupt(null);
+        setPendingIssueConfirm(null);
+        setPendingIssueCaseSelection(null);
+        setPendingIssueSopConfirm(null);
         clearLogs();
         setCompletedRetrievedDocs(null);
 
@@ -1299,10 +1558,16 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       send,
       stop,
       pendingGuidedSelection,
+      pendingIssueConfirm,
+      pendingIssueCaseSelection,
+      pendingIssueSopConfirm,
       pendingReview: pendingInterrupt?.kind === "retrieval_review" ? pendingInterrupt : null,
       pendingDeviceSelection: pendingInterrupt?.kind === "device_selection" ? pendingInterrupt : null,
       submitGuidedSelectionNumber,
       submitGuidedSelectionFinal,
+      submitIssueConfirm,
+      submitIssueCaseSelection,
+      submitIssueSopConfirm,
       submitReview,
       submitSearchQueries,
       submitDeviceSelection,
@@ -1327,9 +1592,15 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       send,
       stop,
       pendingGuidedSelection,
+      pendingIssueConfirm,
+      pendingIssueCaseSelection,
+      pendingIssueSopConfirm,
       pendingInterrupt,
       submitGuidedSelectionNumber,
       submitGuidedSelectionFinal,
+      submitIssueConfirm,
+      submitIssueCaseSelection,
+      submitIssueSopConfirm,
       submitReview,
       submitSearchQueries,
       submitDeviceSelection,

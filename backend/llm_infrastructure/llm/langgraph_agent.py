@@ -10,8 +10,9 @@ import json
 import re
 import logging
 import hashlib
+import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Literal, Optional, Protocol, Set, TypedDict
+from typing import Any, Dict, List, Literal, Optional, Protocol, Set, Tuple, TypedDict
 
 from langgraph.types import Command, interrupt
 from pydantic import BaseModel
@@ -113,6 +114,9 @@ class AgentState(TypedDict, total=False):
     query_en: Optional[str]  # English version of query (for internal processing)
     query_ko: Optional[str]  # Korean version of query (for retrieval)
     task_mode: Optional[str]  # Guided confirm selection ("sop"|"issue"|"all")
+    issue_stage: Optional[str]  # "post_summary" | "post_detail"
+    issue_top10_cases: List[Dict[str, Any]]
+    issue_selected_doc_id: Optional[str]
 
     # Guided auto-parse confirmation
     guided_confirm: bool
@@ -189,6 +193,14 @@ class PromptSpec:
     general_ans_en: Optional[PromptTemplate] = None
     general_ans_zh: Optional[PromptTemplate] = None
     general_ans_ja: Optional[PromptTemplate] = None
+    issue_ans: Optional[PromptTemplate] = None
+    issue_detail_ans: Optional[PromptTemplate] = None
+    issue_ans_en: Optional[PromptTemplate] = None
+    issue_ans_zh: Optional[PromptTemplate] = None
+    issue_ans_ja: Optional[PromptTemplate] = None
+    issue_detail_ans_en: Optional[PromptTemplate] = None
+    issue_detail_ans_zh: Optional[PromptTemplate] = None
+    issue_detail_ans_ja: Optional[PromptTemplate] = None
 
 
 DEFAULT_JUDGE_SETUP = """
@@ -271,6 +283,14 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
     general_ans_en = _try_load_prompt("general_ans_en", version)
     general_ans_zh = _try_load_prompt("general_ans_zh", version)
     general_ans_ja = _try_load_prompt("general_ans_ja", version)
+    issue_ans = _try_load_prompt("issue_ans", version)
+    issue_detail_ans = _try_load_prompt("issue_detail_ans", version)
+    issue_ans_en = _try_load_prompt("issue_ans_en", version)
+    issue_ans_zh = _try_load_prompt("issue_ans_zh", version)
+    issue_ans_ja = _try_load_prompt("issue_ans_ja", version)
+    issue_detail_ans_en = _try_load_prompt("issue_detail_ans_en", version)
+    issue_detail_ans_zh = _try_load_prompt("issue_detail_ans_zh", version)
+    issue_detail_ans_ja = _try_load_prompt("issue_detail_ans_ja", version)
 
     return PromptSpec(
         router=router,
@@ -296,6 +316,14 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
         general_ans_en=general_ans_en,
         general_ans_zh=general_ans_zh,
         general_ans_ja=general_ans_ja,
+        issue_ans=issue_ans,
+        issue_detail_ans=issue_detail_ans,
+        issue_ans_en=issue_ans_en,
+        issue_ans_zh=issue_ans_zh,
+        issue_ans_ja=issue_ans_ja,
+        issue_detail_ans_en=issue_detail_ans_en,
+        issue_detail_ans_zh=issue_detail_ans_zh,
+        issue_detail_ans_ja=issue_detail_ans_ja,
     )
 
 
@@ -427,6 +455,46 @@ TEMP_TRANSLATION = 0.0  # translate
 TEMP_QUERY_GEN = 0.3  # mq, st_mq, refine_queries
 TEMP_ANSWER = 0.5  # answer
 TEMP_ANSWER_SETUP = 0.2  # answer (setup)
+
+ISSUE_CASE_EMPTY_MESSAGE = "관련 이슈 사례를 찾지 못했습니다."
+
+_ISSUE_SCOPE_GROUPS = ("myservice", "gcb", "ts")
+_SOP_SCOPE_GROUPS = ("SOP", "setup")
+
+
+def _build_scope_variants(*group_names: str) -> set[str]:
+    variants: set[str] = set()
+    for group_name in group_names:
+        variants.add(normalize_doc_type(group_name))
+        for raw in DOC_TYPE_GROUPS.get(group_name, []):
+            normalized = normalize_doc_type(raw)
+            if normalized:
+                variants.add(normalized)
+    return variants
+
+
+_ISSUE_SCOPE_VARIANTS = _build_scope_variants(*_ISSUE_SCOPE_GROUPS) | {
+    normalize_doc_type("pems"),
+    normalize_doc_type("trouble_shooting_guide"),
+    normalize_doc_type("trouble shooting guide"),
+}
+_SOP_SCOPE_VARIANTS = _build_scope_variants(*_SOP_SCOPE_GROUPS)
+
+
+def _infer_task_mode_from_doc_types(doc_types: Any) -> Optional[str]:
+    if not isinstance(doc_types, list):
+        return None
+    normalized = {
+        normalize_doc_type(str(value)) for value in doc_types if normalize_doc_type(str(value))
+    }
+    if not normalized:
+        return None
+    if normalized <= _ISSUE_SCOPE_VARIANTS:
+        return "issue"
+    if normalized <= _SOP_SCOPE_VARIANTS:
+        return "sop"
+    return None
+
 
 MAX_ANSWER_FORMAT_RETRIES = 2
 
@@ -1271,6 +1339,23 @@ def _combine_related_text(docs: List[RetrievalResult]) -> str:
 # 6) Graph node helpers
 # -----------------------------
 def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
+    task_mode = str(state.get("task_mode") or "").strip().lower()
+    if not task_mode:
+        parsed_query = (
+            state.get("parsed_query") if isinstance(state.get("parsed_query"), dict) else {}
+        )
+        inferred_mode = _infer_task_mode_from_doc_types(state.get("selected_doc_types"))
+        if inferred_mode is None:
+            inferred_mode = _infer_task_mode_from_doc_types(parsed_query.get("selected_doc_types"))
+        if inferred_mode is not None:
+            task_mode = inferred_mode
+
+    if task_mode == "issue":
+        pq_dict = dict(state.get("parsed_query") or {})
+        pq_dict["route"] = "general"
+        pq_dict["task_mode"] = "issue"
+        return {"route": "general", "task_mode": "issue", "parsed_query": pq_dict}
+
     # Use English query for routing (after translation)
     route_query = state.get("query_en") or state["query"]
     query = _normalize_query_text(route_query) or str(route_query).strip()
@@ -1726,7 +1811,9 @@ def retrieve_node(
             if alias not in expanded_devices:
                 expanded_devices.append(alias)
     if len(expanded_devices) > len(selected_devices):
-        logger.info("retrieve_node: device alias expansion %s -> %s", selected_devices, expanded_devices)
+        logger.info(
+            "retrieve_node: device alias expansion %s -> %s", selected_devices, expanded_devices
+        )
         selected_devices = expanded_devices
 
     selected_device_set = {
@@ -1972,7 +2059,19 @@ def retrieve_node(
         all_docs = boosted_docs
 
     # --- Procedure boost & Scope penalty ---
-    _PROCEDURE_KEYWORDS = {"교체", "절차", "작업", "방법", "replacement", "procedure", "how to", "install", "설치", "수리", "repair"}
+    _PROCEDURE_KEYWORDS = {
+        "교체",
+        "절차",
+        "작업",
+        "방법",
+        "replacement",
+        "procedure",
+        "how to",
+        "install",
+        "설치",
+        "수리",
+        "repair",
+    }
     _PROCEDURE_CHAPTERS = {"work procedure", "flow chart", "work 절차"}
     _SCOPE_MARKERS = {"scope", "contents", "목차", "table of contents", "revision history"}
 
@@ -1980,8 +2079,16 @@ def retrieve_node(
     has_procedure_intent = any(kw in query_lower for kw in _PROCEDURE_KEYWORDS)
 
     if sop_only_predicate and all_docs:
-        proc_boost = float(agent_settings.procedure_boost_factor) if agent_settings.procedure_boost_enabled else 1.0
-        scope_pen = float(agent_settings.scope_penalty_factor) if agent_settings.scope_penalty_enabled else 1.0
+        proc_boost = (
+            float(agent_settings.procedure_boost_factor)
+            if agent_settings.procedure_boost_enabled
+            else 1.0
+        )
+        scope_pen = (
+            float(agent_settings.scope_penalty_factor)
+            if agent_settings.scope_penalty_enabled
+            else 1.0
+        )
         should_apply = (has_procedure_intent and proc_boost != 1.0) or scope_pen != 1.0
 
         if should_apply:
@@ -1995,7 +2102,11 @@ def retrieve_node(
                 score = float(doc.score)
 
                 # Boost Work Procedure / Flow Chart pages when query has procedure intent
-                if has_procedure_intent and proc_boost != 1.0 and any(pc in chapter for pc in _PROCEDURE_CHAPTERS):
+                if (
+                    has_procedure_intent
+                    and proc_boost != 1.0
+                    and any(pc in chapter for pc in _PROCEDURE_CHAPTERS)
+                ):
                     score *= proc_boost
                     proc_boosted += 1
                 # Penalize Scope/Contents/TOC pages (low-value for procedure questions)
@@ -2019,7 +2130,9 @@ def retrieve_node(
             all_docs = adjusted_docs
             logger.info(
                 "retrieve_node: procedure_boost=%d scope_penalty=%d (query_procedure_intent=%s)",
-                proc_boosted, scope_penalized, has_procedure_intent,
+                proc_boosted,
+                scope_penalized,
+                has_procedure_intent,
             )
 
     stage1_ranked_docs = sorted(all_docs, key=_stable_tie_break_key)[:candidate_k]
@@ -2100,11 +2213,14 @@ def retrieve_node(
         if filtered_count > 0:
             logger.info(
                 "retrieve_node: score_threshold=%.3f filtered %d/%d docs",
-                score_threshold, filtered_count, before_count,
+                score_threshold,
+                filtered_count,
+                before_count,
             )
 
     # Deduplicate by base doc_id (keep highest-scoring page per document)
     if agent_settings.dedupe_by_doc_id and docs:
+
         def _base_doc_id(doc_id: str) -> str:
             """Extract base doc_id by removing page/chunk suffix (#0010, :chunk_3, etc.)."""
             s = str(doc_id).strip()
@@ -2126,7 +2242,9 @@ def retrieve_node(
         if len(deduped) < before_count:
             logger.info(
                 "retrieve_node: dedupe_by_doc_id removed %d duplicates (%d -> %d)",
-                before_count - len(deduped), before_count, len(deduped),
+                before_count - len(deduped),
+                before_count,
+                len(deduped),
             )
         docs = deduped
 
@@ -2229,11 +2347,18 @@ def expand_related_docs_node(
                 ]
                 # 연속 페이지 그룹만 유지: 같은 chapter라도 비연속이면 분리
                 hit_page = _extract_page_value(meta)
-                all_section_pages = sorted(set(
-                    p for rd in all_section_docs
-                    for p in [_extract_page_value(rd.metadata if isinstance(rd.metadata, dict) else {})]
-                    if p is not None
-                ))
+                all_section_pages = sorted(
+                    set(
+                        p
+                        for rd in all_section_docs
+                        for p in [
+                            _extract_page_value(
+                                rd.metadata if isinstance(rd.metadata, dict) else {}
+                            )
+                        ]
+                        if p is not None
+                    )
+                )
                 # hit_page를 포함하는 연속 구간만 선택
                 contiguous_group: List[int] = []
                 if hit_page is not None and all_section_pages:
@@ -2247,10 +2372,14 @@ def expand_related_docs_node(
                             current_group = [all_section_pages[i]]
                     if hit_page in current_group:
                         contiguous_group = current_group
-                allowed_pages = set(contiguous_group) if contiguous_group else set(all_section_pages)
+                allowed_pages = (
+                    set(contiguous_group) if contiguous_group else set(all_section_pages)
+                )
                 related_docs = [
-                    rd for rd in all_section_docs
-                    if _extract_page_value(rd.metadata if isinstance(rd.metadata, dict) else {}) in allowed_pages
+                    rd
+                    for rd in all_section_docs
+                    if _extract_page_value(rd.metadata if isinstance(rd.metadata, dict) else {})
+                    in allowed_pages
                 ]
                 expanded_pages = sorted(allowed_pages)
             elif page_fetcher is not None:
@@ -2525,10 +2654,125 @@ def _get_answer_template(
     return default_templates.get(route, spec.general_ans)
 
 
+def _get_issue_answer_template(
+    spec: PromptSpec,
+    language: Optional[str],
+    *,
+    detail: bool,
+) -> PromptTemplate:
+    issue_ans = getattr(spec, "issue_ans", None)
+    issue_detail_ans = getattr(spec, "issue_detail_ans", None)
+    issue_ans_en = getattr(spec, "issue_ans_en", None)
+    issue_ans_zh = getattr(spec, "issue_ans_zh", None)
+    issue_ans_ja = getattr(spec, "issue_ans_ja", None)
+    issue_detail_ans_en = getattr(spec, "issue_detail_ans_en", None)
+    issue_detail_ans_zh = getattr(spec, "issue_detail_ans_zh", None)
+    issue_detail_ans_ja = getattr(spec, "issue_detail_ans_ja", None)
+
+    if detail:
+        default_template = issue_detail_ans or spec.general_ans
+        lang_templates = {
+            "en": issue_detail_ans_en,
+            "zh": issue_detail_ans_zh,
+            "ja": issue_detail_ans_ja,
+        }
+    else:
+        default_template = issue_ans or spec.general_ans
+        lang_templates = {
+            "en": issue_ans_en,
+            "zh": issue_ans_zh,
+            "ja": issue_ans_ja,
+        }
+
+    if language and language in lang_templates and lang_templates[language] is not None:
+        return lang_templates[language]  # type: ignore[return-value]
+    return default_template
+
+
+def _build_issue_cases(
+    ref_items: List[Dict[str, Any]], *, max_cases: int = 10
+) -> List[Dict[str, Any]]:
+    cases: List[Dict[str, Any]] = []
+    seen_doc_ids: set[str] = set()
+    for idx, ref in enumerate(ref_items, start=1):
+        raw_doc_id = str(ref.get("doc_id") or "").strip()
+        if not raw_doc_id or raw_doc_id in seen_doc_ids:
+            continue
+        seen_doc_ids.add(raw_doc_id)
+        title = str(ref.get("title") or raw_doc_id).strip() or raw_doc_id
+        content = str(ref.get("content") or "").strip()
+        summary = content[:240] if content else ""
+        cases.append(
+            {
+                "index": len(cases) + 1,
+                "doc_id": raw_doc_id,
+                "title": title,
+                "summary": summary,
+            }
+        )
+        if len(cases) >= max_cases:
+            break
+    return cases
+
+
+def _ensure_issue_detail_sections(answer: str, language: str) -> str:
+    if str(language).strip().lower() != "ko":
+        return answer
+
+    text = (answer or "").strip()
+    has_issue = "## 이슈 내용" in text
+    has_solution = "## 해결 방안" in text
+    if has_issue and has_solution:
+        return text
+
+    body = text or "(내용 없음)"
+    if not has_issue and not has_solution:
+        return f"## 이슈 내용\n{body}\n\n## 해결 방안\n(REFS 기반 해결 방안을 확인하세요.)"
+    if not has_issue and has_solution:
+        return f"## 이슈 내용\n(원문을 참고하세요.)\n\n{text}"
+    return f"{text}\n\n## 해결 방안\n(원문을 참고하세요.)"
+
+
 def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     route = state["route"]
     answer_language = state.get("target_language") or state.get("detected_language") or "ko"
+    task_mode = str(state.get("task_mode") or "").strip().lower()
     ref_items = state.get("answer_ref_json") or state.get("ref_json", [])
+
+    if task_mode == "issue":
+        if len(ref_items) > MAX_ANSWER_REFS:
+            ref_items = ref_items[:MAX_ANSWER_REFS]
+        if not ref_items:
+            return {
+                "answer": ISSUE_CASE_EMPTY_MESSAGE,
+                "issue_top10_cases": [],
+                "issue_stage": None,
+            }
+
+        query_for_prompt = state.get("query_en") if answer_language == "en" else state.get("query")
+        if not query_for_prompt:
+            query_for_prompt = state.get("query", "")
+
+        ref_text = ref_json_to_text(ref_items)
+        mapping = {"sys.query": query_for_prompt, "ref_text": ref_text}
+        tmpl = _get_issue_answer_template(spec, answer_language, detail=False)
+        user = _format_prompt(tmpl.user, mapping)
+        answer_temperature = resolve_answer_temperature(route)
+        answer, reasoning = _invoke_llm_with_reasoning(
+            llm,
+            tmpl.system,
+            user,
+            max_tokens=MAX_TOKENS_ANSWER,
+            temperature=answer_temperature,
+        )
+        answer = _truncate_repetition(answer)
+        return {
+            "answer": answer,
+            "reasoning": reasoning,
+            "issue_top10_cases": _build_issue_cases(ref_items),
+            "issue_stage": "post_summary",
+        }
+
     if route == "setup":
         ref_items = _prioritize_setup_answer_refs(ref_items)
     # 답변 생성 시 REFS 수 제한
@@ -2743,6 +2987,122 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
         "answer_format": format_result,
         "answer_format_retries": retries,
     }
+
+
+def issue_confirm_node(
+    state: AgentState,
+) -> Command[Literal["issue_case_selection", "done"]]:
+    stage = str(state.get("issue_stage") or "post_summary")
+    if stage not in {"post_summary", "post_detail"}:
+        stage = "post_summary"
+    nonce = str(uuid.uuid4())
+    prompt = (
+        "상세히 보고싶은 문서가 있습니까?"
+        if stage == "post_summary"
+        else "다른 이슈 사례도 상세히 보시겠습니까?"
+    )
+    payload = {
+        "type": "issue_confirm",
+        "nonce": nonce,
+        "stage": stage,
+        "question": state.get("query", ""),
+        "instruction": "summary confirm" if stage == "post_summary" else "other confirm",
+        "prompt": prompt,
+    }
+    decision = interrupt(payload)
+    if isinstance(decision, dict) and bool(decision.get("confirm", False)):
+        return Command(goto="issue_case_selection")
+    return Command(goto="done")
+
+
+def issue_case_selection_node(
+    state: AgentState,
+) -> Command[Literal["issue_detail_answer", "done"]]:
+    cases = state.get("issue_top10_cases") or []
+    if not cases:
+        return Command(goto="done")
+
+    nonce = str(uuid.uuid4())
+    payload = {
+        "type": "issue_case_selection",
+        "nonce": nonce,
+        "question": state.get("query", ""),
+        "instruction": "case pick",
+        "cases": cases,
+    }
+    decision = interrupt(payload)
+    selected_doc_id = ""
+    if isinstance(decision, dict):
+        selected_doc_id = str(decision.get("selected_doc_id") or "").strip()
+    if not selected_doc_id:
+        return Command(goto="done")
+
+    return Command(
+        goto="issue_detail_answer",
+        update={
+            "issue_selected_doc_id": selected_doc_id,
+        },
+    )
+
+
+def issue_detail_answer_node(
+    state: AgentState,
+    *,
+    llm: BaseLLM,
+    spec: PromptSpec,
+) -> Dict[str, Any]:
+    answer_language = state.get("target_language") or state.get("detected_language") or "ko"
+    selected_doc_id = str(state.get("issue_selected_doc_id") or "").strip()
+    all_refs = state.get("answer_ref_json") or state.get("ref_json") or []
+    selected_refs = [
+        ref for ref in all_refs if str(ref.get("doc_id") or "").strip() == selected_doc_id
+    ]
+    if not selected_refs:
+        selected_refs = list(all_refs[:1])
+
+    query_for_prompt = state.get("query_en") if answer_language == "en" else state.get("query")
+    if not query_for_prompt:
+        query_for_prompt = state.get("query", "")
+
+    ref_text = ref_json_to_text(selected_refs)
+    mapping = {"sys.query": query_for_prompt, "ref_text": ref_text}
+    tmpl = _get_issue_answer_template(spec, answer_language, detail=True)
+    user = _format_prompt(tmpl.user, mapping)
+    answer_temperature = resolve_answer_temperature(state.get("route", "general"))
+    answer, reasoning = _invoke_llm_with_reasoning(
+        llm,
+        tmpl.system,
+        user,
+        max_tokens=MAX_TOKENS_ANSWER,
+        temperature=answer_temperature,
+    )
+    answer = _truncate_repetition(answer)
+    answer = _ensure_issue_detail_sections(answer, answer_language)
+    return {
+        "answer": answer,
+        "reasoning": reasoning,
+        "answer_ref_json": selected_refs,
+        "issue_stage": "post_detail",
+    }
+
+
+def issue_sop_confirm_node(
+    state: AgentState,
+) -> Command[Literal["issue_confirm", "done"]]:
+    nonce = str(uuid.uuid4())
+    payload = {
+        "type": "issue_sop_confirm",
+        "nonce": nonce,
+        "question": state.get("query", ""),
+        "instruction": "sop confirm",
+        "prompt": "관련 SOP 확인으로 이어가시겠습니까?",
+        "has_sop_ref": False,
+        "sop_hint": None,
+    }
+    decision = interrupt(payload)
+    if isinstance(decision, dict) and bool(decision.get("confirm", False)):
+        return Command(goto="done")
+    return Command(goto="issue_confirm", update={"issue_stage": "post_detail"})
 
 
 def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
@@ -4183,18 +4543,31 @@ def device_selection_node(
         doc_types_strict=len(selected_doc_types) > 0,
         doc_type_selection_skipped=len(selected_doc_types) == 0,
     )
+
+    inferred_task_mode = _infer_task_mode_from_doc_types(selected_doc_types)
+    if inferred_task_mode:
+        pq_dict["task_mode"] = inferred_task_mode
+    if inferred_task_mode == "issue":
+        pq_dict["route"] = "general"
+
+    update_payload: Dict[str, Any] = {
+        "available_devices": available_devices,
+        "selected_devices": selected_devices,
+        "device_selection_skipped": len(selected_devices) == 0,
+        "available_doc_types": available_doc_types,
+        "selected_doc_types": selected_doc_types,
+        "selected_doc_types_strict": len(selected_doc_types) > 0,
+        "doc_type_selection_skipped": len(selected_doc_types) == 0,
+        "parsed_query": pq_dict,
+    }
+    if inferred_task_mode:
+        update_payload["task_mode"] = inferred_task_mode
+    if inferred_task_mode == "issue":
+        update_payload["route"] = "general"
+
     return Command(
         goto=goto_target,
-        update={
-            "available_devices": available_devices,
-            "selected_devices": selected_devices,
-            "device_selection_skipped": len(selected_devices) == 0,
-            "available_doc_types": available_doc_types,
-            "selected_doc_types": selected_doc_types,
-            "selected_doc_types_strict": len(selected_doc_types) > 0,
-            "doc_type_selection_skipped": len(selected_doc_types) == 0,
-            "parsed_query": pq_dict,
-        },
+        update=update_payload,
     )
 
 
@@ -4204,6 +4577,7 @@ __all__ = [
     "Route",
     "Gate",
     "PromptSpec",
+    "ISSUE_CASE_EMPTY_MESSAGE",
     "SearchServiceRetriever",
     "Retriever",
     "load_prompt_spec",
@@ -4216,6 +4590,10 @@ __all__ = [
     "expand_related_docs_node",
     "ask_user_after_retrieve_node",
     "answer_node",
+    "issue_confirm_node",
+    "issue_case_selection_node",
+    "issue_detail_answer_node",
+    "issue_sop_confirm_node",
     "judge_node",
     "should_retry",
     "retry_bump_node",
