@@ -2,11 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Task Start Kickoff Skill
+## Mandatory Startup Protocol
 
-- Canonical checklist: `docs/agent-skills/task-start-kickoff.md`
-- Claude wrapper: `.claude/skills/task-start-kickoff/SKILL.md`
-- If auto skill loading is unavailable, read the canonical checklist and execute it manually before non-trivial edits.
+Before any non-trivial edit:
+1. Read `docs/2026-03-14-agent-개발-운영.md` section `0) 신규 agent 5분 온보딩 (필독)` and section `5.5 비사소 작업 판정 기준`.
+2. Run the kickoff checklist from `docs/agent-skills/task-start-kickoff.md`.
+3. If local skills are available, the Claude wrapper is `.claude/skills/task-start-kickoff/SKILL.md`.
+4. Read `docs/contracts/product-contract.md` and identify the contract IDs to preserve.
+5. If the task is non-trivial, create or update a task doc from `docs/tasks/TASK_TEMPLATE.md` before editing code.
+
+If auto skill loading is unavailable, perform the same startup sequence manually from the canonical checklist.
 
 ## Project Overview
 

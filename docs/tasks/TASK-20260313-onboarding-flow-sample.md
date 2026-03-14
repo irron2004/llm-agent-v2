@@ -27,7 +27,7 @@ New agents need one concrete example that demonstrates how to use
 ## Allowed Files
 
 - `backend/api/routers/agent.py`
-- `frontend/src/features/chat/components/DevicePanel.tsx`
+- `frontend/src/features/chat/components/device-selection-panel.tsx`
 - `tests/api/test_agent_response_metadata_contract.py`
 - `frontend/src/features/chat/__tests__/chat-page-device-panel.test.tsx`
 - `docs/tasks/TASK-20260313-onboarding-flow-sample.md`

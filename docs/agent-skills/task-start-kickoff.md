@@ -5,6 +5,34 @@
 Use this kickoff checklist at the start of every non-trivial task to prevent scope drift,
 contract breakage, and missing verification evidence.
 
+Canonical rule:
+- Keep the full workflow here.
+- Keep runtime entry docs and local skill wrappers short and aligned to this file.
+
+## Startup Read Order
+
+Use the following read order when a runtime starts a task:
+1. Repo entry document for the runtime:
+   - Codex: `AGENTS.md`
+   - Claude: `CLAUDE.md`
+2. `docs/2026-03-14-agent-개발-운영.md`
+   - Read section `0) 신규 agent 5분 온보딩 (필독)`
+   - Read section `5.5 비사소 작업 판정 기준`
+3. `docs/contracts/product-contract.md`
+4. `docs/tasks/TASK_TEMPLATE.md`
+5. `docs/tasks/README.md` if handoff or verification logging rules are needed
+
+## Scope Boundary
+
+The full kickoff is required before code edits on non-trivial tasks.
+
+You may skip task doc creation for:
+- tiny one-file typo or docs-only fixes,
+- read-only investigation,
+- command-only inspection that does not edit code.
+
+If a tiny or exploratory task grows into a non-trivial code change, run the full kickoff before the first edit.
+
 ## Mandatory Checklist
 
 1. Check working tree ownership

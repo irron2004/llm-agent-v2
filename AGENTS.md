@@ -3,15 +3,18 @@
 Practical guidance for autonomous coding agents in `llm-agent-v2`.
 All commands and conventions below are derived from current repo files.
 
-New agent entrypoint:
-- Start with `docs/2026-03-14-agent-개발-운영.md` section `0) 신규 agent 5분 온보딩 (필독)` before any non-trivial change.
-- Cross-agent kickoff skill source: `docs/agent-skills/task-start-kickoff.md`.
-- Runtime wrappers:
-  - OMC: `.omc/skills/task-start-kickoff/SKILL.md`
-  - OpenCode: `.opencode/skills/task-start-kickoff/SKILL.md`
-  - Claude: `.claude/skills/task-start-kickoff/SKILL.md`
-  - Codex: `.codex/skills/task-start-kickoff/SKILL.md`
-- If local skill auto-loading is unavailable, execute the kickoff checklist from the canonical source manually.
+## 0) Mandatory Startup Protocol
+For every non-trivial task, treat the following startup sequence as required before code edits:
+1. Read `docs/2026-03-14-agent-개발-운영.md` section `0) 신규 agent 5분 온보딩 (필독)` and section `5.5 비사소 작업 판정 기준`.
+2. Run the kickoff checklist from `docs/agent-skills/task-start-kickoff.md`, or use the runtime wrapper if local skills are available:
+   - OMC: `.omc/skills/task-start-kickoff/SKILL.md`
+   - OpenCode: `.opencode/skills/task-start-kickoff/SKILL.md`
+   - Claude: `.claude/skills/task-start-kickoff/SKILL.md`
+   - Codex: `.codex/skills/task-start-kickoff/SKILL.md`
+3. Read `docs/contracts/product-contract.md` and identify relevant contract IDs.
+4. If the task is non-trivial, create or update a task document from `docs/tasks/TASK_TEMPLATE.md` before editing files.
+
+This startup protocol is mandatory even when local skill auto-loading is unavailable.
 
 ## 1) Rule Sources and Priority
 Follow instructions in this order:
