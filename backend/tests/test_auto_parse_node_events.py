@@ -34,7 +34,7 @@ def test_auto_parse_node_emits_event_and_message_without_device_doc_type_match()
     assert result["_events"][0]["language"] == "en"
 
 
-def test_auto_parse_node_extracts_equip_id_from_query() -> None:
+def test_auto_parse_node_equip_id_parsing_is_disabled() -> None:
     state: AgentState = {"query": "equip_id: epag50 관련 gcb 문서 찾아줘"}
 
     result = auto_parse_node(
@@ -45,11 +45,10 @@ def test_auto_parse_node_extracts_equip_id_from_query() -> None:
         doc_type_names=["myservice", "ts", "gcb", "sop", "setup"],
     )
 
-    assert result["auto_parsed_equip_id"] == "EPAG50"
-    assert result["auto_parsed_equip_ids"] == ["EPAG50"]
-    assert result["selected_equip_ids"] == ["EPAG50"]
-    assert "EPAG50" in result["auto_parse_message"]
-    assert result["_events"][0]["equip_id"] == "EPAG50"
+    assert result["auto_parsed_equip_id"] is None
+    assert result["auto_parsed_equip_ids"] == []
+    assert result["selected_equip_ids"] == []
+    assert result["_events"][0]["equip_id"] is None
 
 
 def test_auto_parse_node_ignores_short_component_like_device_labels() -> None:
@@ -85,13 +84,13 @@ def test_auto_parse_node_sticky_keeps_previous_selections_when_no_detection() ->
 
     assert result["selected_devices"] == ["SUPRA N"]
     assert result["selected_doc_types"] == ["gcb"]
-    assert result["selected_equip_ids"] == ["EPAG49"]
+    assert result["selected_equip_ids"] == []
     assert result["parsed_query"]["device_names"] == ["SUPRA N"]
     assert result["parsed_query"]["doc_types"] == ["gcb"]
-    assert result["parsed_query"]["equip_ids"] == ["EPAG49"]
+    assert result["parsed_query"]["equip_ids"] == []
     assert result["parsed_query"]["selected_devices"] == ["SUPRA N"]
     assert result["parsed_query"]["selected_doc_types"] == ["gcb"]
-    assert result["parsed_query"]["selected_equip_ids"] == ["EPAG49"]
+    assert result["parsed_query"]["selected_equip_ids"] == []
     assert result["device_selection_skipped"] is False
     assert result["doc_type_selection_skipped"] is False
     assert result["_events"][0]["type"] == "auto_parse"
@@ -121,16 +120,37 @@ def test_auto_parse_node_replaces_selections_when_new_detection() -> None:
 
     assert result["selected_devices"] == ["SUPRA N"]
     assert result["selected_doc_types"] == ["gcb"]
-    assert result["selected_equip_ids"] == ["EPAG50"]
+    assert result["selected_equip_ids"] == []
     assert result["parsed_query"]["device_names"] == ["SUPRA N"]
     assert result["parsed_query"]["doc_types"] == ["gcb"]
-    assert result["parsed_query"]["equip_ids"] == ["EPAG50"]
+    assert result["parsed_query"]["equip_ids"] == []
     assert result["parsed_query"]["selected_devices"] == ["SUPRA N"]
     assert result["parsed_query"]["selected_doc_types"] == ["gcb"]
-    assert result["parsed_query"]["selected_equip_ids"] == ["EPAG50"]
+    assert result["parsed_query"]["selected_equip_ids"] == []
     assert result["device_selection_skipped"] is False
     assert result["doc_type_selection_skipped"] is False
     assert result["_events"][0]["type"] == "auto_parse"
     assert result["_events"][0]["device"] == "SUPRA N"
     assert result["_events"][0]["doc_type"] == "gcb"
-    assert result["_events"][0]["equip_id"] == "EPAG50"
+    assert result["_events"][0]["equip_id"] == "EPAG49"
+
+
+def test_auto_parse_node_strict_scope_can_narrow_when_new_doc_type_detected() -> None:
+    state: AgentState = {
+        "query": "gcb 문서만 보여줘",
+        "selected_doc_types": ["myservice", "gcb", "ts"],
+        "selected_doc_types_strict": True,
+    }
+
+    result = auto_parse_node(
+        state,
+        llm=_DUMMY,
+        spec=_DUMMY,
+        device_names=["SUPRA N"],
+        doc_type_names=["myservice", "ts", "gcb", "sop", "setup"],
+    )
+
+    assert result["auto_parsed_doc_types"] == ["gcb"]
+    assert result["selected_doc_types"] == ["gcb"]
+    assert result["parsed_query"]["doc_types"] == ["gcb"]
+    assert result["parsed_query"]["selected_doc_types"] == ["gcb"]

@@ -1,7 +1,44 @@
 {
-  "agents": [],
-  "total_spawned": 0,
-  "total_completed": 0,
+  "agents": [
+    {
+      "agent_id": "a517e675f6ad13cdf",
+      "agent_type": "oh-my-claudecode:scientist",
+      "started_at": "2026-03-14T06:39:10.264Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-14T06:43:05.312Z",
+      "duration_ms": 235048
+    },
+    {
+      "agent_id": "ac5e2b321d11d6d79",
+      "agent_type": "oh-my-claudecode:scientist",
+      "started_at": "2026-03-14T06:48:24.923Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-14T06:49:09.630Z",
+      "duration_ms": 44707
+    },
+    {
+      "agent_id": "ad2cf01c742b01489",
+      "agent_type": "oh-my-claudecode:scientist",
+      "started_at": "2026-03-14T06:39:32.365Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-14T06:48:17.819Z",
+      "duration_ms": 525454
+    },
+    {
+      "agent_id": "a82ed5db00dce1ffd",
+      "agent_type": "oh-my-claudecode:scientist",
+      "started_at": "2026-03-14T06:49:40.020Z",
+      "parent_mode": "none",
+      "status": "completed",
+      "completed_at": "2026-03-14T06:55:54.471Z",
+      "duration_ms": 374451
+    }
+  ],
+  "total_spawned": 5,
+  "total_completed": 5,
   "total_failed": 0,
-  "last_updated": "2026-03-12T11:39:45.388Z"
+  "last_updated": "2026-03-14T06:55:54.574Z"
 }

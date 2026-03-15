@@ -604,16 +604,24 @@ def _extract_auto_parse_result(result: Dict[str, Any]) -> Optional[AutoParseResu
     pq_raw = result.get("parsed_query")
     if pq_raw:
         pq = ParsedQuery(**pq_raw)
-        return AutoParseResult(
-            device=pq.device_names[0] if pq.device_names else None,
-            doc_type=pq.doc_types[0] if pq.doc_types else None,
-            devices=pq.device_names or None,
-            doc_types=pq.doc_types or None,
-            equip_id=pq.equip_ids[0] if pq.equip_ids else None,
-            equip_ids=pq.equip_ids or None,
-            language=pq.detected_language,
-            message=pq.message,
+        has_auto_parse_fields = bool(
+            pq.device_names
+            or pq.doc_types
+            or pq.equip_ids
+            or pq.detected_language is not None
+            or pq.message
         )
+        if has_auto_parse_fields:
+            return AutoParseResult(
+                device=pq.device_names[0] if pq.device_names else None,
+                doc_type=pq.doc_types[0] if pq.doc_types else None,
+                devices=pq.device_names or None,
+                doc_types=pq.doc_types or None,
+                equip_id=pq.equip_ids[0] if pq.equip_ids else None,
+                equip_ids=pq.equip_ids or None,
+                language=pq.detected_language,
+                message=pq.message,
+            )
 
     # 기존 fallback
     if (
@@ -649,6 +657,10 @@ def _should_suggest_additional_device_search(
     pq_raw = result.get("parsed_query")
     if pq_raw:
         pq = ParsedQuery(**pq_raw)
+        # Regeneration/override path may store selected_* filters in parsed_query even when
+        # auto-parse did not run; do not emit additional auto-parse suggestion in that case.
+        if pq.selected_devices or pq.selected_doc_types or pq.selected_equip_ids:
+            return False
         effective = [d for d in pq.device_names if _is_effective_parsed_device(d)]
         return not effective and pq.detected_language is not None
 
@@ -883,6 +895,63 @@ def _build_response_metadata(
         ),
     }
 
+    issue_policy_tier = result.get("issue_policy_tier")
+    issue_policy_tier_shadow = result.get("issue_policy_tier_shadow")
+    issue_fallback_reason = result.get("issue_fallback_reason")
+    issue_detail_ref_source = result.get("issue_detail_ref_source")
+    issue_policy_rollout_phase = result.get("issue_policy_rollout_phase")
+    issue_routing_signals = result.get("issue_routing_signals")
+    issue_case_refs = result.get("issue_case_refs")
+    issue_answer_refs = result.get("answer_ref_json")
+    issue_case_refs_shadow = result.get("issue_case_refs_shadow")
+    issue_answer_refs_shadow = result.get("issue_answer_refs_shadow")
+    issue_mode = bool(
+        str(result.get("task_mode") or "").strip().lower() == "issue"
+        or isinstance(issue_policy_tier, str)
+        or isinstance(issue_policy_tier_shadow, str)
+        or isinstance(issue_case_refs, list)
+    )
+
+    if issue_mode and isinstance(issue_policy_tier, str) and issue_policy_tier:
+        metadata["issue_policy_tier"] = issue_policy_tier
+    if issue_mode and isinstance(issue_policy_tier_shadow, str) and issue_policy_tier_shadow:
+        metadata["issue_policy_tier_shadow"] = issue_policy_tier_shadow
+    if issue_mode and isinstance(issue_fallback_reason, str) and issue_fallback_reason:
+        metadata["issue_fallback_reason"] = issue_fallback_reason
+    if issue_mode and isinstance(issue_detail_ref_source, str) and issue_detail_ref_source:
+        metadata["issue_detail_ref_source"] = issue_detail_ref_source
+    if issue_mode and issue_policy_rollout_phase is not None:
+        try:
+            metadata["issue_policy_rollout_phase"] = int(issue_policy_rollout_phase)
+        except (TypeError, ValueError):
+            pass
+
+    if issue_mode and isinstance(issue_case_refs, list):
+        metadata["issue_case_count"] = len(issue_case_refs)
+    if issue_mode and isinstance(issue_answer_refs, list):
+        metadata["issue_answer_ref_count"] = len(issue_answer_refs)
+    if issue_mode and isinstance(issue_case_refs_shadow, list):
+        metadata["issue_case_count_shadow"] = len(issue_case_refs_shadow)
+    if issue_mode and isinstance(issue_answer_refs_shadow, list):
+        metadata["issue_answer_ref_count_shadow"] = len(issue_answer_refs_shadow)
+
+    if issue_mode and isinstance(issue_routing_signals, dict):
+        key_map = {
+            "score_gap_12": "issue_signal_score_gap_12",
+            "myservice_share_50": "issue_signal_myservice_share_50",
+            "gcb_count_50": "issue_signal_gcb_count_50",
+            "ts_count_50": "issue_signal_ts_count_50",
+            "doc_type_entropy_20": "issue_signal_doc_type_entropy_20",
+            "non_myservice_presence_50": "issue_signal_non_myservice_presence_50",
+            "gcb_chapter_coverage_10": "issue_signal_gcb_chapter_coverage_10",
+            "issue_signal_k_effective": "issue_signal_k_effective",
+        }
+        for src_key, dst_key in key_map.items():
+            value = issue_routing_signals.get(src_key)
+            if value is None:
+                continue
+            metadata[dst_key] = value
+
     answer_format = result.get("answer_format")
     if isinstance(answer_format, dict):
         metadata["answer_format"] = answer_format
@@ -925,6 +994,8 @@ async def run_agent(
     """LangGraph RAG 에이전트 실행."""
     if not hasattr(search_service, "search"):
         raise HTTPException(status_code=503, detail="Search service not configured")
+    if req.resume_decision is not None and req.thread_id is None:
+        raise HTTPException(status_code=400, detail="thread_id required for resume")
 
     tid = req.thread_id or str(uuid.uuid4())
     is_resume = req.resume_decision is not None and req.thread_id is not None
@@ -1177,6 +1248,8 @@ async def run_agent_stream(
     """LangGraph RAG 에이전트 실행 (SSE: 노드 실행 로그 스트리밍)."""
     if not hasattr(search_service, "search"):
         raise HTTPException(status_code=503, detail="Search service not configured")
+    if req.resume_decision is not None and req.thread_id is None:
+        raise HTTPException(status_code=400, detail="thread_id required for resume")
 
     tid = req.thread_id or str(uuid.uuid4())
     is_resume = req.resume_decision is not None and req.thread_id is not None

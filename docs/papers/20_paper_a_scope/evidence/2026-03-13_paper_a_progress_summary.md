@@ -100,12 +100,12 @@ Phase 1-4의 부정적 결과가 나온 이유를 분석:
 
 | Condition | explicit_device | explicit_equip | ALL |
 |-----------|:-:|:-:|:-:|
-| B0 orig | 366/429 (85%) | 53/149 (36%) | 419/578 (72%) |
-| B0 masked | 326/429 (76%) | 17/149 (11%) | 343/578 (59%) |
-| **B4 masked** | **417/429 (97%)** | **118/149 (79%)** | **535/578 (93%)** |
-| B4.5 masked | 370/429 (86%) | 97/149 (65%) | 467/578 (81%) |
+| B0 orig | 347/429 (81%) | 47/149 (32%) | 394/578 (68%) |
+| B0 masked | 284/429 (66%) | 3/149 (2%) | 287/578 (50%) |
+| **B4 masked** | **417/429 (97%)** | **113/149 (76%)** | **530/578 (92%)** |
+| B4.5 masked | 351/429 (82%) | 79/149 (53%) | 430/578 (74%) |
 
-→ **Device filter가 recall을 파괴하지 않고 오히려 +34%p 향상** (59% → 93%)
+→ **Device filter가 recall을 파괴하지 않고 오히려 +42%p 향상** (50% → 92%)
 
 #### Device별 B4 masked gold hit (loose)
 
@@ -131,7 +131,7 @@ Phase 1-4의 부정적 결과가 나온 이유를 분석:
 **장비명을 마스킹하면 실제 운영 환경에 더 가까운 시나리오**:
 - PE 엔지니어가 "Controller 교체 절차 알려줘"라고 물으면 → 어떤 장비인지 모름
 - B0는 여러 장비의 Controller SOP를 섞어서 반환 (contamination 52%)
-- B4는 context에서 추론한 장비의 문서만 반환 → gold hit 93%
+- B4는 context에서 추론한 장비의 문서만 반환 → gold hit 92%
 
 ---
 
@@ -169,12 +169,12 @@ Phase 1-4의 부정적 결과가 나온 이유를 분석:
 ### 강한 claim (데이터가 뒷받침)
 1. **Cross-equipment contamination은 심각하다** — BM25 기준 52.9% (explicit_equip에서 95.7%)
 2. **Device-aware hard filter는 contamination을 완전 제거한다** — 0%
-3. **Hard filter가 recall을 향상시킨다** — masked query에서 59% → 93% (+34%p)
+3. **Hard filter가 recall을 향상시킨다** — masked query에서 50% → 92% (+42%p)
 4. **Masking이 evaluation bias를 드러낸다** — 기존 eval에서 scope filter가 무효해 보인 건 gold bias 때문
 
 ### 주의가 필요한 claim
 - "Soft scoring이 hard filter보다 우수하다" → Phase 4에서 +1.9%만 나옴, 재실험 필요
-- "Shared document policy가 recall을 보존한다" → B4.5가 B4보다 낮음 (93% → 81%), 역설적
+- "Shared document policy가 recall을 보존한다" → B4.5가 B4보다 낮음 (92% → 74%), 역설적
 - "모든 query에서 효과적이다" → implicit/ambiguous 미측정
 
 ### 논문 RQ 제안

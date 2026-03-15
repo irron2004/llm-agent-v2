@@ -10,6 +10,8 @@ import json
 import re
 import logging
 import hashlib
+import math
+import os
 import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Protocol, Set, Tuple, TypedDict
@@ -116,6 +118,20 @@ class AgentState(TypedDict, total=False):
     task_mode: Optional[str]  # Guided confirm selection ("sop"|"issue"|"all")
     issue_stage: Optional[str]  # "post_summary" | "post_detail"
     issue_top10_cases: List[Dict[str, Any]]
+    issue_case_refs: List[Dict[str, Any]]
+    issue_case_ref_map: Dict[str, List[Dict[str, Any]]]
+    issue_routing_signals: Dict[str, Any]
+    issue_policy_tier: Optional[str]
+    issue_policy_tier_shadow: Optional[str]
+    issue_case_refs_shadow: List[Dict[str, Any]]
+    issue_answer_refs_shadow: List[Dict[str, Any]]
+    issue_case_ref_map_shadow: Dict[str, List[Dict[str, Any]]]
+    issue_policy_rollout_phase: Optional[int]
+    issue_fallback_reason: Optional[str]
+    issue_detail_ref_source: Optional[str]
+    issue_confirm_nonce: Optional[str]
+    issue_case_selection_nonce: Optional[str]
+    issue_sop_confirm_nonce: Optional[str]
     issue_selected_doc_id: Optional[str]
 
     # Guided auto-parse confirmation
@@ -183,6 +199,7 @@ class PromptSpec:
     judge_general_sys: str
     auto_parse: Optional[PromptTemplate] = None  # Auto-parse device/doc_type
     translate: Optional[PromptTemplate] = None  # Translate query to en/ko
+    issue_mq: Optional[PromptTemplate] = None
     # Language-specific answer prompts
     setup_ans_en: Optional[PromptTemplate] = None
     setup_ans_zh: Optional[PromptTemplate] = None
@@ -265,6 +282,7 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
     # Try to load optional prompts
     auto_parse = _try_load_prompt("auto_parse", version)
     translate = _try_load_prompt("translate", version)
+    issue_mq = _try_load_prompt("issue_mq", version)
 
     # Load language-specific answer prompts (optional, prefer v3 over v2)
     def _load_lang_prompt(name: str, ver: str) -> PromptTemplate | None:
@@ -307,6 +325,7 @@ def load_prompt_spec(version: str = "v1") -> PromptSpec:
         judge_general_sys=DEFAULT_JUDGE_GENERAL,
         auto_parse=auto_parse,
         translate=translate,
+        issue_mq=issue_mq,
         setup_ans_en=setup_ans_en,
         setup_ans_zh=setup_ans_zh,
         setup_ans_ja=setup_ans_ja,
@@ -478,6 +497,11 @@ _ISSUE_SCOPE_VARIANTS = _build_scope_variants(*_ISSUE_SCOPE_GROUPS) | {
     normalize_doc_type("trouble_shooting_guide"),
     normalize_doc_type("trouble shooting guide"),
 }
+_TS_SCOPE_VARIANTS = _build_scope_variants("ts") | {
+    normalize_doc_type("pems"),
+    normalize_doc_type("trouble_shooting_guide"),
+    normalize_doc_type("trouble shooting guide"),
+}
 _SOP_SCOPE_VARIANTS = _build_scope_variants(*_SOP_SCOPE_GROUPS)
 
 
@@ -489,6 +513,8 @@ def _infer_task_mode_from_doc_types(doc_types: Any) -> Optional[str]:
     }
     if not normalized:
         return None
+    if normalized <= _TS_SCOPE_VARIANTS:
+        return "ts"
     if normalized <= _ISSUE_SCOPE_VARIANTS:
         return "issue"
     if normalized <= _SOP_SCOPE_VARIANTS:
@@ -978,15 +1004,22 @@ def results_to_ref_json(
             content = content[:max_chars]
             truncated = True
 
-        # Keep metadata minimal to reduce prompt size
+        # Keep metadata compact but preserve issue-route disambiguation signals.
         metadata: Dict[str, Any] = {}
         if truncated:
             metadata["truncated"] = True
         if isinstance(d.metadata, dict):
-            for key in ("device_name", "equip_id"):
+            for key in ("device_name", "equip_id", "doc_type"):
                 val = d.metadata.get(key)
                 if val and str(val).strip():
                     metadata[key] = str(val).strip()
+            section = (
+                d.metadata.get("section_type")
+                or d.metadata.get("section_chapter")
+                or d.metadata.get("chapter")
+            )
+            if section and str(section).strip():
+                metadata["section"] = str(section).strip()
 
         ref.append(
             {
@@ -1016,18 +1049,26 @@ def ref_json_to_text(ref_json: List[Dict[str, Any]]) -> str:
         content = str(r.get("content", "")).strip()
         content = " ".join(content.split())
 
-        # 장비 메타데이터 태그 추가
+        # 장비 + 문서유형 태그 추가
         meta = r.get("metadata") or {}
         device = meta.get("device_name", "")
         equip = meta.get("equip_id", "")
+        doc_type = meta.get("doc_type", "")
+        section = meta.get("section", "")
+
+        tags: List[str] = []
         if device and equip:
-            tag = f" ({device} / {equip})"
+            tags.append(f"{device} / {equip}")
         elif device:
-            tag = f" ({device})"
+            tags.append(str(device))
         elif equip:
-            tag = f" ({equip})"
-        else:
-            tag = ""
+            tags.append(str(equip))
+        if doc_type:
+            tags.append(f"type={doc_type}")
+        if section:
+            tags.append(f"section={section}")
+
+        tag = f" ({' | '.join(tags)})" if tags else ""
 
         lines.append(f"[{rank}] {doc_id}{tag}: {content}")
     return "\n".join(lines)
@@ -1139,6 +1180,13 @@ def _prioritize_setup_answer_refs(ref_items: List[Dict[str, Any]]) -> List[Dict[
 
 MAX_SETUP_DOC_TRIES = 5  # 적합성 판정 최대 문서 수
 MAX_ANSWER_REFS = 5  # 답변 생성 시 최대 REFS 수
+MAX_ISSUE_REFS = 10  # issue 사례 노출 최대 REFS 수
+MAX_ISSUE_CASE_MAP_DOCS = 10
+MAX_ISSUE_CASE_MAP_REFS_PER_DOC = 12
+MAX_ISSUE_CASE_MAP_CONTENT_CHARS = 800
+ISSUE_POLICY_ROLLOUT_PHASE_DEFAULT = 3
+ISSUE_POLICY_ROLLOUT_PHASE_MIN = 1
+ISSUE_POLICY_ROLLOUT_PHASE_MAX = 3
 
 
 def _group_refs_by_doc_id(
@@ -1356,6 +1404,12 @@ def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
         pq_dict["task_mode"] = "issue"
         return {"route": "general", "task_mode": "issue", "parsed_query": pq_dict}
 
+    if task_mode == "ts":
+        pq_dict = dict(state.get("parsed_query") or {})
+        pq_dict["route"] = "ts"
+        pq_dict["task_mode"] = "ts"
+        return {"route": "ts", "task_mode": "ts", "parsed_query": pq_dict}
+
     # Use English query for routing (after translation)
     route_query = state.get("query_en") or state["query"]
     query = _normalize_query_text(route_query) or str(route_query).strip()
@@ -1374,6 +1428,7 @@ def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
 
 def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     route = state["route"]
+    task_mode = str(state.get("task_mode") or "").strip().lower()
     # Generate MQ in both English and Korean for bilingual retrieval
     query_en = state.get("query_en") or state["query"]
     query_ko = state.get("query_ko") or state["query"]
@@ -1422,7 +1477,10 @@ def mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, A
     ts_mq_ko_list: List[str] = []
     general_mq_ko_list: List[str] = []
 
-    if route == "setup":
+    if task_mode == "issue":
+        issue_mq_template = spec.issue_mq or spec.general_mq
+        general_mq_list, general_mq_ko_list = _generate_mq_bilingual(issue_mq_template)
+    elif route == "setup":
         setup_mq_list, setup_mq_ko_list = _generate_mq_bilingual(spec.setup_mq)
     elif route == "ts":
         ts_mq_list, ts_mq_ko_list = _generate_mq_bilingual(spec.ts_mq)
@@ -2284,7 +2342,7 @@ def expand_related_docs_node(
     max_ref_chars: int = MAX_REF_CHARS_ANSWER,
 ) -> Dict[str, Any]:
     """Expand answer references by doc_type rules."""
-    if page_fetcher is None and doc_fetcher is None:
+    if page_fetcher is None and doc_fetcher is None and section_fetcher is None:
         msg = "expand_related: skipped (no fetcher available)"
         logger.info(msg)
         return {"_events": [msg]}
@@ -2296,8 +2354,9 @@ def expand_related_docs_node(
         return {"_events": [msg]}
 
     expanded_docs: List[RetrievalResult] = []
-    # Use expand_top_k from state if set, otherwise use default EXPAND_TOP_K
-    expand_top_k = state.get("expand_top_k") or EXPAND_TOP_K
+    # Use expand_top_k from state when explicitly set (including 0), otherwise default.
+    expand_top_k_raw = state.get("expand_top_k")
+    expand_top_k = EXPAND_TOP_K if expand_top_k_raw is None else expand_top_k_raw
     max_expand = max(0, int(expand_top_k))
     total_docs = len(docs)
     same_doc_targets = 0
@@ -2689,6 +2748,298 @@ def _get_issue_answer_template(
     return default_template
 
 
+def _extract_doc_type_from_metadata(metadata: Dict[str, Any]) -> str:
+    return _normalize_doc_type(metadata.get("doc_type"))
+
+
+def _extract_section_from_metadata(metadata: Dict[str, Any]) -> str:
+    section = (
+        metadata.get("section")
+        or metadata.get("section_type")
+        or metadata.get("section_chapter")
+        or metadata.get("chapter")
+    )
+    text = str(section or "").strip().lower()
+    return text if text else "unknown"
+
+
+def _compute_issue_routing_signals(docs: List[RetrievalResult]) -> Dict[str, Any]:
+    if not docs:
+        return {
+            "issue_signal_k_effective": 0,
+            "score_gap_12": 0.0,
+            "myservice_share_50": 0.0,
+            "gcb_count_50": 0,
+            "ts_count_50": 0,
+            "non_myservice_presence_50": 0,
+            "doc_type_entropy_20": 0.0,
+            "gcb_chapter_coverage_10": 0.0,
+            "recentness_ratio_180d": None,
+        }
+
+    top50 = docs[: min(50, len(docs))]
+    top20 = docs[: min(20, len(docs))]
+    top10 = docs[: min(10, len(docs))]
+
+    score_1 = float(top50[0].score) if top50 else 0.0
+    score_2 = float(top50[1].score) if len(top50) >= 2 else score_1
+    score_gap_12 = (score_1 - score_2) / max(abs(score_1), 1e-9)
+
+    count_myservice = 0
+    count_gcb = 0
+    count_ts = 0
+    for doc in top50:
+        meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+        doc_type = _extract_doc_type_from_metadata(meta)
+        if doc_type == "myservice":
+            count_myservice += 1
+        elif doc_type == "gcb":
+            count_gcb += 1
+        elif doc_type == "ts":
+            count_ts += 1
+
+    k_effective = len(top50)
+    myservice_share_50 = count_myservice / k_effective if k_effective else 0.0
+    non_myservice_presence_50 = count_gcb + count_ts
+
+    # Normalized entropy over doc_type distribution in top-20.
+    counts_20: Dict[str, int] = {}
+    for doc in top20:
+        meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+        doc_type = _extract_doc_type_from_metadata(meta) or "unknown"
+        counts_20[doc_type] = counts_20.get(doc_type, 0) + 1
+    entropy_raw = 0.0
+    total_20 = len(top20)
+    if total_20 > 0:
+        for count in counts_20.values():
+            p = count / total_20
+            if p > 0:
+                entropy_raw -= p * math.log(p)
+    entropy_denom = math.log(len(counts_20)) if len(counts_20) > 1 else 0.0
+    doc_type_entropy_20 = entropy_raw / entropy_denom if entropy_denom > 0 else 0.0
+
+    # Distinct section coverage ratio for gcb in top-10.
+    gcb_sections: List[str] = []
+    for doc in top10:
+        meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+        if _extract_doc_type_from_metadata(meta) == "gcb":
+            gcb_sections.append(_extract_section_from_metadata(meta))
+    gcb_chapter_coverage_10 = len(set(gcb_sections)) / len(gcb_sections) if gcb_sections else 0.0
+
+    return {
+        "issue_signal_k_effective": k_effective,
+        "score_gap_12": score_gap_12,
+        "myservice_share_50": myservice_share_50,
+        "gcb_count_50": count_gcb,
+        "ts_count_50": count_ts,
+        "non_myservice_presence_50": non_myservice_presence_50,
+        "doc_type_entropy_20": doc_type_entropy_20,
+        "gcb_chapter_coverage_10": gcb_chapter_coverage_10,
+        "recentness_ratio_180d": None,
+    }
+
+
+def _resolve_issue_policy_tier(signals: Dict[str, Any]) -> Tuple[str, Optional[str]]:
+    k_effective = int(signals.get("issue_signal_k_effective") or 0)
+    score_gap_12 = float(signals.get("score_gap_12") or 0.0)
+    myservice_share_50 = float(signals.get("myservice_share_50") or 0.0)
+    gcb_count_50 = int(signals.get("gcb_count_50") or 0)
+    ts_count_50 = int(signals.get("ts_count_50") or 0)
+    non_myservice_presence_50 = int(signals.get("non_myservice_presence_50") or 0)
+
+    if k_effective < 20:
+        if k_effective == 0:
+            return "tier3", "empty_retrieval"
+        return "tier2", "insufficient_signal_k"
+
+    if (
+        score_gap_12 >= 0.12
+        and myservice_share_50 <= 0.70
+        and (gcb_count_50 >= 3 or ts_count_50 >= 2)
+    ):
+        return "tier1", None
+
+    if myservice_share_50 >= 0.85 and non_myservice_presence_50 == 0:
+        return "tier3", "myservice_dominant_sparse_alt"
+
+    return "tier2", None
+
+
+def _doc_type_from_ref_item(ref: Dict[str, Any]) -> str:
+    raw_meta = ref.get("metadata")
+    metadata = raw_meta if isinstance(raw_meta, dict) else {}
+    return _extract_doc_type_from_metadata(metadata)
+
+
+def _select_issue_doc_ids_by_tier(
+    ref_items: List[Dict[str, Any]],
+    *,
+    tier: str,
+    max_docs: int,
+) -> List[str]:
+    ordered_doc_types: Dict[str, str] = {}
+    for item in ref_items:
+        doc_id = str(item.get("doc_id") or "").strip()
+        if not doc_id or doc_id in ordered_doc_types:
+            continue
+        ordered_doc_types[doc_id] = _doc_type_from_ref_item(item)
+
+    ordered_doc_ids = list(ordered_doc_types.keys())
+    if not ordered_doc_ids:
+        return []
+
+    if tier == "tier3":
+        return ordered_doc_ids[:max_docs]
+
+    selected: List[str] = []
+    myservice_cap = 2 if tier == "tier1" else 5
+    myservice_count = 0
+    has_non_myservice = False
+
+    if tier == "tier1":
+        for doc_id in ordered_doc_ids:
+            if ordered_doc_types[doc_id] != "myservice":
+                selected.append(doc_id)
+                has_non_myservice = True
+                if len(selected) >= max_docs:
+                    return selected
+
+        for doc_id in ordered_doc_ids:
+            if ordered_doc_types[doc_id] == "myservice" and myservice_count < myservice_cap:
+                selected.append(doc_id)
+                myservice_count += 1
+                if len(selected) >= max_docs:
+                    return selected
+
+        return selected[:max_docs] if selected else ordered_doc_ids[:max_docs]
+
+    # tier2
+    for doc_id in ordered_doc_ids:
+        doc_type = ordered_doc_types[doc_id]
+        if doc_type == "myservice":
+            if myservice_count >= myservice_cap:
+                continue
+            myservice_count += 1
+        else:
+            has_non_myservice = True
+        selected.append(doc_id)
+        if len(selected) >= max_docs:
+            break
+
+    if not has_non_myservice:
+        for doc_id in ordered_doc_ids:
+            if ordered_doc_types[doc_id] != "myservice" and doc_id not in selected:
+                if len(selected) < max_docs:
+                    selected.append(doc_id)
+                else:
+                    for idx in range(len(selected) - 1, -1, -1):
+                        if ordered_doc_types.get(selected[idx]) == "myservice":
+                            selected[idx] = doc_id
+                            break
+                break
+
+    return selected[:max_docs] if selected else ordered_doc_ids[:max_docs]
+
+
+def _build_refs_for_selected_doc_ids(
+    ref_items: List[Dict[str, Any]],
+    selected_doc_ids: List[str],
+    *,
+    max_refs: int,
+) -> List[Dict[str, Any]]:
+    if not ref_items or not selected_doc_ids:
+        return []
+    selected_set = set(selected_doc_ids)
+    out: List[Dict[str, Any]] = []
+    for item in ref_items:
+        doc_id = str(item.get("doc_id") or "").strip()
+        if doc_id in selected_set:
+            out.append(item)
+            if len(out) >= max_refs:
+                break
+    return out
+
+
+def _select_issue_answer_refs(
+    case_refs: List[Dict[str, Any]],
+    *,
+    tier: str,
+    max_refs: int,
+) -> List[Dict[str, Any]]:
+    if not case_refs:
+        return []
+    if tier == "tier3":
+        return case_refs[:max_refs]
+
+    myservice_cap = 1 if tier == "tier1" else 2
+    myservice_count = 0
+    selected: List[Dict[str, Any]] = []
+    selected_ids: set[int] = set()
+
+    # First pass: one representative ref per doc to maximize diversity.
+    seen_doc_ids: set[str] = set()
+    representative_refs: List[Tuple[int, Dict[str, Any]]] = []
+    for idx, ref in enumerate(case_refs):
+        doc_id = str(ref.get("doc_id") or "").strip()
+        if not doc_id or doc_id in seen_doc_ids:
+            continue
+        seen_doc_ids.add(doc_id)
+        representative_refs.append((idx, ref))
+
+    for idx, ref in representative_refs:
+        doc_type = _doc_type_from_ref_item(ref)
+        if doc_type == "myservice":
+            if myservice_count >= myservice_cap:
+                continue
+            myservice_count += 1
+        selected.append(ref)
+        selected_ids.add(idx)
+        if len(selected) >= max_refs:
+            break
+
+    # Fill remaining slots from the original list while respecting myservice caps.
+    if len(selected) < max_refs:
+        for idx, ref in enumerate(case_refs):
+            if idx in selected_ids:
+                continue
+            doc_type = _doc_type_from_ref_item(ref)
+            if doc_type == "myservice" and myservice_count >= myservice_cap:
+                continue
+            if doc_type == "myservice":
+                myservice_count += 1
+            selected.append(ref)
+            if len(selected) >= max_refs:
+                break
+
+    if not selected:
+        return case_refs[:max_refs]
+    return selected[:max_refs]
+
+
+def _resolve_issue_rollout_phase(state: AgentState) -> int:
+    raw = state.get("issue_policy_rollout_phase")
+    if raw is None:
+        raw = os.getenv("ISSUE_POLICY_ROLLOUT_PHASE", str(ISSUE_POLICY_ROLLOUT_PHASE_DEFAULT))
+    try:
+        phase = int(raw)
+    except (TypeError, ValueError):
+        phase = ISSUE_POLICY_ROLLOUT_PHASE_DEFAULT
+    return max(ISSUE_POLICY_ROLLOUT_PHASE_MIN, min(ISSUE_POLICY_ROLLOUT_PHASE_MAX, phase))
+
+
+def _stable_issue_nonce(state: AgentState, *, kind: str, extra: str = "") -> str:
+    parts = [
+        kind,
+        str(state.get("thread_id") or ""),
+        str(state.get("query") or ""),
+        str(state.get("issue_stage") or ""),
+        str(state.get("issue_selected_doc_id") or ""),
+        extra,
+    ]
+    payload = "|".join(parts)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]
+
+
 def _build_issue_cases(
     ref_items: List[Dict[str, Any]], *, max_cases: int = 10
 ) -> List[Dict[str, Any]]:
@@ -2713,6 +3064,41 @@ def _build_issue_cases(
         if len(cases) >= max_cases:
             break
     return cases
+
+
+def _build_issue_case_ref_map(
+    ref_items: List[Dict[str, Any]],
+    *,
+    max_docs: int = MAX_ISSUE_CASE_MAP_DOCS,
+    max_refs_per_doc: int = MAX_ISSUE_CASE_MAP_REFS_PER_DOC,
+    max_content_chars: int = MAX_ISSUE_CASE_MAP_CONTENT_CHARS,
+) -> Dict[str, List[Dict[str, Any]]]:
+    case_ref_map: Dict[str, List[Dict[str, Any]]] = {}
+    for ref in ref_items:
+        raw_doc_id = str(ref.get("doc_id") or "").strip()
+        if not raw_doc_id:
+            continue
+        if raw_doc_id not in case_ref_map and len(case_ref_map) >= max_docs:
+            continue
+
+        bucket = case_ref_map.setdefault(raw_doc_id, [])
+        if len(bucket) >= max_refs_per_doc:
+            continue
+
+        copied = dict(ref)
+        # Always deep-copy metadata to prevent shared-reference mutations
+        raw_meta = copied.get("metadata")
+        meta_copy: Dict[str, Any] = (
+            {str(k): v for k, v in raw_meta.items()} if isinstance(raw_meta, dict) else {}
+        )
+        content = str(copied.get("content") or "")
+        if len(content) > max_content_chars:
+            copied["content"] = content[:max_content_chars]
+            meta_copy["truncated"] = True
+        copied["metadata"] = meta_copy
+
+        bucket.append(copied)
+    return case_ref_map
 
 
 def _ensure_issue_detail_sections(answer: str, language: str) -> str:
@@ -2740,20 +3126,77 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     ref_items = state.get("answer_ref_json") or state.get("ref_json", [])
 
     if task_mode == "issue":
-        if len(ref_items) > MAX_ANSWER_REFS:
-            ref_items = ref_items[:MAX_ANSWER_REFS]
-        if not ref_items:
+        issue_case_refs_raw = (
+            state.get("issue_case_refs")
+            or state.get("answer_ref_json")
+            or state.get("ref_json", [])
+        )
+        if len(issue_case_refs_raw) > MAX_ISSUE_REFS:
+            issue_case_refs_raw = issue_case_refs_raw[:MAX_ISSUE_REFS]
+
+        baseline_answer_refs = state.get("answer_ref_json") or state.get("ref_json", [])
+        if len(baseline_answer_refs) > MAX_ANSWER_REFS:
+            baseline_answer_refs = baseline_answer_refs[:MAX_ANSWER_REFS]
+        if not baseline_answer_refs and issue_case_refs_raw:
+            baseline_answer_refs = issue_case_refs_raw[:MAX_ANSWER_REFS]
+
+        signal_docs_raw = state.get("all_docs") or state.get("docs") or []
+        signal_docs = [doc for doc in signal_docs_raw if isinstance(doc, RetrievalResult)]
+        issue_routing_signals = _compute_issue_routing_signals(signal_docs)
+        issue_policy_tier_shadow, issue_fallback_reason = _resolve_issue_policy_tier(
+            issue_routing_signals
+        )
+
+        shadow_doc_ids = _select_issue_doc_ids_by_tier(
+            issue_case_refs_raw,
+            tier=issue_policy_tier_shadow,
+            max_docs=MAX_ISSUE_REFS,
+        )
+        issue_case_refs_shadow = _build_refs_for_selected_doc_ids(
+            issue_case_refs_raw,
+            shadow_doc_ids,
+            max_refs=MAX_ISSUE_REFS,
+        )
+        if not issue_case_refs_shadow:
+            issue_case_refs_shadow = issue_case_refs_raw[:MAX_ISSUE_REFS]
+
+        issue_answer_refs_shadow = _select_issue_answer_refs(
+            issue_case_refs_shadow,
+            tier=issue_policy_tier_shadow,
+            max_refs=MAX_ANSWER_REFS,
+        )
+        if not issue_answer_refs_shadow and issue_case_refs_shadow:
+            issue_answer_refs_shadow = issue_case_refs_shadow[:MAX_ANSWER_REFS]
+
+        rollout_phase = _resolve_issue_rollout_phase(state)
+        live_policy_enabled = rollout_phase >= ISSUE_POLICY_ROLLOUT_PHASE_MAX
+
+        issue_case_refs = issue_case_refs_shadow if live_policy_enabled else issue_case_refs_raw
+        answer_refs = issue_answer_refs_shadow if live_policy_enabled else baseline_answer_refs
+        issue_policy_tier = issue_policy_tier_shadow if live_policy_enabled else "baseline"
+
+        if not answer_refs and issue_case_refs:
+            answer_refs = issue_case_refs[:MAX_ANSWER_REFS]
+
+        if not answer_refs:
             return {
                 "answer": ISSUE_CASE_EMPTY_MESSAGE,
                 "issue_top10_cases": [],
                 "issue_stage": None,
+                "issue_routing_signals": issue_routing_signals,
+                "issue_policy_tier": issue_policy_tier,
+                "issue_policy_tier_shadow": issue_policy_tier_shadow,
+                "issue_case_refs_shadow": issue_case_refs_shadow,
+                "issue_answer_refs_shadow": issue_answer_refs_shadow,
+                "issue_policy_rollout_phase": rollout_phase,
+                "issue_fallback_reason": issue_fallback_reason,
             }
 
         query_for_prompt = state.get("query_en") if answer_language == "en" else state.get("query")
         if not query_for_prompt:
             query_for_prompt = state.get("query", "")
 
-        ref_text = ref_json_to_text(ref_items)
+        ref_text = ref_json_to_text(answer_refs)
         mapping = {"sys.query": query_for_prompt, "ref_text": ref_text}
         tmpl = _get_issue_answer_template(spec, answer_language, detail=False)
         user = _format_prompt(tmpl.user, mapping)
@@ -2766,10 +3209,24 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
             temperature=answer_temperature,
         )
         answer = _truncate_repetition(answer)
+
+        issue_case_ref_map = _build_issue_case_ref_map(issue_case_refs)
+        issue_case_ref_map_shadow = _build_issue_case_ref_map(issue_case_refs_shadow)
         return {
             "answer": answer,
             "reasoning": reasoning,
-            "issue_top10_cases": _build_issue_cases(ref_items),
+            "answer_ref_json": answer_refs,
+            "issue_case_refs": issue_case_refs,
+            "issue_case_ref_map": issue_case_ref_map,
+            "issue_routing_signals": issue_routing_signals,
+            "issue_policy_tier": issue_policy_tier,
+            "issue_policy_tier_shadow": issue_policy_tier_shadow,
+            "issue_case_refs_shadow": issue_case_refs_shadow,
+            "issue_answer_refs_shadow": issue_answer_refs_shadow,
+            "issue_case_ref_map_shadow": issue_case_ref_map_shadow,
+            "issue_policy_rollout_phase": rollout_phase,
+            "issue_fallback_reason": issue_fallback_reason,
+            "issue_top10_cases": _build_issue_cases(issue_case_refs),
             "issue_stage": "post_summary",
         }
 
@@ -2995,7 +3452,7 @@ def issue_confirm_node(
     stage = str(state.get("issue_stage") or "post_summary")
     if stage not in {"post_summary", "post_detail"}:
         stage = "post_summary"
-    nonce = str(uuid.uuid4())
+    nonce = _stable_issue_nonce(state, kind="issue_confirm", extra=stage)
     prompt = (
         "상세히 보고싶은 문서가 있습니까?"
         if stage == "post_summary"
@@ -3010,9 +3467,13 @@ def issue_confirm_node(
         "prompt": prompt,
     }
     decision = interrupt(payload)
-    if isinstance(decision, dict) and bool(decision.get("confirm", False)):
-        return Command(goto="issue_case_selection")
-    return Command(goto="done")
+    if isinstance(decision, dict):
+        decision_nonce = str(decision.get("nonce") or "").strip()
+        if decision_nonce != nonce:
+            return Command(goto="done", update={"issue_confirm_nonce": nonce})
+        if bool(decision.get("confirm", False)):
+            return Command(goto="issue_case_selection", update={"issue_confirm_nonce": nonce})
+    return Command(goto="done", update={"issue_confirm_nonce": nonce})
 
 
 def issue_case_selection_node(
@@ -3022,7 +3483,8 @@ def issue_case_selection_node(
     if not cases:
         return Command(goto="done")
 
-    nonce = str(uuid.uuid4())
+    case_ids = ",".join(str(case.get("doc_id") or "") for case in cases)
+    nonce = _stable_issue_nonce(state, kind="issue_case_selection", extra=case_ids)
     payload = {
         "type": "issue_case_selection",
         "nonce": nonce,
@@ -3033,14 +3495,18 @@ def issue_case_selection_node(
     decision = interrupt(payload)
     selected_doc_id = ""
     if isinstance(decision, dict):
+        decision_nonce = str(decision.get("nonce") or "").strip()
+        if decision_nonce != nonce:
+            return Command(goto="done", update={"issue_case_selection_nonce": nonce})
         selected_doc_id = str(decision.get("selected_doc_id") or "").strip()
     if not selected_doc_id:
-        return Command(goto="done")
+        return Command(goto="done", update={"issue_case_selection_nonce": nonce})
 
     return Command(
         goto="issue_detail_answer",
         update={
             "issue_selected_doc_id": selected_doc_id,
+            "issue_case_selection_nonce": nonce,
         },
     )
 
@@ -3054,11 +3520,46 @@ def issue_detail_answer_node(
     answer_language = state.get("target_language") or state.get("detected_language") or "ko"
     selected_doc_id = str(state.get("issue_selected_doc_id") or "").strip()
     all_refs = state.get("answer_ref_json") or state.get("ref_json") or []
-    selected_refs = [
-        ref for ref in all_refs if str(ref.get("doc_id") or "").strip() == selected_doc_id
-    ]
+    selected_refs: List[Dict[str, Any]] = []
+    detail_ref_source = "fallback"
+
+    issue_case_ref_map = state.get("issue_case_ref_map")
+    if isinstance(issue_case_ref_map, dict) and selected_doc_id:
+        mapped_refs = issue_case_ref_map.get(selected_doc_id)
+        if isinstance(mapped_refs, list):
+            selected_refs = [ref for ref in mapped_refs if isinstance(ref, dict)]
+            if selected_refs:
+                detail_ref_source = "case_ref_map"
+
     if not selected_refs:
-        selected_refs = list(all_refs[:1])
+        selected_refs = [
+            ref for ref in all_refs if str(ref.get("doc_id") or "").strip() == selected_doc_id
+        ]
+        if selected_refs:
+            detail_ref_source = "answer_ref_json"
+
+    if not selected_refs:
+        issue_case_refs = state.get("issue_case_refs") or []
+        selected_refs = [
+            ref
+            for ref in issue_case_refs
+            if isinstance(ref, dict) and str(ref.get("doc_id") or "").strip() == selected_doc_id
+        ]
+        if selected_refs:
+            detail_ref_source = "issue_case_refs"
+
+    if not selected_refs:
+        logger.warning(
+            "issue_detail: no refs found for selected_doc_id=%s, returning empty",
+            selected_doc_id,
+        )
+        return {
+            "answer": ISSUE_CASE_EMPTY_MESSAGE,
+            "reasoning": None,
+            "answer_ref_json": [],
+            "issue_detail_ref_source": "not_found",
+            "issue_stage": "post_detail",
+        }
 
     query_for_prompt = state.get("query_en") if answer_language == "en" else state.get("query")
     if not query_for_prompt:
@@ -3082,6 +3583,7 @@ def issue_detail_answer_node(
         "answer": answer,
         "reasoning": reasoning,
         "answer_ref_json": selected_refs,
+        "issue_detail_ref_source": detail_ref_source,
         "issue_stage": "post_detail",
     }
 
@@ -3089,7 +3591,7 @@ def issue_detail_answer_node(
 def issue_sop_confirm_node(
     state: AgentState,
 ) -> Command[Literal["issue_confirm", "done"]]:
-    nonce = str(uuid.uuid4())
+    nonce = _stable_issue_nonce(state, kind="issue_sop_confirm")
     payload = {
         "type": "issue_sop_confirm",
         "nonce": nonce,
@@ -3100,9 +3602,19 @@ def issue_sop_confirm_node(
         "sop_hint": None,
     }
     decision = interrupt(payload)
-    if isinstance(decision, dict) and bool(decision.get("confirm", False)):
-        return Command(goto="done")
-    return Command(goto="issue_confirm", update={"issue_stage": "post_detail"})
+    if isinstance(decision, dict):
+        decision_nonce = str(decision.get("nonce") or "").strip()
+        if decision_nonce != nonce:
+            return Command(
+                goto="issue_confirm",
+                update={"issue_stage": "post_detail", "issue_sop_confirm_nonce": nonce},
+            )
+        if bool(decision.get("confirm", False)):
+            return Command(goto="done", update={"issue_sop_confirm_nonce": nonce})
+    return Command(
+        goto="issue_confirm",
+        update={"issue_stage": "post_detail", "issue_sop_confirm_nonce": nonce},
+    )
 
 
 def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
@@ -3953,10 +4465,12 @@ def auto_parse_node(
     if (not selected_doc_types_strict) and isinstance(parsed_query, dict):
         selected_doc_types_strict = bool(parsed_query.get("doc_types_strict"))
 
-    if selected_doc_types_strict and prev_doc_types:
+    if selected_doc_types_strict and prev_doc_types and not detected_doc_types:
         doc_types = prev_doc_types
+    elif detected_doc_types:
+        doc_types = detected_doc_types
     else:
-        doc_types = detected_doc_types if detected_doc_types else prev_doc_types
+        doc_types = prev_doc_types
     equip_ids = detected_equip_ids if detected_equip_ids else prev_equip_ids
 
     logger.info(
@@ -4017,7 +4531,7 @@ def auto_parse_node(
     # Set selected_devices and selected_doc_types for downstream nodes
     # STRICT: Only one device allowed
     selected_devices = devices[:1]
-    if selected_doc_types_strict and prev_doc_types:
+    if selected_doc_types_strict and prev_doc_types and not detected_doc_types:
         selected_doc_types = prev_doc_types
     else:
         selected_doc_types = doc_types[:2]
@@ -4035,6 +4549,7 @@ def auto_parse_node(
         selected_devices=selected_devices,
         selected_equip_ids=selected_equip_ids,
         selected_doc_types=selected_doc_types,
+        doc_types_strict=selected_doc_types_strict,
         message=auto_parse_message,
         device_selection_skipped=len(selected_devices) == 0,
         doc_type_selection_skipped=len(selected_doc_types) == 0,
@@ -4549,6 +5064,8 @@ def device_selection_node(
         pq_dict["task_mode"] = inferred_task_mode
     if inferred_task_mode == "issue":
         pq_dict["route"] = "general"
+    elif inferred_task_mode == "ts":
+        pq_dict["route"] = "ts"
 
     update_payload: Dict[str, Any] = {
         "available_devices": available_devices,
@@ -4564,6 +5081,8 @@ def device_selection_node(
         update_payload["task_mode"] = inferred_task_mode
     if inferred_task_mode == "issue":
         update_payload["route"] = "general"
+    elif inferred_task_mode == "ts":
+        update_payload["route"] = "ts"
 
     return Command(
         goto=goto_target,

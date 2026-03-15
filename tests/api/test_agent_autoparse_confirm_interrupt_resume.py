@@ -405,6 +405,50 @@ def test_filter_doc_types_issue_scope_interrupt_is_resumable(
     assert resumed["interrupted"] is False
 
 
+def test_followup_query_can_narrow_strict_issue_scope_to_gcb_only(
+    client: TestClient,
+    _real_flow_overrides: _FakeSearchService,
+) -> None:
+    thread_id = f"issue-to-gcb-{uuid4().hex}"
+
+    first = _run(
+        client,
+        payload={
+            "guided_confirm": False,
+            "thread_id": thread_id,
+            "filter_doc_types": ["myservice", "gcb", "ts"],
+        },
+    )
+    assert first["interrupted"] is True
+
+    _real_flow_overrides.calls.clear()
+
+    second = _run(
+        client,
+        payload={
+            "thread_id": thread_id,
+            "message": "gcb 문서만 보여줘",
+            "guided_confirm": False,
+        },
+    )
+    assert second["interrupted"] in {True, False}
+
+    gcb_expected = set(expand_doc_type_selection(["gcb"]))
+    issue_all = set(expand_doc_type_selection(["myservice", "gcb", "ts"]))
+    non_gcb_issue = issue_all - gcb_expected
+
+    gcb_only_calls = [
+        call
+        for call in _real_flow_overrides.calls
+        if (
+            (doc_types := set(cast(list[str], call["kwargs"].get("doc_types") or [])))
+            and doc_types.issubset(gcb_expected)
+            and doc_types.isdisjoint(non_gcb_issue)
+        )
+    ]
+    assert gcb_only_calls
+
+
 def test_missing_checkpoint_400(
     client: TestClient,
     _real_flow_overrides: _FakeSearchService,

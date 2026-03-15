@@ -186,6 +186,50 @@ def test_issue_flow_interrupt_ordering_and_loop() -> None:
     assert [case["doc_id"] for case in payload5["cases"]] == ["doc-1", "doc-2"]
 
 
+def test_issue_flow_rejects_nonce_mismatch_for_selection() -> None:
+    agent = LangGraphRAGAgent(
+        llm=SequencedLLM(["summary answer"]),
+        search_service=StubSearchService(_issue_docs()),
+        prompt_spec=_make_spec(),
+        mode="verified",
+    )
+
+    thread_id = "issue-flow-bad-nonce"
+    first = agent.run(
+        "Door Open Alarm",
+        thread_id=thread_id,
+        state_overrides={"task_mode": "issue", "mq_mode": "off"},
+    )
+    payload1 = _interrupt_payload(first)
+
+    config = {"configurable": {"thread_id": thread_id}}
+    second = agent._graph.invoke(
+        Command(
+            resume={
+                "type": "issue_confirm",
+                "nonce": payload1["nonce"],
+                "stage": "post_summary",
+                "confirm": True,
+            }
+        ),
+        config,
+    )
+    payload2 = _interrupt_payload(second)
+    assert payload2["type"] == "issue_case_selection"
+
+    third = agent._graph.invoke(
+        Command(
+            resume={
+                "type": "issue_case_selection",
+                "nonce": "wrong-nonce",
+                "selected_doc_id": "doc-1",
+            }
+        ),
+        config,
+    )
+    assert not third.get("__interrupt__")
+
+
 def test_issue_flow_no_docs_returns_graceful_answer_without_interrupt() -> None:
     agent = LangGraphRAGAgent(
         llm=SequencedLLM(["unused-summary"]),

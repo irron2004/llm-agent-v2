@@ -2,6 +2,7 @@
 
 import pytest
 from unittest.mock import MagicMock, call
+from typing import Any
 
 from backend.llm_infrastructure.llm.langgraph_agent import (
     expand_related_docs_node,
@@ -17,7 +18,7 @@ def _make_doc(
     content: str | None = None,
 ) -> RetrievalResult:
     """테스트용 문서 생성 헬퍼"""
-    metadata = {"doc_type": doc_type}
+    metadata: dict[str, Any] = {"doc_type": doc_type}
     if page is not None:
         metadata["page"] = page
     return RetrievalResult(
@@ -32,9 +33,9 @@ def _make_doc(
 class TestExpandTopKLimit:
     """상위 K개 확장 제한 테스트"""
 
-    def test_expand_top_k_constant_is_8(self):
-        """EXPAND_TOP_K 상수가 8인지 확인"""
-        assert EXPAND_TOP_K == 8
+    def test_expand_top_k_constant_is_10(self):
+        """EXPAND_TOP_K 상수가 10인지 확인"""
+        assert EXPAND_TOP_K == 10
 
     def test_expand_only_top_k_docs(self):
         """문서 수가 top_k를 초과하면 상위 top_k만 확장 시도"""
@@ -77,6 +78,18 @@ class TestExpandTopKLimit:
 
         # Then: top_k회 호출
         assert page_fetcher.call_count == EXPAND_TOP_K
+
+    def test_expand_top_k_zero_disables_expansion(self):
+        """expand_top_k=0이면 확장을 수행하지 않는다."""
+        docs = [_make_doc(f"doc_{i}", page=i + 1) for i in range(3)]
+        state = {"docs": docs, "expand_top_k": 0}
+
+        page_fetcher = MagicMock(return_value=[])
+
+        result = expand_related_docs_node(state, page_fetcher=page_fetcher)
+
+        assert page_fetcher.call_count == 0
+        assert len(result["answer_ref_json"]) == 0
 
 
 class TestRemainingDocsPreserved:
@@ -223,6 +236,20 @@ class TestEdgeCases:
         # Then
         assert "docs" not in result
         assert "_events" in result
+
+    def test_section_fetcher_only_does_not_early_exit(self):
+        """section_fetcher만 있어도 조기 종료하지 않는다."""
+        docs = [_make_doc("doc", page=5, doc_type="manual")]
+        docs[0].metadata["chapter_ok"] = True
+        docs[0].metadata["section_chapter"] = "WORK PROCEDURE"
+        state = {"docs": docs}
+
+        section_fetcher = MagicMock(return_value=[])
+
+        result = expand_related_docs_node(state, section_fetcher=section_fetcher)
+
+        section_fetcher.assert_called_once()
+        assert "docs" in result
 
     def test_mixed_doc_types(self):
         """여러 doc_type 혼합 시 각각 적절한 fetcher 사용"""

@@ -6,6 +6,11 @@ system: |-
   - Use only REFS lines as evidence (no guessing).
   - If REFS is EMPTY, clearly say no relevant issue cases were found in the RAG data.
   - **IMPORTANT: You MUST answer in English only.**
+  - Interpret REFS tags such as `type=...` and `section=...`, and summarize by document type.
+    - myservice: status (symptom), cause (cause), action (action), result (result)
+    - gcb: summary (summary), detail (detail), timeline (history)
+    - ts: structured troubleshooting guide (check/procedure/recovery)
+  - For gcb refs that may be in original English communication threads, extract the key root cause and confirmed corrective action first.
   - Provide a numbered list of possible issue cases.
   - For each case, include a short summary and cite sources like [1] matching REFS numbering.
   - Append a References section at the end listing used sources.

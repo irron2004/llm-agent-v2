@@ -54,6 +54,33 @@ class _FakeAutoParseAgent:
         }
 
 
+class _FakeNonIssueAnswerRefsAgent:
+    def __init__(self, event_sink: Any = None) -> None:
+        self._event_sink = event_sink
+
+    def run(self, *_: Any, **__: Any) -> dict[str, Any]:
+        if callable(self._event_sink):
+            self._event_sink({"type": "node_end", "node": "retrieve"})
+        return {
+            "answer": "ok",
+            "judge": {"faithful": True, "issues": [], "hint": ""},
+            "display_docs": [],
+            "docs": [],
+            "route": "general",
+            "task_mode": "all",
+            "st_gate": "strict",
+            "mq_used": False,
+            "mq_reason": None,
+            "attempts": 1,
+            "retry_strategy": "refine_queries",
+            "guardrail_dropped_numeric": 0,
+            "guardrail_dropped_anchor": 0,
+            "guardrail_final_count": 1,
+            "search_queries": ["q1"],
+            "answer_ref_json": [{"doc_id": "doc-1", "content": "c1", "metadata": {}}],
+        }
+
+
 def _install_overrides(client: TestClient) -> None:
     app = cast(Any, client.app)
     app.dependency_overrides[dependencies.get_search_service] = (
@@ -158,3 +185,39 @@ def test_agent_run_and_stream_metadata_contract(
     assert stream_resp.status_code == 200
     stream_body = _parse_sse_final_result(stream_resp.text)
     _assert_metadata_contract(stream_body, expected_max_attempts=3)
+
+
+def test_non_issue_answer_refs_do_not_emit_issue_metadata(
+    client: TestClient, monkeypatch
+) -> None:
+    _install_overrides(client)
+
+    def _fake_new_auto_parse_agent(
+        llm: Any,
+        search_service: Any,
+        prompt_spec: Any,
+        *,
+        top_k: int,
+        use_canonical_retrieval: bool = False,
+        event_sink: Any = None,
+    ) -> _FakeNonIssueAnswerRefsAgent:
+        del llm, search_service, prompt_spec, top_k, use_canonical_retrieval
+        return _FakeNonIssueAnswerRefsAgent(event_sink=event_sink)
+
+    monkeypatch.setattr(
+        agent_router, "_new_auto_parse_agent", _fake_new_auto_parse_agent
+    )
+
+    payload = {
+        "message": "non issue metadata",
+        "auto_parse": True,
+        "max_attempts": 3,
+    }
+
+    run_resp = client.post("/api/agent/run", json=payload)
+    assert run_resp.status_code == 200
+    run_body = cast(dict[str, Any], run_resp.json())
+    metadata = cast(dict[str, Any], run_body["metadata"])
+
+    assert "issue_answer_ref_count" not in metadata
+    assert "issue_case_count" not in metadata

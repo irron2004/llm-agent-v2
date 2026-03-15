@@ -183,3 +183,33 @@ def test_auto_parse_confirm_resume_routes_to_guided_confirm_agent(
     assert payload["answer"] == f"guided-resumed:{tid}"
     assert calls["guided"] == 1
     assert calls["hil"] == 0
+
+
+def test_resume_without_thread_id_returns_400_for_run(client: TestClient) -> None:
+    response = client.post(
+        "/api/agent/run",
+        json={
+            "message": "resume without thread",
+            "resume_decision": True,
+            "auto_parse": False,
+        },
+    )
+
+    assert response.status_code == 400
+    payload = cast(dict[str, Any], response.json())
+    assert "thread_id required for resume" in str(payload.get("detail"))
+
+
+def test_resume_without_thread_id_returns_400_for_stream(client: TestClient) -> None:
+    response = client.post(
+        "/api/agent/run/stream",
+        json={
+            "message": "resume without thread",
+            "resume_decision": True,
+            "auto_parse": False,
+        },
+    )
+
+    assert response.status_code == 400
+    payload = cast(dict[str, Any], response.json())
+    assert "thread_id required for resume" in str(payload.get("detail"))
