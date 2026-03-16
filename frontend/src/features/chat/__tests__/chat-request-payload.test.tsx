@@ -96,10 +96,9 @@ describe("chat request payload", () => {
         type: "auto_parse_confirm",
         question: "질문",
         instruction: "안내",
+        steps: ["device", "task"],
         options: {
-          language: [{ value: "en", label: "English" }],
           device: [{ value: "__skip__", label: "건너뛰기" }],
-          equip_id: [{ value: "__skip__", label: "건너뛰기" }],
           task: [{ value: "issue", label: "Issue" }],
         },
         defaults: {
@@ -227,6 +226,72 @@ describe("chat request payload", () => {
             selected_device: "ETCH-01",
             selected_equip_id: null,
             task_mode: "sop",
+          },
+        })
+      );
+    });
+  });
+
+  it("progresses 2-step guided flow without equip pane and keeps target_language in resume payload", async () => {
+    env.chatPath = "/api/agent";
+    postSpy.mockResolvedValueOnce({
+      ...mockAgentResponse,
+      interrupted: true,
+      thread_id: "t-num-2step",
+      interrupt_payload: {
+        type: "auto_parse_confirm",
+        question: "질문",
+        instruction: "",
+        steps: ["device", "task"],
+        options: {
+          device: [
+            { value: "ETCH-01", label: "ETCH-01" },
+            { value: "__skip__", label: "건너뛰기" },
+          ],
+          task: [
+            { value: "sop", label: "SOP" },
+            { value: "issue", label: "Issue" },
+          ],
+        },
+        defaults: {
+          target_language: "ko",
+          device: null,
+          equip_id: null,
+          task_mode: "all",
+        },
+      },
+    } as any);
+
+    const { result } = renderHook(() => useChatSession(), { wrapper });
+
+    await act(async () => {
+      await result.current.send({ text: "numeric guided request 2-step" });
+    });
+    await waitFor(() => {
+      expect(result.current.pendingGuidedSelection).not.toBeNull();
+    });
+
+    await act(async () => {
+      result.current.submitGuidedSelectionNumber("1");
+    });
+    await act(async () => {
+      result.current.submitGuidedSelectionNumber("2");
+    });
+
+    await waitFor(() => {
+      expect(result.current.pendingGuidedSelection).toBeNull();
+      expect(postSpy).toHaveBeenCalledTimes(2);
+      expect(postSpy).toHaveBeenNthCalledWith(
+        2,
+        "/api/agent",
+        expect.objectContaining({
+          thread_id: "t-num-2step",
+          resume_decision: {
+            type: "auto_parse_confirm",
+            target_language: "ko",
+            selected_device: "ETCH-01",
+            selected_equip_id: null,
+            task_mode: "issue",
           },
         })
       );

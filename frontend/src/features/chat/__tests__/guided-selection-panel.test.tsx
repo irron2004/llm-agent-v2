@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { GuidedSelectionPanel } from "../components/guided-selection-panel";
 
 describe("GuidedSelectionPanel", () => {
-  it("completes click flow and calls onComplete once with expected decision", async () => {
+  it("completes 2-step click flow and calls onComplete once with expected decision", async () => {
     const user = userEvent.setup();
     const onComplete = vi.fn();
 
@@ -13,20 +13,16 @@ describe("GuidedSelectionPanel", () => {
         question="질문"
         instruction="단계별로 선택하세요"
         payload={{
+          steps: ["device", "task"],
           options: {
-            language: [
-              { value: "ko", label: "Korean" },
-              { value: "en", label: "English" },
-            ],
             device: [{ value: "ETCH-01", label: "ETCH-01" }],
-            equip_id: [{ value: "EQ-777", label: "EQ-777" }],
             task: [
               { value: "sop", label: "SOP" },
               { value: "issue", label: "Issue" },
             ],
           },
           defaults: {
-            target_language: "ko",
+            target_language: "en",
             device: null,
             equip_id: null,
             task_mode: "all",
@@ -36,9 +32,7 @@ describe("GuidedSelectionPanel", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /English/ }));
     await user.click(screen.getByRole("button", { name: /ETCH-01/ }));
-    await user.click(screen.getByRole("button", { name: /EQ-777/ }));
     await user.click(screen.getByRole("button", { name: /Issue/ }));
 
     expect(onComplete).toHaveBeenCalledTimes(1);
@@ -46,7 +40,7 @@ describe("GuidedSelectionPanel", () => {
       type: "auto_parse_confirm",
       target_language: "en",
       selected_device: "ETCH-01",
-      selected_equip_id: "EQ-777",
+      selected_equip_id: null,
       task_mode: "issue",
     });
   });
@@ -60,8 +54,8 @@ describe("GuidedSelectionPanel", () => {
         question="질문"
         instruction="단계별로 선택하세요"
         payload={{
+          steps: ["device", "equip_id", "task"],
           options: {
-            language: [{ value: "ko", label: "Korean" }],
             device: [{ value: "__skip__", label: "건너뛰기" }],
             equip_id: [{ value: "__manual__", label: "직접 입력" }],
             task: [{ value: "sop", label: "SOP" }],
@@ -77,7 +71,6 @@ describe("GuidedSelectionPanel", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /Korean/ }));
     await user.click(screen.getByRole("button", { name: /건너뛰기/ }));
     await user.click(screen.getByRole("button", { name: /직접 입력/ }));
 
@@ -104,13 +97,9 @@ describe("GuidedSelectionPanel", () => {
         question="질문"
         instruction="단계별로 선택하세요"
         payload={{
+          steps: ["device", "task"],
           options: {
-            language: [
-              { value: "ko", label: "Korean" },
-              { value: "en", label: "English" },
-            ],
             device: [{ value: "ETCH-01", label: "ETCH-01" }],
-            equip_id: [{ value: "__skip__", label: "건너뛰기" }],
             task: [{ value: "sop", label: "SOP" }],
           },
           defaults: {
@@ -129,13 +118,9 @@ describe("GuidedSelectionPanel", () => {
         question="질문"
         instruction="단계별로 선택하세요"
         payload={{
+          steps: ["device", "task"],
           options: {
-            language: [
-              { value: "ko", label: "Korean" },
-              { value: "en", label: "English" },
-            ],
             device: [{ value: "ETCH-01", label: "ETCH-01" }],
-            equip_id: [{ value: "__skip__", label: "건너뛰기" }],
             task: [{ value: "sop", label: "SOP" }],
           },
           defaults: {
@@ -154,7 +139,9 @@ describe("GuidedSelectionPanel", () => {
       />,
     );
 
-    expect(screen.getByText("기기 선택")).toBeInTheDocument();
-    expect(screen.getByText(/선택됨: 언어\(English\)/)).toBeInTheDocument();
+    expect(screen.getByText("작업 선택")).toBeInTheDocument();
+    expect(screen.getByText(/선택됨: 기기\(/)).toBeInTheDocument();
+    expect(screen.queryByText(/선택됨: .*설비\(/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/선택됨: 언어\(/)).not.toBeInTheDocument();
   });
 });

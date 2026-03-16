@@ -172,12 +172,43 @@ const normalizeLanguage = (value: unknown): "ko" | "en" | "zh" | "ja" => {
   return "ko";
 };
 
-const guidedSteps: Array<"language" | "device" | "equip_id" | "task"> = [
-  "language",
-  "device",
-  "equip_id",
-  "task",
-];
+type GuidedStep = "language" | "device" | "equip_id" | "task";
+
+const DEFAULT_GUIDED_STEPS: GuidedStep[] = ["device", "task"];
+
+const isGuidedStep = (value: unknown): value is GuidedStep => {
+  return value === "language" || value === "device" || value === "equip_id" || value === "task";
+};
+
+const resolveGuidedSteps = (payload: Record<string, unknown>): GuidedStep[] => {
+  const raw = payload.steps;
+  if (Array.isArray(raw)) {
+    const normalized = raw
+      .map((step) => (typeof step === "string" ? step.trim() : ""))
+      .filter((step): step is GuidedStep => isGuidedStep(step));
+    if (normalized.length > 0) return normalized;
+  }
+  return DEFAULT_GUIDED_STEPS;
+};
+
+const buildGuidedSummaryText = ({
+  selectedDevice,
+  selectedEquipId,
+  taskMode,
+  includeEquipStep,
+}: {
+  selectedDevice: string | null;
+  selectedEquipId: string | null;
+  taskMode: "sop" | "issue" | "all";
+  includeEquipStep: boolean;
+}): string => {
+  const parts = [selectedDevice ?? "(skip)"];
+  if (includeEquipStep) {
+    parts.push(selectedEquipId ?? "(skip)");
+  }
+  parts.push(taskMode);
+  return `가이드 확인: ${parts.join(" / ")}`;
+};
 
 const APPROVE_TOKENS = ["true", "yes", "y", "ok", "okay", "승인", "확인", "approve"];
 const REJECT_TOKENS = ["false", "no", "n", "거절", "reject", "decline"];
@@ -249,6 +280,65 @@ const buildInterruptPrompt = (kind: InterruptKind, instruction?: string) => {
   }
   if (instruction && instruction.trim()) return instruction.trim();
   return "추가 입력이 필요합니다. 승인/거절 또는 수정 답변을 입력해 주세요.";
+};
+
+type IssueResumeContext = {
+  isIssueResume: boolean;
+  decisionType: "issue_confirm" | "issue_case_selection" | "issue_sop_confirm" | null;
+  confirm: boolean | null;
+};
+
+const DEFAULT_ISSUE_RESUME_CONTEXT: IssueResumeContext = {
+  isIssueResume: false,
+  decisionType: null,
+  confirm: null,
+};
+
+const hasPriorAssistantContentMatch = (messages: Message[], targetContent: string): boolean => {
+  const normalized = targetContent.trim();
+  if (!normalized) return false;
+  const latestAssistantContent = [...messages]
+    .reverse()
+    .find(
+      (m) =>
+        m.role === "assistant" &&
+        m.content !== "처리 중..." &&
+        m.content.trim().length > 0
+    )
+    ?.content
+    ?.trim();
+  return Boolean(latestAssistantContent && latestAssistantContent === normalized);
+};
+
+const buildIssueResumeDuplicateAck = (context: IssueResumeContext): string => {
+  if (context.decisionType === "issue_confirm" && context.confirm === false) {
+    return "추가 이슈 탐색을 생략하고 현재 답변을 유지합니다.";
+  }
+  if (context.decisionType === "issue_sop_confirm" && context.confirm === false) {
+    return "SOP 확인을 생략하고 현재 답변을 유지합니다.";
+  }
+  return "요청을 반영했습니다.";
+};
+
+const resolveInterruptDisplayContent = ({
+  kind,
+  instruction,
+  answer,
+  messages,
+}: {
+  kind: InterruptKind;
+  instruction?: string;
+  answer?: string | null;
+  messages: Message[];
+}): string => {
+  const fallback = buildInterruptPrompt(kind, instruction);
+  const answerText = typeof answer === "string" ? answer.trim() : "";
+  if (!answerText) return fallback;
+
+  if (hasPriorAssistantContentMatch(messages, answerText)) {
+    return fallback;
+  }
+  return answerText;
 };
 
 const normalizeReviewDocs = (payload?: Record<string, unknown> | null): ReviewDoc[] => {
@@ -342,6 +432,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   const onSessionChangeRef = useRef(onSessionChange);
   const guidedThreadIdRef = useRef<string | null>(null);
   const guidedQuestionRef = useRef<string | null>(null);
+  const issueDecisionSubmittingRef = useRef(false);
+  const consumedIssueDecisionKeysRef = useRef<Set<string>>(new Set());
   const threadIdRef = useRef<string | null>(null);
   const onTurnSavedRef = useRef(onTurnSaved);
   onSessionChangeRef.current = onSessionChange;
@@ -368,7 +460,12 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   }, []);
 
   const handleAgentResponse = useCallback(
-    (res: AgentResponse, assistantId: string, fallbackQuestion: string) => {
+    (
+      res: AgentResponse,
+      assistantId: string,
+      fallbackQuestion: string,
+      issueResumeContext: IssueResumeContext = DEFAULT_ISSUE_RESUME_CONTEXT
+    ) => {
       const metadataQueries = toStringArray(res.metadata?.search_queries);
       const responseQueries = Array.isArray(res.search_queries)
         ? res.search_queries.filter((q: unknown): q is string => typeof q === "string" && q.trim().length > 0)
@@ -396,20 +493,26 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         const instruction =
           typeof payload?.instruction === "string" && payload.instruction.trim()
             ? payload.instruction.trim()
-            : "검색 결과를 확인한 뒤 승인/거절/키워드를 입력하세요.";
+            : kind === "auto_parse_confirm"
+              ? ""
+              : "검색 결과를 확인한 뒤 승인/거절/키워드를 입력하세요.";
 
         if (kind === "auto_parse_confirm") {
           if (threadId && payload) {
             guidedThreadIdRef.current = threadId;
             guidedQuestionRef.current = question;
 
-            const optionsRaw = isRecord(payload.options) ? payload.options : {};
             const defaultsRaw = isRecord(payload.defaults) ? payload.defaults : {};
+            const guidedSteps = resolveGuidedSteps(payload);
+            const includeEquipStep = guidedSteps.includes("equip_id");
             const initialDecision = {
               type: "auto_parse_confirm" as const,
               target_language: normalizeLanguage(defaultsRaw.target_language),
               selected_device: typeof defaultsRaw.device === "string" ? defaultsRaw.device : null,
-              selected_equip_id: typeof defaultsRaw.equip_id === "string" ? defaultsRaw.equip_id : null,
+              selected_equip_id:
+                includeEquipStep && typeof defaultsRaw.equip_id === "string"
+                  ? defaultsRaw.equip_id
+                  : null,
               task_mode: normalizeTaskMode(defaultsRaw.task_mode),
             };
             setPendingGuidedSelection({
@@ -441,6 +544,9 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
         if (kind === "issue_confirm") {
           const nonce = typeof payload?.nonce === "string" ? payload.nonce : "";
+          if (nonce) {
+            consumedIssueDecisionKeysRef.current.delete(`issue_confirm:${nonce}`);
+          }
           const stage = payload?.stage === "post_detail" ? "post_detail" : "post_summary";
           const prompt = typeof payload?.prompt === "string" && payload.prompt.trim()
             ? payload.prompt
@@ -462,9 +568,15 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           setPendingIssueSopConfirm(null);
           setPendingInterrupt(null);
           setPendingGuidedSelection(null);
+          issueDecisionSubmittingRef.current = false;
           updateMessage(assistantId, (m) => ({
             ...m,
-            content: res.answer?.trim() ? res.answer : buildInterruptPrompt(kind, instruction),
+            content: resolveInterruptDisplayContent({
+              kind,
+              instruction,
+              answer: res.answer,
+              messages,
+            }),
             retrievedDocs: res.retrieved_docs || [],
             rawAnswer: JSON.stringify(res, null, 2),
             currentNode: null,
@@ -477,6 +589,9 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
         if (kind === "issue_case_selection") {
           const nonce = typeof payload?.nonce === "string" ? payload.nonce : "";
+          if (nonce) {
+            consumedIssueDecisionKeysRef.current.delete(`issue_case_selection:${nonce}`);
+          }
           const cases = toIssueCases(payload?.cases);
           if (threadId && nonce) {
             setPendingIssueCaseSelection({
@@ -494,9 +609,15 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           setPendingIssueSopConfirm(null);
           setPendingInterrupt(null);
           setPendingGuidedSelection(null);
+          issueDecisionSubmittingRef.current = false;
           updateMessage(assistantId, (m) => ({
             ...m,
-            content: res.answer?.trim() ? res.answer : buildInterruptPrompt(kind, instruction),
+            content: resolveInterruptDisplayContent({
+              kind,
+              instruction,
+              answer: res.answer,
+              messages,
+            }),
             retrievedDocs: res.retrieved_docs || [],
             rawAnswer: JSON.stringify(res, null, 2),
             currentNode: null,
@@ -509,6 +630,9 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
         if (kind === "issue_sop_confirm") {
           const nonce = typeof payload?.nonce === "string" ? payload.nonce : "";
+          if (nonce) {
+            consumedIssueDecisionKeysRef.current.delete(`issue_sop_confirm:${nonce}`);
+          }
           const prompt = typeof payload?.prompt === "string" && payload.prompt.trim()
             ? payload.prompt
             : "SOP 확인으로 이어가시겠습니까?";
@@ -532,9 +656,15 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           setPendingIssueCaseSelection(null);
           setPendingInterrupt(null);
           setPendingGuidedSelection(null);
+          issueDecisionSubmittingRef.current = false;
           updateMessage(assistantId, (m) => ({
             ...m,
-            content: res.answer?.trim() ? res.answer : buildInterruptPrompt(kind, instruction),
+            content: resolveInterruptDisplayContent({
+              kind,
+              instruction,
+              answer: res.answer,
+              messages,
+            }),
             retrievedDocs: res.retrieved_docs || [],
             rawAnswer: JSON.stringify(res, null, 2),
             currentNode: null,
@@ -608,6 +738,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       setPendingIssueConfirm(null);
       setPendingIssueCaseSelection(null);
       setPendingIssueSopConfirm(null);
+      issueDecisionSubmittingRef.current = false;
+      consumedIssueDecisionKeysRef.current.clear();
       guidedThreadIdRef.current = null;
       guidedQuestionRef.current = null;
       clearLogs();
@@ -626,9 +758,17 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         setCompletedRetrievedDocs(null);
       }
 
+      const assistantAnswer = typeof res.answer === "string" ? res.answer : "";
+      const hasDuplicateIssueAnswer =
+        issueResumeContext.isIssueResume &&
+        hasPriorAssistantContentMatch(messages, assistantAnswer);
+      const finalAssistantContent = hasDuplicateIssueAnswer
+        ? buildIssueResumeDuplicateAck(issueResumeContext)
+        : assistantAnswer;
+
       updateMessage(assistantId, (m) => ({
         ...m,
-        content: res.answer || "",
+        content: finalAssistantContent,
         retrievedDocs: res.retrieved_docs || [],
         allRetrievedDocs: res.all_retrieved_docs || [],  // 재생성용 전체 문서 (최대 retrieval_top_k개)
         rawAnswer: JSON.stringify(res, null, 2),
@@ -707,7 +847,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
       // Save turn to backend
       const userText = currentUserTextRef.current;
-      const assistantText = res.answer || "";
+      const assistantText = finalAssistantContent;
       const docRefs = toDocRefs(res.retrieved_docs || []);
 
       // Determine title (only for first turn)
@@ -748,7 +888,15 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         console.error("Failed to save turn:", err);
       });
     },
-    [sessionId, updateMessage, setIsStreaming, clearLogs, setCompletedRetrievedDocs, setPendingRegeneration]
+    [
+      sessionId,
+      updateMessage,
+      setIsStreaming,
+      clearLogs,
+      setCompletedRetrievedDocs,
+      setPendingRegeneration,
+      messages,
+    ]
   );
 
   const send = useCallback(
@@ -816,6 +964,19 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           : isIssueResume
             ? decisionRecord
           : undefined;
+
+      const issueResumeContext: IssueResumeContext = isIssueResume
+        ? {
+            isIssueResume: true,
+            decisionType:
+              decisionType === "issue_confirm" ||
+              decisionType === "issue_case_selection" ||
+              decisionType === "issue_sop_confirm"
+                ? decisionType
+                : null,
+            confirm: typeof decisionRecord?.confirm === "boolean" ? decisionRecord.confirm : null,
+          }
+        : DEFAULT_ISSUE_RESUME_CONTEXT;
 
       appendMessage({
         id: userId,
@@ -906,7 +1067,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         const { canStream, streamPath } = resolveChatPaths(env.chatPath);
         if (!canStream) {
           const res = await sendChatMessage(payload);
-          handleAgentResponse(res, assistantId, requestMessage);
+          handleAgentResponse(res, assistantId, requestMessage, issueResumeContext);
           return;
         }
 
@@ -1024,7 +1185,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
               if (evt?.type === "final" && evt?.result) {
                 const res = evt.result;
                 if (isAgentResponseLike(res)) {
-                  handleAgentResponse(res, assistantId, requestMessage);
+                  handleAgentResponse(res, assistantId, requestMessage, issueResumeContext);
                 } else {
                   setError("응답 형식이 올바르지 않습니다.");
                 }
@@ -1172,8 +1333,9 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       const num = parseInt(trimmed, 10);
       if (!Number.isFinite(num)) return;
 
+      const steps = resolveGuidedSteps(pendingGuidedSelection.payload);
       const stepIndex = pendingGuidedSelection.stepIndex ?? 0;
-      const step = guidedSteps[Math.min(stepIndex, guidedSteps.length - 1)] ?? "language";
+      const step = steps[Math.min(stepIndex, steps.length - 1)] ?? "device";
 
       const optionsRaw = isRecord(pendingGuidedSelection.payload.options)
         ? pendingGuidedSelection.payload.options
@@ -1226,18 +1388,24 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         nextDecision.task_mode = normalizeTaskMode(chosen.value);
       }
 
-      const isLastStep = step === "task";
+      const isLastStep = stepIndex >= steps.length - 1;
       if (isLastStep) {
+        const includeEquipStep = steps.includes("equip_id");
         const finalDecision = {
           type: "auto_parse_confirm" as const,
           target_language: normalizeLanguage(nextDecision.target_language),
           selected_device: nextDecision.selected_device ?? null,
-          selected_equip_id: nextDecision.selected_equip_id ?? null,
+          selected_equip_id: includeEquipStep ? (nextDecision.selected_equip_id ?? null) : null,
           task_mode: normalizeTaskMode(nextDecision.task_mode),
         };
         setPendingGuidedSelection(null);
         send({
-          text: `가이드 확인: ${finalDecision.target_language} / ${finalDecision.selected_device ?? "(skip)"} / ${finalDecision.selected_equip_id ?? "(skip)"} / ${finalDecision.task_mode}`,
+          text: buildGuidedSummaryText({
+            selectedDevice: finalDecision.selected_device,
+            selectedEquipId: finalDecision.selected_equip_id,
+            taskMode: finalDecision.task_mode,
+            includeEquipStep,
+          }),
           decisionOverride: finalDecision,
         });
         return;
@@ -1245,7 +1413,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
 
       setPendingGuidedSelection((prev) => {
         if (!prev) return prev;
-        const nextStepIndex = Math.min((prev.stepIndex ?? 0) + 1, guidedSteps.length - 1);
+        const currentSteps = resolveGuidedSteps(prev.payload);
+        const nextStepIndex = Math.min((prev.stepIndex ?? 0) + 1, currentSteps.length - 1);
         return {
           ...prev,
           stepIndex: nextStepIndex,
@@ -1265,10 +1434,21 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       task_mode: "sop" | "issue" | "all";
     }) => {
       if (!pendingGuidedSelection) return;
+      const currentSteps = resolveGuidedSteps(pendingGuidedSelection.payload);
+      const includeEquipStep = currentSteps.includes("equip_id");
+      const finalDecision = {
+        ...decision,
+        selected_equip_id: includeEquipStep ? (decision.selected_equip_id ?? null) : null,
+      };
       setPendingGuidedSelection(null);
       send({
-        text: `가이드 확인: ${decision.target_language} / ${decision.selected_device ?? "(skip)"} / ${decision.selected_equip_id ?? "(skip)"} / ${decision.task_mode}`,
-        decisionOverride: decision,
+        text: buildGuidedSummaryText({
+          selectedDevice: finalDecision.selected_device ?? null,
+          selectedEquipId: finalDecision.selected_equip_id,
+          taskMode: finalDecision.task_mode,
+          includeEquipStep,
+        }),
+        decisionOverride: finalDecision,
       });
     },
     [pendingGuidedSelection, send]
@@ -1277,6 +1457,11 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   const submitIssueConfirm = useCallback(
     (confirm: boolean) => {
       if (!pendingIssueConfirm) return;
+      if (issueDecisionSubmittingRef.current) return;
+      const dedupeKey = `issue_confirm:${pendingIssueConfirm.payload.nonce}`;
+      if (consumedIssueDecisionKeysRef.current.has(dedupeKey)) return;
+      consumedIssueDecisionKeysRef.current.add(dedupeKey);
+      issueDecisionSubmittingRef.current = true;
       const decision = {
         type: "issue_confirm" as const,
         nonce: pendingIssueConfirm.payload.nonce,
@@ -1284,9 +1469,11 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         confirm,
       };
       setPendingIssueConfirm(null);
-      send({
+      void send({
         text: `이슈 확인: ${confirm ? "예" : "아니오"}`,
         decisionOverride: decision,
+      }).finally(() => {
+        issueDecisionSubmittingRef.current = false;
       });
     },
     [pendingIssueConfirm, send]
@@ -1295,17 +1482,24 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   const submitIssueCaseSelection = useCallback(
     (selectedDocId: string) => {
       if (!pendingIssueCaseSelection) return;
+      if (issueDecisionSubmittingRef.current) return;
       const trimmed = selectedDocId.trim();
       if (!trimmed) return;
+      const dedupeKey = `issue_case_selection:${pendingIssueCaseSelection.payload.nonce}`;
+      if (consumedIssueDecisionKeysRef.current.has(dedupeKey)) return;
+      consumedIssueDecisionKeysRef.current.add(dedupeKey);
+      issueDecisionSubmittingRef.current = true;
       const decision = {
         type: "issue_case_selection" as const,
         nonce: pendingIssueCaseSelection.payload.nonce,
         selected_doc_id: trimmed,
       };
       setPendingIssueCaseSelection(null);
-      send({
+      void send({
         text: `이슈 사례 선택: ${trimmed}`,
         decisionOverride: decision,
+      }).finally(() => {
+        issueDecisionSubmittingRef.current = false;
       });
     },
     [pendingIssueCaseSelection, send]
@@ -1314,15 +1508,22 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   const submitIssueSopConfirm = useCallback(
     (confirm: boolean) => {
       if (!pendingIssueSopConfirm) return;
+      if (issueDecisionSubmittingRef.current) return;
+      const dedupeKey = `issue_sop_confirm:${pendingIssueSopConfirm.payload.nonce}`;
+      if (consumedIssueDecisionKeysRef.current.has(dedupeKey)) return;
+      consumedIssueDecisionKeysRef.current.add(dedupeKey);
+      issueDecisionSubmittingRef.current = true;
       const decision = {
         type: "issue_sop_confirm" as const,
         nonce: pendingIssueSopConfirm.payload.nonce,
         confirm,
       };
       setPendingIssueSopConfirm(null);
-      send({
+      void send({
         text: `SOP 확인: ${confirm ? "예" : "아니오"}`,
         decisionOverride: decision,
+      }).finally(() => {
+        issueDecisionSubmittingRef.current = false;
       });
     },
     [pendingIssueSopConfirm, send]
@@ -1337,6 +1538,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     setPendingIssueConfirm(null);
     setPendingIssueCaseSelection(null);
     setPendingIssueSopConfirm(null);
+    issueDecisionSubmittingRef.current = false;
+    consumedIssueDecisionKeysRef.current.clear();
     guidedThreadIdRef.current = null;
     guidedQuestionRef.current = null;
     streamedAutoParseRef.current = {};
@@ -1530,6 +1733,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         setPendingIssueConfirm(null);
         setPendingIssueCaseSelection(null);
         setPendingIssueSopConfirm(null);
+        issueDecisionSubmittingRef.current = false;
+        consumedIssueDecisionKeysRef.current.clear();
         clearLogs();
         setCompletedRetrievedDocs(null);
 

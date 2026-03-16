@@ -229,6 +229,16 @@ def test_interrupt_when_enabled(
     assert data["interrupted"] is True
     interrupt_payload = cast(dict[str, Any], data["interrupt_payload"])
     assert interrupt_payload["type"] == "auto_parse_confirm"
+    assert interrupt_payload.get("steps") == ["device", "task"]
+    assert (
+        cast(dict[str, Any], interrupt_payload.get("options") or {}).get("language")
+        is None
+    )
+    assert (
+        cast(dict[str, Any], interrupt_payload.get("options") or {}).get("equip_id")
+        is None
+    )
+    assert (interrupt_payload.get("instruction") or "") == ""
 
 
 def test_resume_applies_task_mode_scope(
@@ -253,7 +263,7 @@ def test_resume_applies_task_mode_scope(
                 "type": "auto_parse_confirm",
                 "target_language": "ko",
                 "selected_device": "__skip__",
-                "selected_equip_id": "__skip__",
+                "selected_equip_id": None,
                 "task_mode": "sop",
             },
         },
@@ -290,7 +300,7 @@ def test_resume_applies_task_mode_scope(
                 "type": "auto_parse_confirm",
                 "target_language": "ko",
                 "selected_device": "__skip__",
-                "selected_equip_id": "__skip__",
+                "selected_equip_id": None,
                 "task_mode": "issue",
             },
         },
@@ -331,7 +341,7 @@ def test_target_language_metadata(
                 "type": "auto_parse_confirm",
                 "target_language": "en",
                 "selected_device": "__skip__",
-                "selected_equip_id": "__skip__",
+                "selected_equip_id": None,
                 "task_mode": "issue",
             },
         },

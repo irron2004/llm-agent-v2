@@ -4613,38 +4613,12 @@ def auto_parse_confirm_node(
             if str(v).strip()
         ]
     )
-    parsed_equip_ids_raw = _dedupe_queries(
-        [
-            str(v).strip()
-            for v in (
-                pq_dict.get("equip_ids")
-                or state.get("auto_parsed_equip_ids")
-                or (
-                    [state.get("auto_parsed_equip_id")] if state.get("auto_parsed_equip_id") else []
-                )
-            )
-            if str(v).strip()
-        ]
-    )
-    parsed_equip_ids = [
-        eid
-        for eid in (_normalize_equip_id(v) for v in parsed_equip_ids_raw)
-        if _is_valid_equip_id(eid)
-    ]
-
     detected_language_raw = str(
         pq_dict.get("detected_language") or state.get("detected_language") or "ko"
     ).lower()
     detected_language = (
         detected_language_raw if detected_language_raw in {"ko", "en", "zh", "ja"} else "ko"
     )
-
-    language_options = [
-        {"value": "ko", "label": "한국어", "recommended": detected_language == "ko"},
-        {"value": "en", "label": "English", "recommended": detected_language == "en"},
-        {"value": "zh", "label": "中文", "recommended": detected_language == "zh"},
-        {"value": "ja", "label": "日本語", "recommended": detected_language == "ja"},
-    ]
 
     device_options: List[Dict[str, Any]] = []
     seen_devices: Set[str] = set()
@@ -4697,24 +4671,6 @@ def auto_parse_confirm_node(
         {"value": "__skip__", "label": "건너뛰기", "recommended": len(parsed_devices) == 0}
     )
 
-    equip_id_options: List[Dict[str, Any]] = []
-    for idx, equip_id in enumerate(parsed_equip_ids):
-        equip_id_options.append(
-            {
-                "value": equip_id,
-                "label": equip_id,
-                "recommended": idx == 0,
-            }
-        )
-    equip_id_options.append(
-        {
-            "value": "__skip__",
-            "label": "건너뛰기",
-            "recommended": len(parsed_equip_ids) == 0,
-        }
-    )
-    equip_id_options.append({"value": "__manual__", "label": "직접 입력", "recommended": False})
-
     task_options = [
         {"value": "sop", "label": "절차조회", "recommended": False},
         {"value": "issue", "label": "이슈조회", "recommended": True},
@@ -4724,22 +4680,17 @@ def auto_parse_confirm_node(
     defaults = {
         "target_language": detected_language,
         "device": parsed_devices[0] if parsed_devices else None,
-        "equip_id": parsed_equip_ids[0] if parsed_equip_ids else None,
+        "equip_id": None,
         "task_mode": "issue",
     }
 
     payload = {
         "type": "auto_parse_confirm",
         "question": query,
-        "instruction": (
-            "아래 4단계를 숫자 입력 또는 클릭으로 선택하세요. "
-            "권장값은 바로 선택할 수 있고, 건너뛰기를 선택하면 해당 필터 없이 진행합니다."
-        ),
-        "steps": ["language", "device", "equip_id", "task"],
+        "instruction": "",
+        "steps": ["device", "task"],
         "options": {
-            "language": language_options,
             "device": device_options,
-            "equip_id": equip_id_options,
             "task": task_options,
         },
         "defaults": defaults,

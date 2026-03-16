@@ -32,19 +32,21 @@ const isRecord = (value: unknown): value is Record<string, unknown> => {
 
 const asOptions = (value: unknown): GuidedOption[] => {
   if (!Array.isArray(value)) return [];
-  return value
-    .map((item) => {
-      if (!isRecord(item)) return null;
-      const v = typeof item.value === "string" ? item.value : "";
-      const label = typeof item.label === "string" ? item.label : v;
-      if (!v) return null;
-      return {
-        value: v,
-        label,
-        recommended: Boolean(item.recommended),
-      } satisfies GuidedOption;
-    })
-    .filter((x): x is GuidedOption => Boolean(x));
+  const options: GuidedOption[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const optionValue = typeof item.value === "string" ? item.value : "";
+    if (!optionValue) continue;
+    const option: GuidedOption = {
+      value: optionValue,
+      label: typeof item.label === "string" ? item.label : optionValue,
+    };
+    if (item.recommended === true) {
+      option.recommended = true;
+    }
+    options.push(option);
+  }
+  return options;
 };
 
 const normalizeLanguage = (value: string): "ko" | "en" | "zh" | "ja" => {
@@ -75,7 +77,7 @@ export function GuidedSelectionPanel({
         .filter((s) => s.length > 0);
       if (normalized.length > 0) return normalized;
     }
-    return ["device", "equip_id"];
+    return ["device", "task"];
   }, [payload]);
 
   const options = useMemo(() => {
@@ -136,7 +138,8 @@ export function GuidedSelectionPanel({
     }
   }, [draftDecision]);
 
-  const currentStep = steps[Math.min(stepIndex, steps.length - 1)] ?? "language";
+  const currentStep = steps[Math.min(stepIndex, steps.length - 1)] ?? "device";
+  const includeEquipStep = steps.includes("equip_id");
 
   const title =
     currentStep === "language"
@@ -161,7 +164,11 @@ export function GuidedSelectionPanel({
   };
 
   const completeSelection = (device: string | null, equipId: string | null) => {
-    const equip = equipId === "__manual__" ? manualEquipId.trim() : equipId;
+    const equip = includeEquipStep
+      ? equipId === "__manual__"
+        ? manualEquipId.trim()
+        : equipId
+      : null;
     onComplete({
       type: "auto_parse_confirm",
       target_language: targetLanguage,
@@ -217,7 +224,11 @@ export function GuidedSelectionPanel({
     // task step (legacy fallback)
     const normalizedTask = normalizeTaskMode(opt.value);
     setTaskMode(normalizedTask);
-    const equip = selectedEquipId === "__manual__" ? manualEquipId.trim() : selectedEquipId;
+    const equip = includeEquipStep
+      ? selectedEquipId === "__manual__"
+        ? manualEquipId.trim()
+        : selectedEquipId
+      : null;
     onComplete({
       type: "auto_parse_confirm",
       target_language: targetLanguage,
@@ -272,7 +283,6 @@ export function GuidedSelectionPanel({
   }, [options]);
 
   const selectedLabel = {
-    language: optionLabelByValue.language.get(targetLanguage) ?? targetLanguage,
     device: selectedDevice
       ? (optionLabelByValue.device.get(selectedDevice) ?? selectedDevice)
       : "(skip)",
@@ -283,6 +293,12 @@ export function GuidedSelectionPanel({
         : "(skip)",
     task: optionLabelByValue.task.get(taskMode) ?? taskMode,
   };
+
+  const selectionSummaryParts = [`기기(${selectedLabel.device})`];
+  if (includeEquipStep) {
+    selectionSummaryParts.push(`설비(${selectedLabel.equip_id})`);
+  }
+  selectionSummaryParts.push(`작업(${selectedLabel.task})`);
 
   return (
     <Card
@@ -318,7 +334,9 @@ export function GuidedSelectionPanel({
       <Space direction="vertical" style={{ width: "100%" }} size="middle">
         <div>
           <Title level={5} style={{ margin: 0, marginBottom: 4 }}>{title}</Title>
-          <Text type="secondary" style={{ fontSize: 13 }}>{instruction}</Text>
+          {instruction.trim().length > 0 ? (
+            <Text type="secondary" style={{ fontSize: 13 }}>{instruction}</Text>
+          ) : null}
         </div>
 
         <div
@@ -334,7 +352,7 @@ export function GuidedSelectionPanel({
 
         <div>
           <Text type="secondary" style={{ fontSize: 12 }}>
-            선택됨: 언어({selectedLabel.language}) / 기기({selectedLabel.device}) / 설비({selectedLabel.equip_id}) / 작업({selectedLabel.task})
+            선택됨: {selectionSummaryParts.join(" / ")}
           </Text>
         </div>
 
