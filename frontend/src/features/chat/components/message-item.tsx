@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from "react";
 import { CopyOutlined, CheckOutlined, ReloadOutlined, FilterOutlined, LikeOutlined, LikeFilled, DislikeOutlined, DislikeFilled, EditOutlined } from "@ant-design/icons";
 import { Message, FeedbackRating, RetrievedDoc, MessageFeedback } from "../types";
 import { MarkdownContent } from "./markdown-content";
-import { Collapse, Tag } from "antd";
+import { Button, Collapse, Tag } from "antd";
 import { ImagePreviewModal, ImagePreviewItem } from "../../../components/image-preview-modal";
 import { FeedbackForm } from "./feedback-form";
 
@@ -112,11 +112,32 @@ function extractSearchQueriesFromRawAnswer(rawAnswer?: string): string[] {
 type ParsedRawAnswer = {
   query?: unknown;
   suggest_additional_device_search?: unknown;
+  metadata?: {
+    selected_task_mode?: unknown;
+    applied_doc_type_scope?: unknown;
+  } | null;
+  expanded_docs?: Array<{
+    rank?: unknown;
+    doc_id?: unknown;
+  }>;
   auto_parse?: {
     device?: unknown;
     devices?: unknown;
   } | null;
 };
+
+function extractExpandedDocIdsFromRawAnswer(rawAnswer?: string): string[] {
+  if (!rawAnswer) return [];
+  try {
+    const parsed = JSON.parse(rawAnswer) as ParsedRawAnswer;
+    const expanded = Array.isArray(parsed.expanded_docs) ? parsed.expanded_docs : [];
+    return expanded
+      .map((item) => (typeof item?.doc_id === "string" ? item.doc_id.trim() : ""))
+      .filter((docId) => docId.length > 0);
+  } catch {
+    return [];
+  }
+}
 
 // 개별 참고 문서 아이템 - 이미지 로드 상태를 자체 관리
 type ReferenceItemProps = {
@@ -252,10 +273,26 @@ type MessageItemProps = {
   onDetailedFeedback?: (payload: DetailedFeedbackPayload) => void;
   onRegenerate?: (payload: RegeneratePayload) => void;
   onEdit?: (editedText: string) => void;
+  issueCases?: Array<{ doc_id: string; title: string; summary: string }>;
+  onIssueCaseSelect?: (docId: string) => void;
+  showIssueSopButtons?: boolean;
+  onIssueSopConfirm?: (confirm: boolean) => void;
   originalQuery?: string;  // Original user query for regeneration
 };
 
-export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedback, onRegenerate, onEdit, originalQuery }: MessageItemProps) {
+export function MessageItem({
+  message,
+  isStreaming,
+  onFeedback,
+  onDetailedFeedback,
+  onRegenerate,
+  onEdit,
+  issueCases,
+  onIssueCaseSelect,
+  showIssueSopButtons,
+  onIssueSopConfirm,
+  originalQuery,
+}: MessageItemProps) {
   const [copied, setCopied] = useState(false);
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false);
@@ -308,6 +345,127 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
     [effectiveSearchQueries]
   );
 
+  const isSopTaskContext = useMemo(() => {
+    const selectedDocTypes = Array.isArray(message.selectedDocTypes)
+      ? message.selectedDocTypes
+      : [];
+    const hasSopSelection = selectedDocTypes.some(
+      (docType) => typeof docType === "string" && docType.trim().toLowerCase() === "sop"
+    );
+
+    const rawTaskMode = parsedRawAnswer?.metadata?.selected_task_mode;
+    const normalizedRawTaskMode = typeof rawTaskMode === "string" ? rawTaskMode.trim().toLowerCase() : "";
+    return hasSopSelection || normalizedRawTaskMode === "sop";
+  }, [message.selectedDocTypes, parsedRawAnswer]);
+
+  const answerSourceDocIds = useMemo(() => {
+    const direct = Array.isArray(message.expandedDocs)
+      ? message.expandedDocs
+          .map((doc) => (typeof doc?.doc_id === "string" ? doc.doc_id.trim() : ""))
+          .filter((docId) => docId.length > 0)
+      : [];
+    if (direct.length > 0) return direct;
+    return extractExpandedDocIdsFromRawAnswer(message.rawAnswer);
+  }, [message.expandedDocs, message.rawAnswer]);
+
+  const sopPresentation = useMemo(() => {
+    const fallbackDocs = message.retrievedDocs ?? [];
+    if (!isAssistant || fallbackDocs.length === 0 || !isSopTaskContext) {
+      return {
+        enabled: false,
+        docs: fallbackDocs,
+        flowChartUrl: null as string | null,
+      };
+    }
+
+    const normalizeDocType = (doc: RetrievedDoc): string => {
+      const value = (doc.metadata as Record<string, unknown> | null | undefined)?.doc_type;
+      return typeof value === "string" ? value.trim().toLowerCase() : "";
+    };
+
+    const finalSourceDocId = answerSourceDocIds.length > 0
+      ? answerSourceDocIds[answerSourceDocIds.length - 1]
+      : null;
+
+    if (!finalSourceDocId) {
+      return {
+        enabled: false,
+        docs: fallbackDocs,
+        flowChartUrl: null as string | null,
+      };
+    }
+
+    const fullDocCandidates = (message.allRetrievedDocs ?? fallbackDocs).filter(
+      (doc) => doc.id === finalSourceDocId
+    );
+    const sameDocChunks = fullDocCandidates.length > 0
+      ? fullDocCandidates
+      : fallbackDocs.filter((doc) => doc.id === finalSourceDocId);
+
+    const finalSource = sameDocChunks[0] ?? null;
+    if (!finalSource || normalizeDocType(finalSource) !== "sop") {
+      return {
+        enabled: false,
+        docs: fallbackDocs,
+        flowChartUrl: null as string | null,
+      };
+    }
+
+    const mergedPages: number[] = [];
+    const mergedPageUrls: string[] = [];
+    for (const chunk of sameDocChunks) {
+      const pages = chunk.expanded_pages && chunk.expanded_pages.length > 0
+        ? chunk.expanded_pages
+        : chunk.page !== null && chunk.page !== undefined
+          ? [chunk.page]
+          : [];
+      const urls = chunk.expanded_page_urls && chunk.expanded_page_urls.length > 0
+        ? chunk.expanded_page_urls.filter((url) => hasValidImageUrl(url))
+        : hasValidImageUrl(chunk.page_image_url)
+          ? [chunk.page_image_url]
+          : [];
+
+      urls.forEach((url, idx) => {
+        if (mergedPageUrls.includes(url)) return;
+        mergedPageUrls.push(url);
+        if (pages[idx] !== undefined) {
+          mergedPages.push(pages[idx]);
+        }
+      });
+    }
+
+    const flowChartChunk = sameDocChunks.find((chunk) => {
+      const meta = (chunk.metadata as Record<string, unknown> | null | undefined) ?? {};
+      const chapter = `${String(meta.section_chapter ?? "")} ${String(meta.chapter ?? "")} ${String(meta.section ?? "")}`.toLowerCase();
+      return chapter.includes("flow chart");
+    });
+    const flowChartUrl = flowChartChunk
+      ? (
+          flowChartChunk.expanded_page_urls?.find((url) => hasValidImageUrl(url))
+          ?? (hasValidImageUrl(flowChartChunk.page_image_url) ? flowChartChunk.page_image_url : null)
+        )
+      : null;
+
+    const fullDocEntry: RetrievedDoc = {
+      ...finalSource,
+      expanded_pages: mergedPages.length > 0 ? mergedPages : finalSource.expanded_pages,
+      expanded_page_urls: mergedPageUrls.length > 0 ? mergedPageUrls : finalSource.expanded_page_urls,
+      page: mergedPages.length === 1 ? mergedPages[0] : finalSource.page,
+      page_image_url: mergedPageUrls.length > 0 ? mergedPageUrls[0] : finalSource.page_image_url,
+    };
+
+    return {
+      enabled: true,
+      docs: [fullDocEntry],
+      flowChartUrl,
+    };
+  }, [isAssistant, message.retrievedDocs, message.allRetrievedDocs, isSopTaskContext, answerSourceDocIds]);
+
+  const referenceDocs = sopPresentation.docs;
+  const referenceLabel = sopPresentation.enabled
+    ? "답변에 사용된 문서 (1)"
+    : `확장 문서/참고 문서 (${referenceDocs.length})`;
+
   // Check if regeneration info is available
   const hasFilterInfo = Boolean(
     message.selectedDevices?.length ||
@@ -330,21 +488,12 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
     });
   };
 
-  // 이미지 URL이 유효한지 확인
-  const hasValidImageUrl = (url: string | null | undefined): url is string => {
-    if (typeof url !== 'string') return false;
-    const trimmed = url.trim();
-    // 빈 문자열, "null", "undefined" 등 무효한 값 필터링
-    if (trimmed.length === 0 || trimmed === 'null' || trimmed === 'undefined') return false;
-    return true;
-  };
-
   // 이미지 미리보기용 배열 생성 (실제 이미지 URL이 있는 문서만)
   const previewImages: ImagePreviewItem[] = useMemo(() => {
-    if (!message.retrievedDocs) return [];
+    if (referenceDocs.length === 0) return [];
 
     const images: ImagePreviewItem[] = [];
-    message.retrievedDocs.forEach((doc) => {
+    referenceDocs.forEach((doc) => {
       // sop, ts, setup 타입은 {doc_type}_{id} 형식으로 표시
       const docType = (doc.metadata as Record<string, unknown>)?.doc_type as string | undefined;
       const isSpecialDocType = docType && ["sop", "ts", "setup"].includes(docType.toLowerCase());
@@ -380,14 +529,14 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
       // 실제 이미지 URL이 없으면 추가하지 않음 (동적 URL 생성 안 함)
     });
     return images;
-  }, [message.retrievedDocs]);
+  }, [referenceDocs]);
 
   // 문서 인덱스와 페이지 인덱스에서 전체 미리보기 인덱스로 매핑
   const getPreviewIndex = (docIndex: number, pageIndex: number): number => {
-    if (!message.retrievedDocs) return 0;
+    if (referenceDocs.length === 0) return 0;
     let totalIdx = 0;
     for (let i = 0; i < docIndex; i++) {
-      const doc = message.retrievedDocs[i];
+      const doc = referenceDocs[i];
       // 실제 이미지 URL이 있는 경우만 카운트
       const pageCount = doc.expanded_page_urls && doc.expanded_page_urls.length > 0
         ? doc.expanded_page_urls.filter(url => hasValidImageUrl(url)).length
@@ -472,7 +621,79 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
               </div>
             )}
             {isAssistant ? (
-              <MarkdownContent content={message.content} />
+              <>
+                {sopPresentation.flowChartUrl && (
+                  <div style={{ marginBottom: 12 }}>
+                    <img
+                      src={sopPresentation.flowChartUrl}
+                      alt="SOP flow chart"
+                      style={{
+                        maxWidth: "100%",
+                        maxHeight: 280,
+                        borderRadius: 6,
+                        border: "1px solid var(--color-border)",
+                      }}
+                    />
+                  </div>
+                )}
+                <MarkdownContent content={message.content} />
+
+                {Array.isArray(issueCases) && issueCases.length > 0 && (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ marginBottom: 8, fontSize: 13, color: "var(--color-text-secondary)" }}>
+                      자세히 검색하고 싶은 문서를 선택하세요
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {issueCases.map((item, idx) => (
+                        <Button
+                          key={item.doc_id}
+                          type="default"
+                          size="middle"
+                          style={{
+                            textAlign: "left",
+                            whiteSpace: "normal",
+                            height: "auto",
+                            padding: "8px 12px",
+                            borderColor: "var(--color-accent-primary, #1677ff)",
+                            color: "var(--color-accent-primary, #1677ff)",
+                          }}
+                          onClick={() => onIssueCaseSelect?.(item.doc_id)}
+                        >
+                          {idx + 1}. {item.title}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {showIssueSopButtons && (
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ marginBottom: 8, fontSize: 13, color: "var(--color-text-secondary)" }}>
+                      추가로 조회할 항목을 선택하세요
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <Button
+                        type="primary"
+                        size="small"
+                        onClick={() => onIssueSopConfirm?.(true)}
+                      >
+                        관련 SOP 조회
+                      </Button>
+                      <Button
+                        type="default"
+                        size="small"
+                        style={{
+                          borderColor: "var(--color-accent-primary, #1677ff)",
+                          color: "var(--color-accent-primary, #1677ff)",
+                        }}
+                        onClick={() => onIssueSopConfirm?.(false)}
+                      >
+                        다른 이슈 문서 선택
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </>
             ) : isEditing ? (
               <div className="message-edit-area">
                 <textarea
@@ -550,18 +771,18 @@ export function MessageItem({ message, isStreaming, onFeedback, onDetailedFeedba
             </div>
           )}
 
-          {/* Retrieved documents (collapsible) */}
-          {isAssistant && message.retrievedDocs && message.retrievedDocs.length > 0 && (
+          {/* Retrieved documents (collapsible) - hidden by design */}
+          {false && isAssistant && referenceDocs.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <Collapse
                 size="small"
                 items={[
                   {
                     key: "retrieved",
-                    label: `확장 문서/참고 문서 (${message.retrievedDocs.length})`,
+                    label: referenceLabel,
                     children: (
                       <div className="reference-list">
-                        {message.retrievedDocs.map((doc, idx) => {
+                        {referenceDocs.map((doc, idx) => {
                           const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
                             ? doc.expanded_pages
                             : doc.page !== null && doc.page !== undefined

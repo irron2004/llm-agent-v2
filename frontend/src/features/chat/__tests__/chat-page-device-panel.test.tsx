@@ -1,4 +1,4 @@
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   renderChatPage,
@@ -417,5 +417,108 @@ describe("Req 12 — HIL DeviceSelectionPanel renders", () => {
     expect(screen.getByText("검색 범위 선택")).toBeInTheDocument();
     expect(screen.getByText("Pump-X")).toBeInTheDocument();
     expect(screen.getByText("Motor-Y")).toBeInTheDocument();
+  });
+});
+
+describe("Issue inline selection regression", () => {
+  it("renders issue case choices inline under last assistant message", async () => {
+    const submitIssueCaseSelection = vi.fn();
+    await renderChatPage({
+      chatSession: {
+        messages: [
+          {
+            id: "assistant-issue-inline",
+            role: "assistant",
+            content: "이슈 검색 결과를 정리했습니다.",
+          },
+        ],
+        pendingIssueCaseSelection: {
+          threadId: "thread-inline-1",
+          question: "질문",
+          instruction: "문서를 선택하세요",
+          payload: {
+            type: "issue_case_selection",
+            nonce: "nonce-inline-1",
+            cases: [
+              { doc_id: "doc-1", title: "SUPRA - Door Open Alarm", summary: "..." },
+              { doc_id: "doc-2", title: "ZEDIUS - Vacuum Error", summary: "..." },
+            ],
+          },
+        },
+        submitIssueCaseSelection,
+      },
+    });
+
+    expect(screen.getByRole("button", { name: "1. SUPRA - Door Open Alarm" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "2. ZEDIUS - Vacuum Error" })).toBeInTheDocument();
+    expect(screen.queryByText("이슈 문서 선택")).not.toBeInTheDocument();
+  });
+
+  it("supports numeric key selection for inline issue choices", async () => {
+    const submitIssueCaseSelection = vi.fn();
+    await renderChatPage({
+      chatSession: {
+        messages: [
+          {
+            id: "assistant-issue-inline-2",
+            role: "assistant",
+            content: "후보 문서를 선택해 주세요.",
+          },
+        ],
+        pendingIssueCaseSelection: {
+          threadId: "thread-inline-2",
+          question: "질문",
+          instruction: "문서를 선택하세요",
+          payload: {
+            type: "issue_case_selection",
+            nonce: "nonce-inline-2",
+            cases: [
+              { doc_id: "doc-1", title: "A", summary: "..." },
+              { doc_id: "doc-2", title: "B", summary: "..." },
+              { doc_id: "doc-3", title: "C", summary: "..." },
+            ],
+          },
+        },
+        submitIssueCaseSelection,
+      },
+    });
+
+    fireEvent.keyDown(window, { key: "2" });
+    expect(submitIssueCaseSelection).toHaveBeenCalledWith("doc-2");
+  });
+
+  it("supports numeric key selection even when chat input is focused", async () => {
+    const submitIssueCaseSelection = vi.fn();
+    await renderChatPage({
+      chatSession: {
+        messages: [
+          {
+            id: "assistant-issue-inline-3",
+            role: "assistant",
+            content: "후보 문서를 선택해 주세요.",
+          },
+        ],
+        pendingIssueCaseSelection: {
+          threadId: "thread-inline-3",
+          question: "질문",
+          instruction: "문서를 선택하세요",
+          payload: {
+            type: "issue_case_selection",
+            nonce: "nonce-inline-3",
+            cases: [
+              { doc_id: "doc-1", title: "A", summary: "..." },
+              { doc_id: "doc-2", title: "B", summary: "..." },
+            ],
+          },
+        },
+        submitIssueCaseSelection,
+      },
+    });
+
+    const textbox = screen.getByRole("textbox");
+    textbox.focus();
+    fireEvent.keyDown(textbox, { key: "2" });
+
+    expect(submitIssueCaseSelection).toHaveBeenCalledWith("doc-2");
   });
 });

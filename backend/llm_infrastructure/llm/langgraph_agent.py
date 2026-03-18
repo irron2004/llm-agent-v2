@@ -222,16 +222,18 @@ class PromptSpec:
 
 DEFAULT_JUDGE_SETUP = """
 # 역할
-설치/세팅 답변이 질문과 검색 증거에 충실한지 판정한다.
+설치/세팅 답변이 질문과 검색 증거(REFS)에 충실한지 판정한다.
 
-# 입력
-- 질문, 답변, REFS (검색 결과)
+# 평가 기준
+- 답변의 내용이 REFS 근거에 기반하는지 확인한다.
+- 답변의 형식(한국어, 마크다운 등)은 평가 대상이 아니다.
+- issues에는 내용상 문제(누락된 단계, 잘못된 수치, 근거 없는 주장 등)만 기록한다.
 
-# 출력
-JSON 한 줄: {"faithful": bool, "issues": ["..."], "hint": "..."}
-- faithful: 근거 기반이면 true, 아니면 false
-- issues: 부족한 근거/누락된 단계/잘못된 조치 등
-- hint: 재검색/보강에 도움이 되는 한 줄
+# 너의 출력 형식 (반드시 JSON 한 줄로)
+{"faithful": bool, "issues": ["..."], "hint": "..."}
+- faithful: 답변이 REFS 근거에 기반하면 true, 아니면 false
+- issues: 근거 누락/부정확한 내용/잘못된 조치 등 (내용 문제만)
+- hint: 재검색/보강에 도움이 되는 한 줄 제안
 """.strip()
 
 DEFAULT_JUDGE_TS = """
@@ -405,7 +407,7 @@ MAX_TOKENS_CLASSIFICATION = 256  # 라우팅/분류용 (짧은 응답)
 MAX_TOKENS_JUDGE = 1024  # judge용 (reasoning 토큰 포함 여유분)
 MAX_TOKENS_ANSWER = 4096  # 답변 생성용
 MAX_REF_CHARS_REVIEW = 200  # 검색 결과 리뷰용
-MAX_REF_CHARS_ANSWER = 1200  # 답변 생성용
+MAX_REF_CHARS_ANSWER = 8000  # 답변 생성용 (SOP 다페이지 절차 포함)
 RELATED_PAGE_WINDOW = 2  # 인접 페이지 범위 (±N)
 DOC_TYPES_SAME_DOC = {"gcb", "myservice", "pems"}
 EXPAND_TOP_K = 10  # 확장 대상 최대 개수 (rerank 상위)
@@ -1033,6 +1035,40 @@ def results_to_ref_json(
     return ref
 
 
+def _strip_latex_noise(text: str) -> str:
+    """Remove LaTeX markup, empty table cells, image refs, and page headers."""
+    # 이미지 참조 제거
+    text = re.sub(r"\\includegraphics\[[^\]]*\]\{[^}]*\}", "", text)
+    # LaTeX 테이블 환경 태그 제거
+    text = re.sub(r"\\begin\{tabular[^}]*\}(\[[^\]]*\])?", "", text)
+    text = re.sub(r"\\end\{tabular\}", "", text)
+    # LaTeX 명령어 제거 (textbf, hline, cline, multirow, parbox 등)
+    text = re.sub(r"\\textbf\{([^}]*)\}", r"\1", text)
+    text = re.sub(r"\\textcolor\{[^}]*\}\{([^}]*)\}", r"\1", text)
+    text = re.sub(r"\\(?:hline|cline\{[^}]*\})", "", text)
+    text = re.sub(r"\\(?:multirow|multicolumn)\{[^}]*\}\{[^}]*\}\{([^}]*)\}", r"\1", text)
+    text = re.sub(r"\\parbox\{[^}]*\}\{([^}]*)\}", r"\1", text)
+    text = re.sub(r"\\(?:newline|\\)", " ", text)
+    text = re.sub(r"\\(?:rightarrow|neq)", "→", text)
+    text = re.sub(r"\$[^$]*\$", "", text)  # inline math
+    # 빈 테이블 셀 반복 제거 (& & \\ 패턴)
+    text = re.sub(r"(?:\s*&\s*&\s*\\\\)+", " ", text)
+    text = re.sub(r"(?:\s*&\s*\\\\)+", " ", text)
+    # 코드 펜스 제거
+    text = re.sub(r"```(?:markdown)?\s*", "", text)
+    text = re.sub(r"```\s*", "", text)
+    # 페이지 헤더/푸터 반복 제거
+    text = re.sub(r"PS-320-R0\s*(?:PSK\s*)?A4\([^)]*\)", "", text)
+    # HTML 주석 (테이블 좌표 등) 제거
+    text = re.sub(r"<!--[^>]*-->", "", text)
+    # 페이지 구분 마커 정리 (p11:, p12: 등 → 줄바꿈)
+    text = re.sub(r"\bp\d+:\s*", "\n", text)
+    # 연속 공백/줄바꿈 정리
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    text = re.sub(r"[ \t]{2,}", " ", text)
+    return text.strip()
+
+
 def ref_json_to_text(ref_json: List[Dict[str, Any]]) -> str:
     """Format retrieval evidence as plain text for LLM prompts.
 
@@ -1047,6 +1083,7 @@ def ref_json_to_text(ref_json: List[Dict[str, Any]]) -> str:
         rank = r.get("rank", "?")
         doc_id = str(r.get("doc_id", "")).strip()
         content = str(r.get("content", "")).strip()
+        content = _strip_latex_noise(content)
         content = " ".join(content.split())
 
         # 장비 + 문서유형 태그 추가
@@ -1202,22 +1239,59 @@ def _group_refs_by_doc_id(
     return list(groups.items())
 
 
+def _group_refs_by_doc_section_chapter(
+    ref_items: List[Dict[str, Any]],
+) -> List[Tuple[str, List[Dict[str, Any]]]]:
+    """ref_items를 (doc_id, section_chapter)별로 그룹핑. 첫 등장 순서 유지.
+
+    같은 doc_id라도 section_chapter가 다르면 별도 그룹으로 분리한다.
+    이를 통해 하나의 물리 문서에 여러 SOP가 포함된 경우
+    (e.g. REPLACEMENT vs CALIBRATION) 각각 독립적으로 적합성 판정 가능.
+
+    ref_items의 metadata["section"]은 원본 section_chapter에서 유래한 값이다.
+    """
+    from collections import OrderedDict
+
+    groups: OrderedDict[str, List[Dict[str, Any]]] = OrderedDict()
+    for item in ref_items:
+        doc_id = str(item.get("doc_id", "unknown"))
+        meta = item.get("metadata") or {}
+        section_chapter = str(meta.get("section", "") or "").strip()
+        # section_chapter가 있으면 doc_id + section_chapter로 구분, 없으면 doc_id만
+        group_key = f"{doc_id}::{section_chapter}" if section_chapter else doc_id
+        groups.setdefault(group_key, []).append(item)
+    return list(groups.items())
+
+
 def _check_doc_relevance(
     query: str,
     doc_ref_text: str,
     *,
     llm: "BaseLLM",
 ) -> bool:
-    """문서가 질문에 답할 수 있는 절차/작업 정보를 포함하는지 가볍게 판정."""
+    """문서가 질문에 답할 수 있는 절차/작업 정보를 포함하는지 가볍게 판정.
+
+    빈 응답 시 1회 재시도하고, 여전히 빈 응답이면 False(관련 없음)로 처리하여
+    다음 그룹이 체크될 수 있도록 한다.
+    """
     system = (
         "You are a relevance checker. Determine if the document contains "
-        "procedure/work steps that can answer the user's question. "
+        "procedure/work steps that can answer the user's question.\n"
+        "Compare the SPECIFIC subject in the question (model number, part name, "
+        "procedure type) against what the document actually describes.\n"
         "Reply ONLY 'yes' or 'no'."
     )
-    user = f"Question: {query}\nDocument:\n{doc_ref_text[:2000]}"
+    user = f"Question: {query}\nDocument:\n{doc_ref_text[:6000]}"
+
     raw = _invoke_llm(llm, system, user, max_tokens=10, temperature=TEMP_CLASSIFICATION)
-    result = "yes" in (raw or "").lower()
-    logger.info("_check_doc_relevance: raw=%r → %s", (raw or "")[:50], result)
+    raw_stripped = (raw or "").strip().lower()
+    if not raw_stripped:
+        # LLM 빈 응답 → 판정 불가. query-aware 그룹 정렬과 함께 사용되므로
+        # True로 처리하여 가장 관련성 높은 첫 번째 그룹이 통과하도록 한다.
+        logger.info("_check_doc_relevance: raw empty → default True (trust query-aware ordering)")
+        return True
+    result = "yes" in raw_stripped
+    logger.info("_check_doc_relevance: raw=%r → %s", raw_stripped[:50], result)
     return result
 
 
@@ -1712,11 +1786,15 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
 def _apply_section_expansion(
     docs: List[RetrievalResult],
     es_engine: Any,
+    query: str = "",
 ) -> List[RetrievalResult]:
     """Apply section expansion to retrieval results.
 
     For top groups with reliable section_chapter, fetch all section chunks
     and insert them into the result list at the trigger hit position.
+
+    query is used for query-aware candidate scoring: candidates whose doc_id
+    contains query terms are prioritised when selecting top_groups.
     """
     from backend.llm_infrastructure.retrieval.postprocessors.section_expander import (
         SectionExpander,
@@ -1726,9 +1804,13 @@ def _apply_section_expansion(
     if not expander.enabled:
         return docs
 
-    # Identify candidate groups from docs
-    seen_groups: set[tuple[str, str]] = set()
-    candidates: list[tuple[int, RetrievalResult]] = []
+    # --- Collect ALL valid candidates with page-aware multi-SOP dedup ---
+    # In multi-SOP documents, the same section_chapter (e.g. "3. Part 위치")
+    # repeats at different page ranges for each SOP.  Pages >20 apart are
+    # treated as distinct groups so each SOP gets its own expansion slot.
+    _MULTI_SOP_PAGE_GAP = 20
+    seen_group_pages: dict[tuple[str, str], list[int]] = {}
+    all_candidates: list[tuple[int, RetrievalResult]] = []
 
     for idx, doc in enumerate(docs):
         meta = doc.metadata if isinstance(doc.metadata, dict) else {}
@@ -1739,18 +1821,57 @@ def _apply_section_expansion(
         if not section_chapter or not chapter_ok or chapter_source not in expander.allowed_sources:
             continue
 
-        group_key = (str(doc.doc_id), section_chapter)
-        if group_key in seen_groups:
+        page = int(meta.get("page") or 0)
+        base_key = (str(doc.doc_id), section_chapter)
+
+        # Page-aware dedup: same (doc_id, section_chapter) within PAGE_GAP = same SOP
+        is_dup = False
+        if base_key in seen_group_pages:
+            for rep_page in seen_group_pages[base_key]:
+                if abs(page - rep_page) < _MULTI_SOP_PAGE_GAP:
+                    is_dup = True
+                    break
+        if is_dup:
             continue
 
-        seen_groups.add(group_key)
-        candidates.append((idx, doc))
+        seen_group_pages.setdefault(base_key, []).append(page)
+        all_candidates.append((idx, doc))
 
-        if len(candidates) >= expander.top_groups:
-            break
+    # --- Query-aware scoring: prefer candidates whose doc_id matches query terms ---
+    query_tokens = [
+        t for t in re.split(r"[\s,.\-_]+", query.lower()) if len(t) >= 2
+    ] if query else []
+
+    def _candidate_score(idx: int, doc: RetrievalResult) -> tuple[int, int]:
+        """(negative query_match_score, retrieval_rank) — lower = better."""
+        doc_id_lower = str(doc.doc_id).lower()
+        q_score = sum(2 for tok in query_tokens if tok in doc_id_lower)
+        return (-q_score, idx)
+
+    all_candidates.sort(key=lambda pair: _candidate_score(pair[0], pair[1]))
+    candidates = all_candidates[: expander.top_groups]
+
+    if candidates:
+        logger.info(
+            "section_expansion: %d valid candidates, selected %d (query_tokens=%s, keys=%s)",
+            len(all_candidates),
+            len(candidates),
+            query_tokens[:6],
+            [(str(d.doc_id)[-30:], (d.metadata or {}).get("section_chapter", "")) for _, d in candidates],
+        )
 
     if not candidates:
         return docs
+
+    # Cross-section rules: when a trigger section is hit, also fetch target sections
+    # from the same doc_id (within page gap). Covers common SOP patterns where
+    # non-procedural sections (Part 위치, Flow Chart) score high but lack procedure text.
+    _CROSS_SECTION_TRIGGERS: dict[str, list[str]] = {
+        "flow chart": ["Work Procedure"],
+        "workflow": ["Work Procedure"],
+        "part 위치": ["Work Procedure"],
+        "location of parts": ["Work Procedure"],
+    }
 
     # Fetch expanded chunks for each candidate group
     expanded_map: dict[int, list[RetrievalResult]] = {}
@@ -1764,6 +1885,45 @@ def _apply_section_expansion(
             max_pages=expander.max_pages,
             content_index=None,
         )
+
+        # Cross-section expansion: fetch nearby Work Procedure when a
+        # non-procedural section (Flow Chart, Part 위치 등) is the trigger hit.
+        # min_page filter ensures we only grab the Work Procedure belonging to
+        # the SAME SOP within a multi-SOP physical document.
+        _CROSS_SECTION_PAGE_GAP = 3
+        section_lower = section_chapter.lower()
+        for trigger, target_keywords in _CROSS_SECTION_TRIGGERS.items():
+            if trigger in section_lower:
+                trigger_max_page = max(
+                    (h.page for h in (section_hits or []) if h.page is not None),
+                    default=(doc.metadata or {}).get("page") or 0,
+                )
+                min_page = max(0, trigger_max_page - _CROSS_SECTION_PAGE_GAP)
+                for kw in target_keywords:
+                    cross_hits = es_engine.fetch_section_chunks_by_keyword(
+                        doc_id=str(doc.doc_id),
+                        keyword=kw,
+                        max_pages=expander.max_pages,
+                        content_index=None,
+                        min_page=min_page,
+                    )
+                    if cross_hits:
+                        first_page = min(
+                            (h.page for h in cross_hits if h.page is not None),
+                            default=None,
+                        )
+                        if first_page is not None and first_page <= trigger_max_page + _CROSS_SECTION_PAGE_GAP:
+                            section_hits = (section_hits or []) + cross_hits
+                            logger.info(
+                                "cross_section_expansion: %s (max_page=%d) -> %s (first_page=%d, %d chunks, min_page=%d) for doc %s",
+                                section_chapter, trigger_max_page, kw, first_page, len(cross_hits), min_page, doc.doc_id,
+                            )
+                        else:
+                            logger.debug(
+                                "cross_section_expansion: skipped %s (first_page=%s, gap > %d) for doc %s",
+                                kw, first_page, _CROSS_SECTION_PAGE_GAP, doc.doc_id,
+                            )
+                break  # one trigger match is enough
 
         if section_hits:
             expanded_map[idx] = [hit.to_retrieval_result() for hit in section_hits]
@@ -2308,7 +2468,7 @@ def retrieve_node(
 
     # Section expansion: expand top groups by fetching full section chunks
     if rag_settings.section_expand_enabled and docs and hasattr(retriever, "es_engine"):
-        docs = _apply_section_expansion(docs, retriever.es_engine)
+        docs = _apply_section_expansion(docs, retriever.es_engine, query=state.get("query", ""))
 
     logger.info(
         "retrieve_node: returning %d docs (all_docs_for_regen: %d)",
@@ -3232,9 +3392,6 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
 
     if route == "setup":
         ref_items = _prioritize_setup_answer_refs(ref_items)
-    # 답변 생성 시 REFS 수 제한
-    if len(ref_items) > MAX_ANSWER_REFS:
-        ref_items = ref_items[:MAX_ANSWER_REFS]
 
     # Use original query for non-English answers to avoid language drift.
     if answer_language == "en":
@@ -3242,25 +3399,46 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     else:
         query_for_prompt = state["query"]
 
-    # Setup route: 문서별 적합성 판정 후 적합한 문서만 선택
+    # Setup route: (doc_id, section)별 그룹핑 → 적합성 판정 → 선택 → REFS 제한
+    # MAX_ANSWER_REFS를 그룹 선택 이후에 적용하여, 적합한 section이
+    # 순위가 낮더라도 relevance check에 참여할 수 있도록 함.
     if route == "setup" and ref_items:
-        doc_groups = _group_refs_by_doc_id(ref_items)
+        doc_groups = _group_refs_by_doc_section_chapter(ref_items)
+
+        # Query-aware group ordering: prefer groups whose doc_id contains
+        # query tokens so that relevance checks are tried in priority order.
+        _query_lower = query_for_prompt.lower()
+        _q_tokens = [t for t in re.split(r"[\s,.\-_]+", _query_lower) if len(t) >= 2]
+
+        def _group_query_score(item: Tuple[str, List]) -> Tuple[int, int]:
+            gkey, grefs = item
+            gkey_lower = gkey.lower()
+            score = sum(2 for tok in _q_tokens if tok in gkey_lower)
+            return (-score, 0)  # higher score first
+
+        doc_groups.sort(key=_group_query_score)
+
+        logger.info(
+            "answer_node: setup doc_section_groups=%d keys=%s",
+            len(doc_groups),
+            [k[:60] for k, _ in doc_groups[:8]],
+        )
         if len(doc_groups) > 1:
             import time as _time
 
             selected_refs = None
             checks_done = 0
-            for i, (doc_id, group_refs) in enumerate(doc_groups[:MAX_SETUP_DOC_TRIES]):
+            for i, (group_key, group_refs) in enumerate(doc_groups[:MAX_SETUP_DOC_TRIES]):
                 t0 = _time.time()
                 group_text = ref_json_to_text(group_refs)
                 relevant = _check_doc_relevance(query_for_prompt, group_text, llm=llm)
                 elapsed = _time.time() - t0
                 checks_done = i + 1
                 logger.info(
-                    "answer_node: setup relevance check %d/%d doc=%s relevant=%s (%.1fs)",
+                    "answer_node: setup relevance check %d/%d group=%s relevant=%s (%.1fs)",
                     i + 1,
                     min(len(doc_groups), MAX_SETUP_DOC_TRIES),
-                    doc_id[:50],
+                    group_key[:60],
                     relevant,
                     elapsed,
                 )
@@ -3271,17 +3449,25 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
             if selected_refs is not None:
                 ref_items = selected_refs
                 logger.info(
-                    "answer_node: setup selected doc=%s after %d checks",
+                    "answer_node: setup selected group=%s (%d refs) after %d checks",
                     selected_refs[0].get("doc_id", "?")[:50],
+                    len(selected_refs),
                     checks_done,
                 )
             else:
-                # 전부 부적합 → 첫 번째 문서로 fallback
+                # 전부 부적합 → 첫 번째 그룹으로 fallback
                 ref_items = doc_groups[0][1]
                 logger.info(
-                    "answer_node: no relevant doc found, fallback to first doc=%s",
-                    doc_groups[0][0][:50],
+                    "answer_node: no relevant group found, fallback to first group=%s",
+                    doc_groups[0][0][:60],
                 )
+        else:
+            # 그룹이 1개면 그대로 사용
+            ref_items = doc_groups[0][1] if doc_groups else ref_items
+
+    # 답변 생성 시 REFS 수 제한 (setup route는 그룹 선택 후 적용)
+    if len(ref_items) > MAX_ANSWER_REFS:
+        ref_items = ref_items[:MAX_ANSWER_REFS]
 
     ref_text = ref_json_to_text(ref_items)
     logger.info(
@@ -3590,7 +3776,7 @@ def issue_detail_answer_node(
 
 def issue_sop_confirm_node(
     state: AgentState,
-) -> Command[Literal["issue_confirm", "done"]]:
+) -> Command[Literal["issue_confirm", "done", "mq"]]:
     nonce = _stable_issue_nonce(state, kind="issue_sop_confirm")
     payload = {
         "type": "issue_sop_confirm",
@@ -3610,20 +3796,117 @@ def issue_sop_confirm_node(
                 update={"issue_stage": "post_detail", "issue_sop_confirm_nonce": nonce},
             )
         if bool(decision.get("confirm", False)):
-            return Command(goto="done", update={"issue_sop_confirm_nonce": nonce})
+            # 관련 SOP 조회: route를 setup으로 전환하여 SOP 검색 파이프라인 실행
+            # parsed_query의 doc_types도 갱신해야 retrieve_node가 올바른 필터 사용
+            pq_raw = state.get("parsed_query")
+            updated_pq = dict(pq_raw) if isinstance(pq_raw, dict) else {}
+            updated_pq["selected_doc_types"] = ["sop", "setup"]
+            updated_pq["doc_types_strict"] = True
+            updated_pq["route"] = "setup"
+            return Command(
+                goto="mq",
+                update={
+                    "route": "setup",
+                    "task_mode": "sop",
+                    "selected_doc_types": ["sop", "setup"],
+                    "selected_doc_types_strict": True,
+                    "parsed_query": updated_pq,
+                    "issue_sop_confirm_nonce": nonce,
+                },
+            )
     return Command(
         goto="issue_confirm",
         update={"issue_stage": "post_detail", "issue_sop_confirm_nonce": nonce},
     )
 
 
+_SUPPLEMENT_SETUP_SYSTEM = """
+당신은 설치/셋업 SOP 답변 보완 전문가입니다.
+
+## 역할
+기존 답변과 REFS 근거를 비교하여, 누락된 내용을 통합한 **하나의 완성된 답변**을 다시 작성합니다.
+
+## 규칙
+- 기존 답변의 구조와 형식을 유지하세요.
+- REFS에 있지만 답변에서 누락된 단계, 수치, 조건, 주의사항을 해당 위치에 자연스럽게 삽입하세요.
+- 내용을 중복하지 마세요. 이미 있는 내용은 그대로 두고 누락된 부분만 추가하세요.
+- REFS에 없는 내용을 추가하지 마세요.
+- 인용 번호 [N]을 유지하세요.
+- 보완할 내용이 없으면 정확히 "NONE"만 출력하세요.
+- 보완할 내용이 있으면 통합된 **전체 답변**을 출력하세요 (보완 부분만이 아님).
+- 한국어로 작성하세요.
+""".strip()
+
+
+def _supplement_setup_answer(
+    answer: str,
+    query: str,
+    ref_text: str,
+    *,
+    llm: "BaseLLM",
+) -> tuple[str, dict]:
+    """Setup 답변을 REFS와 비교하여 누락된 내용을 통합한 완성된 답변을 생성한다.
+
+    Returns:
+        (통합된 답변, judge dict)
+    """
+    user = (
+        f"질문: {query}\n\n"
+        f"기존 답변:\n{answer}\n\n"
+        f"REFS:\n{ref_text}\n\n"
+        "위 기존 답변에서 REFS 대비 누락된 단계, 수치, 조건, 주의사항을 찾아 "
+        "해당 위치에 통합한 완성된 답변을 작성하세요. "
+        "보완할 내용이 없으면 NONE만 출력하세요."
+    )
+    raw = _invoke_llm(
+        llm, _SUPPLEMENT_SETUP_SYSTEM, user,
+        max_tokens=MAX_TOKENS_ANSWER, temperature=0.2,
+    )
+    raw_stripped = (raw or "").strip()
+
+    if not raw_stripped or raw_stripped.upper() == "NONE":
+        logger.info("judge_node(supplement): no supplement needed")
+        return answer, {
+            "faithful": True,
+            "issues": [],
+            "hint": "supplement: no additions needed",
+            "supplement_applied": False,
+        }
+
+    # LLM이 통합된 전체 답변을 반환
+    merged_answer = raw_stripped
+    logger.info(
+        "judge_node(supplement): merged answer (%d -> %d chars)",
+        len(answer), len(merged_answer),
+    )
+    return merged_answer, {
+        "faithful": True,
+        "issues": [],
+        "hint": "supplement: merged into answer",
+        "supplement_applied": True,
+        "original_length": len(answer),
+        "merged_length": len(merged_answer),
+    }
+
+
 def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str, Any]:
     route = state["route"]
     ref_items = state.get("answer_ref_json") or state.get("ref_json", [])
     ref_text = ref_json_to_text(ref_items)
-    # Use English query for consistent judge evaluation
     query_for_judge = state.get("query_en") or state["query"]
+    answer = state.get("answer", "")
 
+    # Setup route: 보완형 — 답변의 누락 내용을 보완하고 재시도 없이 종료
+    if route == "setup" and answer and "찾지 못했습니다" not in answer:
+        supplemented_answer, judge = _supplement_setup_answer(
+            answer, query_for_judge, ref_text, llm=llm,
+        )
+        result: Dict[str, Any] = {"judge": judge}
+        if supplemented_answer != answer:
+            result["answer"] = supplemented_answer
+        return result
+
+    # Other routes (ts, general) + setup fallback: 기존 faithful 판정 유지
     if route == "setup":
         sys = spec.judge_setup_sys
     elif route == "ts":
@@ -3633,14 +3916,15 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
 
     user = (
         f"질문: {query_for_judge}\n"
-        f"답안: {state.get('answer', '')}\n"
+        f"답안: {answer}\n"
         f"증거(REFS): {ref_text}\n"
-        'JSON 한 줄로 반환: {"faithful": bool, "issues": [...], "hint": "..."}'
+        "\n위 답안의 내용이 REFS 근거에 충실한지 판정하세요. "
+        "답안의 형식은 평가하지 마세요. 내용만 평가하세요.\n"
+        '출력: {"faithful": bool, "issues": [...], "hint": "..."}'
     )
 
     raw = _invoke_llm(llm, sys, user, max_tokens=MAX_TOKENS_JUDGE, temperature=TEMP_CLASSIFICATION)
     try:
-        # LLM이 JSON 외 텍스트를 포함할 수 있으므로 추출 시도
         json_match = re.search(r"\{.*\}", raw, flags=re.S)
         judge = json.loads(json_match.group(0)) if json_match else json.loads(raw)
         if not isinstance(judge, dict):
@@ -4672,7 +4956,7 @@ def auto_parse_confirm_node(
     )
 
     task_options = [
-        {"value": "sop", "label": "절차조회", "recommended": False},
+        {"value": "sop", "label": "작업절차검색", "recommended": False},
         {"value": "issue", "label": "이슈조회", "recommended": True},
         {"value": "all", "label": "전체조회", "recommended": False},
     ]

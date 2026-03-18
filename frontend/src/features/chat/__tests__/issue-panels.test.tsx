@@ -25,8 +25,7 @@ describe("Issue flow panels", () => {
     await user.click(screen.getByRole("button", { name: /1\. Case 1/i }));
     expect(onSelect).toHaveBeenCalledWith("doc-1");
 
-    await user.type(screen.getByPlaceholderText(/번호로 선택/i), "2");
-    await user.click(screen.getByRole("button", { name: "선택" }));
+    await user.click(screen.getByRole("button", { name: /2\. Case 2/i }));
     expect(onSelect).toHaveBeenLastCalledWith("doc-2");
   });
 

@@ -11,9 +11,6 @@ import {
   ChatInput,
   DeviceSelectionPanel,
   GuidedSelectionPanel,
-  IssueCaseSelectionPanel,
-  IssueConfirmPanel,
-  IssueSopConfirmPanel,
 } from "../components";
 import type { RegeneratePayload } from "../components/message-item";
 import { fetchDeviceCatalog } from "../api";
@@ -58,7 +55,7 @@ export default function ChatPage() {
 
   const docTypeOptions = useMemo(() => {
     const presets = [
-      { label: "절차검색 (SOP + Setup)", value: "__preset_sop", isPreset: true },
+      { label: "작업절차검색 (SOP + Setup)", value: "__preset_sop", isPreset: true },
       { label: "이슈검색 (myservice + gcb + TS)", value: "__preset_issue", isPreset: true },
     ];
     const individual = [
@@ -129,6 +126,34 @@ export default function ChatPage() {
   useEffect(() => {
     registerSubmitHandlers({ submitReview, submitSearchQueries });
   }, [submitReview, submitSearchQueries, registerSubmitHandlers]);
+
+  useEffect(() => {
+    if (!pendingIssueConfirm) return;
+    submitIssueConfirm(true, { silent: true });
+  }, [pendingIssueConfirm, submitIssueConfirm]);
+
+  // issue_sop_confirm은 자동 확인하지 않고, 인라인 버튼으로 사용자가 선택
+
+  useEffect(() => {
+    if (!pendingIssueCaseSelection || pendingIssueCaseSelection.payload.cases.length === 0) return;
+
+    const handleKeydown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing) return;
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+
+      if (!/^[1-9]$/.test(event.key)) return;
+      const selectedIndex = Number.parseInt(event.key, 10) - 1;
+      const selected = pendingIssueCaseSelection.payload.cases[selectedIndex];
+      if (!selected) return;
+      event.preventDefault();
+      submitIssueCaseSelection(selected.doc_id);
+    };
+
+    window.addEventListener("keydown", handleKeydown);
+    return () => {
+      window.removeEventListener("keydown", handleKeydown);
+    };
+  }, [pendingIssueCaseSelection, submitIssueCaseSelection]);
 
   useEffect(() => {
     setShowSuggestedDevicePanel(false);
@@ -221,17 +246,11 @@ export default function ChatPage() {
   }, [isStreaming, setIsStreaming]);
 
   useEffect(() => {
-    console.log("[ChatPage] pendingReview from hook:", pendingReview);
     if (pendingReview) {
       const queries = pendingReview.payload?.search_queries;
       const searchQueries = Array.isArray(queries)
         ? queries.map((q) => String(q))
         : [pendingReview.question];
-      console.log("[ChatPage] Setting pendingReview in context:", {
-        threadId: pendingReview.threadId,
-        docs: pendingReview.docs?.length,
-        searchQueries,
-      });
       setPendingReview({
         threadId: pendingReview.threadId,
         question: pendingReview.question,
@@ -395,6 +414,20 @@ export default function ChatPage() {
                     onDetailedFeedback={submitDetailedFeedback}
                     onRegenerate={msg.role === "assistant" ? handleRegenerate : undefined}
                     onEdit={msg.role === "user" && !isStreaming ? (editedText) => send({ text: editedText }) : undefined}
+                    issueCases={
+                      msg.role === "assistant" &&
+                      idx === messages.length - 1 &&
+                      pendingIssueCaseSelection
+                        ? pendingIssueCaseSelection.payload.cases
+                        : undefined
+                    }
+                    onIssueCaseSelect={submitIssueCaseSelection}
+                    showIssueSopButtons={
+                      msg.role === "assistant" &&
+                      idx === messages.length - 1 &&
+                      !!pendingIssueSopConfirm
+                    }
+                    onIssueSopConfirm={(confirm) => submitIssueSopConfirm(confirm, { silent: true })}
                     originalQuery={msg.role === "assistant" ? getOriginalQuery(msg.id) : undefined}
                   />
                 ))
@@ -455,36 +488,6 @@ export default function ChatPage() {
             />
           )}
 
-          {pendingIssueConfirm && (
-            <IssueConfirmPanel
-              question={pendingIssueConfirm.question}
-              instruction={pendingIssueConfirm.instruction}
-              prompt={pendingIssueConfirm.payload.prompt}
-              stage={pendingIssueConfirm.payload.stage}
-              onConfirm={submitIssueConfirm}
-            />
-          )}
-
-          {pendingIssueCaseSelection && (
-            <IssueCaseSelectionPanel
-              question={pendingIssueCaseSelection.question}
-              instruction={pendingIssueCaseSelection.instruction}
-              cases={pendingIssueCaseSelection.payload.cases}
-              onSelect={submitIssueCaseSelection}
-            />
-          )}
-
-          {pendingIssueSopConfirm && (
-            <IssueSopConfirmPanel
-              question={pendingIssueSopConfirm.question}
-              instruction={pendingIssueSopConfirm.instruction}
-              prompt={pendingIssueSopConfirm.payload.prompt}
-              hasSopRef={pendingIssueSopConfirm.payload.has_sop_ref}
-              sopHint={pendingIssueSopConfirm.payload.sop_hint}
-              onConfirm={submitIssueSopConfirm}
-            />
-          )}
-
           {pendingDeviceSelection && (
             (pendingDeviceSelection.devices && pendingDeviceSelection.devices.length > 0) ||
             (pendingDeviceSelection.docTypes && pendingDeviceSelection.docTypes.length > 0)
@@ -508,7 +511,7 @@ export default function ChatPage() {
               onStop={stop}
               isStreaming={isStreaming}
               placeholder={inputPlaceholder}
-              disabled={isLoadingSession || !!pendingGuidedSelection || !!pendingIssueCaseSelection || !!pendingIssueConfirm || !!pendingIssueSopConfirm}
+              disabled={isLoadingSession || !!pendingGuidedSelection}
               docTypeOptions={docTypeOptions}
               selectedDocTypes={selectedDocTypes}
               onDocTypesChange={handleDocTypesChange}

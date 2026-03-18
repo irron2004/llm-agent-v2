@@ -5,7 +5,7 @@ import logging
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 
-from backend.services.storage import get_page_image, sanitize_doc_id
+from backend.services.storage import get_doc_page_count, get_page_image, sanitize_doc_id
 
 router = APIRouter(prefix="/assets", tags=["Assets"])
 logger = logging.getLogger(__name__)
@@ -57,6 +57,32 @@ async def get_document_page_image(doc_id: str, page: int):
         raise HTTPException(
             status_code=500,
             detail="Failed to retrieve page image",
+        ) from e
+
+
+@router.get("/docs/{doc_id}/info")
+async def get_document_info(doc_id: str):
+    """Get document metadata including total page count.
+
+    Args:
+        doc_id: Document identifier
+
+    Returns:
+        JSON with doc_id and total_pages
+    """
+    safe_doc_id = sanitize_doc_id(doc_id)
+
+    try:
+        total_pages = get_doc_page_count(doc_id)
+        return {
+            "doc_id": doc_id,
+            "total_pages": total_pages,
+        }
+    except Exception as e:
+        logger.error("Error fetching doc info: doc_id=%s, error=%s", doc_id, e)
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve document info",
         ) from e
 
 

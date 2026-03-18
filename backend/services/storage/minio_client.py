@@ -189,3 +189,25 @@ def get_page_image(doc_id: str, page: int) -> bytes | None:
     """
     object_name = generate_image_path(doc_id, page)
     return get_object(object_name)
+
+
+def get_doc_page_count(doc_id: str) -> int:
+    """Count the total number of page images for a document in MinIO.
+
+    Args:
+        doc_id: Document ID
+
+    Returns:
+        Number of page images found (0 if none or error)
+    """
+    safe_doc_id = sanitize_doc_id(doc_id)
+    prefix = f"documents/{safe_doc_id}/page_"
+    bucket = minio_settings.bucket
+    client = get_minio_client()
+
+    try:
+        objects = client.list_objects(bucket, prefix=prefix)
+        return sum(1 for _ in objects)
+    except S3Error as e:
+        logger.error("Failed to count pages for %s: %s", doc_id, e)
+        return 0

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Button, Card, Input, Space, Typography } from "antd";
+import { Card, Space, Typography } from "antd";
 
 const { Text, Title } = Typography;
 
@@ -23,21 +23,11 @@ export function IssueCaseSelectionPanel({
   onSelect,
 }: IssueCaseSelectionPanelProps) {
   const [selectedDocId, setSelectedDocId] = useState<string>("");
-  const [manualIndex, setManualIndex] = useState<string>("");
 
   const indexedCases = useMemo(
     () => cases.map((item, idx) => ({ ...item, index: idx + 1 })),
     [cases]
   );
-
-  const chooseByIndex = () => {
-    const parsed = Number.parseInt(manualIndex.trim(), 10);
-    if (!Number.isFinite(parsed)) return;
-    const picked = indexedCases.find((item) => item.index === parsed);
-    if (!picked) return;
-    setSelectedDocId(picked.doc_id);
-    onSelect(picked.doc_id);
-  };
 
   return (
     <Card
@@ -105,15 +95,6 @@ export function IssueCaseSelectionPanel({
           })}
         </div>
 
-        <Space size={8} align="center">
-          <Input
-            placeholder="번호로 선택 (예: 1)"
-            value={manualIndex}
-            onChange={(e) => setManualIndex(e.target.value)}
-            style={{ width: 180 }}
-          />
-          <Button onClick={chooseByIndex}>선택</Button>
-        </Space>
       </Space>
     </Card>
   );

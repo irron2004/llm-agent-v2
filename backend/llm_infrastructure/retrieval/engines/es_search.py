@@ -433,6 +433,53 @@ class EsSearchEngine:
             logger.warning("Section chunk fetch failed: %s", e)
             return []
 
+    def fetch_section_chunks_by_keyword(
+        self,
+        doc_id: str,
+        keyword: str,
+        max_pages: int = 8,
+        content_index: str | None = None,
+        min_page: int | None = None,
+    ) -> list[EsSearchHit]:
+        """Fetch chunks whose section_chapter contains *keyword*, sorted by page.
+
+        Unlike ``fetch_section_chunks`` (exact match), this uses a wildcard
+        query so that e.g. keyword="Work Procedure" matches
+        "6. Work Procedure" or "Work Procedure / 작업 절차".
+
+        Args:
+            min_page: If set, only return chunks with page >= min_page.
+                      Useful to skip earlier sections in multi-SOP documents.
+        """
+        if not doc_id or not keyword:
+            return []
+        filters: list[dict[str, Any]] = [
+            {"term": {"doc_id": doc_id}},
+        ]
+        if min_page is not None:
+            filters.append({"range": {"page": {"gte": min_page}}})
+        query: dict[str, Any] = {
+            "bool": {
+                "filter": filters,
+                "must": [
+                    {"wildcard": {"section_chapter": f"*{keyword}*"}},
+                ],
+            }
+        }
+        body: dict[str, Any] = {
+            "query": query,
+            "size": max_pages,
+            "sort": [{"page": {"order": "asc"}}],
+            "_source": self._source_fields(),
+        }
+        index = content_index or self.index_name
+        try:
+            resp = self.es.search(index=index, body=body)
+            return self._parse_hits(resp)
+        except Exception as e:
+            logger.warning("Section keyword fetch failed (doc=%s, kw=%s): %s", doc_id, keyword, e)
+            return []
+
     def _build_text_query(
         self,
         query_text: str,

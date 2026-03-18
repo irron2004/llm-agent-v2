@@ -322,6 +322,13 @@ class LangGraphRAGAgent:
                 faithful = judge.get("faithful")
                 if faithful is not None:
                     details_parts.append("✓ 충실" if faithful else "✗ 불충실")
+                if not faithful:
+                    issues = judge.get("issues")
+                    hint = judge.get("hint")
+                    if issues:
+                        details_parts.append(f"사유: {', '.join(str(i) for i in issues)}")
+                    if hint:
+                        details_parts.append(f"힌트: {hint}")
 
         elif name == "retry_expand":
             attempts = result.get("attempts") if result else state.get("attempts")

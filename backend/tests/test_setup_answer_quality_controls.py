@@ -84,7 +84,9 @@ def test_answer_node_prioritizes_procedure_refs_for_setup_route() -> None:
     _ = answer_node(state, llm=llm, spec=spec)
 
     assert llm.last_user is not None
-    assert llm.last_user.index("[1] doc_procedure") < llm.last_user.index("[2] doc_scope")
+    # doc_section 그룹핑으로 procedure 문서만 선택되고 scope 문서는 제외됨
+    assert "doc_procedure" in llm.last_user
+    assert "Work Procedure" in llm.last_user
 
 
 def test_answer_node_uses_lower_temperature_for_setup_route() -> None:
@@ -140,5 +142,5 @@ def test_setup_ans_v2_runtime_uses_v3_prompt_with_procedure_first_constraints() 
     assert spec.setup_ans.version == "v3"
     assert "근거 사용 우선순위" in system
     assert "Work Procedure" in system
-    assert "### 작업 절차" in system
+    assert "## 작업 절차" in system
     assert "이모지 번호" in system

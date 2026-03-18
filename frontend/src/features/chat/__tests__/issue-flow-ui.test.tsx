@@ -707,4 +707,136 @@ describe("issue flow end-to-end", () => {
       },
     });
   });
+
+  it("dismisses pending issue card selection when user sends a new chat message", async () => {
+    let call = 0;
+    vi.mocked(connectSse).mockImplementation(async (_req, handlers) => {
+      call += 1;
+      if (call === 1) {
+        handlers.onMessage(
+          JSON.stringify({
+            type: "final",
+            result: {
+              query: "initial question",
+              answer: "summary answer",
+              interrupted: true,
+              thread_id: "issue-thread-dismiss-1",
+              retrieved_docs: [],
+              all_retrieved_docs: [],
+              interrupt_payload: {
+                type: "issue_case_selection",
+                nonce: "nonce-case-dismiss-1",
+                question: "initial question",
+                instruction: "case pick",
+                cases: [{ doc_id: "doc-1", title: "Case 1", summary: "summary 1" }],
+              },
+            },
+          }),
+        );
+      } else {
+        handlers.onMessage(
+          JSON.stringify({
+            type: "final",
+            result: {
+              query: "새 질문",
+              answer: "new answer",
+              interrupted: false,
+              thread_id: "issue-thread-dismiss-1",
+              retrieved_docs: [],
+              all_retrieved_docs: [],
+            },
+          }),
+        );
+      }
+      handlers.onClose?.();
+      return { close: () => {} };
+    });
+
+    const { result } = renderHook(() => useChatSession(), { wrapper });
+
+    await act(async () => {
+      await result.current.send({ text: "initial question" });
+    });
+    await waitFor(() => expect(result.current.pendingIssueCaseSelection).not.toBeNull());
+
+    await act(async () => {
+      await result.current.send({ text: "새 질문" });
+    });
+
+    await waitFor(() => expect(result.current.pendingIssueCaseSelection).toBeNull());
+    expect(vi.mocked(connectSse)).toHaveBeenCalledTimes(2);
+    const req2 = vi.mocked(connectSse).mock.calls[1][0];
+    expect(req2.body).not.toHaveProperty("resume_decision");
+    expect(req2.body).toMatchObject({ message: "새 질문" });
+  });
+
+  it("supports silent issue confirm resume without adding synthetic user message", async () => {
+    let call = 0;
+    vi.mocked(connectSse).mockImplementation(async (_req, handlers) => {
+      call += 1;
+      if (call === 1) {
+        handlers.onMessage(
+          JSON.stringify({
+            type: "final",
+            result: {
+              query: "initial question",
+              answer: "summary answer",
+              interrupted: true,
+              thread_id: "issue-thread-silent-1",
+              retrieved_docs: [],
+              all_retrieved_docs: [],
+              interrupt_payload: {
+                type: "issue_confirm",
+                nonce: "nonce-summary-silent-1",
+                stage: "post_summary",
+                question: "initial question",
+                instruction: "summary confirm",
+                prompt: "추가 문서를 검색하겠습니까?",
+              },
+            },
+          }),
+        );
+      } else {
+        handlers.onMessage(
+          JSON.stringify({
+            type: "final",
+            result: {
+              query: "initial question",
+              answer: "",
+              interrupted: true,
+              thread_id: "issue-thread-silent-1",
+              retrieved_docs: [],
+              all_retrieved_docs: [],
+              interrupt_payload: {
+                type: "issue_case_selection",
+                nonce: "nonce-case-silent-1",
+                question: "initial question",
+                instruction: "case pick",
+                cases: [{ doc_id: "doc-1", title: "Case 1", summary: "summary 1" }],
+              },
+            },
+          }),
+        );
+      }
+      handlers.onClose?.();
+      return { close: () => {} };
+    });
+
+    const { result } = renderHook(() => useChatSession(), { wrapper });
+
+    await act(async () => {
+      await result.current.send({ text: "initial question" });
+    });
+    await waitFor(() => expect(result.current.pendingIssueConfirm).not.toBeNull());
+
+    await act(async () => {
+      result.current.submitIssueConfirm(true, { silent: true });
+    });
+    await waitFor(() => expect(result.current.pendingIssueCaseSelection).not.toBeNull());
+
+    const syntheticConfirmMessages = result.current.messages.filter(
+      (m) => m.role === "user" && m.content.includes("이슈 확인:"),
+    );
+    expect(syntheticConfirmMessages).toHaveLength(0);
+  });
 });

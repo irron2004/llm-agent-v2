@@ -23,6 +23,7 @@ export type SessionChangeCallback = (info: { sessionId: string; title: string; i
 type SendOptions = {
   text: string;
   decisionOverride?: unknown;
+  suppressUserMessage?: boolean;
   overrides?: {
     filterDevices?: string[];
     filterDocTypes?: string[];
@@ -752,7 +753,55 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           ? res.all_retrieved_docs
           : null;
 
-      if (docsToShow) {
+      // SOP 절차조회: 답변에 사용된 문서 1개의 전체 페이지만 오른쪽 pane에 표시
+      const isSopResponse =
+        (typeof res.metadata?.selected_task_mode === "string" &&
+          res.metadata.selected_task_mode.toLowerCase() === "sop") ||
+        (Array.isArray(res.selected_doc_types) &&
+          res.selected_doc_types.some(
+            (dt) => typeof dt === "string" && dt.toLowerCase() === "sop"
+          ));
+
+      const sopFinalDocId = isSopResponse && Array.isArray(res.expanded_docs) && res.expanded_docs.length > 0
+        ? res.expanded_docs[res.expanded_docs.length - 1]?.doc_id ?? null
+        : null;
+
+      if (docsToShow && sopFinalDocId) {
+        // 답변에 사용된 문서 1개의 전체 페이지를 오른쪽 pane에 표시
+        const allDocs = (res.all_retrieved_docs && res.all_retrieved_docs.length > 0)
+          ? res.all_retrieved_docs
+          : docsToShow;
+        const sameDocChunks = allDocs.filter((d) => d.id === sopFinalDocId);
+
+        if (sameDocChunks.length > 0) {
+          const base = sameDocChunks[0];
+          // 우선 base chunk 표시 후, 비동기로 전체 페이지 수를 조회하여 업데이트
+          setCompletedRetrievedDocs([base]);
+
+          const answerPage = typeof base.page === "number" ? base.page : 1;
+
+          fetch(`/api/assets/docs/${encodeURIComponent(sopFinalDocId)}/info`)
+            .then((r) => r.ok ? r.json() : null)
+            .then((info: { total_pages?: number } | null) => {
+              const totalPages = info?.total_pages;
+              if (typeof totalPages === "number" && totalPages > 0) {
+                const allPages = Array.from({ length: totalPages }, (_, i) => i + 1);
+                const allPageUrls = allPages.map((p) => `/api/assets/docs/${sopFinalDocId}/pages/${p}`);
+                const fullDoc: RetrievedDoc = {
+                  ...base,
+                  expanded_pages: allPages,
+                  expanded_page_urls: allPageUrls,
+                  page: answerPage,
+                  page_image_url: allPageUrls[0],
+                };
+                setCompletedRetrievedDocs([fullDoc]);
+              }
+            })
+            .catch(() => { /* 실패 시 base chunk 유지 */ });
+        } else {
+          setCompletedRetrievedDocs(docsToShow);
+        }
+      } else if (docsToShow) {
         setCompletedRetrievedDocs(docsToShow);
       } else {
         setCompletedRetrievedDocs(null);
@@ -771,6 +820,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         content: finalAssistantContent,
         retrievedDocs: res.retrieved_docs || [],
         allRetrievedDocs: res.all_retrieved_docs || [],  // 재생성용 전체 문서 (최대 retrieval_top_k개)
+        expandedDocs: res.expanded_docs ?? null,
         rawAnswer: JSON.stringify(res, null, 2),
         currentNode: null,
         sessionId,
@@ -900,7 +950,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   );
 
   const send = useCallback(
-    async ({ text, decisionOverride, overrides }: SendOptions) => {
+    async ({ text, decisionOverride, suppressUserMessage, overrides }: SendOptions) => {
       stop();
       setError(null);
       setPendingRegeneration(null);
@@ -916,6 +966,13 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       ) && Boolean(issueThreadId);
       const isHilResume = Boolean(hilPending);
       const isResume = isHilResume || isGuidedResume || isIssueResume;
+
+      if (!isResume) {
+        setPendingIssueConfirm(null);
+        setPendingIssueCaseSelection(null);
+        setPendingIssueSopConfirm(null);
+        issueDecisionSubmittingRef.current = false;
+      }
 
       const resumeThreadId = isHilResume
         ? (hilPending?.threadId ?? "")
@@ -978,12 +1035,14 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           }
         : DEFAULT_ISSUE_RESUME_CONTEXT;
 
-      appendMessage({
-        id: userId,
-        role: "user",
-        content: text,
-        sessionId,
-      });
+      if (!suppressUserMessage) {
+        appendMessage({
+          id: userId,
+          role: "user",
+          content: text,
+          sessionId,
+        });
+      }
 
       // Assistant placeholder so the UI shows progress immediately.
       // Note: logs are stored in context, not in message object
@@ -1455,7 +1514,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   );
 
   const submitIssueConfirm = useCallback(
-    (confirm: boolean) => {
+    (confirm: boolean, options?: { silent?: boolean }) => {
       if (!pendingIssueConfirm) return;
       if (issueDecisionSubmittingRef.current) return;
       const dedupeKey = `issue_confirm:${pendingIssueConfirm.payload.nonce}`;
@@ -1470,7 +1529,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       };
       setPendingIssueConfirm(null);
       void send({
-        text: `이슈 확인: ${confirm ? "예" : "아니오"}`,
+        text: options?.silent ? "" : `이슈 확인: ${confirm ? "예" : "아니오"}`,
+        suppressUserMessage: Boolean(options?.silent),
         decisionOverride: decision,
       }).finally(() => {
         issueDecisionSubmittingRef.current = false;
@@ -1506,7 +1566,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
   );
 
   const submitIssueSopConfirm = useCallback(
-    (confirm: boolean) => {
+    (confirm: boolean, options?: { silent?: boolean }) => {
       if (!pendingIssueSopConfirm) return;
       if (issueDecisionSubmittingRef.current) return;
       const dedupeKey = `issue_sop_confirm:${pendingIssueSopConfirm.payload.nonce}`;
@@ -1520,7 +1580,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       };
       setPendingIssueSopConfirm(null);
       void send({
-        text: `SOP 확인: ${confirm ? "예" : "아니오"}`,
+        text: options?.silent ? "" : `SOP 확인: ${confirm ? "예" : "아니오"}`,
+        suppressUserMessage: Boolean(options?.silent),
         decisionOverride: decision,
       }).finally(() => {
         issueDecisionSubmittingRef.current = false;

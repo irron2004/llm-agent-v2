@@ -601,7 +601,7 @@ class AgentSettings(BaseSettings):
         description="Default mq_mode when request does not provide one",
     )
     second_stage_doc_retrieve_enabled: bool = False
-    early_page_penalty_enabled: bool = False
+    early_page_penalty_enabled: bool = True
     early_page_penalty_max_page: int = 2
     early_page_penalty_factor: float = 0.3
     second_stage_max_doc_ids: int = 1

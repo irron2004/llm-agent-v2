@@ -24,6 +24,7 @@ export type Message = {
   rawAnswer?: string;
   retrievedDocs?: RetrievedDoc[];
   allRetrievedDocs?: RetrievedDoc[];  // 전체 검색 문서 (재생성용, 20개)
+  expandedDocs?: ExpandedDoc[] | null;
   logs?: string[];
   currentNode?: string | null;
   sessionId?: string;
@@ -79,6 +80,13 @@ export type RetrievedDoc = {
   expanded_page_urls?: string[] | null;
 };
 
+export type ExpandedDoc = {
+  rank: number;
+  doc_id: string;
+  content: string;
+  content_length: number;
+};
+
 export type ReviewDoc = {
   docId: string;
   rank: number;
@@ -109,6 +117,7 @@ export type AgentResponse = {
   judge?: Record<string, unknown>;
   retrieved_docs?: RetrievedDoc[];
   all_retrieved_docs?: RetrievedDoc[];  // 전체 검색 문서 (재생성용, 20개)
+  expanded_docs?: ExpandedDoc[];
   metadata?: Record<string, unknown>;
   interrupted?: boolean;
   interrupt_payload?: Record<string, unknown> | null;

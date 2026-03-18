@@ -118,9 +118,14 @@ export default function Layout() {
       };
     }
     if (completedRetrievedDocs && completedRetrievedDocs.length > 0) {
+      const isSingleSopDoc = completedRetrievedDocs.length === 1 &&
+        typeof (completedRetrievedDocs[0].metadata as Record<string, unknown> | null | undefined)?.doc_type === "string" &&
+        ((completedRetrievedDocs[0].metadata as Record<string, unknown>).doc_type as string).toLowerCase() === "sop";
       return {
-        title: "확장 문서/참고 문서",
-        subtitle: `${completedRetrievedDocs.length}개 문서`,
+        title: isSingleSopDoc ? "답변에 사용된 문서" : "확장 문서/참고 문서",
+        subtitle: isSingleSopDoc
+          ? completedRetrievedDocs[0].title || "SOP 문서 전체"
+          : `${completedRetrievedDocs.length}개 문서`,
       };
     }
     return {
@@ -1228,6 +1233,21 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
 }> }) {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // SOP 전체 문서: 답변에 사용된 페이지로 자동 스크롤
+  useEffect(() => {
+    if (docs.length !== 1) return;
+    const doc = docs[0];
+    const answerPage = doc.page;
+    if (typeof answerPage !== "number" || !doc.expanded_pages || doc.expanded_pages.length <= 1) return;
+
+    const timer = setTimeout(() => {
+      const el = containerRef.current?.querySelector(`[data-page="${answerPage}"]`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [docs]);
 
   // 이미지 URL이 유효한지 확인
   const hasValidImageUrl = (url: string | null | undefined): url is string => {
@@ -1307,7 +1327,7 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
   };
 
   return (
-    <div className="retrieved-docs-container">
+    <div className="retrieved-docs-container" ref={containerRef}>
       {docs.map((doc, index) => {
         const pageNumbers = doc.expanded_pages && doc.expanded_pages.length > 0
           ? doc.expanded_pages
@@ -1363,6 +1383,7 @@ function RetrievedDocsContent({ docs }: { docs: Array<{
                         key={`${url}-${pageIdx}`}
                         src={url}
                         alt={`${displayTitle || "Document"} page ${pageNumbers[pageIdx] || pageIdx + 1}`}
+                        data-page={pageNumbers[pageIdx] || pageIdx + 1}
                         className="retrieved-doc-image"
                         style={{ cursor: "pointer" }}
                         onClick={() => handleImageClick(index, pageIdx, url)}
