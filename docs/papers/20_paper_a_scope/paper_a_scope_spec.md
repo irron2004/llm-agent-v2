@@ -22,10 +22,11 @@
 **Exploratory (ablation/appendix):**
 4. family-aware retrieval — `device_family_seed.csv` 기반 예비실험만
 5. equip-level contamination — partial experiment (field_record scope label 부족)
+6. acronym/term-sense disambiguation (ASD) — 약어 다의어 보정 (예: `AR`)
 
 **Future extension (Paper A-1/A-2):**
-6. engineer-validated family graph → main experiment 반영
-7. field_record(myservice/gcb) scope table 보강 → equip 실험 본격화
+7. engineer-validated family graph → main experiment 반영
+8. field_record(myservice/gcb) scope table 보강 → equip 실험 본격화
 
 > **논문 서술 권장 (PE)**:
 > - "We use shared-document labels as a verified relaxation mechanism."
@@ -129,6 +130,41 @@ Score(d, q) = Base(d, q) - λ₁(q) · v_scope(d, q) - λ₂(q) · v_type(d, q)
 - `λ₂(q)`: intent 분류 confidence에 따라 조절
 - 본문에서는 `λ₁·v_scope`만 사용, `λ₂·v_type`은 데이터 충분성 확인 후 Appendix로 분리
 
+### 1.5 Acronym/Term-Sense Disambiguation (ASD, v0.7 추가)
+
+현장 질의에는 `AR`처럼 의미가 여러 개인 약어가 자주 등장한다.
+예: `AR 수치 저하`는 의도상 `ashing rate 저하`인데, 검색에서는 `atomic ratio` 관련 문서가 상위로 섞일 수 있다.
+
+이 문제는 Paper A의 core(장비 스코프)와 충돌하지 않는다. 위치는 다음과 같다.
+
+* **Step 0 전처리 모듈**: 파서/라우터 이전에 약어 의미를 정규화
+* **역할**: query lexical ambiguity 완화 (device scope 정책 대체 아님)
+
+v1 정책(규칙 기반, 설명 가능성 우선):
+
+1. 약어 사전 후보 생성: `AR -> {ashing_rate, atomic_ratio, ...}`
+2. 문맥 키워드 점수: 질의 주변 단어(`저하`, `증가`, `알람`, `막힘`, `조성`, `비율` 등)와 sense별 cue 매칭
+3. doc_type prior 점수: intent/doc_type와 sense의 적합도 반영
+4. 최종 결정:
+   - confidence >= `τ_asd` 이면 canonical term으로 치환/확장
+   - confidence < `τ_asd` 이면 원문 유지 + `needs_clarification` 플래그
+
+간단 점수식(규칙 기반):
+
+```
+score(s | q) = w_ctx * match_ctx(s, q) + w_type * prior_doc_type(s, q) + w_dev * prior_device(s, q)
+sense*(q) = argmax_s score(s | q)
+```
+
+출력 필드(로그/분석용):
+
+* `asd_term_raw` (예: `AR`)
+* `asd_sense_pred` (예: `ashing_rate`)
+* `asd_confidence`
+* `asd_mode` (`rewrite` / `expand` / `abstain`)
+
+> 운영 원칙: ASD는 **query normalization 보조기능**이며, Paper A 메인 주장(스코프 필터링)의 대체 기법으로 기술하지 않는다.
+
 ---
 
 ## 2) 오프라인 준비(필수 3종)
@@ -188,14 +224,33 @@ w(a,b) = |Topics(a) ∩ Topics(b)| / |Topics(a) ∪ Topics(b)|   (Jaccard)
 * 라우팅은 **저차원(Matryoshka 128d 기본, ablation: 64/128/256)**로 Top-M device를 검색
 * **필수 확인**: 현재 embedding 모델이 MRL 지원하는지 (지원 안 하면 효과 보장 없음)
 
+### 2.4 ASD 사전/규칙셋 구축 (v0.7 추가, exploratory)
+
+파일(권장): `data/paper_a/metadata/acronym_sense_lexicon.csv`
+
+| 컬럼 | 설명 |
+|---|---|
+| `term_raw` | 원형 약어 (예: `AR`) |
+| `sense_id` | 의미 ID (예: `ashing_rate`, `atomic_ratio`) |
+| `canonical_term` | 치환/확장에 쓸 정규형 |
+| `positive_cues` | 해당 의미를 지지하는 문맥 cue (`|` 구분) |
+| `negative_cues` | 해당 의미와 충돌하는 cue |
+| `preferred_doc_types` | 의미와 잘 맞는 doc_type |
+| `notes` | 비고 |
+
+최초 시드 구축은 상위 빈도 약어(AR, PR, RF, OES 등)부터 시작하고, 오탐 사례를 누적 반영한다.
+
 ---
 
 ## 3) 온라인 파이프라인(의사코드)
 
 ```pseudo
 function ANSWER(q):
+  # 0) Acronym/term-sense normalization (optional exploratory module)
+  q_norm, asd = NORMALIZE_QUERY_TERMS(q)
+
   # 1) Parse (이미 auto-parse 존재)
-  parsed = AUTO_PARSE(q)  # device_name?, equip_id?, intent?
+  parsed = AUTO_PARSE(q_norm)  # device_name?, equip_id?, intent?
 
   # 2) Decide scope S(q)
   if parsed.equip_id:
@@ -208,7 +263,7 @@ function ANSWER(q):
       mode = "HARD_DEVICE"
   else:
       # 2-1) Matryoshka router: get Top-M device candidates
-      C = ROUTE_BY_MATRYOSHKA(q, dim=128, topM=3)
+      C = ROUTE_BY_MATRYOSHKA(q_norm, dim=128, topM=3)
       # 2-2) Family expansion (절차 문서에만 적용)
       S_device = C ∪ UNION(Family(c) for c in C)
       S_equip  = None
@@ -216,7 +271,7 @@ function ANSWER(q):
 
   # 3) Retrieve under scope with scope_level-aware filtering
   candidates = HYBRID_RRF_RETRIEVE(
-      q,
+      q_norm,
       filter = BUILD_SCOPE_FILTER(S_device, S_equip),
       topN = 60
   )
@@ -227,11 +282,11 @@ function ANSWER(q):
   #                          없으면 device_name ∈ S_device (fallback)
 
   # 4) Rerank (optional, baseline/ablation)
-  ranked = CROSS_ENCODER_RERANK(q, candidates)  # topK output
+  ranked = CROSS_ENCODER_RERANK(q_norm, candidates)  # topK output
 
   # 5) Contamination-aware Scoring (v0.4 신규)
   if mode == "ROUTED_FAMILY":
-      conf = ROUTER_CONFIDENCE(q)          # top1-top2 score gap
+      conf = ROUTER_CONFIDENCE(q_norm)          # top1-top2 score gap
       lam = LAM_MAX * sigmoid(ALPHA * conf - BETA)
   else:
       lam = LAM_MAX                        # Hard 모드: 사실상 binary filter
@@ -243,14 +298,15 @@ function ANSWER(q):
   ranked = SORT_BY(ranked, key=final_score, desc=True)
 
   # 6) Generate (RAG)
-  answer = LLM_GENERATE_WITH_CITATIONS(q, top_docs=ranked[1..K])
-  return answer, ranked, mode, S_device, S_equip
+  answer = LLM_GENERATE_WITH_CITATIONS(q_norm, top_docs=ranked[1..K])
+  return answer, ranked, mode, S_device, S_equip, asd
 ```
 
 ### 코드베이스 매핑
 
 | 의사코드 함수 | 현재 구현 | 위치 | 상태 |
 |---|---|---|---|
+| `NORMALIZE_QUERY_TERMS(q)` | — | — | **새로 구현 필요** (ASD 전처리) |
 | `AUTO_PARSE(q)` | `auto_parse_node` | `langgraph_agent.py:2764` | 있음 (룰 기반) |
 | `ROUTE_BY_MATRYOSHKA(q)` | — | — | **새로 구현 필요** |
 | `Family(device)` | — | — | **새로 구축 필요** (오프라인) |
@@ -267,6 +323,7 @@ function ANSWER(q):
 
 | 준비물 | 데이터 소스 | 구현 방법 |
 |---|---|---|
+| ASD lexicon/rules | 약어 오탐 로그 + 도메인 용어집 | `acronym_sense_lexicon.csv` 구축 + 룰 엔진 |
 | D_shared 판정 | topic × device_name 분포 분석 | 스크립트로 집계 → `is_shared` 필드 업데이트 |
 | scope_level 부여 | doc_type + D_shared 판정 결과 | 스크립트로 `scope_level` 필드 산출 → ES 매핑 추가 |
 | Family graph | device 쌍별 공유 topic Jaccard | 스크립트로 그래프 구축 → JSON/config 저장 |
@@ -332,6 +389,22 @@ TypeDrift@k = (1/k) · Σ 1[doc_type(d_i) ∉ expected_types(intent(q))]
 * 메인 메트릭이 아닌 **분석/Discussion 절**에서 contamination의 또 다른 차원으로 제시
 * 특히 myservice 편중 코퍼스에서 SOP 질의 시 로그가 상위에 등장하는 패턴 분석에 유용
 
+### 4.5 Acronym Sense Metrics (보조 분석, v0.7 추가)
+
+약어 다의어(예: AR) 관련 보조 지표:
+
+| 메트릭 | 정의 | 목적 |
+|---|---|---|
+| `ASD-Acc` | `#(정답 sense 예측) / #(약어 다의어 질의)` | 전처리 품질 확인 |
+| `ASD-Abstain` | `#(abstain) / #(약어 다의어 질의)` | 모호 질의 보수성 측정 |
+| `Sense-Cont@k` | top-k 중 의도 sense와 충돌하는 문서 비율 | 의미 혼입 정량화 |
+
+```
+SenseCont@k = (1/k) * Σ 1[sense(d_i) ∉ allowed_senses(q)]
+```
+
+> 주의: 본 지표는 Paper A 메인 성과지표가 아니라, AR류 오탐을 줄이기 위한 보조 분석으로 보고한다.
+
 ---
 
 ## 5) Baseline / Ablation Matrix (실험 표)
@@ -343,6 +416,7 @@ TypeDrift@k = (1/k) · Σ 1[doc_type(d_i) ∉ expected_types(intent(q))]
 | B2 | 없음(글로벌) | Hybrid+RRF | X | 현 표준 |
 | B3 | 없음(글로벌) | Hybrid+RRF | O | strong baseline |
 | B4 | auto-parse Hard | Hybrid+RRF (filter) | O | "필터만" 효과 (≈현 프로덕션) |
+| A1 | B4 + ASD 전처리 | Hybrid+RRF (filter) | O | 약어 다의어 보정 효과 (예: AR) |
 | P1 | Hard + Shared | Hybrid+RRF | O | 공용문서 정책 효과 |
 | P2 | Matryoshka Router Top-M | Hybrid+RRF (filter) | O | **G(라우팅) 핵심** |
 | P3 | Router + Family | Hybrid+RRF | O | 유사장비/공유 SOP 대응 |
@@ -358,6 +432,7 @@ TypeDrift@k = (1/k) · Σ 1[doc_type(d_i) ∉ expected_types(intent(q))]
 * Family 확장 크기 제한 L: {0, 3, 10} — Appendix
 
 모든 실험은 **Explicit / Masked / Ambiguous 서브셋별로 분리** 보고.
+ASD 실험은 별도 `Acronym-Ambiguous` subset에서 `B4 vs A1` 중심으로 비교.
 
 ---
 
@@ -367,6 +442,7 @@ TypeDrift@k = (1/k) · Σ 1[doc_type(d_i) ∉ expected_types(intent(q))]
 * **Mask set**: SOP79에서 device/equip 토큰 제거/치환 → **라우팅 필요성 검증용**
 * **Ambiguous challenge set**: 공유 topic(controller, FFU, robot 등)이 많은 장비/문서만 골라 구성
 * **Real-Implicit set** (가능 시): 운영 로그에서 auto_parse가 device를 못 잡은 질의 (최소 200-300개)
+* **Acronym-Ambiguous set** (신규): 약어 다의어 질의(예: `AR 수치 저하`) 최소 80개
 
 ---
 
@@ -482,6 +558,11 @@ TypeDrift@k = (1/k) · Σ 1[doc_type(d_i) ∉ expected_types(intent(q))]
 - ablation: P6(λ 고정) vs P7(λ 적응형) 비교로 C4 효과 실증
 - doc_type penalty (λ₂·v_type)는 Appendix 후보로 분리 — 본문 scope 관리
 
+### D10. 약어 다의어(ASD) 포지셔닝 — **보조 모듈로 제한** (v0.7)
+- AR류 다의어는 실제 오염 원인이지만, Paper A core 주장(스코프 정책)과 분리해 **exploratory ablation**으로만 보고
+- 메인 테이블은 기존 B0~P7 유지, ASD는 `A1` 보조 표/부록으로 보고
+- 결과 해석 시 `ASD-Acc`, `Sense-Cont@k`를 contamination 보조 증거로 사용
+
 ---
 
 ## 10-추가) 초기 실험 파라미터 고정값 (v0.2)
@@ -543,6 +624,10 @@ TypeDrift@k = (1/k) · Σ 1[doc_type(d_i) ∉ expected_types(intent(q))]
 - [ ] Family(device) 그래프 1차 구축 (Jaccard 임계치 실험 포함)
 - [ ] Router baseline 확정 (auto-parse only vs Matryoshka top-M)
 - [ ] 평가 리포트 템플릿 확정 (`Cont raw/adjusted/shared`, `DocHit`, `PageHit`, latency)
+- [ ] `acronym_sense_lexicon.csv` 구축 (AR, PR, RF, OES 우선)
+- [ ] ASD 전처리 구현 (`NORMALIZE_QUERY_TERMS`) + `asd_confidence` 로깅
+- [ ] Acronym-Ambiguous set 구축 (최소 80질의, sense gold 포함)
+- [ ] ASD ablation 실행 (`B4` vs `A1`) + `ASD-Acc`, `Sense-Cont@k` 산출
 - [x] query_gold_master 확장: Explicit 150 + Implicit 150 + Ambiguous 80 = 380건 확보
 - [ ] (조건부) Equip-Cont@k 포함 여부 결정 — equip-level 데이터 충분성 확인 후
 - [ ] (v0.4) C5 Contamination-aware scoring 구현: `Score = Base - λ·v_scope`
@@ -628,6 +713,7 @@ TypeDrift@k = (1/k) · Σ 1[doc_type(d_i) ∉ expected_types(intent(q))]
 ### 12.6 실험군 고정표 (논문 표 1:1 매핑)
 
 - Baseline: `B0`, `B1`, `B2`, `B3`, `B4`
+- ASD Ablation: `A1` (`B4 + ASD`)
 - Proposed: `P1`, `P2`, `P3`, `P4`, `P6`, `P7`
 - Optional: `P5` (F 구현, 효율 비교)
 - Matryoshka ablation: `dim={64,128,256,768}`, `M={1,3,5}`

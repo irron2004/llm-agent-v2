@@ -39,29 +39,36 @@ shared-policy 역설이라는 네 개의 약한 고리에 걸려 있다.
 - `docs/papers/20_paper_a_scope/evidence/2026-03-14_v06_gold_audit.md`
 - `docs/papers/20_paper_a_scope/evidence/2026-03-14_v07_mixed_eval_restoration.md`
 - `docs/papers/20_paper_a_scope/evidence/2026-03-14_v07_implicit_eval.md`
+- `docs/papers/20_paper_a_scope/evidence/2026-03-18_p7plus_algorithm_proposal.md`
+- `docs/papers/20_paper_a_scope/evidence/2026-03-18_p7plus_experiment.md`
+- `docs/papers/20_paper_a_scope/paper_a_draft_v2.md`
 - `scripts/paper_a/measure_parser_accuracy.py`
 - `scripts/paper_a/analyze_b45_failure_decomposition.py`
 - `scripts/paper_a/generate_v06_gold_audit.py`
 - `scripts/paper_a/build_v07_mixed_eval_set.py`
 - `scripts/paper_a/run_masked_hybrid_experiment.py`
 - `scripts/paper_a/run_masked_p6p7_experiment.py`
+- `scripts/paper_a/run_p8_evidence_scope_experiment.py`
 - `backend/llm_infrastructure/llm/langgraph_agent.py`
 - `data/paper_a/parser_accuracy_report.json`
 - `data/paper_a/parser_accuracy_per_query_diff.csv`
 - `docs/papers/20_paper_a_scope/evidence/2026-03-14_oracle_vs_parser_gap.md`
 - `data/paper_a/masked_hybrid_results.json`
 - `data/paper_a/masked_p6p7_results.json`
+- `data/paper_a/p8_results.json`
 - `data/paper_a/gold_verification_report.json`
 - `data/paper_a/eval/query_gold_master_v0_7_mixed.jsonl`
 - `data/paper_a/eval/query_gold_master_v0_7_mixed_split_report.json`
 - `.sisyphus/evidence/paper-a/runs/2026-03-14_v07_implicit_eval/`
+- `docs/papers/20_paper_a_scope/evidence/2026-03-18_p8_algorithm_spec.md`
+- `docs/papers/20_paper_a_scope/evidence/2026-03-18_p8_implementation_issue_report.md`
 
 ## Out Of Scope
 
 - frontend 변경
 - API route/payload contract 변경
 - unrelated issue-route 작업 파일 수정
-- Paper A 전체 원고 리라이트
+- Paper A 전체 원고 리라이트(구조 전면 변경)
 - API/Frontend feature work
 
 ## Risks
@@ -79,6 +86,7 @@ cd /home/hskim/work/llm-agent-v2
 uv run python scripts/paper_a/measure_parser_accuracy.py
 uv run python scripts/paper_a/generate_v06_gold_audit.py
 uv run python scripts/paper_a/build_v07_mixed_eval_set.py
+uv run python scripts/paper_a/run_masked_p6p7_experiment.py
 uv run python - <<'PY'
 import json
 from pathlib import Path
@@ -91,6 +99,8 @@ for key in ('parser_accuracy', 'retrieval_comparison'):
 assert Path('data/paper_a/gold_verification_report.json').exists()
 assert Path('data/paper_a/eval/query_gold_master_v0_7_mixed.jsonl').exists()
 assert Path('data/paper_a/eval/query_gold_master_v0_7_mixed_split_report.json').exists()
+arr = json.loads(Path('data/paper_a/masked_p6p7_results.json').read_text(encoding='utf-8'))
+assert arr and 'P7plus_masked' in arr[0]['conditions']
 print('parser report verified')
 PY
 uv run pytest tests/api/test_agent_response_metadata_contract.py -v
@@ -129,7 +139,16 @@ uv run pytest tests/api/test_agent_retrieval_only.py -v
   - note: masked hybrid 결과 기본 필드(`conditions`, `target_device`, `scope_observability`) 검증
 - command: `uv run python scripts/paper_a/run_masked_p6p7_experiment.py`
   - result: pass
-  - note: T6 soft scoring 재실험 결과 `data/paper_a/masked_p6p7_results.json` 생성 확인
+  - note: T6 재실행 + `P7plus_masked` 조건 추가 결과 `data/paper_a/masked_p6p7_results.json` 생성 확인
+- command: `python - <<'PY' ... p7plus result artifact verified ... PY`
+  - result: pass
+  - note: `data/paper_a/masked_p6p7_results.json`에 `P7plus_masked` 조건 존재 확인
+- command: `python - <<'PY' ... p7plus evidence doc verified ... PY`
+  - result: pass
+  - note: `docs/papers/20_paper_a_scope/evidence/2026-03-18_p7plus_experiment.md` 핵심 섹션 확인
+- command: `python - <<'PY' ... p7+ proposal updated and verified ... PY`
+  - result: pass
+  - note: P7+ 제안서에 oracle upper bound / realistic 분리 문구 반영 확인
 - command: `python - <<'PY' ... hybrid and p6p7 evidence docs verified ... PY`
   - result: pass
   - note: T5/T6 evidence 문서 `2026-03-14_hybrid_rerank_recovery.md`, `2026-03-14_masked_p6p7_reexperiment.md` 존재 및 핵심 섹션 확인
@@ -157,6 +176,12 @@ uv run pytest tests/api/test_agent_retrieval_only.py -v
 - command: `lsp_diagnostics scripts/paper_a/build_v07_mixed_eval_set.py`
   - result: pass
   - note: 새 T3 스크립트에 에러 진단 없음
+- command: `lsp_diagnostics scripts/paper_a/run_masked_p6p7_experiment.py`
+  - result: pass
+  - note: P7+를 반영한 T6 스크립트에 에러 진단 없음
+- command: `uv run ruff check scripts/paper_a/run_masked_p6p7_experiment.py`
+  - result: blocked
+  - note: 현재 환경에서 `ruff` 실행 파일 미설치로 실행 불가(`No such file or directory`)
 - command: `uv run pytest tests/api/test_agent_response_metadata_contract.py -v`
   - result: pass
   - note: C-API-001 metadata contract 유지 확인
@@ -166,6 +191,9 @@ uv run pytest tests/api/test_agent_retrieval_only.py -v
 - command: `uv run pytest tests/api/test_agent_retrieval_only.py -v`
   - result: pass
   - note: C-API-003 retrieval_only contract 유지 확인
+- command: `lsp_diagnostics scripts/paper_a/run_p8_evidence_scope_experiment.py`
+  - result: pass
+  - note: P8 실험 스크립트 타입/진단 오류 없음 확인
 
 ## Handoff
 
@@ -173,9 +201,9 @@ uv run pytest tests/api/test_agent_retrieval_only.py -v
 - Last passing verification command and result:
   - `uv run pytest tests/api/test_agent_retrieval_only.py -v` (pass)
 - Remaining TODOs (priority order):
-  1. hybrid/dense index 차원 불일치 해결 후 `v0.7` implicit slice 실험 재실행
-  2. reconcile generated evidence with other dirty user-owned Paper A docs before any commit
-  3. update main manuscript files (`paper_a_scope.md`, `paper_a_draft_v2.md`) only after user confirms narrative direction
+  1. `P7+`를 cached-candidate simulation이 아닌 end-to-end retrieval 모드로 확장 검증
+  2. hybrid/dense index 차원 불일치 해결 후 `v0.7` implicit slice 실험 재실행
+  3. reconcile generated evidence with other dirty user-owned Paper A docs before any commit
 - Whether `Allowed Files` changed and why: no
 - Whether `Contracts To Update` is expected: no
 
@@ -192,6 +220,10 @@ uv run pytest tests/api/test_agent_retrieval_only.py -v
 - 2026-03-14: T3 mixed eval restoration 스크립트 구현, split rebuild 및 validation 완료
 - 2026-03-14: v0.7 implicit eval 실행 시도, hybrid index 차원 불일치 blocker 확인 및 evidence 문서화
 - 2026-03-14: API protected contracts(C-API-001/002/003) 회귀 테스트 전부 통과
+- 2026-03-18: `run_masked_p6p7_experiment.py`에 P7+ (confidence-gated hard/soft blending + shared cap) 구현
+- 2026-03-18: P7+ 결과 문서 `2026-03-18_p7plus_experiment.md` 생성
+- 2026-03-18: P7+ 제안서에 oracle upper bound vs realistic 결과 분리 문구 반영
+- 2026-03-18: `run_p8_evidence_scope_experiment.py` 로직 점검/보정 작업 범위를 Allowed Files에 반영
 
 ## Final Check
 

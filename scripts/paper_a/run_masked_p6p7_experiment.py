@@ -1,4 +1,4 @@
-"""P6/P7 soft scoring re-experiment on masked queries (Paper A).
+"""P6/P7/P7+ soft scoring re-experiment on masked queries (Paper A).
 
 Strategy:
   - Load masked_hybrid_results.json which has B3_masked top_doc_ids per query.
@@ -8,7 +8,7 @@ Strategy:
       P7: score = base - lambda_q * v_scope(doc, target_device)
           where lambda_q = 0.05 * (n_out_of_scope / len(docs))
   - Re-sort by adjusted score, compute contamination@10 and gold_hit@10.
-  - Compare: B3_masked, B4_masked, B4.5_masked, P6_masked, P7_masked.
+  - Compare: B3_masked, B4_masked, B4.5_masked, P6_masked, P7_masked, P7plus_masked.
 
 Outputs:
   data/paper_a/masked_p6p7_results.json
@@ -21,13 +21,13 @@ import json
 import sys
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.paper_a._io import read_jsonl, write_json
+from scripts.paper_a._io import JsonValue, read_jsonl, write_json
 
 # ---------------------------------------------------------------------------
 # Paths
@@ -39,6 +39,22 @@ OUT_PATH = ROOT / "data/paper_a/masked_p6p7_results.json"
 
 TOP_K = 10
 LAMBDA_FIXED = 0.05
+
+P7PLUS_T_HIGH = 0.75
+P7PLUS_T_MID = 0.55
+P7PLUS_SHARED_CAP_HIGH = 0
+P7PLUS_SHARED_CAP_MID = 1
+P7PLUS_SHARED_CAP_LOW = 2
+P7PLUS_EARLY_WINDOW = 5
+P7PLUS_CANDIDATE_MAX = 30
+P7PLUS_B4_WEIGHT = 1.15
+P7PLUS_B45_WEIGHT = 0.90
+P7PLUS_LAMBDA_BASE = 0.04
+P7PLUS_LAMBDA_SPAN = 0.06
+P7PLUS_MU_BASE = 0.01
+P7PLUS_MU_SPAN = 0.04
+P7PLUS_ETA_BASE = 0.02
+P7PLUS_ETA_SPAN = 0.08
 
 
 # ---------------------------------------------------------------------------
@@ -102,7 +118,9 @@ def apply_soft_scoring(
     scored: list[tuple[str, float]] = []
     for rank, doc_id in enumerate(doc_ids):
         base = 1.0 / (rank + 1)
-        penalty = lambda_val * v_scope(doc_id, target_device, doc_device_map, shared_ids)
+        penalty = lambda_val * v_scope(
+            doc_id, target_device, doc_device_map, shared_ids
+        )
         scored.append((doc_id, base - penalty))
     scored.sort(key=lambda x: x[1], reverse=True)
     return [doc_id for doc_id, _ in scored]
@@ -121,6 +139,128 @@ def lambda_adaptive(
         1 for d in doc_ids if v_scope(d, target_device, doc_device_map, shared_ids) == 1
     )
     return LAMBDA_FIXED * (n_out / len(doc_ids))
+
+
+def _dedupe_keep_order(doc_ids: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for doc_id in doc_ids:
+        if doc_id not in seen:
+            seen.add(doc_id)
+            out.append(doc_id)
+    return out
+
+
+def _rank_score_map(doc_ids: list[str], weight: float) -> dict[str, float]:
+    score_map: dict[str, float] = {}
+    for rank, doc_id in enumerate(doc_ids):
+        score = weight / (rank + 1)
+        prev = score_map.get(doc_id)
+        if prev is None or score > prev:
+            score_map[doc_id] = score
+    return score_map
+
+
+def scope_confidence_proxy(scope_observability: str) -> float:
+    scope = scope_observability.strip().lower()
+    if scope == "explicit_device":
+        return 0.85
+    if scope == "explicit_equip":
+        return 0.60
+    if scope == "implicit":
+        return 0.45
+    return 0.50
+
+
+def build_p7plus_ranking(
+    *,
+    b3_doc_ids: list[str],
+    b4_doc_ids: list[str],
+    b45_doc_ids: list[str],
+    target_device: str,
+    scope_observability: str,
+    doc_device_map: dict[str, str],
+    shared_ids: set[str],
+) -> tuple[list[str], dict[str, Any]]:
+    conf = scope_confidence_proxy(scope_observability)
+    if conf >= P7PLUS_T_HIGH:
+        seed = b4_doc_ids + b3_doc_ids + b45_doc_ids
+        shared_cap = P7PLUS_SHARED_CAP_HIGH
+    elif conf >= P7PLUS_T_MID:
+        seed = b4_doc_ids + b45_doc_ids + b3_doc_ids
+        shared_cap = P7PLUS_SHARED_CAP_MID
+    else:
+        seed = b3_doc_ids + b45_doc_ids + b4_doc_ids
+        shared_cap = P7PLUS_SHARED_CAP_LOW
+
+    candidates = _dedupe_keep_order(seed)[:P7PLUS_CANDIDATE_MAX]
+
+    b3_score_map = _rank_score_map(b3_doc_ids, 1.0)
+    b4_score_map = _rank_score_map(b4_doc_ids, P7PLUS_B4_WEIGHT)
+    b45_score_map = _rank_score_map(b45_doc_ids, P7PLUS_B45_WEIGHT)
+
+    lambda_q = P7PLUS_LAMBDA_BASE + P7PLUS_LAMBDA_SPAN * (1.0 - conf)
+    mu_q = P7PLUS_MU_BASE + P7PLUS_MU_SPAN * conf
+    eta_q = P7PLUS_ETA_BASE + P7PLUS_ETA_SPAN * conf
+
+    scored: list[tuple[str, float, int]] = []
+    tgt = target_device.strip().upper()
+    for doc_id in candidates:
+        base = max(
+            b3_score_map.get(doc_id, 0.0),
+            b4_score_map.get(doc_id, 0.0),
+            b45_score_map.get(doc_id, 0.0),
+        )
+        oos = v_scope(doc_id, target_device, doc_device_map, shared_ids)
+        is_shared = 1 if doc_id in shared_ids else 0
+        doc_dev = doc_device_map.get(doc_id, "").strip().upper()
+        is_target = 1 if doc_dev and doc_dev == tgt else 0
+        score = base - lambda_q * oos - mu_q * is_shared + eta_q * is_target
+        scored.append((doc_id, score, is_shared))
+
+    scored.sort(key=lambda x: x[1], reverse=True)
+
+    selected: list[str] = []
+    deferred: list[tuple[str, float, int]] = []
+    shared_in_early = 0
+    for doc_id, score, is_shared in scored:
+        if len(selected) >= TOP_K:
+            break
+
+        in_early_window = len(selected) < P7PLUS_EARLY_WINDOW
+        if in_early_window and is_shared == 1 and shared_in_early >= shared_cap:
+            deferred.append((doc_id, score, is_shared))
+            continue
+
+        selected.append(doc_id)
+        if len(selected) <= P7PLUS_EARLY_WINDOW and is_shared == 1:
+            shared_in_early += 1
+
+    if len(selected) < TOP_K:
+        for doc_id, _, _ in deferred:
+            if doc_id in selected:
+                continue
+            selected.append(doc_id)
+            if len(selected) >= TOP_K:
+                break
+
+    if len(selected) < TOP_K:
+        for doc_id, _, _ in scored:
+            if doc_id in selected:
+                continue
+            selected.append(doc_id)
+            if len(selected) >= TOP_K:
+                break
+
+    diag: dict[str, Any] = {
+        "conf_proxy": round(conf, 4),
+        "lambda_p7plus": round(lambda_q, 6),
+        "mu_p7plus": round(mu_q, 6),
+        "eta_p7plus": round(eta_q, 6),
+        "shared_cap": shared_cap,
+        "candidate_count": len(candidates),
+    }
+    return selected[:TOP_K], diag
 
 
 # ---------------------------------------------------------------------------
@@ -183,6 +323,8 @@ def run() -> None:
         b45_entry = conditions.get("B4.5_masked") or {}
 
         b3_doc_ids: list[str] = [str(d) for d in (b3_entry.get("top_doc_ids") or [])]
+        b4_doc_ids: list[str] = [str(d) for d in (b4_entry.get("top_doc_ids") or [])]
+        b45_doc_ids: list[str] = [str(d) for d in (b45_entry.get("top_doc_ids") or [])]
 
         # P6: fixed lambda on B3 base scores
         p6_doc_ids = apply_soft_scoring(
@@ -193,6 +335,16 @@ def run() -> None:
         lam_q = lambda_adaptive(b3_doc_ids, target_device, doc_device_map, shared_ids)
         p7_doc_ids = apply_soft_scoring(
             b3_doc_ids, target_device, doc_device_map, shared_ids, lam_q
+        )
+
+        p7plus_doc_ids, p7plus_diag = build_p7plus_ranking(
+            b3_doc_ids=b3_doc_ids,
+            b4_doc_ids=b4_doc_ids,
+            b45_doc_ids=b45_doc_ids,
+            target_device=target_device,
+            scope_observability=scope_obs,
+            doc_device_map=doc_device_map,
+            shared_ids=shared_ids,
         )
 
         def make_cond_result(doc_ids: list[str]) -> dict[str, Any]:
@@ -212,6 +364,11 @@ def run() -> None:
             "gold_ids_loose": gold_ids_loose,
             "gold_ids_strict": gold_ids_strict,
             "lambda_p7": round(lam_q, 6),
+            "lambda_p7plus": p7plus_diag["lambda_p7plus"],
+            "mu_p7plus": p7plus_diag["mu_p7plus"],
+            "eta_p7plus": p7plus_diag["eta_p7plus"],
+            "conf_p7plus": p7plus_diag["conf_proxy"],
+            "shared_cap_p7plus": p7plus_diag["shared_cap"],
             "conditions": {
                 "B3_masked": {
                     "cont@10": b3_entry.get("cont@10", 0.0),
@@ -223,22 +380,28 @@ def run() -> None:
                     "cont@10": b4_entry.get("cont@10", 0.0),
                     "gold_hit_loose": b4_entry.get("gold_hit_loose", False),
                     "gold_hit_strict": b4_entry.get("gold_hit_strict", False),
-                    "top_doc_ids": [str(d) for d in (b4_entry.get("top_doc_ids") or [])],
+                    "top_doc_ids": [
+                        str(d) for d in (b4_entry.get("top_doc_ids") or [])
+                    ],
                 },
                 "B4.5_masked": {
                     "cont@10": b45_entry.get("cont@10", 0.0),
                     "gold_hit_loose": b45_entry.get("gold_hit_loose", False),
                     "gold_hit_strict": b45_entry.get("gold_hit_strict", False),
-                    "top_doc_ids": [str(d) for d in (b45_entry.get("top_doc_ids") or [])],
+                    "top_doc_ids": [
+                        str(d) for d in (b45_entry.get("top_doc_ids") or [])
+                    ],
                 },
                 "P6_masked": make_cond_result(p6_doc_ids),
                 "P7_masked": make_cond_result(p7_doc_ids),
+                "P7plus_masked": make_cond_result(p7plus_doc_ids),
             },
         }
         per_query.append(q_result)
 
     print(f"\nSaving {len(per_query)} query results to {OUT_PATH} ...")
-    write_json(OUT_PATH, per_query)  # type: ignore[arg-type]
+    serializable_rows: list[JsonValue] = [cast(JsonValue, row) for row in per_query]
+    write_json(OUT_PATH, serializable_rows)
     print("Saved.")
 
     _print_summary(per_query)
@@ -247,7 +410,14 @@ def run() -> None:
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
-CONDITIONS_ORDER = ["B3_masked", "B4_masked", "B4.5_masked", "P6_masked", "P7_masked"]
+CONDITIONS_ORDER = [
+    "B3_masked",
+    "B4_masked",
+    "B4.5_masked",
+    "P6_masked",
+    "P7_masked",
+    "P7plus_masked",
+]
 
 
 def _print_summary(per_query: list[dict[str, Any]]) -> None:
@@ -263,7 +433,9 @@ def _print_summary(per_query: list[dict[str, Any]]) -> None:
             if not cdata or "error" in cdata:
                 continue
             agg[cond]["cont"].append(float(cdata.get("cont@10") or 0.0))
-            agg[cond]["gold_strict"].append(1.0 if cdata.get("gold_hit_strict") else 0.0)
+            agg[cond]["gold_strict"].append(
+                1.0 if cdata.get("gold_hit_strict") else 0.0
+            )
             agg[cond]["gold_loose"].append(1.0 if cdata.get("gold_hit_loose") else 0.0)
 
     def _row(cond: str, data: dict[str, list[float]], n_ref: int) -> str:
@@ -273,10 +445,7 @@ def _print_summary(per_query: list[dict[str, Any]]) -> None:
         cont_avg = sum(data["cont"]) / n
         gs = int(sum(data["gold_strict"]))
         gl = int(sum(data["gold_loose"]))
-        return (
-            f"  {cond:<20}  {cont_avg:>8.3f}  "
-            f"{gs:>5}/{n_ref:<5}    {gl:>5}/{n_ref}"
-        )
+        return f"  {cond:<20}  {cont_avg:>8.3f}  {gs:>5}/{n_ref:<5}    {gl:>5}/{n_ref}"
 
     print(f"\n{'=' * 72}")
     print(f"P6/P7 Soft Scoring on Masked Queries  (n={n_total})")
@@ -291,9 +460,19 @@ def _print_summary(per_query: list[dict[str, Any]]) -> None:
     print("\n--- Delta vs B3_masked ---")
     b3_cont = agg["B3_masked"]["cont"]
     b3_cont_avg = sum(b3_cont) / len(b3_cont) if b3_cont else 0.0
-    b3_gs = sum(agg["B3_masked"]["gold_strict"]) / len(agg["B3_masked"]["gold_strict"]) if agg["B3_masked"]["gold_strict"] else 0.0
-    b3_gl = sum(agg["B3_masked"]["gold_loose"]) / len(agg["B3_masked"]["gold_loose"]) if agg["B3_masked"]["gold_loose"] else 0.0
-    print(f"  {'condition':<20}  {'Δcont@10':>10}  {'Δgold_strict':>14}  {'Δgold_loose':>12}")
+    b3_gs = (
+        sum(agg["B3_masked"]["gold_strict"]) / len(agg["B3_masked"]["gold_strict"])
+        if agg["B3_masked"]["gold_strict"]
+        else 0.0
+    )
+    b3_gl = (
+        sum(agg["B3_masked"]["gold_loose"]) / len(agg["B3_masked"]["gold_loose"])
+        if agg["B3_masked"]["gold_loose"]
+        else 0.0
+    )
+    print(
+        f"  {'condition':<20}  {'Δcont@10':>10}  {'Δgold_strict':>14}  {'Δgold_loose':>12}"
+    )
     print("-" * 68)
     for cond in CONDITIONS_ORDER[1:]:
         data = agg[cond]
@@ -322,7 +501,9 @@ def _print_summary(per_query: list[dict[str, Any]]) -> None:
     for scope, rows in sorted(scope_groups.items()):
         ns = len(rows)
         print(f"\n--- scope={scope} (n={ns}) ---")
-        print(f"{'condition':<22}  {'cont@10':>8}  {'gold_strict':>14}  {'gold_loose':>12}")
+        print(
+            f"{'condition':<22}  {'cont@10':>8}  {'gold_strict':>14}  {'gold_loose':>12}"
+        )
         print("-" * 68)
         for cond in CONDITIONS_ORDER:
             conts, gss, gls = [], [], []
@@ -336,19 +517,56 @@ def _print_summary(per_query: list[dict[str, Any]]) -> None:
             if not conts:
                 continue
             print(
-                f"  {cond:<20}  {sum(conts)/len(conts):>8.3f}  "
+                f"  {cond:<20}  {sum(conts) / len(conts):>8.3f}  "
                 f"{int(sum(gss)):>5}/{ns:<5}    "
                 f"{int(sum(gls)):>5}/{ns}"
             )
 
     # P7 lambda distribution
-    lam_vals = [q.get("lambda_p7", 0.0) for q in per_query if q.get("lambda_p7") is not None]
+    lam_vals = [
+        q.get("lambda_p7", 0.0) for q in per_query if q.get("lambda_p7") is not None
+    ]
     if lam_vals:
         lam_nonzero = [v for v in lam_vals if v > 0]
         print(f"\n--- P7 adaptive lambda stats ---")
-        print(f"  mean={sum(lam_vals)/len(lam_vals):.5f}  "
-              f"max={max(lam_vals):.5f}  "
-              f"n_nonzero={len(lam_nonzero)}/{len(lam_vals)}")
+        print(
+            f"  mean={sum(lam_vals) / len(lam_vals):.5f}  "
+            f"max={max(lam_vals):.5f}  "
+            f"n_nonzero={len(lam_nonzero)}/{len(lam_vals)}"
+        )
+
+    p7plus_lam_vals = [
+        float(q.get("lambda_p7plus", 0.0))
+        for q in per_query
+        if q.get("lambda_p7plus") is not None
+    ]
+    p7plus_mu_vals = [
+        float(q.get("mu_p7plus", 0.0))
+        for q in per_query
+        if q.get("mu_p7plus") is not None
+    ]
+    p7plus_eta_vals = [
+        float(q.get("eta_p7plus", 0.0))
+        for q in per_query
+        if q.get("eta_p7plus") is not None
+    ]
+    p7plus_conf_vals = [
+        float(q.get("conf_p7plus", 0.0))
+        for q in per_query
+        if q.get("conf_p7plus") is not None
+    ]
+    if p7plus_lam_vals and p7plus_mu_vals and p7plus_eta_vals and p7plus_conf_vals:
+        print(f"\n--- P7+ parameter stats ---")
+        print(
+            f"  lambda_mean={sum(p7plus_lam_vals) / len(p7plus_lam_vals):.5f}  "
+            f"mu_mean={sum(p7plus_mu_vals) / len(p7plus_mu_vals):.5f}  "
+            f"eta_mean={sum(p7plus_eta_vals) / len(p7plus_eta_vals):.5f}"
+        )
+        print(
+            f"  conf_mean={sum(p7plus_conf_vals) / len(p7plus_conf_vals):.5f}  "
+            f"conf_min={min(p7plus_conf_vals):.5f}  "
+            f"conf_max={max(p7plus_conf_vals):.5f}"
+        )
 
 
 # ---------------------------------------------------------------------------
