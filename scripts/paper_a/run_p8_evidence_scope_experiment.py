@@ -33,6 +33,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 import sys
 import time
 from collections import Counter, defaultdict
@@ -53,7 +55,17 @@ from backend.llm_infrastructure.reranking.adapters.cross_encoder import (
 from backend.services.embedding_service import EmbeddingService
 from scripts.paper_a._io import JsonValue, read_jsonl, write_json
 
-logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
+LOG_FILE = ROOT / "data/paper_a/p8_experiment.log"
+LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    handlers=[
+        logging.StreamHandler(sys.stdout),
+        logging.FileHandler(str(LOG_FILE), mode="w", encoding="utf-8"),
+    ],
+)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -72,6 +84,10 @@ SHARED_IDS_PATH = ROOT / ".sisyphus/evidence/paper-a/policy/shared_doc_ids.txt"
 MASKED_HYBRID_PATH = ROOT / "data/paper_a/masked_hybrid_results.json"
 P6P7_RESULTS_PATH = ROOT / "data/paper_a/masked_p6p7_results.json"
 OUT_PATH = ROOT / "data/paper_a/p8_results.json"
+
+
+def normalize_device_name(value: str) -> str:
+    return re.sub(r"[^A-Z0-9]+", "", value.strip().upper())
 
 
 # ---------------------------------------------------------------------------
@@ -115,8 +131,9 @@ def build_device_to_doc_ids(doc_device_map: dict[str, str]) -> dict[str, list[st
     """Build {device_name_upper -> [doc_id, ...]}."""
     result: dict[str, list[str]] = defaultdict(list)
     for doc_id, device in doc_device_map.items():
-        if device:
-            result[device.strip().upper()].append(doc_id)
+        norm = normalize_device_name(device)
+        if norm:
+            result[norm].append(doc_id)
     return dict(result)
 
 
@@ -317,7 +334,16 @@ def retrieve_hybrid_rerank(
             r["score"] = float(s)
         result.sort(key=lambda x: x["score"], reverse=True)
 
-    return result[:top_k]
+    # Doc-level dedup: keep highest-scored chunk per doc_id
+    seen_docs: set[str] = set()
+    deduped: list[dict[str, Any]] = []
+    for r in result:
+        did = r["doc_id"]
+        if did and did not in seen_docs:
+            seen_docs.add(did)
+            deduped.append(r)
+
+    return deduped[:top_k]
 
 
 # ---------------------------------------------------------------------------
@@ -337,7 +363,7 @@ def generate_hypotheses(
     for doc_id in b3_doc_ids:
         if doc_id in shared_ids:
             continue
-        device = doc_device_map.get(doc_id, "").strip().upper()
+        device = normalize_device_name(doc_device_map.get(doc_id, ""))
         if device:
             device_counts[device] += 1
     return device_counts.most_common(m)
@@ -354,9 +380,9 @@ def generate_hypotheses_from_hits(
         doc_id = str(hit.get("doc_id") or "")
         if doc_id in shared_ids:
             continue
-        device_name = str(hit.get("device_name") or "").strip().upper()
+        device_name = normalize_device_name(str(hit.get("device_name") or ""))
         if not device_name and doc_id:
-            device_name = doc_device_map.get(doc_id, "").strip().upper()
+            device_name = normalize_device_name(doc_device_map.get(doc_id, ""))
         if device_name:
             device_counts[device_name] += 1
     return device_counts.most_common(m)
@@ -436,7 +462,7 @@ def run_p8_for_query(
     # Stage 2: Per-hypothesis hard retrieval
     hypothesis_results: dict[str, list[dict[str, Any]]] = {}
     ev_scores: dict[str, float] = {}
-    tgt_upper = target_device.strip().upper()
+    tgt_norm = normalize_device_name(target_device)
 
     for device, _count in hypotheses:
         # Build device filter
@@ -482,11 +508,11 @@ def run_p8_for_query(
 
     # Stage 3: Evidence-based selection
     selected_device = max(ev_scores.items(), key=lambda item: item[1])[0]
-    scope_correct = selected_device == tgt_upper
+    scope_correct = selected_device == tgt_norm
 
     # Target device rank in hypotheses
     hyp_devices = [d for d, _ in hypotheses]
-    target_rank = hyp_devices.index(tgt_upper) + 1 if tgt_upper in hyp_devices else None
+    target_rank = hyp_devices.index(tgt_norm) + 1 if tgt_norm in hyp_devices else None
 
     # Stage 4: Final output
     selected_hits = list(hypothesis_results[selected_device])  # copy to avoid mutation
@@ -560,8 +586,8 @@ def v_scope(
         return 0
     if doc_id in shared_ids:
         return 0
-    doc_dev = doc_device_map.get(doc_id, "").strip().upper()
-    tgt = target_device.strip().upper()
+    doc_dev = normalize_device_name(doc_device_map.get(doc_id, ""))
+    tgt = normalize_device_name(target_device)
     return 0 if doc_dev == tgt else 1
 
 
@@ -591,7 +617,7 @@ def compute_contamination_hits(
     top_hits = hits[:k]
     if not top_hits:
         return 0.0
-    tgt = target_device.strip().upper()
+    tgt = normalize_device_name(target_device)
     contaminated = 0
     for hit in top_hits:
         doc_id = str(hit.get("doc_id") or "")
@@ -599,9 +625,9 @@ def compute_contamination_hits(
             continue
         if doc_id in shared_ids:
             continue
-        device_name = str(hit.get("device_name") or "").strip().upper()
+        device_name = normalize_device_name(str(hit.get("device_name") or ""))
         if not device_name:
-            device_name = doc_device_map.get(doc_id, "").strip().upper()
+            device_name = normalize_device_name(doc_device_map.get(doc_id, ""))
         if device_name != tgt:
             contaminated += 1
     return contaminated / k
@@ -622,13 +648,36 @@ def compute_mrr(doc_ids: list[str], gold_ids: list[str], k: int) -> float:
 # ---------------------------------------------------------------------------
 # Build allowed_devices map (upper -> [raw ES device names])
 # ---------------------------------------------------------------------------
-def build_allowed_devices_map(doc_device_map: dict[str, str]) -> dict[str, list[str]]:
-    """Build {DEVICE_UPPER -> [raw_device_name_1, raw_device_name_2, ...]}."""
+def build_allowed_devices_map(
+    doc_device_map: dict[str, str],
+    es: Elasticsearch,
+) -> dict[str, list[str]]:
+    """Build {DEVICE_UPPER -> [raw_device_name_1, raw_device_name_2, ...]}.
+
+    Uses both doc_scope AND ES aggregation to capture all device_name variants.
+    """
     upper_to_raw: dict[str, set[str]] = defaultdict(set)
     for _doc_id, device in doc_device_map.items():
         if device:
             raw = device.strip()
-            upper_to_raw[raw.upper()].add(raw)
+            upper_to_raw[normalize_device_name(raw)].add(raw)
+    # From ES embed index aggregation (actual stored values)
+    try:
+        resp = es.search(
+            index=EMBED_INDEX,
+            body={
+                "size": 0,
+                "aggs": {"devices": {"terms": {"field": "device_name", "size": 200}}},
+            },
+        )
+        for bucket in resp["aggregations"]["devices"]["buckets"]:
+            raw = bucket["key"]
+            norm = normalize_device_name(raw)
+            if norm:
+                upper_to_raw[norm].add(raw)
+        logger.info("  ES device_name variants loaded (%d normalized devices)", len(upper_to_raw))
+    except Exception:
+        logger.warning("Failed to load ES device_name variants, using doc_scope only")
     return {k: sorted(v) for k, v in upper_to_raw.items()}
 
 
@@ -656,26 +705,31 @@ def run() -> None:
     print("P8: Evidence-Based Scope Selection Experiment")
     print("=" * 72)
 
+    logger.info("P8 experiment starting (pid=%d)", os.getpid())
+
     # Load policy data
-    print("\nLoading policy data...")
+    logger.info("Loading policy data...")
     doc_device_map = load_doc_scope(DOC_SCOPE_PATH)
     shared_ids = load_shared_ids(SHARED_IDS_PATH)
     device_doc_ids = build_device_to_doc_ids(doc_device_map)
-    allowed_devices_map = build_allowed_devices_map(doc_device_map)
-    print(f"  doc_scope: {len(doc_device_map)} entries")
-    print(f"  shared: {len(shared_ids)} docs")
-    print(f"  devices: {len(device_doc_ids)} unique")
+    # Connect to ES (needed for allowed_devices_map)
+    es = _build_es()
+    logger.info("ES connected: %s", search_settings.es_host)
+
+    allowed_devices_map = build_allowed_devices_map(doc_device_map, es)
+    logger.info("  doc_scope: %d entries, shared: %d docs, devices: %d unique",
+                len(doc_device_map), len(shared_ids), len(device_doc_ids))
 
     # Load cached results for baselines + hypothesis generation
-    print(f"\nLoading cached results from {MASKED_HYBRID_PATH} ...")
+    logger.info("Loading cached results from %s ...", MASKED_HYBRID_PATH)
     with MASKED_HYBRID_PATH.open(encoding="utf-8") as f:
         masked_hybrid: list[dict[str, Any]] = json.load(f)
-    print(f"  Loaded {len(masked_hybrid)} query entries.")
+    logger.info("  Loaded %d query entries.", len(masked_hybrid))
 
     # Load P7+ results if available
     p7plus_map: dict[str, dict[str, Any]] = {}
     if P6P7_RESULTS_PATH.exists():
-        print(f"Loading P7+ results from {P6P7_RESULTS_PATH} ...")
+        logger.info("Loading P7+ results from %s ...", P6P7_RESULTS_PATH)
         with P6P7_RESULTS_PATH.open(encoding="utf-8") as f:
             p7plus_data: list[dict[str, Any]] = json.load(f)
         for row in p7plus_data:
@@ -684,24 +738,20 @@ def run() -> None:
                 p7plus_map[q_id] = row
 
     # Load eval set for question_masked
-    print(f"\nLoading eval set from {EVAL_PATH} ...")
+    logger.info("Loading eval set from %s ...", EVAL_PATH)
     eval_rows: dict[str, dict[str, Any]] = {}
     for row in read_jsonl(EVAL_PATH):
         assert isinstance(row, dict)
         q_id = str(row.get("q_id") or "")
         if q_id:
             eval_rows[q_id] = row
-    print(f"  Loaded {len(eval_rows)} eval queries.")
-
-    # Connect to ES
-    es = _build_es()
-    print(f"  ES host: {search_settings.es_host}")
+    logger.info("  Loaded %d eval queries.", len(eval_rows))
 
     # Pre-warm models
-    print("\nPre-warming models (embedding + reranker)...")
+    logger.info("Pre-warming models (embedding + reranker)...")
     _ = embed_query("warm up query")
     get_reranker()
-    print("  Models ready.")
+    logger.info("Models ready.")
 
     # Run experiment
     per_query: list[dict[str, Any]] = []
@@ -716,6 +766,7 @@ def run() -> None:
         gold_ids_strict = [str(g) for g in (q.get("gold_ids_strict") or [])]
 
         if not target_device or not gold_ids_loose:
+            logger.debug("Skipping q_id=%s: no target_device or gold_ids_loose", q_id)
             continue
 
         # Get masked question from eval set
@@ -725,12 +776,12 @@ def run() -> None:
             logger.warning("No masked question for q_id=%s, skipping", q_id)
             continue
 
-        if qi % 50 == 0:
-            elapsed = time.time() - start_time
-            qps = (qi + 1) / elapsed if elapsed > 0 else 0
-            print(
-                f"  [{qi}/{total}] q_id={q_id} device={target_device} ({qps:.1f} q/s)"
-            )
+        elapsed = time.time() - start_time
+        qps = (qi + 1) / elapsed if elapsed > 0 else 0
+        logger.info(
+            "[%d/%d] q_id=%s device=%s obs=%s (%.1f q/s)",
+            qi, total, q_id, target_device, scope_obs, qps,
+        )
 
         probe_hits: list[dict[str, Any]] = []
         try:
@@ -804,50 +855,58 @@ def run() -> None:
 
         # Run P8 conditions
         for cond_name, m_val, sc_val in P8_CONDITIONS:
-            p8_result = run_p8_for_query(
-                es=es,
-                query=question_masked,
-                b3_doc_ids=b3_doc_ids,
-                target_device=target_device,
-                doc_device_map=doc_device_map,
-                device_doc_ids=device_doc_ids,
-                shared_ids=shared_ids,
-                allowed_devices_map=allowed_devices_map,
-                m=m_val,
-                shared_cap=sc_val,
-                probe_hits=probe_hits,
-            )
+            try:
+                p8_result = run_p8_for_query(
+                    es=es,
+                    query=question_masked,
+                    b3_doc_ids=b3_doc_ids,
+                    target_device=target_device,
+                    doc_device_map=doc_device_map,
+                    device_doc_ids=device_doc_ids,
+                    shared_ids=shared_ids,
+                    allowed_devices_map=allowed_devices_map,
+                    m=m_val,
+                    shared_cap=sc_val,
+                    probe_hits=probe_hits,
+                )
 
-            p8_doc_ids = p8_result["top_doc_ids"]
-            p8_hits = cast(list[dict[str, Any]], p8_result.get("hits") or [])
-            q_result["conditions"][cond_name] = {
-                "cont@10": compute_contamination_hits(
-                    p8_hits, target_device, doc_device_map, shared_ids, TOP_K
-                ),
-                "gold_hit_strict": compute_gold_hit(p8_doc_ids, gold_ids_strict, TOP_K),
-                "gold_hit_loose": compute_gold_hit(p8_doc_ids, gold_ids_loose, TOP_K),
-                "mrr": compute_mrr(p8_doc_ids, gold_ids_strict, TOP_K),
-                "top_doc_ids": p8_doc_ids[:TOP_K],
-                "selected_device": p8_result["selected_device"],
-                "scope_correct": p8_result["scope_correct"],
-                "hypotheses": p8_result["hypotheses"],
-                "evidence_scores": p8_result["evidence_scores"],
-                "target_hypothesis_rank": p8_result["target_hypothesis_rank"],
-                "fallback": p8_result.get("fallback", False),
-                "hypothesis_source": p8_result.get("hypothesis_source", "cached"),
-            }
+                p8_doc_ids = p8_result["top_doc_ids"]
+                p8_hits = cast(list[dict[str, Any]], p8_result.get("hits") or [])
+                q_result["conditions"][cond_name] = {
+                    "cont@10": compute_contamination_hits(
+                        p8_hits, target_device, doc_device_map, shared_ids, TOP_K
+                    ),
+                    "gold_hit_strict": compute_gold_hit(p8_doc_ids, gold_ids_strict, TOP_K),
+                    "gold_hit_loose": compute_gold_hit(p8_doc_ids, gold_ids_loose, TOP_K),
+                    "mrr": compute_mrr(p8_doc_ids, gold_ids_strict, TOP_K),
+                    "top_doc_ids": p8_doc_ids[:TOP_K],
+                    "selected_device": p8_result["selected_device"],
+                    "scope_correct": p8_result["scope_correct"],
+                    "hypotheses": p8_result["hypotheses"],
+                    "evidence_scores": p8_result["evidence_scores"],
+                    "target_hypothesis_rank": p8_result["target_hypothesis_rank"],
+                    "fallback": p8_result.get("fallback", False),
+                    "hypothesis_source": p8_result.get("hypothesis_source", "cached"),
+                }
+                logger.info(
+                    "  %s: selected=%s scope_correct=%s",
+                    cond_name, p8_result["selected_device"], p8_result["scope_correct"],
+                )
+            except Exception:
+                logger.exception("P8 condition %s failed for q_id=%s", cond_name, q_id)
+                q_result["conditions"][cond_name] = {"error": "exception"}
 
         per_query.append(q_result)
 
     elapsed_total = time.time() - start_time
-    print(f"\nCompleted {len(per_query)} queries in {elapsed_total:.1f}s")
-    print(f"  ({len(per_query) / elapsed_total:.1f} queries/sec)")
+    logger.info("Completed %d queries in %.1fs (%.1f q/s)",
+                len(per_query), elapsed_total, len(per_query) / max(elapsed_total, 0.001))
 
     # Save results
-    print(f"\nSaving results to {OUT_PATH} ...")
+    logger.info("Saving results to %s ...", OUT_PATH)
     serializable: list[JsonValue] = [cast(JsonValue, row) for row in per_query]
     write_json(OUT_PATH, serializable)
-    print("Saved.")
+    logger.info("Saved %d results.", len(per_query))
 
     # Print summary
     _print_summary(per_query)
@@ -988,4 +1047,8 @@ def _print_summary_for_scope(
 
 
 if __name__ == "__main__":
-    run()
+    try:
+        run()
+    except Exception:
+        logger.exception("FATAL: run() crashed")
+        sys.exit(1)
