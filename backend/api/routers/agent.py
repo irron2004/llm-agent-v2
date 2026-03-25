@@ -421,6 +421,7 @@ class ExpandedDoc(BaseModel):
     doc_id: str
     content: str  # 확장된 전체 내용
     content_length: int  # 내용 길이
+    start_page: int | None = None  # 확장 섹션의 시작 페이지 (스크롤 위치용)
 
 
 class AutoParseResult(BaseModel):
@@ -493,6 +494,7 @@ def _is_guided_resume(req: AgentRequest) -> bool:
         "issue_confirm",
         "issue_case_selection",
         "issue_sop_confirm",
+        "abbreviation_resolve",
     }
 
 
@@ -512,6 +514,14 @@ def _validated_guided_resume_decision(decision: Any) -> Dict[str, Any]:
             status_code=400, detail="Invalid guided resume_decision: expected object"
         )
     decision_type = decision.get("type")
+
+    # abbreviation_resolve: 별도 Pydantic 모델 없이 직접 통과
+    if decision_type == "abbreviation_resolve":
+        if not isinstance(decision.get("selections"), dict):
+            raise HTTPException(
+                status_code=400, detail="Invalid abbreviation_resolve: selections must be dict"
+            )
+        return decision
 
     model_map: Dict[str, type[BaseModel]] = {
         "auto_parse_confirm": AutoParseConfirmDecision,
@@ -556,18 +566,34 @@ def _resolve_trace_context(traceparent: Optional[str], tracestate: Optional[str]
 
 
 def _to_expanded_docs(answer_ref_json: List[Dict[str, Any]] | None) -> List[ExpandedDoc] | None:
-    """answer_ref_json을 ExpandedDoc 리스트로 변환."""
+    """answer_ref_json을 ExpandedDoc 리스트로 변환.
+
+    같은 doc_id의 ref들 중 최소 page를 start_page로 설정하여
+    프론트엔드 스크롤 위치를 섹션 시작 페이지로 안내한다.
+    """
     if not answer_ref_json:
         return None
+
+    # doc_id별 최소 페이지 계산
+    doc_min_page: Dict[str, int] = {}
+    for ref in answer_ref_json:
+        doc_id = ref.get("doc_id", "")
+        page = ref.get("page")
+        if doc_id and page is not None:
+            if doc_id not in doc_min_page or page < doc_min_page[doc_id]:
+                doc_min_page[doc_id] = page
+
     docs: List[ExpandedDoc] = []
     for ref in answer_ref_json:
         content = ref.get("content", "")
+        doc_id = ref.get("doc_id", "")
         docs.append(
             ExpandedDoc(
                 rank=ref.get("rank", 0),
-                doc_id=ref.get("doc_id", ""),
+                doc_id=doc_id,
                 content=content,
                 content_length=len(content),
+                start_page=doc_min_page.get(doc_id),
             )
         )
     return docs if docs else None
@@ -1265,6 +1291,10 @@ async def run_agent_stream(
     state_overrides = _build_state_overrides(req)
     has_overrides = bool(state_overrides)
     state_overrides["mq_mode"] = effective_mq_mode
+    logger.info(
+        "[run/stream] auto_parse=%s, is_resume=%s, ask_user=%s, has_overrides=%s, guided_confirm=%s, overrides_keys=%s",
+        req.auto_parse, is_resume, req.ask_user_after_retrieve, has_overrides, req.guided_confirm, list(state_overrides.keys()),
+    )
 
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=256)

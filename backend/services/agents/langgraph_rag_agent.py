@@ -16,7 +16,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Command
 
-from backend.config.settings import rag_settings
+from backend.config.settings import agent_settings, rag_settings
 from backend.llm_infrastructure.llm.base import BaseLLM
 from backend.llm_infrastructure.llm.langgraph_agent import (
     AgentState,
@@ -26,6 +26,7 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     SearchServiceRetriever,
     answer_node,
     ask_user_after_retrieve_node,
+    abbreviation_resolve_node,
     auto_parse_confirm_node,
     auto_parse_node,
     device_selection_node,
@@ -465,6 +466,26 @@ class LangGraphRAGAgent:
             queries.append(stable_query_en)
         if stable_query_ko and stable_query_ko != stable_query_en:
             queries.append(stable_query_ko)
+
+        # 동의어/약어 변형 쿼리 추가 (결정적 variant, max +2)
+        if agent_settings.abbreviation_expand_enabled:
+            try:
+                from backend.llm_infrastructure.query_expansion.abbreviation_expander import (
+                    get_abbreviation_expander,
+                )
+
+                _syn_exp = get_abbreviation_expander(agent_settings.abbreviation_dict_path)
+                abbr_sels = state.get("abbreviation_selections") or {}
+                orig_q = str(state.get("original_query") or state.get("query") or "")
+                syn_variants = _syn_exp.get_synonym_variants(
+                    orig_q, max_variants=2, abbr_selections=abbr_sels,
+                )
+                if syn_variants:
+                    logger.info("prepare_retrieve: synonym variants for '%s': %s", orig_q, syn_variants)
+                    queries.extend(syn_variants)
+            except Exception:
+                logger.debug("prepare_retrieve: synonym variant failed", exc_info=True)
+
         if queries:
             update["search_queries"] = queries
         return update
@@ -546,6 +567,12 @@ class LangGraphRAGAgent:
                 return "prepare_retrieve"
             return "mq"
 
+        # Abbreviation disambiguation node — 모든 경로에서 공통 실행
+        builder.add_node(
+            "abbreviation_resolve",
+            self._wrap_node("abbreviation_resolve", abbreviation_resolve_node),
+        )
+
         # Auto-parse mode: auto_parse → translate → route → (mq | prepare_retrieve)
         # This ensures route receives translated query (query_en)
         if self.auto_parse_enabled:
@@ -600,9 +627,10 @@ class LangGraphRAGAgent:
                     functools.partial(query_rewrite_node, llm=self.llm),
                 ),
             )
-            # Flow: START → auto_parse → auto_parse_confirm → history_check → [query_rewrite] → translate → route → mq
+            # Flow: START → auto_parse → abbreviation_resolve → auto_parse_confirm → history_check → [query_rewrite] → translate → route → mq
             builder.add_edge(START, "auto_parse")
-            builder.add_edge("auto_parse", "auto_parse_confirm")
+            builder.add_edge("auto_parse", "abbreviation_resolve")
+            builder.add_edge("abbreviation_resolve", "auto_parse_confirm")
             builder.add_edge("auto_parse_confirm", "history_check")
             builder.add_conditional_edges(
                 "history_check",
@@ -625,12 +653,15 @@ class LangGraphRAGAgent:
                     functools.partial(device_selection_node, device_fetcher=self.device_fetcher),
                 ),
             )
-            builder.add_edge(START, "route")
+            # Flow: START → abbreviation_resolve → route → device_selection
+            builder.add_edge(START, "abbreviation_resolve")
+            builder.add_edge("abbreviation_resolve", "route")
             builder.add_edge("route", "device_selection")
             # device_selection_node returns Command(goto="mq"|"prepare_retrieve"), so no explicit edge needed
         else:
-            # Default flow: START → route → (mq | prepare_retrieve)
-            builder.add_edge(START, "route")
+            # Default flow: START → abbreviation_resolve → route → (mq | prepare_retrieve)
+            builder.add_edge(START, "abbreviation_resolve")
+            builder.add_edge("abbreviation_resolve", "route")
             builder.add_conditional_edges(
                 "route",
                 _route_after_node,

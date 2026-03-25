@@ -185,6 +185,52 @@ def test_auto_parse_confirm_resume_routes_to_guided_confirm_agent(
     assert calls["hil"] == 0
 
 
+def test_abbreviation_resume_routes_to_hil_agent(
+    client: TestClient,
+    monkeypatch,
+) -> None:
+    calls = {"guided": 0, "hil": 0}
+
+    def _fake_guided(*_args: Any, **_kwargs: Any) -> _ResumeOnlyAgent:
+        calls["guided"] += 1
+        return _ResumeOnlyAgent()
+
+    def _fake_hil(*_args: Any, **_kwargs: Any) -> _ResumeOnlyAgent:
+        calls["hil"] += 1
+        return _ResumeOnlyAgent()
+
+    monkeypatch.setattr(agent_router, "_new_guided_confirm_agent", _fake_guided)
+    monkeypatch.setattr(agent_router, "_new_hil_agent", _fake_hil)
+
+    app = cast(Any, client.app)
+    app.dependency_overrides[dependencies.get_default_llm] = lambda: object()
+    app.dependency_overrides[dependencies.get_prompt_spec_cached] = lambda: object()
+
+    tid = "resume-abbreviation-thread"
+    response = client.post(
+        "/api/agent/run",
+        json={
+            "message": "resume",
+            "thread_id": tid,
+            "ask_user_after_retrieve": True,
+            "resume_decision": {
+                "type": "abbreviation_resolve",
+                "selections": {
+                    "AR": "1",
+                },
+            },
+            "auto_parse": True,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = cast(dict[str, Any], response.json())
+    assert payload["interrupted"] is False
+    assert payload["answer"] == f"guided-resumed:{tid}"
+    assert calls["guided"] == 0
+    assert calls["hil"] == 1
+
+
 def test_resume_without_thread_id_returns_400_for_run(client: TestClient) -> None:
     response = client.post(
         "/api/agent/run",

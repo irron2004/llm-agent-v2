@@ -85,6 +85,7 @@ export type ExpandedDoc = {
   doc_id: string;
   content: string;
   content_length: number;
+  start_page?: number | null;
 };
 
 export type ReviewDoc = {

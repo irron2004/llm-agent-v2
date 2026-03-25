@@ -708,6 +708,86 @@ describe("issue flow end-to-end", () => {
     });
   });
 
+  it("submits structured abbreviation_resolve decision from pending interrupt", async () => {
+    let call = 0;
+    vi.mocked(connectSse).mockImplementation(async (_req, handlers) => {
+      call += 1;
+      if (call === 1) {
+        handlers.onMessage(
+          JSON.stringify({
+            type: "final",
+            result: {
+              query: "AR alarm",
+              answer: "",
+              interrupted: true,
+              thread_id: "abbr-thread-1",
+              retrieved_docs: [],
+              all_retrieved_docs: [],
+              interrupt_payload: {
+                type: "abbreviation_resolve",
+                question: "AR alarm",
+                instruction: "약어 의미를 선택해 주세요.",
+                abbreviations: [
+                  {
+                    token: "AR",
+                    abbr_key: "AR",
+                    options: [
+                      { value: "1", label: "Aspect Ratio" },
+                      { value: "2", label: "As Received" },
+                    ],
+                  },
+                ],
+              },
+            },
+          }),
+        );
+      } else {
+        handlers.onMessage(
+          JSON.stringify({
+            type: "final",
+            result: {
+              query: "AR alarm",
+              answer: "resolved answer",
+              interrupted: false,
+              thread_id: "abbr-thread-1",
+              retrieved_docs: [],
+              all_retrieved_docs: [],
+            },
+          }),
+        );
+      }
+      handlers.onClose?.();
+      return { close: () => {} };
+    });
+
+    const { result } = renderHook(() => useChatSession(), { wrapper });
+
+    await act(async () => {
+      await result.current.send({ text: "AR alarm" });
+    });
+
+    await waitFor(() => expect(result.current.pendingAbbreviationResolve).not.toBeNull());
+
+    await act(async () => {
+      result.current.submitAbbreviationResolve({ AR: "1" });
+    });
+
+    await waitFor(() => expect(result.current.isStreaming).toBe(false));
+
+    expect(vi.mocked(connectSse)).toHaveBeenCalledTimes(2);
+    const req2 = vi.mocked(connectSse).mock.calls[1][0];
+    expect(req2.body).toMatchObject({
+      thread_id: "abbr-thread-1",
+      ask_user_after_retrieve: true,
+      resume_decision: {
+        type: "abbreviation_resolve",
+        selections: {
+          AR: "1",
+        },
+      },
+    });
+  });
+
   it("dismisses pending issue card selection when user sends a new chat message", async () => {
     let call = 0;
     vi.mocked(connectSse).mockImplementation(async (_req, handlers) => {

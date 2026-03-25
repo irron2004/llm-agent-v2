@@ -19,6 +19,7 @@ export const mockSubmitSearchQueries = vi.fn();
 export const mockSubmitDeviceSelection = vi.fn();
 export const mockSubmitFeedback = vi.fn();
 export const mockSubmitDetailedFeedback = vi.fn();
+export const mockSubmitAbbreviationResolve = vi.fn();
 
 export const mockSetPendingReview = vi.fn();
 export const mockSetPendingRegeneration = vi.fn();
@@ -76,6 +77,8 @@ const defaultChatSession: ChatSessionReturn = {
   inputPlaceholder: "메시지를 입력하세요...",
   pendingReview: null,
   pendingDeviceSelection: null,
+  pendingAbbreviationResolve: null,
+  submitAbbreviationResolve: mockSubmitAbbreviationResolve,
   submitReview: mockSubmitReview,
   submitSearchQueries: mockSubmitSearchQueries,
   submitDeviceSelection: mockSubmitDeviceSelection,
@@ -174,6 +177,7 @@ export function resetAllMocks() {
   mockSubmitDeviceSelection.mockReset();
   mockSubmitFeedback.mockReset();
   mockSubmitDetailedFeedback.mockReset();
+  mockSubmitAbbreviationResolve.mockReset();
   mockSetPendingReview.mockReset();
   mockSetPendingRegeneration.mockReset();
   mockSetIsStreaming.mockReset();

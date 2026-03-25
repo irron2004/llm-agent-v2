@@ -407,16 +407,29 @@ class EsSearchEngine:
         section_chapter: str,
         max_pages: int = 8,
         content_index: str | None = None,
+        min_page: int | None = None,
+        max_page: int | None = None,
     ) -> list[EsSearchHit]:
-        """Fetch all chunks for a doc_id + section_chapter, sorted by page."""
+        """Fetch all chunks for a doc_id + section_chapter, sorted by page.
+
+        Args:
+            min_page: If set, only return chunks with page >= min_page.
+            max_page: If set, only return chunks with page <= max_page.
+                      Useful to scope results to the correct SOP in multi-SOP documents.
+        """
         if not doc_id or not section_chapter:
             return []
+        filters: list[dict[str, Any]] = [
+            {"term": {"doc_id": doc_id}},
+            {"term": {"section_chapter": section_chapter}},
+        ]
+        if min_page is not None:
+            filters.append({"range": {"page": {"gte": min_page}}})
+        if max_page is not None:
+            filters.append({"range": {"page": {"lte": max_page}}})
         query: dict[str, Any] = {
             "bool": {
-                "filter": [
-                    {"term": {"doc_id": doc_id}},
-                    {"term": {"section_chapter": section_chapter}},
-                ]
+                "filter": filters,
             }
         }
         body: dict[str, Any] = {

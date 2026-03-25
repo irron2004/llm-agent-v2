@@ -10,6 +10,7 @@ import {
   MessageItem,
   ChatInput,
   DeviceSelectionPanel,
+  AbbreviationResolvePanel,
   GuidedSelectionPanel,
 } from "../components";
 import type { RegeneratePayload } from "../components/message-item";
@@ -99,11 +100,13 @@ export default function ChatPage() {
     pendingReview,
     pendingDeviceSelection,
     pendingGuidedSelection,
+    pendingAbbreviationResolve,
     pendingIssueConfirm,
     pendingIssueCaseSelection,
     pendingIssueSopConfirm,
     submitGuidedSelectionNumber,
     submitGuidedSelectionFinal,
+    submitAbbreviationResolve,
     submitIssueConfirm,
     submitIssueCaseSelection,
     submitIssueSopConfirm,
@@ -488,6 +491,15 @@ export default function ChatPage() {
             />
           )}
 
+          {pendingAbbreviationResolve && (
+            <AbbreviationResolvePanel
+              question={pendingAbbreviationResolve.question}
+              instruction={pendingAbbreviationResolve.instruction}
+              abbreviations={pendingAbbreviationResolve.payload.abbreviations}
+              onSubmit={submitAbbreviationResolve}
+            />
+          )}
+
           {pendingDeviceSelection && (
             (pendingDeviceSelection.devices && pendingDeviceSelection.devices.length > 0) ||
             (pendingDeviceSelection.docTypes && pendingDeviceSelection.docTypes.length > 0)
@@ -511,7 +523,7 @@ export default function ChatPage() {
               onStop={stop}
               isStreaming={isStreaming}
               placeholder={inputPlaceholder}
-              disabled={isLoadingSession || !!pendingGuidedSelection}
+              disabled={isLoadingSession || !!pendingGuidedSelection || !!pendingAbbreviationResolve}
               docTypeOptions={docTypeOptions}
               selectedDocTypes={selectedDocTypes}
               onDocTypesChange={handleDocTypesChange}

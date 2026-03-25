@@ -176,6 +176,11 @@ class AgentState(TypedDict, total=False):
     retrieval_confirmed: bool
     thread_id: Optional[str]
 
+    # Abbreviation disambiguation
+    abbreviation_resolved: bool  # 약어 모호성 해소 완료 여부
+    abbreviation_selections: Dict[str, str]  # {약어: 선택된 풀네임}
+    original_query: Optional[str]  # 약어 확장 전 원본 쿼리 (동의어 variant 생성용)
+
     # Internal flags
     _skip_human_review: bool  # Auto-parse 모드에서 human_review 건너뛰기
 
@@ -405,9 +410,9 @@ class SearchServiceRetriever:
 # 노드 타입별 max_tokens 설정
 MAX_TOKENS_CLASSIFICATION = 256  # 라우팅/분류용 (짧은 응답)
 MAX_TOKENS_JUDGE = 1024  # judge용 (reasoning 토큰 포함 여유분)
-MAX_TOKENS_ANSWER = 4096  # 답변 생성용
+MAX_TOKENS_ANSWER = 16384  # 답변 생성용 (oss-120b 32K context 기준, 입력 ~16K 여유)
 MAX_REF_CHARS_REVIEW = 200  # 검색 결과 리뷰용
-MAX_REF_CHARS_ANSWER = 8000  # 답변 생성용 (SOP 다페이지 절차 포함)
+MAX_REF_CHARS_ANSWER = 16000  # 답변 생성용 (SOP 다페이지 절차 원문 번역용)
 RELATED_PAGE_WINDOW = 2  # 인접 페이지 범위 (±N)
 DOC_TYPES_SAME_DOC = {"gcb", "myservice", "pems"}
 EXPAND_TOP_K = 10  # 확장 대상 최대 개수 (rerank 상위)
@@ -560,8 +565,8 @@ def _validate_answer_format(
     missing_sections = [s for s in _REQUIRED_SECTIONS_KO if s not in text]
     has_emoji_numbering = bool(_EMOJI_NUMERAL_RE.search(text))
     has_markdown_table = "|---|" in text or bool(_MARKDOWN_TABLE_LINE_RE.search(text))
-    # 번호 목록(1. )이 있으면 OK — 섹션 헤딩 유무는 불문
-    numbering_ok = bool(re.search(r"(?m)^\s*1\.\s+", text))
+    # 번호 목록(N. )이 있으면 OK — 원문 Step 번호가 1이 아닐 수 있으므로 임의 숫자 허용
+    numbering_ok = bool(re.search(r"(?m)^\s*\d+\.\s+", text))
     citations_ok = True
     references_ok = True
     if has_refs:
@@ -1023,6 +1028,16 @@ def results_to_ref_json(
             if section and str(section).strip():
                 metadata["section"] = str(section).strip()
 
+        # Extract page number for scroll positioning
+        page_val = None
+        if isinstance(d.metadata, dict):
+            raw_page = d.metadata.get("page")
+            if raw_page is not None:
+                try:
+                    page_val = int(raw_page)
+                except (ValueError, TypeError):
+                    pass
+
         ref.append(
             {
                 "rank": i,
@@ -1030,6 +1045,7 @@ def results_to_ref_json(
                 "content": content,
                 "metadata": metadata,
                 "score": getattr(d, "score", None),
+                "page": page_val,
             }
         )
     return ref
@@ -1216,7 +1232,7 @@ def _prioritize_setup_answer_refs(ref_items: List[Dict[str, Any]]) -> List[Dict[
 
 
 MAX_SETUP_DOC_TRIES = 5  # 적합성 판정 최대 문서 수
-MAX_ANSWER_REFS = 5  # 답변 생성 시 최대 REFS 수
+MAX_ANSWER_REFS = 10  # 답변 생성 시 최대 REFS 수 (다페이지 SOP 원문 번역 대응)
 MAX_ISSUE_REFS = 10  # issue 사례 노출 최대 REFS 수
 MAX_ISSUE_CASE_MAP_DOCS = 10
 MAX_ISSUE_CASE_MAP_REFS_PER_DOC = 12
@@ -1757,6 +1773,32 @@ def st_mq_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     korean_queries = korean_queries[:3]
 
     merged = english_queries + korean_queries
+
+    # ── 동의어/약어 변형 쿼리 추가 (결정적 variant, max +2) ──
+    if agent_settings.abbreviation_expand_enabled and not used_existing_queries:
+        try:
+            from backend.llm_infrastructure.query_expansion.abbreviation_expander import (
+                get_abbreviation_expander,
+            )
+
+            _syn_expander = get_abbreviation_expander(agent_settings.abbreviation_dict_path)
+            abbr_sels: Dict[str, str] = state.get("abbreviation_selections") or {}
+            original_query = str(state.get("original_query") or state.get("query") or "")
+            syn_variants = _syn_expander.get_synonym_variants(
+                original_query,
+                max_variants=2,
+                abbr_selections=abbr_sels,
+            )
+            if syn_variants:
+                logger.info(
+                    "st_mq_node: synonym variants for '%s': %s",
+                    original_query,
+                    syn_variants,
+                )
+                merged.extend(syn_variants)
+        except Exception:
+            logger.debug("st_mq_node: synonym variant generation failed", exc_info=True)
+
     guardrail_result = (
         {
             "search_queries": merged,
@@ -1838,9 +1880,9 @@ def _apply_section_expansion(
         all_candidates.append((idx, doc))
 
     # --- Query-aware scoring: prefer candidates whose doc_id matches query terms ---
-    query_tokens = [
-        t for t in re.split(r"[\s,.\-_]+", query.lower()) if len(t) >= 2
-    ] if query else []
+    query_tokens = (
+        [t for t in re.split(r"[\s,.\-_]+", query.lower()) if len(t) >= 2] if query else []
+    )
 
     def _candidate_score(idx: int, doc: RetrievalResult) -> tuple[int, int]:
         """(negative query_match_score, retrieval_rank) — lower = better."""
@@ -1857,7 +1899,10 @@ def _apply_section_expansion(
             len(all_candidates),
             len(candidates),
             query_tokens[:6],
-            [(str(d.doc_id)[-30:], (d.metadata or {}).get("section_chapter", "")) for _, d in candidates],
+            [
+                (str(d.doc_id)[-30:], (d.metadata or {}).get("section_chapter", ""))
+                for _, d in candidates
+            ],
         )
 
     if not candidates:
@@ -1879,12 +1924,36 @@ def _apply_section_expansion(
         meta = doc.metadata if isinstance(doc.metadata, dict) else {}
         section_chapter = str(meta.get("section_chapter", "") or "")
 
+        # Page-scoped expansion: in multi-SOP documents, the same section_chapter
+        # name repeats at different page ranges.  Scope the fetch to the trigger
+        # hit's page neighbourhood so we only get chunks from the correct SOP.
+        trigger_page = int(meta.get("page") or 0)
+        if trigger_page > 0:
+            scope_min = max(0, trigger_page - _MULTI_SOP_PAGE_GAP)
+            scope_max = trigger_page + _MULTI_SOP_PAGE_GAP
+        else:
+            scope_min = None
+            scope_max = None
+
         section_hits = es_engine.fetch_section_chunks(
             doc_id=str(doc.doc_id),
             section_chapter=section_chapter,
             max_pages=expander.max_pages,
             content_index=None,
+            min_page=scope_min,
+            max_page=scope_max,
         )
+        if section_hits:
+            logger.info(
+                "section_expansion: doc=%s section=%s trigger_page=%d scope=[%s,%s] fetched=%d chunks (pages=%s)",
+                str(doc.doc_id)[-40:],
+                section_chapter[:30],
+                trigger_page,
+                scope_min,
+                scope_max,
+                len(section_hits),
+                [h.page for h in section_hits[:5]],
+            )
 
         # Cross-section expansion: fetch nearby Work Procedure when a
         # non-procedural section (Flow Chart, Part 위치 등) is the trigger hit.
@@ -1912,16 +1981,28 @@ def _apply_section_expansion(
                             (h.page for h in cross_hits if h.page is not None),
                             default=None,
                         )
-                        if first_page is not None and first_page <= trigger_max_page + _CROSS_SECTION_PAGE_GAP:
+                        if (
+                            first_page is not None
+                            and first_page <= trigger_max_page + _CROSS_SECTION_PAGE_GAP
+                        ):
                             section_hits = (section_hits or []) + cross_hits
                             logger.info(
                                 "cross_section_expansion: %s (max_page=%d) -> %s (first_page=%d, %d chunks, min_page=%d) for doc %s",
-                                section_chapter, trigger_max_page, kw, first_page, len(cross_hits), min_page, doc.doc_id,
+                                section_chapter,
+                                trigger_max_page,
+                                kw,
+                                first_page,
+                                len(cross_hits),
+                                min_page,
+                                doc.doc_id,
                             )
                         else:
                             logger.debug(
                                 "cross_section_expansion: skipped %s (first_page=%s, gap > %d) for doc %s",
-                                kw, first_page, _CROSS_SECTION_PAGE_GAP, doc.doc_id,
+                                kw,
+                                first_page,
+                                _CROSS_SECTION_PAGE_GAP,
+                                doc.doc_id,
                             )
                 break  # one trigger match is enough
 
@@ -1993,6 +2074,60 @@ def retrieve_node(
         fallback_query = _normalize_query_text(state.get("query_en") or state["query"])
         if fallback_query and not _is_garbage_query(fallback_query):
             queries = [fallback_query]
+
+    # ── 약어 확장 (domain dictionary) ──
+    # 1:1은 자동 치환, 1:N은 사용자가 선택한 결과(abbreviation_selections)를 적용
+    if agent_settings.abbreviation_expand_enabled:
+        try:
+            from backend.llm_infrastructure.query_expansion.abbreviation_expander import (
+                get_abbreviation_expander,
+            )
+
+            _abbr_expander = get_abbreviation_expander(agent_settings.abbreviation_dict_path)
+            abbr_selections: Dict[str, str] = state.get("abbreviation_selections") or {}
+            expanded_queries = []
+            for q in queries:
+                result = _abbr_expander.expand_query(q)
+                expanded = result.expanded_query
+                # 사용자가 선택한 모호 약어도 치환
+                if abbr_selections and result.ambiguous:
+                    import re as _re
+
+                    for match in result.matches:
+                        if not match.ambiguous:
+                            continue
+                        selected_eng = abbr_selections.get(match.abbr_key)
+                        if not selected_eng:
+                            continue
+                        if selected_eng.lower() in expanded.lower():
+                            continue
+                        pattern = _re.compile(
+                            rf"\b{_re.escape(match.token)}\b",
+                            _re.IGNORECASE,
+                        )
+                        replacement = f"{match.token} ({selected_eng})"
+                        new_expanded = pattern.sub(replacement, expanded, count=1)
+                        if new_expanded != expanded:
+                            expanded = new_expanded
+                            logger.info(
+                                "Abbreviation resolved (user): %s → %s | query: %s → %s",
+                                match.token,
+                                selected_eng,
+                                q,
+                                expanded,
+                            )
+                if result.auto_expanded:
+                    logger.info(
+                        "Abbreviation expanded: %s → %s (tokens: %s)",
+                        q,
+                        result.expanded_query,
+                        result.auto_expanded,
+                    )
+                expanded_queries.append(expanded)
+            queries = expanded_queries
+        except Exception:
+            logger.debug("Abbreviation expander not available", exc_info=True)
+
     # ParsedQuery 우선, 없으면 기존 필드 fallback
     pq_raw = state.get("parsed_query")
     if pq_raw:
@@ -2019,12 +2154,13 @@ def retrieve_node(
     # No need to add bilingual queries here
     query_en = _normalize_query_text(state.get("query_en") or "")
 
-    # Expand device aliases (e.g., SUPRA XP ↔ ZEDIUS XP)
+    # Expand device aliases (e.g., SUPRA XP ↔ ZEDIUS XP, SUPRA V+ ↔ SUPRA Vplus)
     _device_aliases = agent_settings.device_aliases
+    _alias_lower = {k.lower(): v for k, v in _device_aliases.items()}
     expanded_devices: List[str] = []
     for d in selected_devices:
         expanded_devices.append(d)
-        aliases = _device_aliases.get(d, [])
+        aliases = _alias_lower.get(d.lower(), [])
         for alias in aliases:
             if alias not in expanded_devices:
                 expanded_devices.append(alias)
@@ -2548,12 +2684,19 @@ def expand_related_docs_node(
             expanded_pages.sort()
         elif (
             section_fetcher is not None
-            and bool(meta.get("chapter_ok", False))
             and str(meta.get("section_chapter", "") or "")
+            and str(meta.get("chapter_source", "") or "") in {"title", "rule", "toc_match", "carry"}
         ):
             # Chapter-based expansion: fetch all pages in the same section
             section_targets += 1
             section_chapter = str(meta.get("section_chapter", ""))
+            _ch_src = str(meta.get("chapter_source", ""))
+            if _ch_src == "carry":
+                logger.warning(
+                    "[expand_related] CARRY-TRIGGERED section expansion: "
+                    "doc_id=%s, page=%s, chapter='%s', chapter_source=%s",
+                    doc.doc_id, _extract_page_value(meta), section_chapter, _ch_src,
+                )
             section_hits = section_fetcher(
                 doc_id=str(doc.doc_id),
                 section_chapter=section_chapter,
@@ -3859,8 +4002,11 @@ def _supplement_setup_answer(
         "보완할 내용이 없으면 NONE만 출력하세요."
     )
     raw = _invoke_llm(
-        llm, _SUPPLEMENT_SETUP_SYSTEM, user,
-        max_tokens=MAX_TOKENS_ANSWER, temperature=0.2,
+        llm,
+        _SUPPLEMENT_SETUP_SYSTEM,
+        user,
+        max_tokens=MAX_TOKENS_ANSWER,
+        temperature=0.2,
     )
     raw_stripped = (raw or "").strip()
 
@@ -3877,7 +4023,8 @@ def _supplement_setup_answer(
     merged_answer = raw_stripped
     logger.info(
         "judge_node(supplement): merged answer (%d -> %d chars)",
-        len(answer), len(merged_answer),
+        len(answer),
+        len(merged_answer),
     )
     return merged_answer, {
         "faithful": True,
@@ -3899,7 +4046,10 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     # Setup route: 보완형 — 답변의 누락 내용을 보완하고 재시도 없이 종료
     if route == "setup" and answer and "찾지 못했습니다" not in answer:
         supplemented_answer, judge = _supplement_setup_answer(
-            answer, query_for_judge, ref_text, llm=llm,
+            answer,
+            query_for_judge,
+            ref_text,
+            llm=llm,
         )
         result: Dict[str, Any] = {"judge": judge}
         if supplemented_answer != answer:
@@ -4880,7 +5030,8 @@ def auto_parse_confirm_node(
 ) -> Command[Literal["history_check"]]:
     guided_confirm = state.get("guided_confirm") is True
     already_confirmed = state.get("auto_parse_confirmed") is True
-    if (not guided_confirm) or already_confirmed:
+    abbreviation_resolved = state.get("abbreviation_resolved") is True
+    if (not guided_confirm) or already_confirmed or abbreviation_resolved:
         return Command(goto="history_check", update={})
 
     query = str(state.get("query") or "")
@@ -5036,6 +5187,191 @@ def auto_parse_confirm_node(
 
     update["parsed_query"] = merged_pq
     return Command(goto="history_check", update=update)
+
+
+def abbreviation_resolve_node(
+    state: AgentState,
+) -> Dict[str, Any]:
+    """약어/동의어를 확장하고, 모호한 약어(1:N)는 사용자에게 선택을 요청.
+
+    - 1:1 약어 + 동의어: 자동 치환하여 state["query"] 업데이트
+    - 1:N 모호 약어: interrupt로 사용자 선택 후 치환
+    - 확장된 쿼리가 이후 모든 노드(translate, mq, retrieve, answer)에 전파됨
+    """
+    already_resolved = state.get("abbreviation_resolved") is True
+    if already_resolved:
+        return {}
+
+    if not agent_settings.abbreviation_expand_enabled:
+        return {}
+
+    query = str(state.get("query") or "")
+    if not query:
+        return {}
+
+    try:
+        from backend.llm_infrastructure.query_expansion.abbreviation_expander import (
+            get_abbreviation_expander,
+        )
+
+        expander = get_abbreviation_expander(agent_settings.abbreviation_dict_path)
+        result = expander.expand_query(query)
+    except Exception:
+        logger.debug("abbreviation_resolve_node: expander not available", exc_info=True)
+        return {}
+
+    # 매칭된 약어/동의어가 없으면 통과
+    if not result.matches:
+        return {}
+
+    # ── 1:N 모호 약어 처리: 사용자에게 선택 요청 ──
+    selections: Dict[str, str] = {}
+    if result.ambiguous:
+        abbreviation_items: List[Dict[str, Any]] = []
+        concept_eng_by_id: Dict[str, str] = {}
+        seen_tokens: Set[str] = set()
+
+        for match in result.matches:
+            if not match.ambiguous:
+                continue
+            if match.abbr_key in seen_tokens:
+                continue
+
+            candidates = [m for m in result.matches if m.abbr_key == match.abbr_key and m.ambiguous]
+            options = []
+            for c in candidates:
+                concept_value = str(c.concept_id)
+                selected_eng = str(c.primary_eng or "").strip()
+                if selected_eng:
+                    concept_eng_by_id[concept_value] = selected_eng
+                options.append(
+                    {
+                        "value": concept_value,
+                        "label": f"{c.primary_eng} ({c.primary_kr})"
+                        if c.primary_kr
+                        else c.primary_eng,
+                        "eng": c.primary_eng,
+                        "kr": c.primary_kr,
+                    }
+                )
+            abbreviation_items.append(
+                {
+                    "token": match.token,
+                    "abbr_key": match.abbr_key,
+                    "options": options,
+                }
+            )
+            seen_tokens.add(match.abbr_key)
+
+        if abbreviation_items:
+            logger.info(
+                "[abbreviation_resolve] ambiguous abbreviations detected: %s",
+                [item["abbr_key"] for item in abbreviation_items],
+            )
+
+            payload_base = {
+                "type": "abbreviation_resolve",
+                "question": query,
+                "instruction": "다음 약어의 의미를 선택해주세요.",
+                "abbreviations": abbreviation_items,
+            }
+
+            def _resolve_selections(candidate: Any) -> Dict[str, str] | None:
+                if not isinstance(candidate, dict):
+                    return None
+                if candidate.get("type") != "abbreviation_resolve":
+                    return None
+                user_selections = candidate.get("selections")
+                if not isinstance(user_selections, dict):
+                    return None
+
+                resolved: Dict[str, str] = {}
+                for item in abbreviation_items:
+                    abbr_key = str(item.get("abbr_key") or "").strip()
+                    if not abbr_key:
+                        return None
+                    concept_id_raw = user_selections.get(abbr_key)
+                    if concept_id_raw is None:
+                        return None
+                    concept_id_value = str(concept_id_raw).strip()
+                    if not concept_id_value:
+                        return None
+
+                    selected_eng = concept_eng_by_id.get(concept_id_value, "")
+                    if not selected_eng:
+                        return None
+                    resolved[abbr_key] = selected_eng
+
+                return resolved if resolved else None
+
+            decision = interrupt(payload_base)
+            resolved = _resolve_selections(decision)
+            while resolved is None:
+                logger.warning("[abbreviation_resolve] invalid decision, re-prompting")
+                decision = interrupt(
+                    {
+                        **payload_base,
+                        "instruction": "선택값이 올바르지 않습니다. 모든 약어의 의미를 다시 선택해주세요.",
+                    }
+                )
+                resolved = _resolve_selections(decision)
+
+            selections = resolved
+            for abbr_key, selected_eng in selections.items():
+                logger.info(
+                    "[abbreviation_resolve] user selected: '%s' → '%s'",
+                    abbr_key,
+                    selected_eng,
+                )
+
+    # ── 쿼리 확장 적용 (1:1 자동 + 1:N 사용자 선택) ──
+    expanded = str(getattr(result, "expanded_query", query) or query)  # 1:1 + 동의어는 이미 치환됨
+
+    # 사용자 선택한 모호 약어도 치환
+    if selections:
+        import re as _re
+
+        for match in result.matches:
+            if not match.ambiguous:
+                continue
+            selected_eng = selections.get(match.abbr_key)
+            if not selected_eng:
+                continue
+            if selected_eng.lower() in expanded.lower():
+                continue
+            is_synonym = match.abbr_key.startswith("SYN:")
+            if is_synonym:
+                idx = expanded.lower().find(match.token.lower())
+                if idx == -1:
+                    continue
+                original_token = expanded[idx : idx + len(match.token)]
+                replacement = f"{original_token} ({selected_eng})"
+                expanded = expanded[:idx] + replacement + expanded[idx + len(match.token) :]
+            else:
+                pattern = _re.compile(
+                    rf"\b{_re.escape(match.token)}\b",
+                    _re.IGNORECASE,
+                )
+                replacement = f"{match.token} ({selected_eng})"
+                new_expanded = pattern.sub(replacement, expanded, count=1)
+                if new_expanded != expanded:
+                    expanded = new_expanded
+
+    # 쿼리가 변경되었으면 state["query"] 업데이트
+    update: Dict[str, Any] = {
+        "abbreviation_resolved": True,
+        "abbreviation_selections": selections,
+        "original_query": query,  # 확장 전 원본 쿼리 (동의어 variant 생성용)
+    }
+    if expanded != query:
+        update["query"] = expanded
+        logger.info(
+            "[abbreviation_resolve] query expanded: '%s' → '%s'",
+            query,
+            expanded,
+        )
+
+    return update
 
 
 def translate_node(

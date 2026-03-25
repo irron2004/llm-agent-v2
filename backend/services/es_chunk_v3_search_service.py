@@ -48,10 +48,13 @@ def _normalize_doc_types_to_v3_groups(doc_types: list[str] | None) -> list[str] 
 
 
 def _normalize_device_names_to_v3(device_names: list[str] | None) -> list[str] | None:
-    """Normalize device names to v3 format (spaces → underscores, uppercase).
+    """Normalize device names to v3 format.
 
-    v3 indices store device_name as 'SUPRA_XP', but runtime sends 'SUPRA XP'.
-    Include both original and normalized forms so the filter matches either format.
+    v3 indices store device_name in multiple formats:
+    - 'SUPRA_VPLUS' (underscore, from manifest)
+    - 'SUPRA VPLUS' (space, from filename parser)
+    - 'SUPRA Vplus' (mixed case, from runtime)
+    Include all forms so the filter matches any format.
     """
     if not device_names:
         return device_names
@@ -70,6 +73,11 @@ def _normalize_device_names_to_v3(device_names: list[str] | None) -> list[str] |
         if v3_name not in seen:
             seen.add(v3_name)
             result.append(v3_name)
+        # uppercase with spaces (filename parser format)
+        upper_space = name.upper()
+        if upper_space not in seen:
+            seen.add(upper_space)
+            result.append(upper_space)
     return result or None
 
 

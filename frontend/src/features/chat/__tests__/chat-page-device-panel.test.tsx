@@ -6,6 +6,7 @@ import {
   mockSend,
   mockSetPendingRegeneration,
   mockFetchDeviceCatalog,
+  mockSubmitAbbreviationResolve,
 } from "./helpers/render-chat-page";
 import { makePendingRegeneration, makeDeviceCatalogResponse } from "./helpers/mock-data";
 
@@ -520,5 +521,66 @@ describe("Issue inline selection regression", () => {
     fireEvent.keyDown(textbox, { key: "2" });
 
     expect(submitIssueCaseSelection).toHaveBeenCalledWith("doc-2");
+  });
+});
+
+describe("Abbreviation resolve panel regression", () => {
+  it("renders abbreviation resolve panel and disables chat input while pending", async () => {
+    await renderChatPage({
+      chatSession: {
+        pendingAbbreviationResolve: {
+          threadId: "thread-abbr-1",
+          question: "AR alarm in PM chamber",
+          instruction: "약어 의미를 선택해 주세요.",
+          payload: {
+            type: "abbreviation_resolve",
+            abbreviations: [
+              {
+                token: "AR",
+                abbr_key: "AR",
+                options: [
+                  { value: "1", label: "Aspect Ratio" },
+                  { value: "2", label: "As Received" },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(screen.getByText("약어 의미 선택")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "선택 완료" })).toBeDisabled();
+    expect(screen.getByRole("textbox")).toBeDisabled();
+  });
+
+  it("submits selected abbreviation meanings as structured payload", async () => {
+    await renderChatPage({
+      chatSession: {
+        pendingAbbreviationResolve: {
+          threadId: "thread-abbr-2",
+          question: "AR alarm in PM chamber",
+          instruction: "약어 의미를 선택해 주세요.",
+          payload: {
+            type: "abbreviation_resolve",
+            abbreviations: [
+              {
+                token: "AR",
+                abbr_key: "AR",
+                options: [
+                  { value: "1", label: "Aspect Ratio" },
+                  { value: "2", label: "As Received" },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "1. Aspect Ratio" }));
+    fireEvent.click(screen.getByRole("button", { name: "선택 완료" }));
+
+    expect(mockSubmitAbbreviationResolve).toHaveBeenCalledWith({ AR: "1" });
   });
 });

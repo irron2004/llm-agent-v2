@@ -3,6 +3,7 @@ export { MarkdownContent } from "./markdown-content";
 export { ChatContainer, MessageList, InputArea } from "./chat-container";
 export { ChatInput } from "./chat-input";
 export { DeviceSelectionPanel } from "./device-selection-panel";
+export { AbbreviationResolvePanel } from "./abbreviation-resolve-panel";
 export { GuidedSelectionPanel } from "./guided-selection-panel";
 export { IssueConfirmPanel } from "./issue-confirm-panel";
 export { IssueCaseSelectionPanel } from "./issue-case-selection-panel";

@@ -38,6 +38,7 @@ type InterruptKind =
   | "device_selection"
   | "retrieval_review"
   | "human_review"
+  | "abbreviation_resolve"
   | "issue_confirm"
   | "issue_case_selection"
   | "issue_sop_confirm"
@@ -141,6 +142,31 @@ type PendingIssueSopConfirm = {
   };
 };
 
+type AbbreviationOption = {
+  value: string;
+  label: string;
+  eng?: string;
+  kr?: string | null;
+};
+
+type AbbreviationItem = {
+  token: string;
+  abbr_key: string;
+  options: AbbreviationOption[];
+};
+
+type AbbreviationResolvePayload = {
+  type: "abbreviation_resolve";
+  abbreviations: AbbreviationItem[];
+};
+
+type PendingAbbreviationResolve = {
+  threadId: string;
+  question: string;
+  instruction: string;
+  payload: AbbreviationResolvePayload;
+};
+
 type GuidedOption = {
   value: string;
   recommended?: boolean;
@@ -234,6 +260,7 @@ const resolveInterruptKind = (payload?: Record<string, unknown> | null): Interru
   if (payload?.type === "device_selection") return "device_selection";
   if (payload?.type === "retrieval_review") return "retrieval_review";
   if (payload?.type === "human_review") return "human_review";
+  if (payload?.type === "abbreviation_resolve") return "abbreviation_resolve";
   if (payload?.type === "issue_confirm") return "issue_confirm";
   if (payload?.type === "issue_case_selection") return "issue_case_selection";
   if (payload?.type === "issue_sop_confirm") return "issue_sop_confirm";
@@ -279,8 +306,53 @@ const buildInterruptPrompt = (kind: InterruptKind, instruction?: string) => {
   if (kind === "retrieval_review") {
     return "검색 결과가 준비되었습니다. 아래에서 문서를 선택하거나 추가 키워드를 입력해 주세요.";
   }
+  if (kind === "abbreviation_resolve") {
+    if (instruction && instruction.trim()) return instruction.trim();
+    return "약어 의미를 선택해 주세요.";
+  }
   if (instruction && instruction.trim()) return instruction.trim();
   return "추가 입력이 필요합니다. 승인/거절 또는 수정 답변을 입력해 주세요.";
+};
+
+const toAbbreviationOptions = (value: unknown): AbbreviationOption[] => {
+  if (!Array.isArray(value)) return [];
+  const options: AbbreviationOption[] = [];
+  for (const item of value) {
+    const src = isRecord(item) ? item : null;
+    const optionValue = typeof src?.value === "string" ? src.value.trim() : "";
+    if (!optionValue) continue;
+    options.push({
+      value: optionValue,
+      label: typeof src?.label === "string" && src.label.trim() ? src.label.trim() : optionValue,
+      eng: typeof src?.eng === "string" ? src.eng : undefined,
+      kr: typeof src?.kr === "string" ? src.kr : null,
+    });
+  }
+  return options;
+};
+
+const toAbbreviationResolvePayload = (
+  payload?: Record<string, unknown> | null
+): AbbreviationResolvePayload | null => {
+  if (!payload || payload.type !== "abbreviation_resolve") return null;
+  const rawItems = Array.isArray(payload.abbreviations) ? payload.abbreviations : [];
+  const abbreviations: AbbreviationItem[] = [];
+
+  for (const item of rawItems) {
+    const src = isRecord(item) ? item : null;
+    const token = typeof src?.token === "string" ? src.token.trim() : "";
+    const abbrKey = typeof src?.abbr_key === "string" ? src.abbr_key.trim() : "";
+    if (!abbrKey) continue;
+    const options = toAbbreviationOptions(src?.options);
+    if (options.length === 0) continue;
+    abbreviations.push({ token, abbr_key: abbrKey, options });
+  }
+
+  if (abbreviations.length === 0) return null;
+  return {
+    type: "abbreviation_resolve",
+    abbreviations,
+  };
 };
 
 type IssueResumeContext = {
@@ -762,9 +834,10 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
             (dt) => typeof dt === "string" && dt.toLowerCase() === "sop"
           ));
 
-      const sopFinalDocId = isSopResponse && Array.isArray(res.expanded_docs) && res.expanded_docs.length > 0
-        ? res.expanded_docs[res.expanded_docs.length - 1]?.doc_id ?? null
+      const sopExpandedDoc = isSopResponse && Array.isArray(res.expanded_docs) && res.expanded_docs.length > 0
+        ? res.expanded_docs[0]
         : null;
+      const sopFinalDocId = sopExpandedDoc?.doc_id ?? null;
 
       if (docsToShow && sopFinalDocId) {
         // 답변에 사용된 문서 1개의 전체 페이지를 오른쪽 pane에 표시
@@ -778,7 +851,11 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           // 우선 base chunk 표시 후, 비동기로 전체 페이지 수를 조회하여 업데이트
           setCompletedRetrievedDocs([base]);
 
-          const answerPage = typeof base.page === "number" ? base.page : 1;
+          // 확장 섹션의 시작 페이지 우선, 없으면 검색 히트 페이지
+          const sectionStartPage = typeof sopExpandedDoc?.start_page === "number"
+            ? sopExpandedDoc.start_page
+            : null;
+          const answerPage = sectionStartPage ?? (typeof base.page === "number" ? base.page : 1);
 
           fetch(`/api/assets/docs/${encodeURIComponent(sopFinalDocId)}/info`)
             .then((r) => r.ok ? r.json() : null)
@@ -1590,6 +1667,40 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
     [pendingIssueSopConfirm, send]
   );
 
+  const submitAbbreviationResolve = useCallback(
+    (selections: Record<string, string>) => {
+      if (!pendingInterrupt || pendingInterrupt.kind !== "abbreviation_resolve") return;
+
+      const payload = toAbbreviationResolvePayload(pendingInterrupt.payload);
+      if (!payload) {
+        setError("약어 선택 정보를 확인할 수 없습니다.");
+        return;
+      }
+
+      const normalized: Record<string, string> = {};
+      for (const item of payload.abbreviations) {
+        const raw = selections[item.abbr_key];
+        const value = typeof raw === "string" ? raw.trim() : "";
+        if (!value) {
+          setError("모든 약어의 의미를 선택해야 합니다.");
+          return;
+        }
+        normalized[item.abbr_key] = value;
+      }
+
+      setPendingInterrupt(null);
+      void send({
+        text: "약어 의미를 선택했습니다.",
+        suppressUserMessage: true,
+        decisionOverride: {
+          type: "abbreviation_resolve",
+          selections: normalized,
+        },
+      });
+    },
+    [pendingInterrupt, send]
+  );
+
   const reset = useCallback(() => {
     stop();
     setMessages([]);
@@ -1827,6 +1938,19 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       pendingIssueConfirm,
       pendingIssueCaseSelection,
       pendingIssueSopConfirm,
+      pendingAbbreviationResolve:
+        pendingInterrupt?.kind === "abbreviation_resolve"
+          ? (() => {
+              const payload = toAbbreviationResolvePayload(pendingInterrupt.payload);
+              if (!payload) return null;
+              return {
+                threadId: pendingInterrupt.threadId,
+                question: pendingInterrupt.question,
+                instruction: pendingInterrupt.instruction,
+                payload,
+              } satisfies PendingAbbreviationResolve;
+            })()
+          : null,
       pendingReview: pendingInterrupt?.kind === "retrieval_review" ? pendingInterrupt : null,
       pendingDeviceSelection: pendingInterrupt?.kind === "device_selection" ? pendingInterrupt : null,
       submitGuidedSelectionNumber,
@@ -1834,6 +1958,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       submitIssueConfirm,
       submitIssueCaseSelection,
       submitIssueSopConfirm,
+      submitAbbreviationResolve,
       submitReview,
       submitSearchQueries,
       submitDeviceSelection,
@@ -1844,6 +1969,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
           ? "기기를 선택하거나 건너뛰기를 클릭하세요..."
           : pendingInterrupt.kind === "retrieval_review"
             ? "검색 결과 승인/거절 또는 추가 키워드를 입력하세요..."
+            : pendingInterrupt.kind === "abbreviation_resolve"
+              ? "약어 의미를 선택해 주세요..."
             : "승인/거절 또는 수정 답변을 입력하세요..."
         : "메시지를 입력하세요...",
       reset,
@@ -1867,6 +1994,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
       submitIssueConfirm,
       submitIssueCaseSelection,
       submitIssueSopConfirm,
+      submitAbbreviationResolve,
       submitReview,
       submitSearchQueries,
       submitDeviceSelection,

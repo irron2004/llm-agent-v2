@@ -111,7 +111,7 @@ class SectionExpander:
         self.enabled = enabled
         self.top_groups = top_groups
         self.max_pages = max_pages
-        self.allowed_sources = allowed_sources or {"title", "rule", "toc_match"}
+        self.allowed_sources = allowed_sources or {"title", "rule", "toc_match", "carry"}
 
     @classmethod
     def from_settings(cls, settings: "RAGSettings") -> "SectionExpander":
@@ -163,7 +163,6 @@ class SectionExpander:
 
             if (
                 not section_chapter
-                or not chapter_ok
                 or chapter_source not in self.allowed_sources
             ):
                 continue
@@ -174,6 +173,19 @@ class SectionExpander:
 
             seen_groups.add(group_key)
             candidate_hits.append(hit)
+
+            if chapter_source == "carry":
+                logger.warning(
+                    "[SectionExpander] CARRY-TRIGGERED expansion: "
+                    "doc_id=%s, page=%s, chapter='%s', chapter_ok=%s, source=%s",
+                    hit.doc_id, hit.page, section_chapter, chapter_ok, chapter_source,
+                )
+            else:
+                logger.info(
+                    "[SectionExpander] expansion trigger: "
+                    "doc_id=%s, page=%s, chapter='%s', source=%s",
+                    hit.doc_id, hit.page, section_chapter, chapter_source,
+                )
 
             if len(candidate_hits) >= self.top_groups:
                 break
@@ -203,6 +215,16 @@ class SectionExpander:
                 expanded_groups.append(group)
                 for chunk in group.all_chunks:
                     expanded_chunk_ids.add(chunk.chunk_id)
+
+                chapter_source = str((hit.metadata or {}).get("chapter_source", ""))
+                pages = sorted({c.page for c in group.all_chunks if c.page})
+                logger.info(
+                    "[SectionExpander] expanded group: doc_id=%s, chapter='%s', "
+                    "source=%s, pages=%s (%d chunks)",
+                    hit.doc_id, section_chapter, chapter_source,
+                    f"{pages[0]}-{pages[-1]}" if pages else "?",
+                    len(group.all_chunks),
+                )
 
         # Hits not part of any expanded group
         unexpanded = [

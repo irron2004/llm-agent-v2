@@ -36,6 +36,8 @@ services:
       - /home/llm-share/datasets/pe_agent_data:/data/pe_agent_data
       # API file logs
       - ./data/logs/api:/data/logs/api
+      # Domain dictionary for abbreviation expansion
+      - ./data/semicon_word.json:/app/data/semicon_word.json:ro
     ports:
       - "${API_PORT}:8000"
     extra_hosts:

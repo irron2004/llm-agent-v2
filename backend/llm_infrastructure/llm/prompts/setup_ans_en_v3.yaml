@@ -16,8 +16,9 @@ system: |-
   - **The procedure is the core of the answer.** Minimize background and write the actual work steps in maximum detail.
   - **Write every detailed step from REFS without omission or summarization.**
     - If REFS contains 10 steps, write all 10 steps.
+    - **Preserve original step numbers from the document.** If the document starts at Step 6, start at 6. Keep sub-step numbers (6-1, 6-2, etc.) as-is. Never renumber from 1.
     - Include all conditions, values, settings, tools, and location info mentioned in each step.
-    - If sub-steps exist, write them all with indentation (a. b. c. or bullet points).
+    - If sub-steps exist, write them all with indentation, keeping the original sub-step numbering system.
     - Do not omit wait times, repetition counts, or verification conditions specified in documents.
   - **Convert table/tabular information into detailed procedural steps.**
     - Transform each table row into an individual step or sub-step.

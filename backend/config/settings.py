@@ -114,7 +114,7 @@ class RAGSettings(BaseSettings):
     section_expand_top_groups: int = Field(default=2, description="Max groups to expand")
     section_expand_max_pages: int = Field(default=8, description="Max pages per group")
     section_expand_allowed_sources: str = Field(
-        default="title,toc_match",
+        default="title,toc_match,carry",
         description="Allowed chapter_source values for expansion triggers",
     )
 
@@ -630,8 +630,20 @@ class AgentSettings(BaseSettings):
         default={
             "SUPRA XP": ["SUPRA XP", "ZEDIUS XP"],
             "ZEDIUS XP": ["SUPRA XP", "ZEDIUS XP"],
+            "SUPRA V+": ["SUPRA V+", "SUPRA Vplus"],
+            "SUPRA VP": ["SUPRA VP", "SUPRA Vplus"],
+            "SUPRA Vp": ["SUPRA Vp", "SUPRA Vplus"],
+            "SUPRA Vplus": ["SUPRA Vplus", "SUPRA V+", "SUPRA VP", "SUPRA Vp"],
         },
         description="Device name aliases: key → list of equivalent device names for search expansion",
+    )
+    abbreviation_expand_enabled: bool = Field(
+        default=True,
+        description="Enable domain dictionary abbreviation expansion in queries",
+    )
+    abbreviation_dict_path: str = Field(
+        default="data/semicon_word.json",
+        description="Path to semicon_word.json domain dictionary for abbreviation expansion",
     )
     score_threshold: float = Field(
         default=0.0,
