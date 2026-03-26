@@ -531,6 +531,26 @@ def _infer_task_mode_from_doc_types(doc_types: Any) -> Optional[str]:
 
 MAX_ANSWER_FORMAT_RETRIES = 2
 
+# --- Intent keyword sets for routing & retrieval gating ---
+# Procedure intent: 절차/교체/설치 등 작업 수행 의도
+_PROCEDURE_KEYWORDS_SET = frozenset({
+    "교체", "절차", "작업", "방법", "replacement", "procedure",
+    "how to", "install", "설치", "수리", "repair",
+})
+# Inquiry intent: 문서 내 특정 섹션 조회/열람 의도
+_INQUIRY_KEYWORDS = frozenset({
+    "조회", "보여줘", "알려줘", "목록", "리스트",
+    "worksheet", "work sheet", "tool list", "check sheet",
+    "scope", "목차", "part 위치", "개요", "overview",
+    "show me", "list of",
+})
+# 복합 패턴: procedure 키워드를 포함하지만 실제로는 조회 의도인 구문
+# "작업 check sheet", "작업 체크시트" 등 — procedure wins를 무효화
+_INQUIRY_COMPOUND_PATTERNS = (
+    "작업 check", "작업 체크", "작업check", "작업체크",
+    "work check", "work sheet",
+)
+
 _CITATION_RE = re.compile(r"\[[0-9]+\]")
 _EMOJI_NUMERAL_RE = re.compile(r"[0-9]️⃣")
 _MARKDOWN_TABLE_LINE_RE = re.compile(r"(?m)^\|.*\|\s*$")
@@ -1509,6 +1529,22 @@ def route_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     )
     logger.info("route_node: query=%s..., route=%s", query[:50] if query else None, route)
 
+    # --- Inquiry safe override (B + 일부 A) ---
+    # SOP/Setup 선택 상태에서 라우터가 setup을 반환했지만, 실제 질문이 정보 조회
+    # (worksheet, tool list, scope 등)인 경우 general로 오버라이드한다.
+    # 단, procedure 키워드가 있으면 절차 의도 우선(procedure wins).
+    if route == "setup" and task_mode in ("sop", ""):
+        user_query_lower = (state["query"] or "").lower()
+        _has_inquiry = any(kw in user_query_lower for kw in _INQUIRY_KEYWORDS)
+        _has_procedure = any(kw in user_query_lower for kw in _PROCEDURE_KEYWORDS_SET)
+        _has_compound_inquiry = any(cp in user_query_lower for cp in _INQUIRY_COMPOUND_PATTERNS)
+        if _has_inquiry and (not _has_procedure or _has_compound_inquiry):
+            logger.info(
+                "route_node: inquiry override setup->general (query=%s)",
+                user_query_lower[:50],
+            )
+            route = "general"
+
     # parsed_query 업데이트
     pq_dict = dict(state.get("parsed_query") or {})
     pq_dict["route"] = route
@@ -2363,6 +2399,30 @@ def retrieve_node(
         or bool(selected_doc_types_normalized.intersection(sop_variants))
     )
 
+    # --- Intent-based gating for SOP adjustments ---
+    # SOP 문서 선택 시에도, 비절차(조회) 질문이면 절차 편향 조정을 건너뛴다.
+    route = state.get("route", "general")
+    query_lower_for_intent = (original_query or "").lower()
+    has_procedure_intent_early = any(
+        kw in query_lower_for_intent for kw in _PROCEDURE_KEYWORDS_SET
+    )
+    has_inquiry_intent = any(
+        kw in query_lower_for_intent for kw in _INQUIRY_KEYWORDS
+    )
+    # Procedure wins: 절차 키워드가 있으면 inquiry 무시
+    # 단, 복합 조회 패턴("작업 check sheet" 등)은 procedure wins를 무효화
+    has_compound_inquiry = any(
+        cp in query_lower_for_intent for cp in _INQUIRY_COMPOUND_PATTERNS
+    )
+    is_procedural_context = (
+        route == "setup" or has_procedure_intent_early
+    ) and not (has_inquiry_intent and (not has_procedure_intent_early or has_compound_inquiry))
+
+    logger.info(
+        "retrieve_node: intent gating — sop_pred=%s, procedural=%s, inquiry=%s, route=%s",
+        sop_only_predicate, is_procedural_context, has_inquiry_intent, route,
+    )
+
     def _apply_early_page_penalty(docs: List[RetrievalResult]) -> List[RetrievalResult]:
         penalty_max_page = int(agent_settings.early_page_penalty_max_page)
         penalty_factor = float(agent_settings.early_page_penalty_factor)
@@ -2384,7 +2444,7 @@ def retrieve_node(
                 penalized_docs.append(doc)
         return sorted(penalized_docs, key=_stable_tie_break_key)
 
-    if agent_settings.early_page_penalty_enabled and sop_only_predicate and all_docs:
+    if agent_settings.early_page_penalty_enabled and sop_only_predicate and is_procedural_context and all_docs:
         all_docs = _apply_early_page_penalty(all_docs)
 
     if selected_doc_ids:
@@ -2393,7 +2453,7 @@ def retrieve_node(
         all_docs = [d for d in all_docs if str(d.doc_id) in selected_doc_id_set]
         logger.info("retrieve_node: filtered by selected_doc_ids %d -> %d", before, len(all_docs))
 
-    if sop_only_predicate and all_docs:
+    if sop_only_predicate and is_procedural_context and all_docs:
         soft_boost_factor = float(agent_settings.sop_soft_boost_factor)
         boosted_docs: List[RetrievalResult] = []
         for doc in all_docs:
@@ -2443,7 +2503,9 @@ def retrieve_node(
             if agent_settings.scope_penalty_enabled
             else 1.0
         )
-        should_apply = (has_procedure_intent and proc_boost != 1.0) or scope_pen != 1.0
+        # Scope penalty는 inquiry 의도가 아닐 때만 적용 (조회 질문에서 scope/목차 패널티 방지)
+        effective_scope_pen = scope_pen if not has_inquiry_intent else 1.0
+        should_apply = (has_procedure_intent and proc_boost != 1.0) or effective_scope_pen != 1.0
 
         if should_apply:
             adjusted_docs: List[RetrievalResult] = []
@@ -2464,12 +2526,13 @@ def retrieve_node(
                     score *= proc_boost
                     proc_boosted += 1
                 # Penalize Scope/Contents/TOC pages (low-value for procedure questions)
-                elif agent_settings.scope_penalty_enabled and scope_pen != 1.0:
+                # inquiry 의도일 때는 패널티 건너뜀
+                elif agent_settings.scope_penalty_enabled and effective_scope_pen != 1.0:
                     is_scope = any(sm in content_preview for sm in _SCOPE_MARKERS)
                     page = _extract_page_value(meta)
                     # Also penalize chapter_ok=false non-procedure pages
                     if is_scope or (page is not None and page <= 1):
-                        score *= scope_pen
+                        score *= effective_scope_pen
                         scope_penalized += 1
 
                 adjusted_docs.append(
@@ -2528,6 +2591,7 @@ def retrieve_node(
                 if (
                     agent_settings.early_page_penalty_enabled
                     and sop_only_predicate
+                    and is_procedural_context
                     and per_call_results
                 ):
                     per_call_results = _apply_early_page_penalty(per_call_results)
@@ -2601,6 +2665,50 @@ def retrieve_node(
                 len(deduped),
             )
         docs = deduped
+
+    # --- Doc-type diversity quota (SOP + Setup 동시 선택 시) ---
+    setup_variants = {normalize_doc_type(v) for v in DOC_TYPE_GROUPS.get("setup", [])}
+    both_selected = bool(
+        selected_doc_types_normalized.intersection(sop_variants)
+        and selected_doc_types_normalized.intersection(setup_variants)
+    )
+    if agent_settings.doc_type_diversity_enabled and both_selected and len(docs) > 1:
+        min_setup = agent_settings.doc_type_diversity_min_setup
+        min_sop = agent_settings.doc_type_diversity_min_sop
+
+        sop_docs: List[RetrievalResult] = []
+        setup_docs: List[RetrievalResult] = []
+        other_docs: List[RetrievalResult] = []
+        for doc in docs:
+            meta = doc.metadata if isinstance(doc.metadata, dict) else {}
+            dt_norm = normalize_doc_type(str(meta.get("doc_type", "")))
+            if dt_norm in setup_variants:
+                setup_docs.append(doc)
+            elif dt_norm in sop_variants:
+                sop_docs.append(doc)
+            else:
+                other_docs.append(doc)
+
+        need_rebalance = (
+            (len(setup_docs) < min_setup and setup_docs)
+            or (len(sop_docs) < min_sop and sop_docs)
+        )
+        if need_rebalance:
+            # 각 그룹에서 최소 쿼터만큼 확보, 나머지는 원래 score 순서로 채움
+            guaranteed: List[RetrievalResult] = []
+            guaranteed.extend(sop_docs[:min_sop])
+            guaranteed.extend(setup_docs[:min_setup])
+            guaranteed_ids = {id(d) for d in guaranteed}
+            remaining = [d for d in docs if id(d) not in guaranteed_ids]
+            max_fill = max(0, len(docs) - len(guaranteed))
+            docs = guaranteed + remaining[:max_fill]
+            logger.info(
+                "retrieve_node: doc_type diversity rebalanced — sop=%d setup=%d other=%d (total=%d)",
+                min(len(sop_docs), min_sop),
+                min(len(setup_docs), min_setup),
+                len(other_docs),
+                len(docs),
+            )
 
     # Section expansion: expand top groups by fetching full section chunks
     if rag_settings.section_expand_enabled and docs and hasattr(retriever, "es_engine"):

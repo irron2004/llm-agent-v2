@@ -296,6 +296,10 @@ class OllamaSettings(BaseSettings):
         default=256,
         description="Token window for repeat penalty (default ollama=64, 0=disabled, -1=ctx_size)",
     )
+    num_ctx: int = Field(
+        default=131072,
+        description="Context window size in tokens (default ollama=8192, 131072=128K)",
+    )
 
 
 class VlmClientSettings(BaseSettings):
@@ -654,6 +658,18 @@ class AgentSettings(BaseSettings):
     dedupe_by_doc_id: bool = Field(
         default=True,
         description="Deduplicate results by base doc_id, keeping only the highest-scoring page per document.",
+    )
+    doc_type_diversity_enabled: bool = Field(
+        default=True,
+        description="SOP+Setup 동시 선택 시 top-k 결과에 doc_type 다양성 쿼터 적용.",
+    )
+    doc_type_diversity_min_setup: int = Field(
+        default=3,
+        description="SOP+Setup 동시 선택 시 top-k에 포함할 최소 setup 문서 수 (가용 시).",
+    )
+    doc_type_diversity_min_sop: int = Field(
+        default=3,
+        description="SOP+Setup 동시 선택 시 top-k에 포함할 최소 SOP 문서 수 (가용 시).",
     )
 
 

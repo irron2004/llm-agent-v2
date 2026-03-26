@@ -38,10 +38,11 @@ class Stage2OnlyRetriever:
 
 def test_stage2_per_call_early_page_penalty_reorders_before_rrf_merge() -> None:
     retriever = Stage2OnlyRetriever()
+    # 절차 의도(procedure intent)가 있어야 early_page_penalty가 적용됨
     state = {
-        "query": "sop troubleshooting",
-        "route": "general",
-        "search_queries": ["sop troubleshooting"],
+        "query": "sop 교체 절차",
+        "route": "setup",
+        "search_queries": ["sop 교체 절차"],
         "selected_doc_types": ["sop"],
         "selected_doc_ids": ["doc-stage2"],
     }
