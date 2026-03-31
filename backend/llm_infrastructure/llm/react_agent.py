@@ -451,13 +451,7 @@ class ReactRAGAgent:
         queries_used = list(state.get("search_queries_used") or [])
         queries_used.append(search_query)
 
-        elapsed = (time.perf_counter() - t0) * 1000
-        self._emit_node(
-            "search",
-            elapsed,
-            f"q='{search_query[:40]}' found={len(new_docs)} added={len(added)}",
-        )
-        return {
+        update: Dict[str, Any] = {
             "collected_docs": combined,
             "action_trace": trace,
             "iterations": int(state.get("iterations", 0) or 0) + 1,
@@ -471,6 +465,26 @@ class ReactRAGAgent:
             ),
             "guardrail_final_count": len(combined),
         }
+
+        elapsed = (time.perf_counter() - t0) * 1000
+        self._emit_node(
+            "search",
+            elapsed,
+            f"q='{search_query[:40]}' found={len(new_docs)} added={len(added)}",
+        )
+
+        # C-API-003: retrieval_only=True 시 answer 생성 전 interrupt
+        if state.get("retrieval_only"):
+            display = _merge_display_docs(combined)
+            update["display_docs"] = display
+            update["docs"] = combined
+            interrupt({
+                "type": "retrieval_review",
+                "docs": display,
+                "response_mode": "retrieval_only",
+            })
+
+        return update
 
     def _answer_node(self, state: ReactAgentState) -> Dict[str, Any]:
         """수집된 문서로 최종 답변을 생성한다. 기존 answer_node 재사용."""

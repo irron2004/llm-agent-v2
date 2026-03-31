@@ -1112,8 +1112,9 @@ async def run_agent(
                     top_k=req.top_k,
                     use_canonical_retrieval=req.use_canonical_retrieval,
                 )
-            elif req.use_react_agent and not req.retrieval_only:
-                # [실험적] ReAct planner loop — non-resume/non-guided/non-retrieval_only 경로만
+            elif req.use_react_agent:
+                # [실험적] ReAct planner loop — non-resume/non-guided 경로
+                # retrieval_only=True 시 _search_node에서 interrupt 처리 (C-API-003)
                 agent = _new_react_agent(
                     llm,
                     search_service,
@@ -1399,8 +1400,9 @@ async def run_agent_stream(
                         use_canonical_retrieval=req.use_canonical_retrieval,
                         event_sink=_enqueue,
                     )
-                elif req.use_react_agent and not req.retrieval_only:
+                elif req.use_react_agent:
                     # [실험적] ReAct planner loop — streaming 경로
+                    # retrieval_only=True 시 _search_node에서 interrupt 처리 (C-API-003)
                     agent = _new_react_agent(
                         llm,
                         search_service,
