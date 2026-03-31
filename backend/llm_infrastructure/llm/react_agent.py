@@ -20,9 +20,7 @@
 
 from __future__ import annotations
 
-import json
 import logging
-import re
 import time
 import uuid
 from typing import Any, Callable, Dict, List, Literal, Optional, TypedDict, cast
@@ -31,19 +29,19 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from pydantic import BaseModel as PydanticBaseModel
+
 from backend.config.settings import agent_settings, rag_settings
 from backend.llm_infrastructure.llm.base import BaseLLM
 from backend.llm_infrastructure.llm.langgraph_agent import (
     PromptSpec,
     SearchServiceRetriever,
-    _invoke_llm,
     _merge_display_docs,
     answer_node,
     auto_parse_node,
     expand_related_docs_node,
     judge_node,
     load_prompt_spec,
-    ref_json_to_text,
     results_to_ref_json,
     retrieve_node,
     translate_node,
@@ -71,6 +69,17 @@ def _infer_route(state: "ReactAgentState") -> str:  # type: ignore[name-defined]
 
 MAX_SEARCH_ITERATIONS = 3   # 최대 검색 횟수 (초과 시 강제 answer)
 TEMP_PLAN = 0.0             # planner 온도 (결정론적)
+
+
+# ── NextAction 모델 (BaseLLM.generate(response_model=NextAction) 용) ──────────
+
+class NextAction(PydanticBaseModel):
+    """planner LLM이 결정하는 다음 행동."""
+    action: Literal["search", "search_solution", "answer"]
+    reason: str
+    query: Optional[str] = None
+    device_names: List[str] = []
+    doc_types: List[str] = []
 
 # ── State ────────────────────────────────────────────────────────────────────
 
@@ -135,15 +144,6 @@ _PLAN_SYSTEM = """\
 - search         : 문서를 검색 (처음이거나 현재 문서가 부적절할 때)
 - search_solution: 문제 원인 문서는 있지만 해결 절차 문서가 없을 때 추가 검색
 - answer         : 수집된 문서로 답변 생성 가능할 때
-
-반드시 아래 JSON 형식으로만 응답하세요 (다른 텍스트 없이):
-{
-  "action": "search" | "search_solution" | "answer",
-  "reason": "결정 이유 (1~2문장)",
-  "query": "검색 쿼리 (search/search_solution 시 필수, answer 시 생략)",
-  "device_names": [],
-  "doc_types": []
-}
 """
 
 _PLAN_USER_TMPL = """\
@@ -168,15 +168,26 @@ _PLAN_USER_TMPL = """\
 
 
 def _format_history(chat_history: List[Dict[str, Any]]) -> str:
+    """ChatHistoryTurn(user_text/assistant_text) 또는 일반 role/content 형식을 모두 처리."""
     if not chat_history:
         return "(없음)"
     lines = []
-    for turn in chat_history[-6:]:   # 최근 3턴만 포함
-        role = turn.get("role", "user")
-        content = str(turn.get("content", ""))[:200]
-        prefix = "사용자" if role == "user" else "에이전트"
-        lines.append(f"{prefix}: {content}")
-    return "\n".join(lines)
+    for turn in chat_history[-6:]:   # 최근 3턴 (6개 메시지)
+        # ChatHistoryTurn 형식 (agent.py가 model_dump()로 넘기는 형식)
+        if "user_text" in turn:
+            user = str(turn.get("user_text", ""))[:200]
+            asst = str(turn.get("assistant_text", ""))[:200]
+            if user:
+                lines.append(f"사용자: {user}")
+            if asst:
+                lines.append(f"에이전트: {asst}")
+        else:
+            # 일반 role/content 형식
+            role = turn.get("role", "user")
+            content = str(turn.get("content", ""))[:200]
+            prefix = "사용자" if role == "user" else "에이전트"
+            lines.append(f"{prefix}: {content}")
+    return "\n".join(lines) if lines else "(없음)"
 
 
 def _format_action_trace(trace: List[Dict[str, Any]]) -> str:
@@ -215,22 +226,9 @@ def _format_doc_summary(docs: List[Any]) -> str:
     return "\n".join(summaries) if summaries else "(없음)"
 
 
-def _parse_plan(text: str) -> Dict[str, Any]:
-    """LLM 출력에서 JSON 계획을 파싱한다."""
-    try:
-        m = re.search(r"\{.*\}", text, re.S)
-        if m:
-            plan = json.loads(m.group(0))
-            if isinstance(plan, dict) and plan.get("action") in (
-                "search",
-                "search_solution",
-                "answer",
-            ):
-                return plan
-    except Exception:
-        pass
-    logger.warning("react_agent: plan parse failed, defaulting to answer. raw=%s", text[:200])
-    return {"action": "answer", "reason": "plan parse failed"}
+def _plan_fallback() -> Dict[str, Any]:
+    """planner 실패 시 기본 plan."""
+    return {"action": "answer", "reason": "plan generation failed"}
 
 
 # ── ReactRAGAgent ─────────────────────────────────────────────────────────────
@@ -361,10 +359,24 @@ class ReactRAGAgent:
 
         # 최대 반복 횟수 초과 시 강제 answer
         if iterations >= max_iter:
-            plan = {"action": "answer", "reason": f"max iterations ({max_iter}) reached"}
+            plan: Dict[str, Any] = {
+                "action": "answer",
+                "reason": f"max iterations ({max_iter}) reached",
+            }
         else:
-            raw = _invoke_llm(self.llm, _PLAN_SYSTEM, user, temperature=TEMP_PLAN)
-            plan = _parse_plan(raw)
+            try:
+                next_action: NextAction = self.llm.generate(
+                    messages=[
+                        {"role": "system", "content": _PLAN_SYSTEM},
+                        {"role": "user", "content": user},
+                    ],
+                    response_model=NextAction,
+                    temperature=TEMP_PLAN,
+                )
+                plan = next_action.model_dump()
+            except Exception:
+                logger.warning("react_agent: plan generation failed", exc_info=True)
+                plan = _plan_fallback()
 
         elapsed = (time.perf_counter() - t0) * 1000
         self._emit_node("plan", elapsed, f"→ {plan.get('action')} | {plan.get('reason', '')[:60]}")

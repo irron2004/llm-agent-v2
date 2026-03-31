@@ -32,9 +32,10 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     _detect_language_rule_based,
     _extract_devices_from_query,
 )
-from backend.services.device_cache import get_device_cache
+from backend.services.device_cache import get_device_cache, ensure_device_cache_initialized
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
 from backend.services.agents.langgraph_rag_agent import LangGraphRAGAgent
+from backend.llm_infrastructure.llm.react_agent import ReactRAGAgent
 from backend.services.search_service import SearchService
 
 
@@ -294,6 +295,32 @@ def _new_auto_parse_agent(
     )
 
 
+def _new_react_agent(
+    llm,
+    search_service,
+    prompt_spec,
+    *,
+    top_k: int,
+    event_sink=None,
+) -> ReactRAGAgent:
+    """[실험적] ReAct planner loop 에이전트.
+    non-resume / non-retrieval_only / non-guided 경로에만 적용.
+    """
+    cache = ensure_device_cache_initialized(search_service)
+    return ReactRAGAgent(
+        llm=llm,
+        search_service=search_service,
+        prompt_spec=prompt_spec,
+        top_k=top_k,
+        retrieval_top_k=DEFAULT_RETRIEVAL_TOP_K,
+        checkpointer=_checkpointer,
+        device_names=cache.device_names,
+        doc_type_names=cache.doc_type_names,
+        equip_id_set=cache.equip_id_set,
+        event_sink=event_sink,
+    )
+
+
 def _new_guided_confirm_agent(
     llm,
     search_service,
@@ -363,6 +390,10 @@ class AgentRequest(BaseModel):
     retrieval_only: bool = Field(
         False,
         description="답변 생성 전 문서 검색 단계까지만 수행 (전체 문서 대상)",
+    )
+    use_react_agent: bool = Field(
+        False,
+        description="[실험적] ReAct planner loop 기반 에이전트 사용 (non-resume, non-retrieval_only 경로만 적용)",
     )
 
 
@@ -1081,6 +1112,14 @@ async def run_agent(
                     top_k=req.top_k,
                     use_canonical_retrieval=req.use_canonical_retrieval,
                 )
+            elif req.use_react_agent and not req.retrieval_only:
+                # [실험적] ReAct planner loop — non-resume/non-guided/non-retrieval_only 경로만
+                agent = _new_react_agent(
+                    llm,
+                    search_service,
+                    prompt_spec,
+                    top_k=req.top_k,
+                )
             else:
                 agent = _new_auto_parse_agent(
                     llm,
@@ -1358,6 +1397,15 @@ async def run_agent_stream(
                         prompt_spec,
                         top_k=req.top_k,
                         use_canonical_retrieval=req.use_canonical_retrieval,
+                        event_sink=_enqueue,
+                    )
+                elif req.use_react_agent and not req.retrieval_only:
+                    # [실험적] ReAct planner loop — streaming 경로
+                    agent = _new_react_agent(
+                        llm,
+                        search_service,
+                        prompt_spec,
+                        top_k=req.top_k,
                         event_sink=_enqueue,
                     )
                 else:
