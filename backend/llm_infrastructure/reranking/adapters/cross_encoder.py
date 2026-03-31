@@ -30,7 +30,7 @@ class CrossEncoderReranker(BaseReranker):
     """
 
     # Default model for cross-encoder reranking
-    DEFAULT_MODEL = "cross-encoder/ms-marco-MiniLM-L-6-v2"
+    DEFAULT_MODEL = "BAAI/bge-reranker-v2-m3"
 
     def __init__(
         self,
