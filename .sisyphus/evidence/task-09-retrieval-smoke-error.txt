@@ -1,1 +1,0 @@
-Retrieval smoke test failed: corpus_doc_ids_path is required. Retrieval runner always requires a corpus whitelist filter.

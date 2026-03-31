@@ -1,5 +1,0 @@
-DIRA /tmp/stab_bench_a_uEMFqj
-DIRB /tmp/stab_bench_b_XzhF8Q
-manifest_a 22e4537f8e6dab25e17ac37b52db267cc7302601ba6ec50f49eb279c3760601a
-manifest_b 22e4537f8e6dab25e17ac37b52db267cc7302601ba6ec50f49eb279c3760601a
-equal True

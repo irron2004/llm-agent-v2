@@ -1,2 +1,0 @@
-Wrote per-call results: .sisyphus/evidence/paper-b/task-6-smoke/out/results.jsonl
-Wrote aggregate metrics: .sisyphus/evidence/paper-b/task-6-smoke/out/metrics.json

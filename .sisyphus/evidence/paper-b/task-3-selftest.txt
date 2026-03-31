@@ -1,2 +1,0 @@
-SELFTEST expected failure: L1 violation on Q_0000: query contains forbidden token pattern
-exit_code 1

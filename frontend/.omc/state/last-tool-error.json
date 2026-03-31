@@ -1,7 +1,0 @@
-{
-  "tool_name": "Read",
-  "tool_input_preview": "{\"file_path\":\"/home/hskim/work/llm-agent-v2/backend/llm_infrastructure/preprocessing/chunking\"}",
-  "error": "EISDIR: illegal operation on a directory, read '/home/hskim/work/llm-agent-v2/backend/llm_infrastructure/preprocessing/chunking'",
-  "timestamp": "2026-03-14T06:39:49.687Z",
-  "retry_count": 2
-}

@@ -1,7 +1,0 @@
-run_a 2000ba659eb2480eb378bf024826157a
-run_b cc48a4c3280d4cb2b2d902f9176a6c82
-equal True
-doc_ids_a ['GCB_4252', 'GCB_3934', '40121544', 'GCB_3546', '40033569']
-doc_ids_b ['GCB_4252', 'GCB_3934', '40121544', 'GCB_3546', '40033569']
-translate_a {'query_en': 'What checks should I perform first to maintain the PM value in NOVA_08_SYNTH?', 'query_ko': 'NOVA_08_SYNTH에서 PM 값 유지하려면 어떤 점검을 먼저 해야 하나요?'}
-translate_b {'query_en': 'What checks should I perform first to maintain the PM value in NOVA_08_SYNTH?', 'query_ko': 'NOVA_08_SYNTH에서 PM 값 유지하려면 어떤 점검을 먼저 해야 하나요?'}

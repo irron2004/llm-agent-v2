@@ -1,6 +1,0 @@
-Scenario: Contract fields present
-Command:
-  PYTHONPATH=. python -c "import backend.api.routers.agent as a; print('guided_confirm' in a.AgentRequest.model_fields)"
-
-Output:
-True

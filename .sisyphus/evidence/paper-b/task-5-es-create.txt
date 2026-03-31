@@ -1,2 +1,0 @@
-Index created: rag_synth_synth_v1
-Alias switched: rag_synth_synth_current -> rag_synth_synth_v1

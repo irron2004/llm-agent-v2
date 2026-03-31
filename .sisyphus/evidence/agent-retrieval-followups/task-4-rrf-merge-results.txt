@@ -1,3 +1,0 @@
-$ pytest -q backend/tests/test_rrf_merge_results.py
-...                                                                      [100%]
-3 passed in 0.02s

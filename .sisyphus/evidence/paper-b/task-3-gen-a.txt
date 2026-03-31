@@ -1,3 +1,0 @@
-Wrote corpus: /tmp/stab_bench_a_uEMFqj/corpus.jsonl
-Wrote queries: /tmp/stab_bench_a_uEMFqj/queries.jsonl
-Wrote manifest: /tmp/stab_bench_a_uEMFqj/manifest.json

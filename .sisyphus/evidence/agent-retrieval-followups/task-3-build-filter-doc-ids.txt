@@ -1,4 +1,0 @@
-command: pytest -q backend/tests/test_es_build_filter_doc_ids.py
-stdout:
-..                                                                       [100%]
-2 passed in 1.20s

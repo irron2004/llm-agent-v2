@@ -1,7 +1,0 @@
-doc_type_raw,doc_type_norm,doc_group,default_scope_level
-SOP,sop,technical_doc,device
-gcb,gcb,field_record,equip
-myservice,myservice,field_record,equip
-sample,sample,other,shared
-set_up_manual,manual,technical_doc,device
-trouble_shooting_guide,ts,technical_doc,device

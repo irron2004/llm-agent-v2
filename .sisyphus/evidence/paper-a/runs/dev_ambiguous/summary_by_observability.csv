@@ -1,7 +1,0 @@
-scope_observability,system_id,n_queries,n_ok,n_skipped,mean_raw_cont@5,mean_adj_cont@5,mean_shared@5,mean_ce@5,mean_hit@5,mean_mrr
-ambiguous,B0,80,0,80,0.0,0.0,0.0,0.0,0.0,0.0
-ambiguous,B1,80,0,80,0.0,0.0,0.0,0.0,0.0,0.0
-ambiguous,B2,80,0,80,0.0,0.0,0.0,0.0,0.0,0.0
-ambiguous,B3,80,0,80,0.0,0.0,0.0,0.0,0.0,0.0
-ambiguous,B4,80,0,80,0.0,0.0,0.0,0.0,0.0,0.0
-ambiguous,P1,80,0,80,0.0,0.0,0.0,0.0,0.0,0.0

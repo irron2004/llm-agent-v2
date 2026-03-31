@@ -1,2 +1,0 @@
-- 2026-03-11 audit: "완료" 주장 대비 코드 반영 상태 재점검 결과, issue panel 계열은 파일 생성은 되어 있으나 현재 chat-page/index/hook 플로우에 완전 연결되지 않은 항목이 확인됨.
-- 상세 근거 및 분류는 `.sisyphus/evidence/2026-03-11-claim-vs-code-audit.md` 참고.

@@ -1,1 +1,0 @@
-Preflight failed: Cannot connect to Elasticsearch at http://127.0.0.1:1. host=http://127.0.0.1:1 env=dev alias_or_index=rag_chunks_dev_current
