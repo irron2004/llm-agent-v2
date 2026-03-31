@@ -194,6 +194,15 @@ uv run pytest tests/api/test_agent_retrieval_only.py -v
 - command: `lsp_diagnostics scripts/paper_a/run_p8_evidence_scope_experiment.py`
   - result: pass
   - note: P8 실험 스크립트 타입/진단 오류 없음 확인
+- command: `uv run python -m scripts.paper_a.run_p8_evidence_scope_experiment`
+  - result: pass
+  - note: P8 full rerun 완료, `data/paper_a/p8_results.json` 재생성 및 baseline/P8 요약 출력 확인
+- command: `uv run python - <<'PY' ... (source/scope bucket stratification) ... PY`
+  - result: pass
+  - note: P8 결과를 `hypothesis_source`/`scope_correct` 버킷으로 분해해 지표 단조성 점검
+- command: `uv run python - <<'PY' ... (high-contamination spot checks) ... PY`
+  - result: pass
+  - note: `GENEVA XP` vs `GENEVA_XP` 정규화 불일치가 contamination 과대계산 원인임을 확인
 
 ## Handoff
 
@@ -224,6 +233,8 @@ uv run pytest tests/api/test_agent_retrieval_only.py -v
 - 2026-03-18: P7+ 결과 문서 `2026-03-18_p7plus_experiment.md` 생성
 - 2026-03-18: P7+ 제안서에 oracle upper bound vs realistic 결과 분리 문구 반영
 - 2026-03-18: `run_p8_evidence_scope_experiment.py` 로직 점검/보정 작업 범위를 Allowed Files에 반영
+- 2026-03-18: P8 shared-cap merge 보정(비공유 우선 후 shared 주입 재정렬), Stage1 cached-first/fallback-probe 적용
+- 2026-03-18: P8 device 정규화(`GENEVA XP` vs `GENEVA_XP`) 일관화로 scope/contamination 계산 오류 수정
 
 ## Final Check
 

@@ -71,13 +71,29 @@ up:
 	@echo ""
 
 prod-up:
+	@if ! git diff --quiet || ! git diff --cached --quiet; then \
+		echo "ERROR: uncommitted changes exist. Commit or stash before deploying to prod."; \
+		exit 1; \
+	fi
+	@echo "Switching to main branch..."
+	git checkout main
 	$(DOCKER_COMPOSE) --env-file .env --env-file .env.prod --profile prod up -d --build
 
 dev-up:
+	@echo "Switching to dev branch..."
+	git checkout dev
 	$(DOCKER_COMPOSE) --env-file .env --env-file .env.dev --profile dev up -d
 
 dev-rebuild:
+	@echo "Switching to dev branch..."
+	git checkout dev
 	$(DOCKER_COMPOSE) --env-file .env --env-file .env.dev --profile dev up -d --build
+
+feat:
+	@if [ -z "$(name)" ]; then echo "Usage: make feat name=<branch-name>"; exit 1; fi
+	git checkout dev
+	git checkout -b feat/$(name)
+	@echo "Created and switched to feat/$(name)"
 
 up-prod: prod-up
 

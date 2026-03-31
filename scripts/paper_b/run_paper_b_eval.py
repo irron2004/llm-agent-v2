@@ -49,7 +49,7 @@ CONDITION_PRESETS: dict[str, dict[str, object]] = {
         "deterministic": False,
         "skip_mq": False,
         "rerank_enabled": False,
-        "steps": ["translate", "mq", "retrieve"],
+        "steps": ["retrieve"],  # MQ handled via skip_mq=False, not steps
         "query_transform": None,
         "group_fusion": None,
     },
@@ -618,10 +618,15 @@ def _run_standard(
             if count % 50 == 0 or count == total:
                 print(f"  [{condition_id}] {count}/{total} queries processed", flush=True)
 
-            docs, latency_ms, response = _run_single_query(
-                endpoint, query_text, condition_config, timeout_seconds,
-                final_top_k=DEFAULT_K, fetch_extra=1,
-            )
+            try:
+                docs, latency_ms, response = _run_single_query(
+                    endpoint, query_text, condition_config, timeout_seconds,
+                    final_top_k=DEFAULT_K, fetch_extra=1,
+                )
+            except RuntimeError as exc:
+                print(f"  WARN: skipping {row.qid} repeat={repeat_idx}: {exc}",
+                      file=sys.stderr, flush=True)
+                continue
 
             top_k_doc_ids = [d.doc_id for d in docs[:DEFAULT_K]]
             boundary_margin = _compute_boundary_margin(docs, DEFAULT_K)

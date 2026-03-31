@@ -622,20 +622,7 @@ export function MessageItem({
             )}
             {isAssistant ? (
               <>
-                {sopPresentation.flowChartUrl && (
-                  <div style={{ marginBottom: 12 }}>
-                    <img
-                      src={sopPresentation.flowChartUrl}
-                      alt="SOP flow chart"
-                      style={{
-                        maxWidth: "100%",
-                        maxHeight: 280,
-                        borderRadius: 6,
-                        border: "1px solid var(--color-border)",
-                      }}
-                    />
-                  </div>
-                )}
+                {/* flow chart 이미지 비활성화 */}
                 <MarkdownContent content={message.content} />
 
                 {Array.isArray(issueCases) && issueCases.length > 0 && (

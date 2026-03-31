@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import cast
 
 import pytest
-from textual.containers import Vertical
 from textual.widgets import Static
 
 from ai_workbench.core.tmux_adapter import TmuxAdapter
@@ -15,6 +14,7 @@ from ai_workbench.tui.app import WorkbenchApp
 from ai_workbench.tui.screens.dashboard import DashboardScreen
 from ai_workbench.tui.screens.note_modal import NoteModal
 from ai_workbench.tui.screens.restore_modal import RestoreModal
+from ai_workbench.tui.widgets.master_detail import MasterDetail
 from ai_workbench.tui.widgets.note_drawer import NoteDrawer
 
 
@@ -184,7 +184,7 @@ async def test_add_terminal_pane_with_t_key(
 
 
 @pytest.mark.asyncio
-async def test_refresh_keeps_preview_widgets_when_roles_unchanged(
+async def test_refresh_keeps_master_detail_when_roles_unchanged(
     workbench_home: Path,
     fake_tmux_path: Path,
 ) -> None:
@@ -194,18 +194,15 @@ async def test_refresh_keeps_preview_widgets_when_roles_unchanged(
     async with app.run_test(size=(100, 50)) as pilot:
         await pilot.pause()
         dashboard = cast(DashboardScreen, app.screen)
-        container = dashboard.query_one("#preview-stack", Vertical)
-        before_children = tuple(container.children)
+        master_detail = dashboard.query_one("#master-detail", MasterDetail)
+        assert master_detail is not None
 
         await dashboard.refresh_from_services()
         await pilot.pause()
 
         dashboard = cast(DashboardScreen, app.screen)
-        container = dashboard.query_one("#preview-stack", Vertical)
-        after_children = tuple(container.children)
-
-        assert before_children
-        assert before_children == after_children
+        master_detail_after = dashboard.query_one("#master-detail", MasterDetail)
+        assert master_detail is master_detail_after
 
 
 @pytest.mark.asyncio

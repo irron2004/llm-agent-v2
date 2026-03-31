@@ -27,6 +27,7 @@ from backend.api.routers import (
     ingestions,
     retrieval,
     search,
+    slang_dict,
 )
 from backend.config.settings import api_settings, search_settings
 from backend.llm_infrastructure.elasticsearch.manager import EsIndexManager
@@ -128,6 +129,7 @@ def create_app() -> FastAPI:
     # app.include_router(query_expansion.router, prefix="/api")
     # app.include_router(summarization.router, prefix="/api")
     app.include_router(devices.router, prefix="/api")
+    app.include_router(slang_dict.router, prefix="/api")
     # app.include_router(retrieval_evaluation.router, prefix="/api")
 
     @app.on_event("startup")

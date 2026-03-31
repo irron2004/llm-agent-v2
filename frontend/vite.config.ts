@@ -34,6 +34,7 @@ export default defineConfig({
   plugins: [react(), serveDataFolder()],
   server: {
     port: PORT,
+    host: "0.0.0.0",
     proxy: {
       // Frontend dev 서버에서 /api/* 요청을 백엔드로 프록시
       "/api": {

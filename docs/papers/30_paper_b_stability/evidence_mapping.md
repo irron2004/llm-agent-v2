@@ -19,15 +19,48 @@
 | B-C6 | ANN backend behavior can contribute to ranking instability. | `ram2009rankann`, `malkov2020hnsw` | T4 reindex/rebuild stability deltas |
 | B-C7 | Robustness claims should be checked across heterogeneous retrieval settings. | `thakur2021beir` | Cross-config and cross-subset robustness tables |
 | B-C8 | If answer consistency is included, consensus selection methods are justified. | `wang2022selfconsistency` | Conclusion consistency metric (optional) |
+| B-C9 | Companion-paper references must distinguish executed experiments from design-only follow-up work. | Internal review note (A-2 status audit) | `evidence/2026-03-25_a2_phase2_bayesian_review.md` |
+| B-C10 | Bayesian LR with decision-theoretic threshold predicts query-level instability and provides a principled flagging policy. | `gelman2013bda`, `vehtari2017loo`, EPV < 10 justification | Bayesian stability gate experiments (§7.6), PyMC posterior + LOO-CV |
+| B-C11 | The stability gate and A-2's evidence gate share a unified decision-theoretic framework composable into a single risk score. | A-2 Bayesian framework design (cited as design-only) | `evidence/2026-03-26_bayesian_framework_review.md`, §8.3 |
 
-## Paper B Core Outputs (expected)
+## Executed Experiments (2026-03-26)
+
+### S1_direct (Full-scale, 339 groups, 1,356 queries, 3 repeats)
+- **Evidence**: `.sisyphus/evidence/paper-b/S1_direct/metrics.json`, `results.jsonl`
+- **Script**: `scripts/paper_b/run_paper_b_eval_direct.py`
+- RepeatJaccard@10 = 0.9666 [0.963, 0.970]
+- ParaphraseJaccard@10 = 0.3943 [0.383, 0.405]
+- 91.2% groups unstable (Jaccard < 0.7)
+- BoundaryMargin@10 mean=0.000461, median=0.000233
+
+### Bayesian Analysis (Full-scale, N=339)
+- **Evidence**: `.sisyphus/evidence/paper-b/bayesian_full/bayesian_analysis.json`
+- **Script**: `scripts/paper_b/bayesian_stability_analysis.py`
+- **Figures**: `fig4_margin_vs_jaccard.png`, `fig6_bayesian_posterior.png`, `fig7_flag_rate_vs_recall.png`
+- β_margin = −0.779 [−1.054, −0.515] (σ=1.0 prior)
+- Spearman ρ = 0.174 (p = 0.001), Pearson r = 0.407 (p < 10⁻¹⁴)
+- LOO-ELPD = −85.4 ± 11.0
+- R̂ = 1.000, ESS > 4,900, no divergences
+
+### Preliminary S0 vs S1 (10 groups, API-based)
+- **Evidence**: `.sisyphus/evidence/paper-b/preliminary_comparison.md`
+- S0 RepeatJaccard=0.7614, S1 RepeatJaccard=0.9788
+- Preliminary only — confirms direction, insufficient for correlation analysis
+
+## Paper B Core Outputs
 - Figure B1: stability-aware retrieval architecture
 - Figure B2: Stability vs Recall trade-off
-- Table B1: T1/T2/T3/T4 stability metrics
-- Table B2: instability driver decomposition
+- Figure 4: BoundaryMargin vs ParaphraseJaccard scatter (executed)
+- Figure 6: Bayesian posterior distributions (executed)
+- Figure 7: Flag rate vs recall curve (executed)
+- Table 1: S1_direct metrics (executed)
+- Table 2: Binned margin → Jaccard (executed)
 - Table B3: method ablation (deterministic, consensus, optional regularization)
 
 ## Notes
 - Maintain Paper B scope boundaries:
   - include: retrieval stability and reproducibility
   - exclude: hierarchy constraints (Paper A), faithfulness validator (Paper D)
+- When citing A-2 from Paper B, use `evidence/2026-03-25_a2_phase2_bayesian_review.md` as the status guardrail:
+  - Phase 2 = documented simulation
+  - Bayesian = design only / not yet executed
