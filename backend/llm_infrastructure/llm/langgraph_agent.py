@@ -1371,8 +1371,8 @@ def _normalize_device_name(device_name: str | None) -> str:
     if not device_name:
         return ""
     # v3 stores underscored names (SUPRA_XP), v2 uses spaces (SUPRA XP)
-    # Normalize both to spaces for consistent matching
-    return str(device_name).strip().lower().replace("_", " ")
+    # Normalize underscores and hyphens to spaces for consistent matching
+    return str(device_name).strip().lower().replace("_", " ").replace("-", " ")
 
 
 def _extract_page_value(metadata: Dict[str, Any] | None) -> int | None:
@@ -2322,12 +2322,31 @@ def retrieve_node(
         doc_type = _normalize_doc_type(meta.get("doc_type"))
         return bool(doc_type) and doc_type in selected_doc_type_set
 
+    # Token containment 매칭용: 선택된 장비명의 토큰 집합을 미리 계산
+    # e.g. "geneva xp" → {"geneva", "xp"}
+    _selected_device_token_sets: List[set[str]] = []
+    for d in selected_device_set:
+        tokens = set(d.split())
+        if tokens:
+            _selected_device_token_sets.append(tokens)
+
     def _matches_device(doc: RetrievalResult) -> bool:
         if not selected_device_set:
             return True
         meta = doc.metadata if isinstance(doc.metadata, dict) else {}
         device_name = _normalize_device_name(meta.get("device_name"))
-        return bool(device_name) and device_name in selected_device_set
+        if not device_name:
+            return False
+        # 1차: exact match (기존 방식)
+        if device_name in selected_device_set:
+            return True
+        # 2차: token containment — 선택 장비 토큰이 모두 문서 장비명에 포함되면 매칭
+        # e.g. selected="geneva xp" tokens={"geneva","xp"} ⊆ doc="geneva stp300 xp" → match
+        doc_tokens = set(device_name.split())
+        for sel_tokens in _selected_device_token_sets:
+            if sel_tokens <= doc_tokens:  # subset check
+                return True
+        return False
 
     def _matches_equip_id(doc: RetrievalResult) -> bool:
         if not selected_equip_id_set:
@@ -4182,16 +4201,41 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     )
 
     raw = _invoke_llm(llm, sys, user, max_tokens=MAX_TOKENS_JUDGE, temperature=TEMP_CLASSIFICATION)
+    judge: Dict[str, Any] | None = None
+    # 1차: non-greedy nested JSON 파싱
     try:
-        json_match = re.search(r"\{.*\}", raw, flags=re.S)
-        judge = json.loads(json_match.group(0)) if json_match else json.loads(raw)
-        if not isinstance(judge, dict):
-            raise ValueError("judge not dict")
+        json_match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", raw)
+        if json_match:
+            parsed = json.loads(json_match.group(0))
+            if isinstance(parsed, dict) and "faithful" in parsed:
+                judge = parsed
     except Exception:
-        logger.warning(
-            "judge_node: failed to parse LLM output: %s", raw[:200] if raw else "(empty)"
-        )
-        judge = {"faithful": False, "issues": ["parse_error"], "hint": "judge JSON parse failed"}
+        pass
+    # 2차: greedy fallback (단일 JSON 객체)
+    if judge is None:
+        try:
+            json_match = re.search(r"\{.*\}", raw, flags=re.S)
+            if json_match:
+                parsed = json.loads(json_match.group(0))
+                if isinstance(parsed, dict):
+                    judge = parsed
+        except Exception:
+            pass
+    # 3차: raw text에서 faithful 키워드 추출 (parse 완전 실패 시)
+    if judge is None:
+        raw_lower = (raw or "").lower()
+        if '"faithful": true' in raw_lower or '"faithful":true' in raw_lower:
+            judge = {"faithful": True, "issues": [], "hint": "parsed from raw text (faithful=true)"}
+        elif '"faithful": false' in raw_lower or '"faithful":false' in raw_lower:
+            # hint/issues 추출 시도
+            hint_match = re.search(r'"hint"\s*:\s*"([^"]*)"', raw or "")
+            hint = hint_match.group(1) if hint_match else ""
+            judge = {"faithful": False, "issues": [], "hint": hint or "parsed from raw text"}
+        else:
+            logger.warning(
+                "judge_node: failed to parse LLM output: %s", raw[:200] if raw else "(empty)"
+            )
+            judge = {"faithful": False, "issues": ["parse_error"], "hint": "judge JSON parse failed"}
     attempts = int(state.get("attempts", 0) or 0)
     max_attempts = int(state.get("max_attempts", 0) or 0)
     faithful = bool(judge.get("faithful", False))
@@ -4624,36 +4668,132 @@ def _filter_devices_by_query(
     return _dedupe_queries(filtered)[:2]
 
 
+def _is_valid_device_candidate(name: str) -> bool:
+    cleaned = str(name).strip()
+    if not cleaned:
+        return False
+    compact = _compact_text(cleaned)
+    if compact in {"all", "etc"}:
+        return False
+    token = re.sub(r"[\s\-_./]+", "", cleaned)
+    # Short alphabetic tokens (e.g., APC, ALL) are typically component/noise labels,
+    # not equipment models. Ignore them for auto-parse to reduce false positives.
+    if token.isalpha() and len(token) <= 4:
+        return False
+    return True
+
+
+# 한국어 음차 → canonical 장비명 매핑 (exact match 전 정규화용)
+_DEVICE_KO_ALIASES: Dict[str, str] = {
+    "수프라": "SUPRA",
+    "제니바": "GENEVA",
+    "프레시아": "PRECIA",
+    "인테저": "INTEGER",
+    "옴니스": "OMNIS",
+    "테라": "TERA",
+    "지비스": "ZIVIS",
+    "티그마": "TIGMA",
+    "제디우스": "ZEDIUS",
+}
+
+
 def _extract_devices_from_query(device_names: List[str], query: str) -> List[str]:
     if not device_names or not query:
         return []
 
-    def _is_valid_device_candidate(name: str) -> bool:
-        cleaned = str(name).strip()
-        if not cleaned:
-            return False
-        compact = _compact_text(cleaned)
-        if compact in {"all", "etc"}:
-            return False
-        token = re.sub(r"[\s\-_./]+", "", cleaned)
-        # Short alphabetic tokens (e.g., APC, ALL) are typically component/noise labels,
-        # not equipment models. Ignore them for auto-parse to reduce false positives.
-        if token.isalpha() and len(token) <= 4:
-            return False
-        return True
-
     query_compact = _compact_text(query)
+
+    # Phase 0: 한국어 음차를 영문으로 치환하여 query_compact 보강
+    query_for_match = query_compact
+    for ko, en in _DEVICE_KO_ALIASES.items():
+        if ko in query:
+            query_for_match = query_for_match.replace(_compact_text(ko), _compact_text(en))
+
+    # Phase 1: exact substring match (기존 로직)
     matches: List[str] = []
     for name in device_names:
         cleaned = str(name).strip()
-        if not cleaned:
+        if not cleaned or not _is_valid_device_candidate(cleaned):
             continue
-        if not _is_valid_device_candidate(cleaned):
-            continue
-        if _compact_text(cleaned) and _compact_text(cleaned) in query_compact:
+        name_compact = _compact_text(cleaned)
+        if name_compact and name_compact in query_for_match:
             matches.append(cleaned)
-    # STRICT: Only one device allowed
-    return _dedupe_queries(matches)[:1]
+    if matches:
+        return _dedupe_queries(matches)[:1]
+
+    # Phase 2: token-level fuzzy fallback (rapidfuzz) — exact match 실패 시에만
+    # 전체 쿼리 대신 개별 토큰을 추출하여 장비명과 비교 (오타 내성 향상)
+    try:
+        from rapidfuzz import fuzz, process
+
+        candidates: Dict[str, str] = {}  # compact → original
+        for name in device_names:
+            cleaned = str(name).strip()
+            if not cleaned or not _is_valid_device_candidate(cleaned):
+                continue
+            candidates[_compact_text(cleaned)] = cleaned
+
+        if not candidates:
+            return []
+
+        # 토큰 추출: 한글/공백/구두점으로 분리하여 영문+숫자 토큰만 추출
+        raw_tokens = re.split(r"[\s가-힣,;:()\"'?!。，；：（）]+", query)
+        alpha_tokens = [
+            _compact_text(t) for t in raw_tokens
+            if len(t) > 3 and not t.isdigit()
+        ]
+        # 연속 토큰 2-3개 결합 (multi-word 장비명 대응: "supra vplus", "integer plus")
+        combined_tokens: List[str] = list(alpha_tokens)
+        for i in range(len(raw_tokens) - 1):
+            pair = _compact_text(raw_tokens[i] + raw_tokens[i + 1])
+            if len(pair) > 4:
+                combined_tokens.append(pair)
+        if len(raw_tokens) >= 3:
+            for i in range(len(raw_tokens) - 2):
+                triple = _compact_text(raw_tokens[i] + raw_tokens[i + 1] + raw_tokens[i + 2])
+                if len(triple) > 4:
+                    combined_tokens.append(triple)
+
+        # 각 토큰을 장비명 후보와 WRatio로 매칭 (partial_ratio보다 오타에 강건)
+        best_match: tuple | None = None  # (score, compact, original)
+        candidate_keys = list(candidates.keys())
+        for token in combined_tokens:
+            if not token or len(token) < 4:
+                continue
+            result = process.extractOne(
+                token,
+                candidate_keys,
+                scorer=fuzz.WRatio,
+                score_cutoff=82,
+            )
+            if result:
+                matched_compact, score, _idx = result
+                if best_match is None or score > best_match[0]:
+                    best_match = (score, matched_compact, candidates[matched_compact])
+
+        # fallback: 전체 쿼리로도 시도 (토큰 분리가 실패한 경우 대비)
+        if best_match is None:
+            result = process.extractOne(
+                query_for_match,
+                candidate_keys,
+                scorer=fuzz.WRatio,
+                score_cutoff=82,
+            )
+            if result:
+                matched_compact, score, _idx = result
+                best_match = (score, matched_compact, candidates[matched_compact])
+
+        if best_match:
+            score, matched_compact, original = best_match
+            logger.info(
+                "device fuzzy match: query='%s' → '%s' (score=%d)",
+                query[:40], original, score,
+            )
+            return [original]
+    except Exception:
+        logger.debug("device fuzzy match failed", exc_info=True)
+
+    return []
 
 
 def _extract_doc_types_from_query(query: str) -> List[str]:
@@ -4987,10 +5127,12 @@ def auto_parse_node(
     detected_language = _detect_language_rule_based(query)
     detected_devices = _extract_devices_from_query(device_names, query)
     detected_doc_types = _extract_doc_types_from_query(query)
-    # equip_id 추출 비활성화: 모델명(SR8241, 3000QC 등)을 equip_id로 오인하여
-    # 검색 결과가 0건이 되는 문제 방지 (2026-03-12)
-    # detected_equip_ids = _extract_equip_ids_from_query(query, known_equip_ids=equip_id_set)
-    detected_equip_ids: list[str] = []
+    # equip_id 추출: lookup 기반만 활성화 (known set 대조, 안전)
+    # regex fallback은 모델명(SR8241, 3000QC 등) 오인 문제로 비활성화 유지 (2026-03-12)
+    if equip_id_set:
+        detected_equip_ids = _extract_equip_ids_by_lookup(query, equip_id_set)
+    else:
+        detected_equip_ids = []
 
     chat_history = state.get("chat_history") or []
     needs_history = bool(state.get("needs_history"))
