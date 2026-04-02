@@ -3,7 +3,7 @@
 기존 20+ 노드 DAG를 3-노드 루프로 대체한다.
 
   preprocess → plan → search → plan (loop, max MAX_SEARCH_ITERATIONS)
-                     → answer → judge → END
+                     → answer → judge → END | plan (retry, max MAX_JUDGE_RETRIES)
 
 중앙 plan_node LLM이 매 스텝 결정:
   - search        : 새 쿼리로 문서 검색
@@ -20,7 +20,9 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 import time
 import uuid
 from typing import Any, Callable, Dict, List, Literal, Optional, TypedDict, cast
@@ -68,6 +70,7 @@ def _infer_route(state: "ReactAgentState") -> str:  # type: ignore[name-defined]
 # ── 상수 ────────────────────────────────────────────────────────────────────
 
 MAX_SEARCH_ITERATIONS = 3   # 최대 검색 횟수 (초과 시 강제 answer)
+MAX_JUDGE_RETRIES = 2       # judge unfaithful 시 최대 재시도 횟수
 TEMP_PLAN = 0.0             # planner 온도 (결정론적)
 
 
@@ -144,6 +147,12 @@ _PLAN_SYSTEM = """\
 - search         : 문서를 검색 (처음이거나 현재 문서가 부적절할 때)
 - search_solution: 문제 원인 문서는 있지만 해결 절차 문서가 없을 때 추가 검색
 - answer         : 수집된 문서로 답변 생성 가능할 때
+
+판단 기준:
+- 수집된 문서가 질문의 **구체적 행위**(교체/청소/조정/캘리브레이션 등)에 직접 관련되는지 확인하세요.
+- 문서가 같은 부품이라도 다른 행위(예: 교체를 물어봤는데 청소 문서만 있음)에 대한 것이면 search로 재검색하세요.
+- doc_id에 행위 유형이 포함됩니다: rep=교체(replacement), cln=청소(cleaning), adj=조정(adjustment), cal=캘리브레이션. 질문의 행위와 doc_id의 행위가 일치하는지 확인하세요.
+- reranker score가 낮은 문서(score < 0.1)가 대부분이면, 검색어를 더 구체적으로 변경하여 재검색하세요.
 """
 
 _PLAN_USER_TMPL = """\
@@ -162,7 +171,7 @@ _PLAN_USER_TMPL = """\
 
 ## 수집된 문서 ({doc_count}개 청크)
 {doc_summary}
-
+{judge_feedback}
 다음 행동을 JSON으로 결정하세요.\
 """
 
@@ -203,7 +212,7 @@ def _format_action_trace(trace: List[Dict[str, Any]]) -> str:
 
 
 def _format_doc_summary(docs: List[Any]) -> str:
-    """수집된 문서를 간략히 요약 (planner 프롬프트용)."""
+    """수집된 문서를 간략히 요약 (planner 프롬프트용). reranker score 포함."""
     if not docs:
         return "(없음)"
     seen: Dict[str, str] = {}
@@ -216,8 +225,16 @@ def _format_doc_summary(docs: List[Any]) -> str:
             or meta.get("doc_type", "")
         )
         device = meta.get("device_name", "")
+        score = getattr(doc, "score", None) or meta.get("score")
         if doc_id and doc_id not in seen:
-            label = f"[{device}] {title}" if device else title
+            label = f"[{device}] {doc_id}"
+            if title:
+                label += f" | {title}"
+            if score is not None:
+                try:
+                    label += f" (score={float(score):.3f})"
+                except (ValueError, TypeError):
+                    pass
             seen[doc_id] = label
 
     summaries = [f"- {v}" for v in list(seen.values())[:10]]
@@ -226,9 +243,115 @@ def _format_doc_summary(docs: List[Any]) -> str:
     return "\n".join(summaries) if summaries else "(없음)"
 
 
-def _plan_fallback() -> Dict[str, Any]:
-    """planner 실패 시 기본 plan."""
-    return {"action": "answer", "reason": "plan generation failed"}
+def _plan_fallback(has_docs: bool = False) -> Dict[str, Any]:
+    """planner 실패 시 기본 plan. 문서가 없으면 search, 있으면 answer."""
+    if has_docs:
+        return {"action": "answer", "reason": "plan generation failed; using collected docs"}
+    return {"action": "search", "reason": "plan generation failed; fallback to search"}
+
+
+# ── 장비명 토큰 기반 확장 ─────────────────────────────────────────────────────
+
+def _expand_device_names_by_tokens(
+    selected: List[str],
+    all_devices: List[str],
+) -> List[str]:
+    """선택된 장비명의 토큰이 모두 포함된 다른 장비명 변형을 자동 확장한다.
+
+    예: selected=["GENEVA XP"] → "GENEVA STP300 xp", "GENEVA_STP300_XP" 등 추가.
+    ES terms 필터가 exact match이므로, 변형을 미리 추가해야 검색됨.
+    """
+    expanded: List[str] = list(selected)
+    expanded_lower = {d.lower() for d in expanded}
+
+    for sel in selected:
+        # 선택 장비명을 토큰으로 분리 (공백, _, -, / 등으로)
+        sel_norm = sel.strip().lower().replace("_", " ").replace("-", " ")
+        sel_tokens = set(sel_norm.split())
+        if not sel_tokens or len(sel_tokens) < 1:
+            continue
+
+        for candidate in all_devices:
+            cand_lower = candidate.strip().lower()
+            if cand_lower in expanded_lower:
+                continue
+            # 후보를 토큰으로 분리
+            cand_norm = cand_lower.replace("_", " ").replace("-", " ")
+            cand_tokens = set(cand_norm.split())
+            # 선택 장비의 모든 토큰이 후보에 포함되면 같은 계열
+            if sel_tokens <= cand_tokens:
+                expanded.append(candidate)
+                expanded_lower.add(cand_lower)
+
+    if len(expanded) > len(selected):
+        logger.info(
+            "device token expansion: %s → %s (%d variants added)",
+            selected, expanded[:5], len(expanded) - len(selected),
+        )
+    return expanded
+
+
+# ── 행위 유형 필터링 ──────────────────────────────────────────────────────────
+
+# 질문에서 행위 의도를 감지하는 키워드 → doc_id action code 매핑
+_ACTION_KEYWORDS: Dict[str, List[str]] = {
+    "rep": ["교체", "replacement", "replace", "교환", "바꾸", "바꿔"],
+    "cln": ["청소", "clean", "cleaning", "세정", "세척"],
+    "adj": ["조정", "adjust", "adjustment", "조절", "정렬", "align"],
+    "cal": ["캘리브레이션", "calibration", "calibrate", "교정", "보정"],
+}
+
+# doc_id에서 action code를 추출하는 패턴 (e.g. ..._rep_..., ..._cln_...)
+_DOC_ID_ACTION_RE = re.compile(r"_(rep|cln|adj|cal)_")
+
+
+def _detect_action_intent(query: str) -> Optional[str]:
+    """질문에서 행위 의도를 감지하여 action code를 반환한다."""
+    q_lower = query.lower()
+    for action_code, keywords in _ACTION_KEYWORDS.items():
+        if any(kw in q_lower for kw in keywords):
+            return action_code
+    return None
+
+
+def _filter_docs_by_action_type(
+    docs: List[Any],
+    query: str,
+) -> List[Any]:
+    """질문의 행위 의도와 doc_id의 action code가 불일치하는 문서를 후순위로 밀어낸다.
+
+    완전 제거하지 않고, 불일치 문서를 리스트 뒤로 이동시킨다.
+    (같은 부품의 다른 행위 문서도 참고 가치가 있을 수 있으므로)
+    """
+    intent = _detect_action_intent(query)
+    if not intent:
+        return docs  # 행위 의도가 불명확하면 필터링 안 함
+
+    matched: List[Any] = []
+    unmatched: List[Any] = []
+    neutral: List[Any] = []  # doc_id에 action code가 없는 문서
+
+    for doc in docs:
+        doc_id = (
+            getattr(doc, "doc_id", None)
+            or (getattr(doc, "metadata", {}) or {}).get("doc_id", "")
+        )
+        m = _DOC_ID_ACTION_RE.search(str(doc_id))
+        if not m:
+            neutral.append(doc)
+        elif m.group(1) == intent:
+            matched.append(doc)
+        else:
+            unmatched.append(doc)
+
+    if matched or unmatched:
+        logger.info(
+            "action_type_filter: intent=%s matched=%d unmatched=%d neutral=%d",
+            intent, len(matched), len(unmatched), len(neutral),
+        )
+
+    # 매칭 문서 우선, 중립 문서 다음, 불일치 문서 마지막
+    return matched + neutral + unmatched
 
 
 # ── ReactRAGAgent ─────────────────────────────────────────────────────────────
@@ -308,6 +431,7 @@ class ReactRAGAgent:
         ap_result = auto_parse_node(
             cast(Any, compat),
             llm=self.llm,
+            spec=self.spec,
             device_names=self._device_names,
             doc_type_names=self._doc_type_names,
             equip_id_set=self._equip_id_set,
@@ -317,14 +441,44 @@ class ReactRAGAgent:
 
         # translate
         compat2: Dict[str, Any] = {**compat, **update}
-        tr_result = translate_node(cast(Any, compat2), llm=self.llm)
+        tr_result = translate_node(cast(Any, compat2), llm=self.llm, spec=self.spec)
         update.update(tr_result)
 
-        elapsed = (time.perf_counter() - t0) * 1000
+        # route 분류 (rule-based): preprocess 단계에서 명시적으로 결정
         pq = update.get("parsed_query") or {}
+        if not pq.get("route"):
+            doc_types = pq.get("selected_doc_types") or pq.get("doc_types") or []
+            dt_lower = [str(d).lower() for d in doc_types]
+            if any("sop" in d or "setup" in d for d in dt_lower):
+                route = "setup"
+            elif any("tsg" in d or "ts" == d for d in dt_lower):
+                route = "ts"
+            else:
+                route = "general"
+            pq["route"] = route
+            update["parsed_query"] = pq
+            update["route"] = route
+
+        # 트러블슈팅 질문 시 doc_types를 myservice/gcb/ts로 확장
+        # (이상 원인, 점검/조치 이력 등 문제 해결 질문은 세 doc_type 모두 검색 필요)
+        raw_query = state["query"]
+        _TS_KEYWORDS = ("트러블슈팅", "troubleshoot", "이상", "abnormal", "점검", "조치", "이력", "알람", "에러", "error", "alarm")
+        if any(kw in raw_query.lower() for kw in _TS_KEYWORDS):
+            current_dt = pq.get("selected_doc_types") or pq.get("doc_types") or []
+            ts_types = {"myservice", "gcb", "ts"}
+            expanded = list(ts_types | {str(d).lower() for d in current_dt})
+            pq["selected_doc_types"] = expanded
+            pq["doc_types"] = expanded
+            if not pq.get("route") or pq.get("route") == "general":
+                pq["route"] = "ts"
+            update["parsed_query"] = pq
+            update["route"] = pq["route"]
+
+        elapsed = (time.perf_counter() - t0) * 1000
         devices = (pq.get("device_names") or [])[:2]
         lang = update.get("detected_language", "")
-        self._emit_node("preprocess", elapsed, f"lang={lang} devices={devices}")
+        route_label = pq.get("route", "?")
+        self._emit_node("preprocess", elapsed, f"lang={lang} devices={devices} route={route_label}")
         return update
 
     def _plan_node(self, state: ReactAgentState) -> Dict[str, Any]:
@@ -344,6 +498,22 @@ class ReactRAGAgent:
         doc_count = len(state.get("collected_docs") or [])
         remaining = max(0, max_iter - iterations)
 
+        # judge retry 시 피드백 구성
+        judge_hint = state.get("_judge_retry_hint") or ""
+        judge_issues = state.get("_judge_retry_issues") or []
+        if judge_hint or judge_issues:
+            feedback_lines = ["\n## ⚠️ 이전 답변 품질 문제 (재시도 필요)"]
+            if judge_hint:
+                feedback_lines.append(f"판정 힌트: {judge_hint}")
+            if judge_issues:
+                feedback_lines.append("문제점:")
+                for issue in judge_issues[:5]:
+                    feedback_lines.append(f"  - {issue}")
+            feedback_lines.append("→ 다른 검색어나 다른 문서 타입으로 재검색하세요.")
+            judge_feedback = "\n".join(feedback_lines)
+        else:
+            judge_feedback = ""
+
         user = _PLAN_USER_TMPL.format(
             query=query,
             history=history_text,
@@ -355,7 +525,10 @@ class ReactRAGAgent:
             action_trace=action_trace_text,
             doc_count=doc_count,
             doc_summary=doc_summary,
+            judge_feedback=judge_feedback,
         )
+
+        has_docs = bool(state.get("collected_docs"))
 
         # 최대 반복 횟수 초과 시 강제 answer
         if iterations >= max_iter:
@@ -375,12 +548,45 @@ class ReactRAGAgent:
                 )
                 plan = next_action.model_dump()
             except Exception:
-                logger.warning("react_agent: plan generation failed", exc_info=True)
-                plan = _plan_fallback()
+                logger.warning("react_agent: plan generation failed, trying raw JSON parse", exc_info=True)
+                # structured output 실패 시 raw JSON 파싱 시도
+                plan = self._try_raw_plan_parse(user) or _plan_fallback(has_docs)
 
         elapsed = (time.perf_counter() - t0) * 1000
         self._emit_node("plan", elapsed, f"→ {plan.get('action')} | {plan.get('reason', '')[:60]}")
         return {"plan": plan}
+
+    def _try_raw_plan_parse(self, user_prompt: str) -> Optional[Dict[str, Any]]:
+        """structured output 실패 시 raw text → JSON 파싱 시도."""
+        try:
+            raw_resp = self.llm.generate(
+                messages=[
+                    {"role": "system", "content": _PLAN_SYSTEM},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=TEMP_PLAN,
+            )
+            text = raw_resp.text if hasattr(raw_resp, "text") else str(raw_resp)
+            json_match = re.search(r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}", text)
+            if not json_match:
+                return None
+            parsed = json.loads(json_match.group(0))
+            if not isinstance(parsed, dict) or "action" not in parsed:
+                return None
+            action = parsed["action"]
+            valid_actions = ("search", "search_solution", "answer")
+            if action not in valid_actions:
+                action = "search"
+            return {
+                "action": action,
+                "reason": parsed.get("reason", "raw parse fallback"),
+                "query": parsed.get("query"),
+                "device_names": parsed.get("device_names", []),
+                "doc_types": parsed.get("doc_types", []),
+            }
+        except Exception:
+            logger.debug("react_agent: raw plan parse also failed", exc_info=True)
+            return None
 
     def _search_node(self, state: ReactAgentState) -> Dict[str, Any]:
         """plan에 따라 문서를 검색하고 collected_docs에 누적한다."""
@@ -388,11 +594,33 @@ class ReactRAGAgent:
         plan = state.get("plan") or {}
         search_query = plan.get("query") or state.get("query_en") or state.get("query", "")
 
+        # AbbreviationExpander: 약어를 풀네임으로 확장 (0ms, rule-based)
+        if agent_settings.abbreviation_expand_enabled:
+            try:
+                from backend.llm_infrastructure.query_expansion.abbreviation_expander import (
+                    get_abbreviation_expander,
+                )
+                _expander = get_abbreviation_expander(agent_settings.abbreviation_dict_path)
+                expand_result = _expander.expand_query(search_query)
+                if expand_result.expanded_query != search_query:
+                    logger.info(
+                        "react_agent: abbreviation expanded '%s' → '%s'",
+                        search_query[:60], expand_result.expanded_query[:60],
+                    )
+                    search_query = expand_result.expanded_query
+            except Exception:
+                logger.debug("react_agent: abbreviation expansion failed", exc_info=True)
+
         # 필터: plan 우선, parsed_query 폴백
         pq = state.get("parsed_query") or {}
         device_names: List[str] = plan.get("device_names") or pq.get("selected_devices") or pq.get("device_names") or []
         doc_types: List[str] = plan.get("doc_types") or pq.get("selected_doc_types") or pq.get("doc_types") or []
         equip_ids: List[str] = pq.get("selected_equip_ids") or pq.get("equip_ids") or []
+
+        # 장비명 토큰 기반 확장: "GENEVA XP" → "GENEVA STP300 xp", "GENEVA_STP300_XP" 등 포함
+        # ES terms 필터가 exact match이므로, known device list에서 토큰이 모두 포함된 변형을 추가
+        if device_names and self._device_names:
+            device_names = _expand_device_names_by_tokens(device_names, self._device_names)
 
         # AgentState 호환 state 구성 후 retrieve_node 재사용
         compat: Dict[str, Any] = {
@@ -423,6 +651,13 @@ class ReactRAGAgent:
         )
 
         new_docs: List[Any] = retrieve_result.get("docs") or []
+
+        # 행위 유형 필터링: 질문의 행위(교체/청소/조정 등)와 doc_id의 action code 매칭
+        # doc_id 패턴: ..._rep_... (교체), ..._cln_... (청소), ..._adj_... (조정), ..._cal_... (캘리브레이션)
+        new_docs = _filter_docs_by_action_type(
+            new_docs,
+            state.get("query") or state.get("query_ko") or "",
+        )
 
         # 기존 collected_docs에 중복 없이 누적
         existing = state.get("collected_docs") or []
@@ -492,7 +727,7 @@ class ReactRAGAgent:
         docs = state.get("collected_docs") or []
 
         # retrieved docs를 ref_json으로 변환
-        ref_json = results_to_ref_json(docs, top_k=self.top_k)
+        ref_json = results_to_ref_json(docs)
 
         # expand_related_docs_node 재사용: 챕터/섹션 확장
         expand_compat: Dict[str, Any] = {
@@ -546,9 +781,11 @@ class ReactRAGAgent:
         }
 
     def _judge_node(self, state: ReactAgentState) -> Dict[str, Any]:
-        """기존 judge_node 재사용."""
+        """기존 judge_node 재사용. unfaithful 시 retry 힌트를 plan에 전달."""
         t0 = time.perf_counter()
         route = _infer_route(state)
+        attempts = int(state.get("attempts", 0) or 0)
+        max_attempts = int(state.get("max_attempts", MAX_JUDGE_RETRIES) or MAX_JUDGE_RETRIES)
         judge_compat: Dict[str, Any] = {
             "query": state.get("query", ""),
             "query_en": state.get("query_en"),
@@ -556,14 +793,42 @@ class ReactRAGAgent:
             "answer": state.get("answer", ""),
             "answer_ref_json": state.get("answer_ref_json") or [],
             "ref_json": state.get("ref_json") or [],
-            "attempts": state.get("attempts", 0),
-            "max_attempts": state.get("max_attempts", 1),
+            "attempts": attempts,
+            "max_attempts": max_attempts,
         }
         result = judge_node(cast(Any, judge_compat), llm=self.llm, spec=self.spec)
+        judge_result = result.get("judge") or {}
+        faithful = bool(judge_result.get("faithful", False))
+
+        # attempts 증가
+        result["attempts"] = attempts + 1
+
+        # unfaithful 시 judge hint를 plan에 전달하여 재검색/재답변 유도
+        if not faithful and (attempts + 1) < max_attempts:
+            hint = judge_result.get("hint", "")
+            issues = judge_result.get("issues", [])
+            logger.info(
+                "react_agent: judge unfaithful (attempt %d/%d), will retry. hint=%s issues=%s",
+                attempts + 1, max_attempts, hint[:100], issues[:3],
+            )
+            result["_judge_retry_hint"] = hint
+            result["_judge_retry_issues"] = issues
+
         elapsed = (time.perf_counter() - t0) * 1000
-        faithful = (result.get("judge") or {}).get("faithful", False)
-        self._emit_node("judge", elapsed, "✓ 충실" if faithful else "✗ 불충실")
+        self._emit_node("judge", elapsed, "✓ 충실" if faithful else f"✗ 불충실 (attempt {attempts + 1}/{max_attempts})")
         return result
+
+    @staticmethod
+    def _route_after_judge(state: ReactAgentState) -> str:
+        """Judge 결과에 따라 retry 또는 종료를 결정한다."""
+        judge = state.get("judge") or {}
+        faithful = bool(judge.get("faithful", False))
+        attempts = int(state.get("attempts", 0) or 0)
+        max_attempts = int(state.get("max_attempts", MAX_JUDGE_RETRIES) or MAX_JUDGE_RETRIES)
+
+        if faithful or attempts >= max_attempts:
+            return "done"
+        return "retry"
 
     # ── 라우팅 ────────────────────────────────────────────────────────────────
 
@@ -595,7 +860,11 @@ class ReactRAGAgent:
         )
         builder.add_edge("search", "plan")   # 루프: search → plan → search | answer
         builder.add_edge("answer", "judge")
-        builder.add_edge("judge", END)
+        builder.add_conditional_edges(
+            "judge",
+            self._route_after_judge,
+            {"done": END, "retry": "plan"},
+        )
 
         return builder.compile(checkpointer=self.checkpointer)
 
@@ -606,7 +875,7 @@ class ReactRAGAgent:
         query: str,
         *,
         attempts: int = 0,
-        max_attempts: int = 1,
+        max_attempts: int = MAX_JUDGE_RETRIES,
         thread_id: Optional[str] = None,
         state_overrides: Optional[Dict[str, Any]] = None,
         **kwargs: Any,

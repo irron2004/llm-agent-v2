@@ -223,3 +223,71 @@ def get_query_expander() -> BaseQueryExpander:
         version="v1",
         prompt_template=rag_settings.multi_query_prompt,
     )
+
+
+def get_raptor_rebuild_service() -> "RaptorRebuildService":
+    """Provide a RAPTOR rebuild service.
+
+    Not cached — each rebuild call gets a fresh service instance
+    to avoid stale ES client state after long intervals.
+    """
+    from backend.config.settings import search_settings
+    from backend.services.raptor_rebuild_service import RaptorRebuildService, RebuildConfig
+
+    from elasticsearch import Elasticsearch
+
+    es_client = Elasticsearch(search_settings.es_host)
+    embedder = get_default_embedder()
+    llm = get_default_llm()
+
+    def summarizer(texts: list[str]) -> str:
+        # Limit input to avoid LLM timeout: sample up to 10 chunks, truncate each
+        max_chunks = 10
+        max_chars_per_chunk = 500
+        sampled = texts[:max_chunks] if len(texts) <= max_chunks else (
+            texts[:5] + texts[len(texts)//2 : len(texts)//2 + 2] + texts[-3:]
+        )
+        truncated = [t[:max_chars_per_chunk] for t in sampled]
+        combined = "\n\n---\n\n".join(truncated)
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "당신은 반도체 장비 문서 요약 전문가입니다. "
+                    "핵심 정보를 보존하되, 중복은 제거하세요. "
+                    "도메인 용어는 그대로 유지하세요. "
+                    "300자 이내로 요약하세요."
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"다음 문서 조각들({len(texts)}개 중 샘플)을 하나의 통합 요약으로 작성하세요:\n\n{combined}",
+            },
+        ]
+        response = llm.generate(messages)
+        return response.text
+
+    # Resolve embed index name (same logic as main.py startup)
+    embed_index = (search_settings.v3_embed_index or "").strip()
+    if not embed_index:
+        model_key = (search_settings.v3_embed_model_key or "").strip()
+        if model_key:
+            embed_index = f"chunk_v3_embed_{model_key}_v1"
+
+    return RaptorRebuildService(
+        es_client=es_client,
+        index_name=search_settings.v3_content_index,
+        embedder=embedder,
+        summarizer=summarizer,
+        config=RebuildConfig(
+            max_levels=rag_settings.raptor_max_levels,
+            min_partition_size=rag_settings.raptor_min_partition_size,
+        ),
+        embed_index_name=embed_index or None,
+    )
+
+
+# Lazy import for type checking
+if False:  # TYPE_CHECKING
+    from backend.services.raptor_rebuild_service import RaptorRebuildService
