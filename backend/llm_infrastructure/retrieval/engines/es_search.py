@@ -399,6 +399,7 @@ class EsSearchEngine:
             "section_number",
             "chapter_source",
             "chapter_ok",
+            "components",
         ]
 
     def fetch_section_chunks(

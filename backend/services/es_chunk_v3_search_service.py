@@ -14,6 +14,7 @@ from backend.llm_infrastructure.reranking import get_reranker
 from backend.llm_infrastructure.reranking.base import BaseReranker
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
 from backend.llm_infrastructure.retrieval.engines.es_search import EsSearchEngine
+from backend.llm_infrastructure.retrieval.postprocessors.relation_expander import RelationExpander
 from backend.llm_infrastructure.retrieval.rrf import merge_retrieval_result_lists_rrf
 from backend.llm_infrastructure.text_quality import is_noisy_chunk, strip_noisy_lines
 from backend.services.embedding_service import EmbeddingService
@@ -146,6 +147,7 @@ class EsChunkV3SearchService:
         rrf_k: int = 60,
         reranker: BaseReranker | None = None,
         raptor_enabled: bool = False,
+        relation_expander: RelationExpander | None = None,
     ) -> None:
         self.es = es_client
         self.content_index = content_index
@@ -159,6 +161,7 @@ class EsChunkV3SearchService:
         self.rrf_k = rrf_k
         self.reranker = reranker
         self.raptor_enabled = raptor_enabled
+        self.relation_expander = relation_expander
 
         self.es_engine = EsSearchEngine(
             es_client=es_client,
@@ -247,6 +250,8 @@ class EsChunkV3SearchService:
                 device=rag_settings.embedding_device,
             )
 
+        relation_expander = RelationExpander.from_settings(rag_settings)
+
         return cls(
             es_client=es_client,
             content_index=resolved_content_index,
@@ -260,6 +265,7 @@ class EsChunkV3SearchService:
             rrf_k=rag_settings.hybrid_rrf_k,
             reranker=reranker,
             raptor_enabled=rag_settings.raptor_enabled,
+            relation_expander=relation_expander,
         )
 
     @staticmethod
@@ -692,6 +698,23 @@ class EsChunkV3SearchService:
             device_names=v3_device_names,
         )
 
+        # Preserve base filters for RAPTOR summary search (which adds its own
+        # is_summary_node=True filter). The main search gets an extra exclusion.
+        base_filters = filters
+
+        # Exclude RAPTOR summary nodes from main dense/sparse search.
+        # Summary nodes have broad aggregated content that can dominate results;
+        # they are handled separately by _raptor_summary_search → children expansion.
+        if self.raptor_enabled:
+            exclude_summary = {"term": {"is_summary_node": False}}
+            if filters is None:
+                filters = exclude_summary
+            elif isinstance(filters, dict) and "bool" in filters and "must" in filters["bool"]:
+                filters = copy.deepcopy(filters)
+                filters["bool"]["must"].append(exclude_summary)
+            else:
+                filters = {"bool": {"must": [filters, exclude_summary]}}
+
         dense_candidates = self._dense_search_candidates(
             query_vector,
             top_k=candidate_n,
@@ -724,7 +747,7 @@ class EsChunkV3SearchService:
                 processed_query,
                 query_vector,
                 top_k=k,
-                filters=filters,
+                filters=base_filters,
             )
 
         if resolved_use_rrf:
@@ -752,7 +775,16 @@ class EsChunkV3SearchService:
                 sparse_weight=resolved_sparse_weight,
             )
 
-        return _filter_noisy_results(merged[:k])
+        filtered = _filter_noisy_results(merged[:k])
+
+        # Relation expansion: enrich results with related chunks
+        if self.relation_expander and self.relation_expander.enabled:
+            expand_result = self.relation_expander.expand(
+                filtered, self.es, self.content_index
+            )
+            return expand_result.all_results()
+
+        return filtered
 
     def fetch_doc_pages(
         self,

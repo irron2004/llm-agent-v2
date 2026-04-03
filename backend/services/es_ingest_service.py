@@ -35,6 +35,7 @@ from backend.llm_infrastructure.llm import get_llm
 from backend.llm_infrastructure.preprocessing.registry import get_preprocessor
 from backend.services.embedding_service import EmbeddingService
 from backend.services.ingest.document_ingest_service import Section, DocumentIngestService
+from backend.domain.component_dictionary import get_component_dict, match_components, match_components_fuzzy
 from backend.services.ingest.txt_parser import parse_maintenance_txt
 from backend.services.ingest.gcb_parser import parse_gcb_txt
 from backend.services.storage import ImageUploadRenderer
@@ -311,6 +312,17 @@ class EsIngestService:
                 raise ValueError(
                     f"Embedding dimension mismatch: got {embed_dim}, expected {expected}"
                 )
+
+        # Extract components for each section if not already set
+        comp_dict = get_component_dict()
+        for section in section_list:
+            meta = section.metadata or {}
+            if not meta.get("components"):
+                components = match_components(section.text, comp_dict)
+                if components:
+                    if section.metadata is None:
+                        section.metadata = {}
+                    section.metadata["components"] = components
 
         # Convert sections to EsChunkDocuments
         es_docs: list[EsChunkDocument] = []
@@ -638,6 +650,12 @@ class EsIngestService:
         if "chunk_keywords" in llm_analysis:
             common_meta["overall_keywords"] = llm_analysis["chunk_keywords"]
 
+        # Extract components from doc_description (fuzzy for user-written text)
+        comp_dict = get_component_dict()
+        components = match_components_fuzzy(doc_description, comp_dict, threshold=85)
+        if components:
+            common_meta["components"] = components
+
         # Create Section objects for each section
         sections = []
         section_names = ["status", "action", "cause", "result"]
@@ -790,6 +808,12 @@ class EsIngestService:
             common_meta["overall_summary"] = llm_analysis["chunk_summary"]
         if "chunk_keywords" in llm_analysis:
             common_meta["overall_keywords"] = llm_analysis["chunk_keywords"]
+
+        # Extract components from doc_description (fuzzy for user-written text)
+        comp_dict = get_component_dict()
+        components = match_components_fuzzy(doc_description, comp_dict, threshold=85)
+        if components:
+            common_meta["components"] = components
 
         # Create Section objects for each section
         sections = []
