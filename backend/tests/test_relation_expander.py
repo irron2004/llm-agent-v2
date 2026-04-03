@@ -217,7 +217,7 @@ class TestRelationExpandResult:
         related = [
             RetrievalResult(
                 doc_id="doc2", content="expanded", score=0.0,
-                metadata={"chunk_id": "c_exp"},
+                metadata={"chunk_id": "c_exp", "doc_type": "sop"},
             ),
         ]
         group = RelationGroup(
@@ -235,13 +235,38 @@ class TestRelationExpandResult:
         assert (all_r[0].metadata or {}).get("chunk_id") == "c1"
         assert (all_r[1].metadata or {}).get("chunk_id") == "c_exp"
 
+    def test_cross_type_excluded_from_all_results(self):
+        """Different doc_type expanded results should not appear in all_results."""
+        original = [_make_result(chunk_id="c1", doc_type="sop")]
+        related = [
+            RetrievalResult(
+                doc_id="doc2", content="text", score=0.0,
+                metadata={"chunk_id": "c_cross", "doc_type": "ts"},
+            ),
+        ]
+        group = RelationGroup(
+            trigger_doc_id="doc1",
+            trigger_chunk_id="c1",
+            related_results=related,
+            relation_type="cross_doc_type",
+        )
+        result = RelationExpandResult(
+            original_results=original,
+            expanded_groups=[group],
+        )
+        all_r = result.all_results()
+        assert len(all_r) == 1  # only original, cross-type excluded
+        suggestions = result.cross_type_suggestions()
+        assert "ts" in suggestions
+        assert len(suggestions["ts"]) == 1
+
     def test_expanded_tagged_with_relation_type(self):
         """Expanded results should have relation_type and relation_trigger."""
         original = [_make_result(chunk_id="c1")]
         related = [
             RetrievalResult(
                 doc_id="doc2", content="text", score=0.0,
-                metadata={"chunk_id": "c_exp"},
+                metadata={"chunk_id": "c_exp", "doc_type": "sop"},
             ),
         ]
         group = RelationGroup(
