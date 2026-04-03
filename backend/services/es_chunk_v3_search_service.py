@@ -891,6 +891,28 @@ class EsChunkV3SearchService:
             )
             return []
 
+    def fetch_chunks_by_ids(
+        self,
+        chunk_ids: list[str],
+    ) -> list[RetrievalResult]:
+        """Fetch specific chunks by their chunk_ids (for context_chunk_ids flow)."""
+        if not chunk_ids:
+            return []
+        docs = self._mget_content_docs(chunk_ids)
+        results: list[RetrievalResult] = []
+        for cid in chunk_ids:
+            doc = docs.get(cid)
+            if doc is None:
+                logger.warning("fetch_chunks_by_ids: chunk_id=%s not found", cid)
+                continue
+            results.append(self._content_doc_to_result(doc, score=0.0))
+        logger.info(
+            "fetch_chunks_by_ids: requested=%d, found=%d",
+            len(chunk_ids),
+            len(results),
+        )
+        return results
+
     def health_check(self) -> bool:
         try:
             return self.es.ping()

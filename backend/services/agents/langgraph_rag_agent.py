@@ -438,6 +438,19 @@ class LangGraphRAGAgent:
         return update
 
     def _retrieve_node(self, state: AgentState) -> Dict[str, Any]:
+        # Pre-fetched context docs (관련 문서 제안 버튼 클릭): skip retrieval
+        context_docs = state.get("context_docs")
+        if context_docs:
+            logger.info(
+                "_retrieve_node: using %d pre-fetched context_docs (skip search)",
+                len(context_docs),
+            )
+            return {
+                "docs": list(context_docs),
+                "all_docs": list(context_docs),
+                "ref_json": [],
+                "search_queries": state.get("search_queries", []),
+            }
         if self.use_canonical_retrieval:
             return self._canonical_retrieve_node(state)
         return retrieve_node(

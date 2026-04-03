@@ -36,6 +36,7 @@ export type Message = {
   selectedDocTypes?: string[] | null;
   searchQueries?: string[] | null;
   suggestAdditionalDeviceSearch?: boolean;
+  relatedDocTypes?: RelatedDocTypeSuggestion[] | null;
 };
 
 export type DeviceInfo = {
@@ -110,6 +111,13 @@ export type AutoParseResult = {
   message?: string | null;
 };
 
+export type RelatedDocTypeSuggestion = {
+  doc_type: string;
+  count: number;
+  chunk_ids: string[];
+  message: string;
+};
+
 export type TaskMode = "sop" | "issue" | "all";
 
 export type AgentResponse = {
@@ -131,6 +139,7 @@ export type AgentResponse = {
   search_queries?: string[] | null;
   detected_language?: string | null;
   suggest_additional_device_search?: boolean;
+  related_doc_types?: RelatedDocTypeSuggestion[] | null;
 };
 
 export type ChatHistoryTurn = {
@@ -156,6 +165,7 @@ export type AgentRequest = {
   filter_equip_ids?: string[] | null;
   search_queries?: string[] | null;
   selected_doc_ids?: string[] | null;
+  context_chunk_ids?: string[] | null;
 };
 
 export type Conversation = {

@@ -154,6 +154,9 @@ class AgentState(TypedDict, total=False):
     needs_history: bool
     prev_doc_ids: List[str]  # 이전 턴 참조 문서 ID
 
+    # Pre-fetched context docs (관련 문서 제안 버튼 클릭 시)
+    context_docs: List[RetrievalResult]
+
     # Retrieval outputs
     docs: List[RetrievalResult]
     all_docs: List[RetrievalResult]  # 재생성용 전체 문서 (rerank 전, 최대 20개)
@@ -4710,19 +4713,56 @@ def _extract_devices_from_query(device_names: List[str], query: str) -> List[str
             query_for_match = query_for_match.replace(_compact_text(ko), _compact_text(en))
 
     # Phase 1: exact substring match (기존 로직)
-    matches: List[str] = []
+    # 단어 경계 인식을 위해 원본 query 토큰도 함께 사용
+    query_tokens_compact = [_compact_text(t) for t in re.split(r"[\s가-힣,;:()\"'?!。，；：（）의]+", query) if t.strip()]
+    # 연속 토큰 조합도 생성 (multi-word device: "supra vplus" → "supravplus")
+    query_token_combos: set[str] = set(query_tokens_compact)
+    for i in range(len(query_tokens_compact) - 1):
+        query_token_combos.add(query_tokens_compact[i] + query_tokens_compact[i + 1])
+    if len(query_tokens_compact) >= 3:
+        for i in range(len(query_tokens_compact) - 2):
+            query_token_combos.add(query_tokens_compact[i] + query_tokens_compact[i + 1] + query_tokens_compact[i + 2])
+
+    token_matches: List[str] = []
+    substr_matches: List[str] = []
     for name in device_names:
         cleaned = str(name).strip()
         if not cleaned or not _is_valid_device_candidate(cleaned):
             continue
         name_compact = _compact_text(cleaned)
-        if name_compact and name_compact in query_for_match:
-            matches.append(cleaned)
+        if not name_compact:
+            continue
+        # 토큰 조합 기반 매칭 (word boundary 보존, 우선)
+        if name_compact in query_token_combos:
+            token_matches.append(cleaned)
+        # fallback: 전체 compact query에서 substring 매칭
+        elif name_compact in query_for_match:
+            substr_matches.append(cleaned)
+    # 토큰 조합 매칭 우선, 없으면 substring fallback
+    matches = token_matches if token_matches else substr_matches
     if matches:
-        return _dedupe_queries(matches)[:1]
+        # 긴 이름 우선 (SUPRA Vplus > SUPRA V)
+        matches.sort(key=lambda n: len(_compact_text(n)), reverse=True)
+        best = matches[0]
+        best_compact = _compact_text(best)
+        # prefix 모호성 체크: 매칭된 이름이 더 긴 device name의 prefix인 경우
+        # Phase 2 fuzzy로 더 specific한 매칭 시도 (오타 대응: "vvplus" → "vplus")
+        has_longer_candidate = any(
+            _compact_text(n).startswith(best_compact)
+            and len(_compact_text(n)) > len(best_compact)
+            and _is_valid_device_candidate(n)
+            for n in device_names
+        )
+        if not has_longer_candidate:
+            return _dedupe_queries(matches)[:1]
+        # prefix 모호성이 있으면 Phase 2로 fall through
+        logger.debug(
+            "device Phase 1 match '%s' is prefix of longer candidate, trying fuzzy",
+            best,
+        )
 
-    # Phase 2: token-level fuzzy fallback (rapidfuzz) — exact match 실패 시에만
-    # 전체 쿼리 대신 개별 토큰을 추출하여 장비명과 비교 (오타 내성 향상)
+    # Phase 2: token-level fuzzy (rapidfuzz)
+    # exact match 실패 또는 prefix 모호성 시 실행. 오타 내성 향상.
     try:
         from rapidfuzz import fuzz, process
 
@@ -4768,7 +4808,13 @@ def _extract_devices_from_query(device_names: List[str], query: str) -> List[str
             )
             if result:
                 matched_compact, score, _idx = result
-                if best_match is None or score > best_match[0]:
+                if best_match is None:
+                    best_match = (score, matched_compact, candidates[matched_compact])
+                elif score > best_match[0] + 5:
+                    # 확실히 높은 score → 교체
+                    best_match = (score, matched_compact, candidates[matched_compact])
+                elif score >= best_match[0] - 5 and len(matched_compact) > len(best_match[1]):
+                    # score 비슷하지만 더 specific(긴 이름) → 우선
                     best_match = (score, matched_compact, candidates[matched_compact])
 
         # fallback: 전체 쿼리로도 시도 (토큰 분리가 실패한 경우 대비)
@@ -4785,6 +4831,25 @@ def _extract_devices_from_query(device_names: List[str], query: str) -> List[str
 
         if best_match:
             score, matched_compact, original = best_match
+            # Phase 1 prefix 모호성으로 fall-through한 경우:
+            # fuzzy 결과가 Phase 1보다 더 specific(긴 이름)이면 fuzzy 우선,
+            # 아니면 Phase 1 결과 유지
+            if matches:
+                phase1_best = matches[0]
+                phase1_len = len(_compact_text(phase1_best))
+                fuzzy_len = len(matched_compact)
+                if fuzzy_len >= phase1_len:
+                    logger.info(
+                        "device fuzzy preferred over Phase 1: '%s'→'%s' (score=%d, Phase1='%s')",
+                        query[:40], original, score, phase1_best,
+                    )
+                    return [original]
+                else:
+                    logger.info(
+                        "device Phase 1 kept over fuzzy: '%s' (Phase1='%s', fuzzy='%s' score=%d)",
+                        query[:40], phase1_best, original, score,
+                    )
+                    return [phase1_best]
             logger.info(
                 "device fuzzy match: query='%s' → '%s' (score=%d)",
                 query[:40], original, score,
@@ -4792,6 +4857,11 @@ def _extract_devices_from_query(device_names: List[str], query: str) -> List[str
             return [original]
     except Exception:
         logger.debug("device fuzzy match failed", exc_info=True)
+
+    # Phase 2 실패 시 Phase 1 결과가 있으면 fallback
+    if matches:
+        logger.info("device fuzzy failed, falling back to Phase 1: '%s'", matches[0])
+        return _dedupe_queries(matches)[:1]
 
     return []
 

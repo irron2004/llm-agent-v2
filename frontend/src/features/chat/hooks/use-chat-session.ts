@@ -30,6 +30,7 @@ type SendOptions = {
     searchQueries?: string[];
     selectedDocIds?: string[];
     autoParse?: boolean;
+    contextChunkIds?: string[];
   };
 };
 
@@ -915,6 +916,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         selectedDevices: res.selected_devices ?? null,
         selectedDocTypes: res.selected_doc_types ?? null,
         searchQueries: effectiveSearchQueries.length > 0 ? effectiveSearchQueries : null,
+        relatedDocTypes: res.related_doc_types ?? null,
       }));
 
       // If auto-parse could not detect a device, proactively open
@@ -1194,6 +1196,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
             filter_doc_types: overrides.filterDocTypes,
             search_queries: overrides.searchQueries,
             selected_doc_ids: overrides.selectedDocIds,
+            ...(overrides.contextChunkIds?.length ? { context_chunk_ids: overrides.contextChunkIds } : {}),
           } : {}),
           ...resumePayload,
           ...(!isResume && threadIdRef.current
