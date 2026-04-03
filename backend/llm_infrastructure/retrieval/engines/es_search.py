@@ -447,6 +447,109 @@ class EsSearchEngine:
             logger.warning("Section chunk fetch failed: %s", e)
             return []
 
+    def resolve_chapter_and_fetch(
+        self,
+        doc_id: str,
+        hit_page: int,
+        max_pages: int = 20,
+        content_index: str | None = None,
+    ) -> list[EsSearchHit]:
+        """Resolve chapter from neighbor pages when section_chapter is empty.
+
+        1. Look backward for the nearest page with non-empty section_chapter
+        2. Look forward for the next page with a different section_chapter
+        3. Fetch all pages in the resolved range
+
+        Returns empty list if no chapter can be resolved.
+        """
+        if not doc_id or hit_page is None:
+            return []
+        index = content_index or self.index_name
+
+        # Step 1: Find nearest previous page with non-empty section_chapter
+        try:
+            resp = self.es.search(
+                index=index,
+                body={
+                    "query": {"bool": {"filter": [
+                        {"term": {"doc_id": doc_id}},
+                        {"range": {"page": {"lte": hit_page}}},
+                    ], "must_not": [
+                        {"term": {"section_chapter": ""}},
+                    ]}},
+                    "size": 1,
+                    "sort": [{"page": {"order": "desc"}}],
+                    "_source": ["page", "section_chapter"],
+                },
+            )
+        except Exception as e:
+            logger.warning("resolve_chapter backward search failed: %s", e)
+            return []
+
+        backward_hits = resp.get("hits", {}).get("hits", [])
+        if not backward_hits:
+            return []
+
+        chapter_name = backward_hits[0]["_source"]["section_chapter"]
+        chapter_start_page = backward_hits[0]["_source"]["page"]
+
+        # Step 2: Find the next page with a different non-empty section_chapter
+        try:
+            resp2 = self.es.search(
+                index=index,
+                body={
+                    "query": {"bool": {"filter": [
+                        {"term": {"doc_id": doc_id}},
+                        {"range": {"page": {"gt": hit_page}}},
+                    ], "must_not": [
+                        {"term": {"section_chapter": ""}},
+                        {"term": {"section_chapter": chapter_name}},
+                    ]}},
+                    "size": 1,
+                    "sort": [{"page": {"order": "asc"}}],
+                    "_source": ["page", "section_chapter"],
+                },
+            )
+        except Exception as e:
+            logger.warning("resolve_chapter forward search failed: %s", e)
+            resp2 = {"hits": {"hits": []}}
+
+        forward_hits = resp2.get("hits", {}).get("hits", [])
+        chapter_end_page = (forward_hits[0]["_source"]["page"] - 1) if forward_hits else None
+
+        # Step 3: Fetch all pages in the resolved range
+        filters: list[dict[str, Any]] = [
+            {"term": {"doc_id": doc_id}},
+            {"range": {"page": {"gte": chapter_start_page}}},
+        ]
+        if chapter_end_page is not None:
+            filters.append({"range": {"page": {"lte": chapter_end_page}}})
+
+        try:
+            resp3 = self.es.search(
+                index=index,
+                body={
+                    "query": {"bool": {"filter": filters}},
+                    "size": max_pages,
+                    "sort": [{"page": {"order": "asc"}}],
+                    "_source": self._source_fields(),
+                },
+            )
+            result = self._parse_hits(resp3)
+            if result:
+                logger.info(
+                    "[resolve_chapter] doc_id=%s, hit_page=%d, resolved='%s' "
+                    "(pages %d-%s, fetched %d chunks)",
+                    doc_id, hit_page, chapter_name,
+                    chapter_start_page,
+                    chapter_end_page if chapter_end_page else "end",
+                    len(result),
+                )
+            return result
+        except Exception as e:
+            logger.warning("resolve_chapter range fetch failed: %s", e)
+            return []
+
     def fetch_section_chunks_by_keyword(
         self,
         doc_id: str,

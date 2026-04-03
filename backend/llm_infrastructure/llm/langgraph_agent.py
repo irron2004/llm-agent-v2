@@ -2764,6 +2764,7 @@ def expand_related_docs_node(
     page_fetcher: Any = None,
     doc_fetcher: Any = None,
     section_fetcher: Any = None,
+    chapter_resolver: Any = None,
     page_window: int = RELATED_PAGE_WINDOW,
     max_ref_chars: int = MAX_REF_CHARS_ANSWER,
 ) -> Dict[str, Any]:
@@ -2885,6 +2886,49 @@ def expand_related_docs_node(
                     pages = list(range(page_min, page_max + 1))
                     expanded_pages = pages
                     related_docs = page_fetcher(doc.doc_id, pages)
+        elif chapter_resolver is not None:
+            # Fallback: section_chapter is empty — resolve from neighbor pages
+            page = _extract_page_value(meta)
+            if page is not None:
+                section_targets += 1
+                resolved_hits = chapter_resolver(
+                    doc_id=str(doc.doc_id),
+                    hit_page=page,
+                    max_pages=20,
+                )
+                if resolved_hits:
+                    related_docs = [
+                        hit.to_retrieval_result() if hasattr(hit, "to_retrieval_result") else hit
+                        for hit in resolved_hits
+                    ]
+                    expanded_pages = sorted(
+                        set(
+                            p
+                            for rd in related_docs
+                            for p in [
+                                _extract_page_value(
+                                    rd.metadata if isinstance(rd.metadata, dict) else {}
+                                )
+                            ]
+                            if p is not None
+                        )
+                    )
+                    logger.info(
+                        "[expand_related] chapter_resolver fallback: doc_id=%s, "
+                        "hit_page=%d, resolved %d pages",
+                        doc.doc_id, page, len(expanded_pages),
+                    )
+                elif page_fetcher is not None:
+                    # chapter_resolver returned nothing, fall back to page window
+                    page_targets += 1
+                    section_targets -= 1
+                    page_min = max(1, page - page_window)
+                    page_max = page + page_window
+                    pages = list(range(page_min, page_max + 1))
+                    expanded_pages = pages
+                    related_docs = page_fetcher(doc.doc_id, pages)
+            else:
+                skipped_targets += 1
         elif page_fetcher is not None:
             page = _extract_page_value(meta)
             if page is not None:

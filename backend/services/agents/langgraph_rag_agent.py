@@ -103,6 +103,8 @@ class LangGraphRAGAgent:
         # section_fetcher for chapter-based expansion (v3)
         _es_engine = getattr(search_service, "es_engine", None)
         self.section_fetcher = getattr(_es_engine, "fetch_section_chunks", None)
+        # chapter_resolver: fallback when section_chapter is empty
+        self.chapter_resolver = getattr(_es_engine, "resolve_chapter_and_fetch", None)
         self.mode = mode
         self.ask_user_after_retrieve = ask_user_after_retrieve
         self.ask_device_selection = ask_device_selection
@@ -541,6 +543,7 @@ class LangGraphRAGAgent:
                     page_fetcher=self.page_fetcher,
                     doc_fetcher=self.doc_fetcher,
                     section_fetcher=self.section_fetcher,
+                    chapter_resolver=self.chapter_resolver,
                 ),
             ),
         )
