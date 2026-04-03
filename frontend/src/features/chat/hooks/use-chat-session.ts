@@ -916,7 +916,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         selectedDevices: res.selected_devices ?? null,
         selectedDocTypes: res.selected_doc_types ?? null,
         searchQueries: effectiveSearchQueries.length > 0 ? effectiveSearchQueries : null,
-        relatedDocTypes: res.related_doc_types ?? null,
+        relatedDocTypes: res.related_doc_types ?? m.relatedDocTypes ?? null,
       }));
 
       // If auto-parse could not detect a device, proactively open
