@@ -42,32 +42,78 @@ class RelationExpandResult:
     original_results: list["RetrievalResult"]
     expanded_groups: list[RelationGroup]
 
-    def all_results(self) -> list["RetrievalResult"]:
-        """원래 결과 + 확장된 결과를 합친 최종 리스트 (중복 제거)."""
-        seen_chunk_ids: set[str] = set()
-        result: list["RetrievalResult"] = []
+    @property
+    def _original_doc_types(self) -> set[str]:
+        """원래 결과에 포함된 doc_type 집합."""
+        return {
+            str((r.metadata or {}).get("doc_type", ""))
+            for r in self.original_results
+        } - {""}
+
+    def _tag_and_collect(
+        self,
+        *,
+        include_cross_type: bool,
+    ) -> tuple[list["RetrievalResult"], list["RetrievalResult"]]:
+        """확장 결과를 태깅하고, 같은/다른 doc_type으로 분리.
+
+        Returns:
+            (same_type_results, cross_type_results)
+        """
+        original_types = self._original_doc_types
+        seen: set[str] = set()
+        same: list["RetrievalResult"] = []
+        cross: list["RetrievalResult"] = []
 
         # Original results first
         for r in self.original_results:
             cid = (r.metadata or {}).get("chunk_id", r.doc_id)
-            if cid not in seen_chunk_ids:
-                seen_chunk_ids.add(cid)
-                result.append(r)
+            if cid not in seen:
+                seen.add(cid)
+                same.append(r)
 
-        # Then expanded results
+        # Expanded results — split by doc_type match
         for group in self.expanded_groups:
             for r in group.related_results:
                 cid = (r.metadata or {}).get("chunk_id", r.doc_id)
-                if cid not in seen_chunk_ids:
-                    seen_chunk_ids.add(cid)
-                    # Tag with relation type
-                    metadata = dict(r.metadata or {})
-                    metadata["relation_type"] = group.relation_type
-                    metadata["relation_trigger"] = group.trigger_chunk_id
-                    r.metadata = metadata
-                    result.append(r)
+                if cid in seen:
+                    continue
+                seen.add(cid)
+                # Tag with relation type
+                metadata = dict(r.metadata or {})
+                metadata["relation_type"] = group.relation_type
+                metadata["relation_trigger"] = group.trigger_chunk_id
+                r.metadata = metadata
 
-        return result
+                doc_type = str(metadata.get("doc_type", ""))
+                if not original_types or doc_type in original_types:
+                    same.append(r)
+                else:
+                    cross.append(r)
+
+        return same, cross
+
+    def all_results(self) -> list["RetrievalResult"]:
+        """원래 결과 + 같은 doc_type 확장 결과 (중복 제거).
+
+        다른 doc_type의 확장 결과는 제외된다.
+        cross_type_suggestions()로 별도 확인 가능.
+        """
+        same, _ = self._tag_and_collect(include_cross_type=False)
+        return same
+
+    def cross_type_suggestions(self) -> dict[str, list["RetrievalResult"]]:
+        """다른 doc_type의 확장 결과를 doc_type별로 그룹핑하여 반환.
+
+        에이전트가 follow-up 질문 생성에 활용:
+        예: "TS 문서에도 관련 내용이 있습니다. 확인하시겠습니까?"
+        """
+        _, cross = self._tag_and_collect(include_cross_type=True)
+        grouped: dict[str, list["RetrievalResult"]] = {}
+        for r in cross:
+            doc_type = str((r.metadata or {}).get("doc_type", "unknown"))
+            grouped.setdefault(doc_type, []).append(r)
+        return grouped
 
 
 class RelationExpander:
@@ -254,16 +300,21 @@ class RelationExpander:
             equip_id = str(meta.get("equip_id", "")).strip()
             chunk_id = str(meta.get("chunk_id", r.doc_id))
 
+            device_name = str(meta.get("device_name", "")).strip()
+
             if not equip_id or equip_id in processed_equips:
                 continue
             processed_equips.add(equip_id)
 
+            filters: list[dict[str, Any]] = [
+                {"term": {"equip_id": equip_id}},
+                {"term": {"doc_type": "myservice"}},
+            ]
+            if device_name:
+                filters.append({"term": {"device_name": device_name}})
             query: dict[str, Any] = {
                 "bool": {
-                    "filter": [
-                        {"term": {"equip_id": equip_id}},
-                        {"term": {"doc_type": "myservice"}},
-                    ],
+                    "filter": filters,
                 }
             }
 
@@ -311,9 +362,10 @@ class RelationExpander:
         """같은 components 필드를 가진 다른 문서의 chunk를 가져온다."""
         groups: list[RelationGroup] = []
 
-        # Collect all components from top results
+        # Collect all components and device_names from top results
         all_components: set[str] = set()
         trigger_doc_ids: set[str] = set()
+        device_names: set[str] = set()
         trigger_chunk_id = ""
 
         for r in results:
@@ -326,17 +378,23 @@ class RelationExpander:
                 trigger_doc_ids.add(r.doc_id)
                 if not trigger_chunk_id:
                     trigger_chunk_id = str(meta.get("chunk_id", r.doc_id))
+            device = str(meta.get("device_name", "")).strip()
+            if device:
+                device_names.add(device)
 
         if not all_components:
             return groups
 
-        # Search for chunks with same components but different doc_id
+        # Search for chunks with same components, same device, different doc_id
         must_not = [{"term": {"doc_id": did}} for did in trigger_doc_ids]
+        filters: list[dict[str, Any]] = [
+            {"terms": {"components": list(all_components)}},
+        ]
+        if device_names:
+            filters.append({"terms": {"device_name": list(device_names)}})
         query: dict[str, Any] = {
             "bool": {
-                "filter": [
-                    {"terms": {"components": list(all_components)}},
-                ],
+                "filter": filters,
                 "must_not": must_not,
             },
         }

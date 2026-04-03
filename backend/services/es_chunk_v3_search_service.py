@@ -162,6 +162,7 @@ class EsChunkV3SearchService:
         self.reranker = reranker
         self.raptor_enabled = raptor_enabled
         self.relation_expander = relation_expander
+        self._last_cross_type_suggestions: dict[str, list[RetrievalResult]] = {}
 
         self.es_engine = EsSearchEngine(
             es_client=es_client,
@@ -782,8 +783,20 @@ class EsChunkV3SearchService:
             expand_result = self.relation_expander.expand(
                 filtered, self.es, self.content_index
             )
+            self._last_cross_type_suggestions = (
+                expand_result.cross_type_suggestions()
+            )
+            if self._last_cross_type_suggestions:
+                hint_types = {
+                    dt: len(rs)
+                    for dt, rs in self._last_cross_type_suggestions.items()
+                }
+                logger.info(
+                    "[RelationExpander] cross_type suggestions: %s", hint_types
+                )
             return expand_result.all_results()
 
+        self._last_cross_type_suggestions = {}
         return filtered
 
     def fetch_doc_pages(
