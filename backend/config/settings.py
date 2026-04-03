@@ -6,9 +6,10 @@ Configuration is loaded from:
 3. Default values (lowest priority)
 """
 
+from pathlib import Path
 from typing import Literal
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .settings_vlm import vlm_settings  # noqa: F401  (optional VLM settings import)
@@ -116,6 +117,24 @@ class RAGSettings(BaseSettings):
     section_expand_allowed_sources: str = Field(
         default="title,toc_match,carry",
         description="Allowed chapter_source values for expansion triggers",
+    )
+
+    # RAPTOR
+    raptor_enabled: bool = Field(
+        default=False, description="Enable RAPTOR hierarchical retrieval"
+    )
+    raptor_tree_strategy: str = Field(
+        default="collapsed",
+        description="RAPTOR tree search strategy (collapsed/tree_traversal)",
+    )
+    raptor_expand_summaries: bool = Field(
+        default=True, description="Expand summary nodes to leaf evidence"
+    )
+    raptor_max_levels: int = Field(
+        default=3, description="Maximum RAPTOR tree depth"
+    )
+    raptor_min_partition_size: int = Field(
+        default=10, description="Minimum chunks per partition to build tree"
     )
 
     # Reranking
@@ -488,6 +507,23 @@ class MinioSettings(BaseSettings):
         default="http://minio:9000",
         description="MinIO server endpoint URL",
     )
+
+    @model_validator(mode="after")
+    def _resolve_minio_host(self) -> "MinioSettings":
+        """Replace Docker-internal 'minio' hostname with 'localhost' when running on host."""
+        if "://minio:" in self.endpoint and not Path("/.dockerenv").exists():
+            import logging
+
+            logger = logging.getLogger(__name__)
+            original = self.endpoint
+            resolved = self.endpoint.replace("://minio:", "://localhost:")
+            object.__setattr__(self, "endpoint", resolved)
+            logger.warning(
+                "MinIO endpoint auto-resolved: %s -> %s (not running in Docker)",
+                original,
+                resolved,
+            )
+        return self
     access_key: str = Field(
         default="minioadmin",
         validation_alias=AliasChoices("MINIO_ACCESS_KEY", "MINIO_ROOT_USER"),
