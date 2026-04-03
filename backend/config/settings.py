@@ -113,7 +113,7 @@ class RAGSettings(BaseSettings):
     # Section expansion (chapter-aware retrieval)
     section_expand_enabled: bool = Field(default=True, description="Enable section expansion")
     section_expand_top_groups: int = Field(default=2, description="Max groups to expand")
-    section_expand_max_pages: int = Field(default=8, description="Max pages per group")
+    section_expand_max_pages: int = Field(default=20, description="Max pages per group")
     section_expand_allowed_sources: str = Field(
         default="title,toc_match,carry",
         description="Allowed chapter_source values for expansion triggers",

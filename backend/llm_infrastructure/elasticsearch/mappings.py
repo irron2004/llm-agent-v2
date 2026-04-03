@@ -592,6 +592,13 @@ def get_chunk_v3_content_mapping() -> dict[str, Any]:
             "pipeline_version": {"type": "keyword", "doc_values": True},
             "created_at": {"type": "date"},
             "extra_meta": {"type": "object", "enabled": False},
+            # RAPTOR hierarchical retrieval fields
+            "partition_key": {"type": "keyword", "doc_values": True},
+            "raptor_level": {"type": "integer"},
+            "raptor_parent_id": {"type": "keyword", "doc_values": True},
+            "raptor_children_ids": {"type": "keyword", "doc_values": True},
+            "is_summary_node": {"type": "boolean"},
+            "cluster_id": {"type": "keyword", "doc_values": True},
         },
     }
 

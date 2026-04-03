@@ -5,6 +5,7 @@ from .dense import DenseRetriever
 from .bm25 import BM25Retriever
 from .hybrid import HybridRetriever
 from .es_hybrid import EsHybridRetriever, EsDenseRetriever
+from .raptor_retriever import RaptorHierarchicalRetriever, RaptorFlatRetriever
 
 __all__ = [
     "DenseRetriever",
@@ -12,4 +13,6 @@ __all__ = [
     "HybridRetriever",
     "EsHybridRetriever",
     "EsDenseRetriever",
+    "RaptorHierarchicalRetriever",
+    "RaptorFlatRetriever",
 ]
