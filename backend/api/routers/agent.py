@@ -498,6 +498,10 @@ class AgentResponse(BaseModel):
         False,
         description="auto_parse에서 device를 찾지 못해 추가 장비 검색을 제안해야 하는지 여부",
     )
+    related_doc_types: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="다른 doc_type에서 발견된 관련 문서 제안 [{doc_type, count, message}]",
+    )
 
 
 class TraceContext(BaseModel):
@@ -851,6 +855,33 @@ def _sanitize_search_queries_raw(result: Dict[str, Any]) -> Optional[List[str]]:
             break
 
     return cleaned or None
+
+
+_DOC_TYPE_LABELS: dict[str, str] = {
+    "ts": "Trouble Shooting",
+    "setup": "Setup/설치",
+    "sop": "SOP",
+    "myservice": "MyService 이력",
+    "gcb": "GCB",
+}
+
+
+def _build_related_doc_type_suggestions(
+    search_service: SearchService,
+) -> Optional[List[Dict[str, Any]]]:
+    """search_service의 cross_type_suggestions를 API 응답 형식으로 변환."""
+    suggestions_map = getattr(search_service, "_last_cross_type_suggestions", {})
+    if not suggestions_map:
+        return None
+    result: list[dict[str, Any]] = []
+    for doc_type, chunks in suggestions_map.items():
+        label = _DOC_TYPE_LABELS.get(doc_type, doc_type.upper())
+        result.append({
+            "doc_type": doc_type,
+            "count": len(chunks),
+            "message": f"{label} 문서에도 관련 내용이 {len(chunks)}건 있습니다. 확인하시겠습니까?",
+        })
+    return result
 
 
 def _resolve_index_name(search_service: SearchService) -> Optional[str]:
@@ -1266,6 +1297,7 @@ async def run_agent(
             search_queries=final_search_queries,
             detected_language=result.get("detected_language"),
             suggest_additional_device_search=suggest_additional_device_search,
+            related_doc_types=_build_related_doc_type_suggestions(search_service),
         )
 
     # 정상 완료
@@ -1298,6 +1330,7 @@ async def run_agent(
         search_queries=final_search_queries,
         detected_language=result.get("detected_language"),
         suggest_additional_device_search=suggest_additional_device_search,
+        related_doc_types=_build_related_doc_type_suggestions(search_service),
     )
 
 
@@ -1557,6 +1590,7 @@ async def run_agent_stream(
                     search_queries=final_search_queries,
                     detected_language=result.get("detected_language"),
                     suggest_additional_device_search=suggest_additional_device_search,
+                    related_doc_types=_build_related_doc_type_suggestions(search_service),
                 )
             else:
                 resp = AgentResponse(
@@ -1590,6 +1624,7 @@ async def run_agent_stream(
                     search_queries=final_search_queries,
                     detected_language=result.get("detected_language"),
                     suggest_additional_device_search=suggest_additional_device_search,
+                    related_doc_types=_build_related_doc_type_suggestions(search_service),
                 )
 
             _enqueue({"type": "final", "result": resp.model_dump()})

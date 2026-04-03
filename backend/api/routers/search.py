@@ -49,6 +49,14 @@ class SearchResultItem(BaseModel):
     device_name: Optional[str] = None
 
 
+class RelatedDocTypeSuggestion(BaseModel):
+    """다른 doc_type에서 발견된 관련 문서 제안."""
+
+    doc_type: str = Field(description="관련 문서 종류 (ts, setup 등)")
+    count: int = Field(description="해당 doc_type의 관련 chunk 수")
+    message: str = Field(description="사용자에게 표시할 제안 메시지")
+
+
 class SearchResponse(BaseModel):
     query: str
     clean_query: str
@@ -59,6 +67,10 @@ class SearchResponse(BaseModel):
     has_next: bool
     multi_query_used: bool = Field(default=False, description="Whether multi-query expansion was used")
     reranked: bool = Field(default=False, description="Whether results were reranked")
+    related_doc_types: List[RelatedDocTypeSuggestion] = Field(
+        default_factory=list,
+        description="다른 doc_type에서 발견된 관련 문서 제안 목록",
+    )
 
 
 class LegacyChatPipelineRequest(BaseModel):
@@ -204,6 +216,7 @@ async def search(
             has_next=has_next,
             multi_query_used=was_multi_query,
             reranked=was_reranked,
+            related_doc_types=_build_related_doc_type_suggestions(search_service),
         )
 
     except RuntimeError as exc:
@@ -300,6 +313,33 @@ async def search_chat_pipeline_legacy(
 
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+
+_DOC_TYPE_LABELS: dict[str, str] = {
+    "ts": "Trouble Shooting",
+    "setup": "Setup/설치",
+    "sop": "SOP",
+    "myservice": "MyService 이력",
+    "gcb": "GCB",
+}
+
+
+def _build_related_doc_type_suggestions(
+    search_service: SearchService,
+) -> list[RelatedDocTypeSuggestion]:
+    """search_service의 cross_type_suggestions를 API 응답 형식으로 변환."""
+    suggestions_map = getattr(search_service, "_last_cross_type_suggestions", {})
+    if not suggestions_map:
+        return []
+    result: list[RelatedDocTypeSuggestion] = []
+    for doc_type, chunks in suggestions_map.items():
+        label = _DOC_TYPE_LABELS.get(doc_type, doc_type.upper())
+        result.append(RelatedDocTypeSuggestion(
+            doc_type=doc_type,
+            count=len(chunks),
+            message=f"{label} 문서에도 관련 내용이 {len(chunks)}건 있습니다. 확인하시겠습니까?",
+        ))
+    return result
 
 
 def _to_search_items(results, start_idx: int, query: str) -> list[SearchResultItem]:
