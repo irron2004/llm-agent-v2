@@ -119,6 +119,21 @@ class RAGSettings(BaseSettings):
         description="Allowed chapter_source values for expansion triggers",
     )
 
+    # Relation expansion (component-based retrieval)
+    relation_expand_enabled: bool = Field(
+        default=False, description="Enable relation expansion post-processing"
+    )
+    relation_expand_max_groups: int = Field(
+        default=3, description="Max trigger groups to expand"
+    )
+    relation_expand_max_per_group: int = Field(
+        default=3, description="Max related chunks per group"
+    )
+    relation_expand_strategies: str = Field(
+        default="cross_doc_type,component_link,sequential",
+        description="Comma-separated expansion strategies",
+    )
+
     # RAPTOR
     raptor_enabled: bool = Field(
         default=False, description="Enable RAPTOR hierarchical retrieval"
