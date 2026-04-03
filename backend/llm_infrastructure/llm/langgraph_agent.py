@@ -2853,7 +2853,7 @@ def expand_related_docs_node(
                 if hit_page is not None and all_section_pages:
                     current_group: List[int] = [all_section_pages[0]]
                     for i in range(1, len(all_section_pages)):
-                        if all_section_pages[i] - all_section_pages[i - 1] <= 1:
+                        if all_section_pages[i] - all_section_pages[i - 1] <= 3:
                             current_group.append(all_section_pages[i])
                         else:
                             if hit_page in current_group:
