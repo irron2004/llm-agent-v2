@@ -3740,11 +3740,14 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     if route == "setup":
         ref_items = _prioritize_setup_answer_refs(ref_items)
 
-    # Use original query for non-English answers to avoid language drift.
+    # Use original (pre-abbreviation-expansion) query for the prompt so the
+    # LLM sees natural phrasing (e.g. "APC valve") instead of the expanded
+    # form ("APC (Automated Process Control) valve") which can confuse it
+    # into thinking REFS don't match.
     if answer_language == "en":
         query_for_prompt = state.get("query_en") or state["query"]
     else:
-        query_for_prompt = state["query"]
+        query_for_prompt = state.get("original_query") or state["query"]
 
     # Setup route: (doc_id, section)별 그룹핑 → 적합성 판정 → 선택 → REFS 제한
     # MAX_ANSWER_REFS를 그룹 선택 이후에 적용하여, 적합한 section이
