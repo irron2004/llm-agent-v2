@@ -1255,6 +1255,8 @@ def _prioritize_setup_answer_refs(ref_items: List[Dict[str, Any]]) -> List[Dict[
 
 
 MAX_SETUP_DOC_TRIES = 5  # 적합성 판정 최대 문서 수
+MIN_REFS_FOR_ACCEPT = 3  # 그룹 즉시 채택 최소 refs 수
+CONSECUTIVE_EMPTY_LIMIT = 2  # 연속 빈 응답 시 early-exit 임계값
 MAX_ANSWER_REFS = 10  # 답변 생성 시 최대 REFS 수 (다페이지 SOP 원문 번역 대응)
 MAX_ISSUE_REFS = 10  # issue 사례 노출 최대 REFS 수
 MAX_ISSUE_CASE_MAP_DOCS = 10
@@ -1307,11 +1309,13 @@ def _check_doc_relevance(
     doc_ref_text: str,
     *,
     llm: "BaseLLM",
-) -> bool:
+) -> Optional[bool]:
     """문서가 질문에 답할 수 있는 절차/작업 정보를 포함하는지 가볍게 판정.
 
-    빈 응답 시 1회 재시도하고, 여전히 빈 응답이면 False(관련 없음)로 처리하여
-    다음 그룹이 체크될 수 있도록 한다.
+    Returns:
+        True: 관련 있음 ("yes" 포함)
+        False: 관련 없음 ("yes" 미포함)
+        None: 빈 응답으로 판정 불가 — 호출자가 처리
     """
     system = (
         "You are a relevance checker. Determine if the document contains "
@@ -1325,10 +1329,8 @@ def _check_doc_relevance(
     raw = _invoke_llm(llm, system, user, max_tokens=10, temperature=TEMP_CLASSIFICATION)
     raw_stripped = (raw or "").strip().lower()
     if not raw_stripped:
-        # LLM 빈 응답 → 판정 불가. query-aware 그룹 정렬과 함께 사용되므로
-        # True로 처리하여 가장 관련성 높은 첫 번째 그룹이 통과하도록 한다.
-        logger.info("_check_doc_relevance: raw empty → default True (trust query-aware ordering)")
-        return True
+        logger.info("_check_doc_relevance: raw empty → None (undecidable)")
+        return None
     result = "yes" in raw_stripped
     logger.info("_check_doc_relevance: raw=%r → %s", raw_stripped[:50], result)
     return result
@@ -3752,6 +3754,8 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     # Setup route: (doc_id, section)별 그룹핑 → 적합성 판정 → 선택 → REFS 제한
     # MAX_ANSWER_REFS를 그룹 선택 이후에 적용하여, 적합한 section이
     # 순위가 낮더라도 relevance check에 참여할 수 있도록 함.
+    doc_groups: list = []
+    is_fallback_selection = False
     if route == "setup" and ref_items:
         doc_groups = _group_refs_by_doc_section_chapter(ref_items)
 
@@ -3777,6 +3781,9 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
             import time as _time
 
             selected_refs = None
+            fallback_refs = None
+            fallback_group_key = None
+            consecutive_empty = 0
             checks_done = 0
             for i, (group_key, group_refs) in enumerate(doc_groups[:MAX_SETUP_DOC_TRIES]):
                 t0 = _time.time()
@@ -3785,31 +3792,58 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
                 elapsed = _time.time() - t0
                 checks_done = i + 1
                 logger.info(
-                    "answer_node: setup relevance check %d/%d group=%s relevant=%s (%.1fs)",
+                    "answer_node: setup relevance check %d/%d group=%s refs=%d relevant=%s (%.1fs)",
                     i + 1,
                     min(len(doc_groups), MAX_SETUP_DOC_TRIES),
                     group_key[:60],
+                    len(group_refs),
                     relevant,
                     elapsed,
                 )
-                if relevant:
-                    selected_refs = group_refs
-                    break
+                if relevant is None:
+                    consecutive_empty += 1
+                    if consecutive_empty >= CONSECUTIVE_EMPTY_LIMIT:
+                        logger.warning(
+                            "answer_node: %d consecutive empty responses, early-exit",
+                            consecutive_empty,
+                        )
+                        break
+                else:
+                    consecutive_empty = 0
+                    if relevant:
+                        if len(group_refs) >= MIN_REFS_FOR_ACCEPT:
+                            selected_refs = group_refs
+                            break
+                        elif fallback_refs is None:
+                            fallback_refs = group_refs
+                            fallback_group_key = group_key
 
+            # 3단계 우선순위 선택
             if selected_refs is not None:
                 ref_items = selected_refs
+                is_fallback_selection = False
                 logger.info(
-                    "answer_node: setup selected group=%s (%d refs) after %d checks",
+                    "answer_node: setup selected group=%s (%d refs) after %d checks (direct)",
                     selected_refs[0].get("doc_id", "?")[:50],
                     len(selected_refs),
                     checks_done,
                 )
-            else:
-                # 전부 부적합 → 첫 번째 그룹으로 fallback
-                ref_items = doc_groups[0][1]
+            elif fallback_refs is not None:
+                ref_items = fallback_refs
+                is_fallback_selection = True
                 logger.info(
-                    "answer_node: no relevant group found, fallback to first group=%s",
+                    "answer_node: setup fallback group=%s (%d refs) after %d checks",
+                    fallback_group_key[:60] if fallback_group_key else "?",
+                    len(fallback_refs),
+                    checks_done,
+                )
+            else:
+                ref_items = doc_groups[0][1]
+                is_fallback_selection = True
+                logger.info(
+                    "answer_node: no relevant group found, fallback to first group=%s (%d refs)",
                     doc_groups[0][0][:60],
+                    len(doc_groups[0][1]),
                 )
         else:
             # 그룹이 1개면 그대로 사용
@@ -3818,6 +3852,25 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     # 답변 생성 시 REFS 수 제한 (setup route는 그룹 선택 후 적용)
     if len(ref_items) > MAX_ANSWER_REFS:
         ref_items = ref_items[:MAX_ANSWER_REFS]
+
+    # --- Debug events for workflow trace ---
+    _answer_events: List[str] = []
+    if route == "setup" and doc_groups:
+        _group_info = [(k[:60], len(refs)) for k, refs in doc_groups[:5]]
+        _answer_events.append(f"[answer] groups({len(doc_groups)}): {_group_info}")
+        _sel_doc = ref_items[0].get("doc_id", "?")[:50] if ref_items else "none"
+        _sel_pages = [str(r.get("page", "?")) for r in ref_items[:5]]
+        _sel_mode = "direct" if not is_fallback_selection else "fallback"
+        _answer_events.append(
+            f"[answer] selected: {_sel_doc} pages=[{','.join(_sel_pages)}] refs={len(ref_items)} ({_sel_mode})"
+        )
+        if route == "setup" and not is_fallback_selection:
+            _answer_events.append(f"[answer] answer_ref_json: set (refs={len(ref_items)})")
+        elif route == "setup" and is_fallback_selection:
+            _answer_events.append("[answer] answer_ref_json: unset (fallback)")
+    _answer_events.append(
+        f"[answer] route={route} lang={answer_language} refs={len(ref_items)}"
+    )
 
     ref_text = ref_json_to_text(ref_items)
     logger.info(
@@ -3914,14 +3967,20 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
         answer[:500] if answer else "(empty)",
     )
 
+    _answer_events.append(f"[answer] ref_chars={len(ref_text)} answer_chars={len(answer)}")
+
     enforce_format = str(answer_language).strip().lower() == "ko"
     if not enforce_format:
-        return {
+        _result: Dict[str, Any] = {
             "answer": answer,
             "reasoning": reasoning,
             "answer_format": {"ok": True, "skipped": True, "target_language": answer_language},
             "answer_format_retries": 0,
+            "_events": _answer_events,
         }
+        if route == "setup" and not is_fallback_selection:
+            _result["answer_ref_json"] = ref_items
+        return _result
 
     has_refs = bool(ref_items)
     format_result = _validate_answer_format(answer, target_language="ko", has_refs=has_refs)
@@ -3974,12 +4033,16 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
             bool(format_result.get("ok")),
         )
 
-    return {
+    _result_ko: Dict[str, Any] = {
         "answer": answer,
         "reasoning": reasoning,
         "answer_format": format_result,
         "answer_format_retries": retries,
+        "_events": _answer_events,
     }
+    if route == "setup" and not is_fallback_selection:
+        _result_ko["answer_ref_json"] = ref_items
+    return _result_ko
 
 
 def issue_confirm_node(
