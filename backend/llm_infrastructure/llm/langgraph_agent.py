@@ -2416,14 +2416,15 @@ def retrieve_node(
     selected_doc_types_normalized = {
         normalize_doc_type(dt) for dt in selected_doc_types if normalize_doc_type(dt)
     }
+    route = state.get("route", "general")
     sop_only_predicate = bool(
         state.get("sop_intent") is True
+        or route == "setup"
         or bool(selected_doc_types_normalized.intersection(sop_variants))
     )
 
     # --- Intent-based gating for SOP adjustments ---
     # SOP 문서 선택 시에도, 비절차(조회) 질문이면 절차 편향 조정을 건너뛴다.
-    route = state.get("route", "general")
     query_lower_for_intent = (original_query or "").lower()
     has_procedure_intent_early = any(
         kw in query_lower_for_intent for kw in _PROCEDURE_KEYWORDS_SET
@@ -2746,6 +2747,34 @@ def retrieve_node(
         mq_mode == "fallback" and not bool(state.get("mq_used", False)) and len(docs) == 0
     )
 
+    # --- Debug events for workflow trace ---
+    _retrieve_events: List[str] = []
+    _retrieve_events.append(
+        f"[retrieve] sop_pred={sop_only_predicate} procedural={is_procedural_context} "
+        f"inquiry={has_inquiry_intent} route={route}"
+    )
+    if sop_only_predicate:
+        _penalty_parts = []
+        if agent_settings.early_page_penalty_enabled:
+            _penalty_parts.append(f"early_page(factor={agent_settings.early_page_penalty_factor})")
+        if agent_settings.scope_penalty_enabled:
+            _penalty_parts.append(f"scope(factor={agent_settings.scope_penalty_factor})")
+        if agent_settings.procedure_boost_enabled:
+            _penalty_parts.append(f"proc_boost(factor={agent_settings.procedure_boost_factor})")
+        _retrieve_events.append(f"[retrieve] penalties: {', '.join(_penalty_parts) or 'none'}")
+    else:
+        _retrieve_events.append("[retrieve] penalties: SKIPPED (sop_pred=False)")
+    # Top docs summary
+    _top_summary = []
+    for _di, _d in enumerate(docs[:5]):
+        _dm = _d.metadata if isinstance(_d.metadata, dict) else {}
+        _top_summary.append(
+            f"#{_di+1} p={_dm.get('page','?')} ch='{_dm.get('section_chapter','')}' "
+            f"s={float(_d.score):.4f} {str(_d.doc_id)[:50]}"
+        )
+    if _top_summary:
+        _retrieve_events.append("[retrieve] top docs: " + " | ".join(_top_summary))
+
     return {
         "docs": docs,
         "ref_json": results_to_ref_json(docs),
@@ -2755,6 +2784,7 @@ def retrieve_node(
             "enabled": stage2_enabled,
             "doc_ids": stage2_doc_ids,
         },
+        "_events": _retrieve_events,
     }
 
 
