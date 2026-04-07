@@ -79,8 +79,8 @@ class LangGraphRAGAgent:
         llm: BaseLLM,
         search_service: SearchService,
         prompt_spec: Optional[PromptSpec] = None,
-        top_k: int = 20,
-        retrieval_top_k: int = 50,
+        top_k: int = 50,
+        retrieval_top_k: int = 100,
         mode: str = "verified",  # base | verified
         checkpointer: Optional[MemorySaver] = None,
         ask_user_after_retrieve: bool = False,

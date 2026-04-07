@@ -621,7 +621,8 @@ def _normalize_device_in_query(query: str, canonical_device: str) -> str:
                 continue
             # Exact compact match
             if span_compact == canonical_compact:
-                return query.replace(span_text, canonical_device, 1)
+                display_device = canonical_device.replace("_", " ")
+                return query.replace(span_text, display_device, 1)
             # Fuzzy match (same threshold as device detection)
             try:
                 from rapidfuzz import fuzz
@@ -634,7 +635,10 @@ def _normalize_device_in_query(query: str, canonical_device: str) -> str:
                 pass
 
     if best_span is not None:
-        return query.replace(best_span, canonical_device, 1)
+        # Use space-separated form for better BM25 tokenization
+        # e.g. "SUPRA_VPLUS" → "SUPRA VPLUS"
+        display_device = canonical_device.replace("_", " ")
+        return query.replace(best_span, display_device, 1)
     return query
 
 
