@@ -65,6 +65,9 @@ papers/
 !docs/papers/**
 docs/refactoring_analysis_report.md
 
+# Runtime PID files
+.api.pid
+
 # Claude Code / OMC agent runtime
 .omc/
 **/.omc/
