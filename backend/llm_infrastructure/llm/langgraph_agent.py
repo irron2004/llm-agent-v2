@@ -591,6 +591,53 @@ def _extract_doc_id_boost_tokens(
     return result
 
 
+def _normalize_device_in_query(query: str, canonical_device: str) -> str:
+    """Replace fuzzy device name variant in query with canonical form.
+
+    Uses compact text comparison + rapidfuzz WRatio to find the variant
+    span in the query and replace it with the canonical device name.
+    Reuses the same matching strategy as _extract_devices_from_query.
+    """
+    canonical_compact = _compact_text(canonical_device)
+    if not canonical_compact or len(canonical_compact) < 3:
+        return query
+
+    # Split query into word tokens (Korean separators included)
+    raw_tokens = re.split(r"([\s가-힣,;:()\"'?!。，；：（）의]+)", query)
+    word_tokens = [t for t in raw_tokens if t.strip() and not re.fullmatch(r"[\s가-힣,;:()\"'?!。，；：（）의]+", t)]
+
+    if not word_tokens:
+        return query
+
+    # Try 1-, 2-, 3-token spans (matching _extract_devices_from_query strategy)
+    best_span: str | None = None
+    best_score: float = 0
+
+    for width in range(1, min(4, len(word_tokens) + 1)):
+        for i in range(len(word_tokens) - width + 1):
+            span_text = " ".join(word_tokens[i : i + width])
+            span_compact = _compact_text(span_text)
+            if not span_compact or len(span_compact) < 3:
+                continue
+            # Exact compact match
+            if span_compact == canonical_compact:
+                return query.replace(span_text, canonical_device, 1)
+            # Fuzzy match (same threshold as device detection)
+            try:
+                from rapidfuzz import fuzz
+
+                score = fuzz.WRatio(span_compact, canonical_compact)
+                if score >= 82 and score > best_score:
+                    best_score = score
+                    best_span = span_text
+            except ImportError:
+                pass
+
+    if best_span is not None:
+        return query.replace(best_span, canonical_device, 1)
+    return query
+
+
 _CITATION_RE = re.compile(r"\[[0-9]+\]")
 _EMOJI_NUMERAL_RE = re.compile(r"[0-9]️⃣")
 _MARKDOWN_TABLE_LINE_RE = re.compile(r"(?m)^\|.*\|\s*$")
@@ -3799,6 +3846,21 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
         query_for_prompt = state.get("query_en") or state["query"]
     else:
         query_for_prompt = state.get("original_query") or state["query"]
+
+    # Modification D (approach 2): normalize device name variant in query
+    # using the canonical name already detected by fuzzy matching in auto_parse.
+    # e.g. "SUPRAvvplus APC 교체 방법" → "SUPRA Vplus APC 교체 방법"
+    if route == "setup":
+        _pq_raw = state.get("parsed_query")
+        _canonical_devices = (_pq_raw.get("selected_devices") or []) if isinstance(_pq_raw, dict) else []
+        if _canonical_devices:
+            _original_qfp = query_for_prompt
+            query_for_prompt = _normalize_device_in_query(query_for_prompt, _canonical_devices[0])
+            if query_for_prompt != _original_qfp:
+                logger.info(
+                    "answer_node: device name normalized in query: %r → %r",
+                    _original_qfp, query_for_prompt,
+                )
 
     # Setup route: (doc_id, section)별 그룹핑 → 적합성 판정 → 선택 → REFS 제한
     # MAX_ANSWER_REFS를 그룹 선택 이후에 적용하여, 적합한 section이
