@@ -79,6 +79,16 @@ def _normalize_device_names_to_v3(device_names: list[str] | None) -> list[str] |
         if upper_space not in seen:
             seen.add(upper_space)
             result.append(upper_space)
+        # space-separated form: underscores → spaces, preserving case
+        space_form = name.replace("_", " ")
+        if space_form not in seen:
+            seen.add(space_form)
+            result.append(space_form)
+        # space-separated uppercase
+        space_upper = space_form.upper()
+        if space_upper not in seen:
+            seen.add(space_upper)
+            result.append(space_upper)
     return result or None
 
 

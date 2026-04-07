@@ -1414,7 +1414,9 @@ def _check_doc_relevance(
     )
     user = f"Question: {query}\nDocument:\n{doc_ref_text[:6000]}"
 
-    raw = _invoke_llm(llm, system, user, max_tokens=10, temperature=TEMP_CLASSIFICATION)
+    # max_tokens must be large enough for thinking models (e.g. DeepSeek)
+    # which consume tokens in reasoning before producing the actual answer
+    raw = _invoke_llm(llm, system, user, max_tokens=256, temperature=TEMP_CLASSIFICATION)
     raw_stripped = (raw or "").strip().lower()
     if not raw_stripped:
         logger.info("_check_doc_relevance: raw empty → None (undecidable)")
@@ -2462,6 +2464,15 @@ def retrieve_node(
                 seen.add(key)
                 all_docs.append(d)
 
+    # Normalize device name variants in queries for better BM25 tokenization
+    # e.g. "supravvplus" → "SUPRA VPLUS" so BM25 matches individual tokens
+    if selected_devices:
+        _canonical_for_norm = selected_devices[0]
+        _queries_before = list(queries)
+        queries = [_normalize_device_in_query(q, _canonical_for_norm) for q in queries]
+        if queries != _queries_before:
+            logger.info("retrieve_node: device-normalized queries: %s → %s", _queries_before, queries)
+
     # Use search_queries directly (already contains EN+KO from st_mq_node)
     all_queries = queries
 
@@ -2471,7 +2482,8 @@ def retrieve_node(
     _route_for_boost = state.get("route", "general")
     doc_id_boost_tokens: list | None = None
     if _route_for_boost == "setup":
-        doc_id_boost_tokens = _extract_doc_id_boost_tokens(original_query, selected_devices)
+        _boost_source = queries[0] if queries else original_query
+        doc_id_boost_tokens = _extract_doc_id_boost_tokens(_boost_source, selected_devices)
         if doc_id_boost_tokens:
             logger.info("retrieve_node: doc_id_boost_tokens=%s", doc_id_boost_tokens)
 
