@@ -1,6 +1,6 @@
 # Task: Setup route relevance check — 하위 컴포넌트 쿼리 시 전 그룹 거부 문제
 
-Status: In-Progress (F, B 구현 완료 — 검증 대기)
+Status: In-Progress (F, B, D 구현 완료 — 검증 대기)
 Owner: hskim
 Branch or worktree: feat/retrieval-logic-개선
 Created: 2026-04-07
@@ -338,11 +338,18 @@ query_for_prompt = query.replace("SUPRAvvplus", state["detected_device_name"])
 ```
 
 접근 2가 기존 fuzzy matching 로직을 재활용하므로 중복 구현 없이 깔끔하다.
+**→ 접근 2로 구현 완료** (`_normalize_device_in_query` 헬퍼, answer_node에서 호출).
+
+**접근 1 향후 가능성:** 현재 접근 2는 answer 단계 이후만 혜택을 받는다. 만약 검색 쿼리
+자체의 품질이 device name 오타로 인해 저하되는 케이스가 추가로 발견되면, 접근 1
+(abbreviation 단계에서 device_aliases.json 로드 + 쿼리 정규화)을 도입하여 retrieve
+단계의 BM25/dense 검색까지 커버하는 것을 검토할 수 있다. 다만 현재는 수정 F(doc_id
+keyword boost)가 retrieve 단계를 보완하므로 접근 1의 필요성은 낮다.
 
 **주의:** 이 케이스의 직접 원인은 device filter 실패가 아니라 group selection failure다.
-따라서 D는 독립 해결책이라기보다 A/B 성능을 끌어올리는 보조 수단으로 보는 편이 맞다.
+따라서 D는 독립 해결책이라기보다 F/B 성능을 끌어올리는 보조 수단으로 보는 편이 맞다.
 
-**비용:** state에 필드 1개 추가.
+**비용:** state 필드 추가 불필요 (기존 parsed_query.selected_devices 재사용).
 **효과:** 그룹 정렬, relevance check, answer 프롬프트 모두에서 정규화된 장비명 사용.
 
 ### 수정 F: retrieval 단계에서 doc_id/section_chapter 키워드 부스트 (신규)
@@ -535,6 +542,7 @@ cd backend && uv run pytest tests/ -v -k "test_abbreviation or test_expand"
 - 2026-04-07: RC-2 재정의 — "fallback 그룹 오선택" → "전 그룹 실패 시 재검색 경로 부재(RC-2a) + fallback 정렬 기준 부족(RC-2b)". 수정 E(early-exit → 재검색) 추가
 - 2026-04-07: 수정 F 추가 — doc_id 키워드 부스트(retrieval 단계). ES BM25 검색에서 doc_id가 점수에 미반영되는 문제 발견. 가장 근본적 해결로 1순위 격상. 최종 진단을 "retrieval scoring 부족 + group selection failure 복합 문제"로 수정
 - 2026-04-07: 수정 F+B 구현 완료 — `feat/retrieval-logic-개선` 브랜치. F: es_search.py에 doc_id wildcard should-clause 추가 (boost=3.0), adapter/engine 4계층 파라미터 전달. B: langgraph_agent.py _group_query_score에 content sampling 추가. 기존 테스트 38건 전체 통과
+- 2026-04-07: 수정 D 구현 완료 (접근 2) — `_normalize_device_in_query` 헬퍼 추가, answer_node에서 parsed_query.selected_devices 재활용하여 query_for_prompt 정규화. 접근 1은 향후 필요 시 검토 가능성 문서에 명시
 
 ## Final Check
 
