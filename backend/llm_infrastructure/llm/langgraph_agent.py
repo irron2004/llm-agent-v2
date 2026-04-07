@@ -184,6 +184,10 @@ class AgentState(TypedDict, total=False):
     abbreviation_selections: Dict[str, str]  # {약어: 선택된 풀네임}
     original_query: Optional[str]  # 약어 확장 전 원본 쿼리 (동의어 variant 생성용)
 
+    # Setup group-level retry
+    _relevant_groups: List[Tuple[str, List[Dict[str, Any]]]]  # relevance check 통과한 그룹들
+    _current_group_idx: int  # 현재 사용 중인 그룹 인덱스
+
     # Internal flags
     _skip_human_review: bool  # Auto-parse 모드에서 human_review 건너뛰기
 
@@ -1138,6 +1142,10 @@ def results_to_ref_json(
             )
             if section and str(section).strip():
                 metadata["section"] = str(section).strip()
+            # Preserve rerank hit count for group scoring
+            _rhc = d.metadata.get("rerank_hit_count")
+            if _rhc is not None:
+                metadata["rerank_hit_count"] = int(_rhc)
 
         # Extract page number for scroll positioning
         page_val = None
@@ -2748,32 +2756,37 @@ def retrieve_node(
     # Rerank if reranker is available
     # Use English query for reranking - cross-encoder models often work better with English
     rerank_query = query_en if query_en else original_query
+    _count_before_rerank = len(all_docs)
     if reranker is not None and all_docs:
-        logger.info(
-            "retrieve_node: reranking %d docs to top %d (using query_en)",
-            len(all_docs),
-            final_top_k,
-        )
         docs = reranker.rerank(rerank_query, all_docs, top_k=final_top_k)
     else:
         # No reranker: just take top final_top_k by score
         docs = sorted(all_docs, key=_stable_tie_break_key)[:final_top_k]
+    _count_after_rerank = len(docs)
+    logger.info(
+        "retrieve_node: [1/4 rerank] %d → %d docs",
+        _count_before_rerank,
+        _count_after_rerank,
+    )
 
     # Score threshold: filter out docs below minimum score
     score_threshold = float(agent_settings.score_threshold)
     if score_threshold > 0.0 and docs:
-        before_count = len(docs)
+        _count_before_threshold = len(docs)
         docs = [d for d in docs if float(d.score) >= score_threshold]
-        filtered_count = before_count - len(docs)
+        filtered_count = _count_before_threshold - len(docs)
         if filtered_count > 0:
+            _count_after_rerank = len(docs)  # update for pipeline summary
             logger.info(
-                "retrieve_node: score_threshold=%.3f filtered %d/%d docs",
+                "retrieve_node: [1.5/4 threshold] %.3f filtered %d → %d docs",
                 score_threshold,
-                filtered_count,
-                before_count,
+                _count_before_threshold,
+                _count_after_rerank,
             )
 
     # Deduplicate by base doc_id (keep highest-scoring page per document)
+    # Count rerank hits per doc_id BEFORE dedup — used as group relevance signal
+    hit_counts: dict[str, int] = {}
     if agent_settings.dedupe_by_doc_id and docs:
 
         def _base_doc_id(doc_id: str) -> str:
@@ -2785,22 +2798,42 @@ def retrieve_node(
                     return s[:idx]
             return s
 
+        # Step 1: count hits per base_doc_id (before dedup)
+        from collections import Counter as _Counter
+        hit_counts: dict[str, int] = _Counter(
+            _base_doc_id(doc.doc_id) for doc in docs
+        )
+
+        # Step 2: dedupe — keep highest-scoring page, inject rerank_hit_count
         before_count = len(docs)
         seen_base: dict[str, int] = {}  # base_doc_id -> index in deduped list
         deduped: List[RetrievalResult] = []
         for doc in docs:
             base = _base_doc_id(doc.doc_id)
             if base not in seen_base:
-                seen_base[base] = len(deduped)
-                deduped.append(doc)
+                # Inject hit count into metadata for downstream group scoring
+                meta = dict(doc.metadata) if isinstance(doc.metadata, dict) else {}
+                meta["rerank_hit_count"] = hit_counts.get(base, 1)
+                deduped.append(
+                    RetrievalResult(
+                        doc_id=doc.doc_id,
+                        content=doc.content,
+                        score=doc.score,
+                        metadata=meta,
+                        raw_text=doc.raw_text,
+                    )
+                )
+                seen_base[base] = len(deduped) - 1
             # else: skip duplicate (first occurrence has highest score after sort)
-        if len(deduped) < before_count:
-            logger.info(
-                "retrieve_node: dedupe_by_doc_id removed %d duplicates (%d -> %d)",
-                before_count - len(deduped),
-                before_count,
-                len(deduped),
-            )
+        _top_hits = sorted(hit_counts.items(), key=lambda x: -x[1])[:8]
+        logger.info(
+            "retrieve_node: [2/4 group+dedupe] %d → %d docs (unique doc_ids=%d), "
+            "hit_counts=%s",
+            before_count,
+            len(deduped),
+            len(hit_counts),
+            [(k.split("/")[-1][:40], v) for k, v in _top_hits],
+        )
         docs = deduped
 
     # --- Doc-type diversity quota (SOP + Setup 동시 선택 시) ---
@@ -2848,11 +2881,18 @@ def retrieve_node(
             )
 
     # Section expansion: expand top groups by fetching full section chunks
+    _count_before_expand = len(docs)
     if rag_settings.section_expand_enabled and docs and hasattr(retriever, "es_engine"):
         docs = _apply_section_expansion(docs, retriever.es_engine, query=state.get("query", ""))
+    logger.info(
+        "retrieve_node: [3/4 section_expand] %d → %d docs (+%d)",
+        _count_before_expand,
+        len(docs),
+        len(docs) - _count_before_expand,
+    )
 
     logger.info(
-        "retrieve_node: returning %d docs (all_docs_for_regen: %d)",
+        "retrieve_node: [4/4 done] returning %d docs (all_docs_for_regen: %d)",
         len(docs),
         len(all_docs_for_regen),
     )
@@ -2863,6 +2903,20 @@ def retrieve_node(
 
     # --- Debug events for workflow trace ---
     _retrieve_events: List[str] = []
+    # Pipeline count summary for workflow trace (all actual counts)
+    _retrieve_events.append(
+        f"[retrieve] pipeline: {_count_before_rerank} retrieved"
+        f" → {_count_after_rerank} reranked"
+        f" → {_count_before_expand} deduped"
+        f" → {len(docs)} expanded"
+    )
+    # Top rerank hit counts (multi-query voting signal)
+    if hit_counts:
+        _hit_summary = ", ".join(
+            f"{k.split('/')[-1][:30]}={v}"
+            for k, v in sorted(hit_counts.items(), key=lambda x: -x[1])[:5]
+        )
+        _retrieve_events.append(f"[retrieve] rerank_hit_counts: {_hit_summary}")
     _retrieve_events.append(
         f"[retrieve] sop_pred={sop_only_predicate} procedural={is_procedural_context} "
         f"inquiry={has_inquiry_intent} route={route}"
@@ -2882,8 +2936,9 @@ def retrieve_node(
     _top_summary = []
     for _di, _d in enumerate(docs[:5]):
         _dm = _d.metadata if isinstance(_d.metadata, dict) else {}
+        _rhc = _dm.get("rerank_hit_count", 1)
         _top_summary.append(
-            f"#{_di+1} p={_dm.get('page','?')} ch='{_dm.get('section_chapter','')}' "
+            f"#{_di+1} hits={_rhc} p={_dm.get('page','?')} "
             f"s={float(_d.score):.4f} {str(_d.doc_id)[:50]}"
         )
     if _top_summary:
@@ -3883,6 +3938,8 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     # 순위가 낮더라도 relevance check에 참여할 수 있도록 함.
     doc_groups: list = []
     is_fallback_selection = False
+    prev_relevant: List[Tuple[str, List[Dict[str, Any]]]] = []
+    current_group_idx = 0
     if route == "setup" and ref_items:
         doc_groups = _group_refs_by_doc_section_chapter(ref_items)
 
@@ -3900,108 +3957,128 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
                 str(r.get("content", ""))[:500].lower() for r in grefs[:3]
             )
             score += sum(1 for tok in _q_tokens if tok in content_sample)
+            # Rerank hit count: docs that appeared multiple times in rerank
+            # top-K are stronger relevance signals (multi-query voting)
+            max_hit = max(
+                (int((r.get("metadata") or {}).get("rerank_hit_count", 1)) for r in grefs),
+                default=1,
+            )
+            score += max_hit  # add hit count as bonus
             return (-score, 0)  # higher score first
 
         doc_groups.sort(key=_group_query_score)
 
+        _group_hit_info = []
+        for _gk, _gr in doc_groups[:8]:
+            _mhit = max(
+                (int((_r.get("metadata") or {}).get("rerank_hit_count", 1)) for _r in _gr),
+                default=1,
+            )
+            _group_hit_info.append(f"{_gk[:40]}(hits={_mhit},refs={len(_gr)})")
         logger.info(
-            "answer_node: setup doc_section_groups=%d keys=%s",
+            "answer_node: setup doc_section_groups=%d groups=%s",
             len(doc_groups),
-            [k[:60] for k, _ in doc_groups[:8]],
+            _group_hit_info,
         )
         if len(doc_groups) > 1:
             import time as _time
 
-            selected_refs = None
-            fallback_refs = None
-            fallback_group_key = None
-            consecutive_empty = 0
-            checks_done = 0
-            for i, (group_key, group_refs) in enumerate(doc_groups[:MAX_SETUP_DOC_TRIES]):
-                t0 = _time.time()
-                group_text = ref_json_to_text(group_refs)
-                relevant = _check_doc_relevance(query_for_prompt, group_text, llm=llm)
-                elapsed = _time.time() - t0
-                checks_done = i + 1
-                logger.info(
-                    "answer_node: setup relevance check %d/%d group=%s refs=%d relevant=%s (%.1fs)",
-                    i + 1,
-                    min(len(doc_groups), MAX_SETUP_DOC_TRIES),
-                    group_key[:60],
-                    len(group_refs),
-                    relevant,
-                    elapsed,
-                )
-                if relevant is None:
-                    consecutive_empty += 1
-                    if consecutive_empty >= CONSECUTIVE_EMPTY_LIMIT:
-                        logger.warning(
-                            "answer_node: %d consecutive empty responses, early-exit",
-                            consecutive_empty,
-                        )
-                        break
-                else:
-                    consecutive_empty = 0
-                    if relevant:
-                        if len(group_refs) >= MIN_REFS_FOR_ACCEPT:
-                            selected_refs = group_refs
-                            break
-                        elif fallback_refs is None:
-                            fallback_refs = group_refs
-                            fallback_group_key = group_key
+            # Check if we already have relevant groups from a previous pass
+            # (group-level retry: judge unfaithful → try next group)
+            prev_relevant = state.get("_relevant_groups") or []
+            current_group_idx = int(state.get("_current_group_idx", 0) or 0)
 
-            # 3단계 우선순위 선택
-            if selected_refs is not None:
-                ref_items = selected_refs
+            if prev_relevant and current_group_idx < len(prev_relevant):
+                # Group-level retry: skip relevance checks, use next group
+                group_key, group_refs = prev_relevant[current_group_idx]
+                ref_items = group_refs
                 is_fallback_selection = False
                 logger.info(
-                    "answer_node: setup selected group=%s (%d refs) after %d checks (direct)",
-                    selected_refs[0].get("doc_id", "?")[:50],
-                    len(selected_refs),
-                    checks_done,
-                )
-            elif fallback_refs is not None:
-                ref_items = fallback_refs
-                is_fallback_selection = True
-                logger.info(
-                    "answer_node: setup fallback group=%s (%d refs) after %d checks",
-                    fallback_group_key[:60] if fallback_group_key else "?",
-                    len(fallback_refs),
-                    checks_done,
+                    "answer_node: setup group retry %d/%d group=%s refs=%d (skip relevance check)",
+                    current_group_idx + 1,
+                    len(prev_relevant),
+                    group_key[:60],
+                    len(group_refs),
                 )
             else:
-                # Modification E: early-exit when all groups fail relevance check.
-                # Skip answer generation + judge to save ~50-80s per cycle.
-                # But at max_attempts, fall through to fallback so the user gets
-                # *some* answer rather than an empty retry loop.
-                _cur_attempts = int(state.get("attempts", 0) or 0)
-                _max_attempts = int(state.get("max_attempts", 0) or 0)
-                if _cur_attempts < _max_attempts:
+                # First pass: run relevance checks and collect ALL relevant groups
+                relevant_groups: List[Tuple[str, List[Dict[str, Any]]]] = []
+                consecutive_empty = 0
+                checks_done = 0
+                for i, (group_key, group_refs) in enumerate(doc_groups[:MAX_SETUP_DOC_TRIES]):
+                    t0 = _time.time()
+                    group_text = ref_json_to_text(group_refs)
+                    relevant = _check_doc_relevance(query_for_prompt, group_text, llm=llm)
+                    elapsed = _time.time() - t0
+                    checks_done = i + 1
                     logger.info(
-                        "answer_node: no relevant group found — early-exit to re-retrieve "
-                        "(groups checked: %d, attempt %d/%d)",
-                        checks_done, _cur_attempts, _max_attempts,
+                        "answer_node: setup relevance check %d/%d group=%s refs=%d relevant=%s (%.1fs)",
+                        i + 1,
+                        min(len(doc_groups), MAX_SETUP_DOC_TRIES),
+                        group_key[:60],
+                        len(group_refs),
+                        relevant,
+                        elapsed,
                     )
-                    _early_events: List[str] = []
-                    if doc_groups:
-                        _grp_info = [(k[:60], len(refs)) for k, refs in doc_groups[:5]]
-                        _early_events.append(f"[answer] groups({len(doc_groups)}): {_grp_info}")
-                    _early_events.append(
-                        f"[answer] early-exit: no relevant group after {checks_done} checks"
+                    if relevant is None:
+                        consecutive_empty += 1
+                        if consecutive_empty >= CONSECUTIVE_EMPTY_LIMIT:
+                            logger.warning(
+                                "answer_node: %d consecutive empty responses, early-exit",
+                                consecutive_empty,
+                            )
+                            break
+                    else:
+                        consecutive_empty = 0
+                        if relevant:
+                            relevant_groups.append((group_key, group_refs))
+
+                if relevant_groups:
+                    # Use first relevant group, store all for group-level retry
+                    ref_items = relevant_groups[0][1]
+                    is_fallback_selection = len(relevant_groups[0][1]) < MIN_REFS_FOR_ACCEPT
+                    current_group_idx = 0
+                    prev_relevant = relevant_groups
+                    logger.info(
+                        "answer_node: setup selected group=%s (%d refs) after %d checks, "
+                        "total relevant_groups=%d",
+                        relevant_groups[0][0][:60],
+                        len(relevant_groups[0][1]),
+                        checks_done,
+                        len(relevant_groups),
                     )
-                    return {
-                        "answer": "",
-                        "answer_skip_reason": "no_relevant_group",
-                        "_events": _early_events,
-                    }
-                # max_attempts reached — use first group as fallback
-                ref_items = doc_groups[0][1]
-                is_fallback_selection = True
-                logger.info(
-                    "answer_node: no relevant group but max_attempts reached — "
-                    "fallback to first group=%s (%d refs)",
-                    doc_groups[0][0][:60], len(ref_items),
-                )
+                else:
+                    # No relevant group found
+                    _cur_attempts = int(state.get("attempts", 0) or 0)
+                    _max_attempts = int(state.get("max_attempts", 0) or 0)
+                    if _cur_attempts < _max_attempts:
+                        logger.info(
+                            "answer_node: no relevant group found — early-exit to re-retrieve "
+                            "(groups checked: %d, attempt %d/%d)",
+                            checks_done, _cur_attempts, _max_attempts,
+                        )
+                        _early_events: List[str] = []
+                        if doc_groups:
+                            _grp_info = [(k[:60], len(refs)) for k, refs in doc_groups[:5]]
+                            _early_events.append(f"[answer] groups({len(doc_groups)}): {_grp_info}")
+                        _early_events.append(
+                            f"[answer] early-exit: no relevant group after {checks_done} checks"
+                        )
+                        return {
+                            "answer": "",
+                            "answer_skip_reason": "no_relevant_group",
+                            "_events": _early_events,
+                        }
+                    # max_attempts reached — use first group as fallback
+                    ref_items = doc_groups[0][1]
+                    is_fallback_selection = True
+                    prev_relevant = []
+                    current_group_idx = 0
+                    logger.info(
+                        "answer_node: no relevant group but max_attempts reached — "
+                        "fallback to first group=%s (%d refs)",
+                        doc_groups[0][0][:60], len(ref_items),
+                    )
         else:
             # 그룹이 1개면 그대로 사용
             ref_items = doc_groups[0][1] if doc_groups else ref_items
@@ -4136,8 +4213,11 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
             "answer_skip_reason": None,
             "_events": _answer_events,
         }
-        if route == "setup" and not is_fallback_selection:
+        if route == "setup":
             _result["answer_ref_json"] = ref_items
+            if prev_relevant:
+                _result["_relevant_groups"] = prev_relevant
+                _result["_current_group_idx"] = current_group_idx
         return _result
 
     has_refs = bool(ref_items)
@@ -4199,8 +4279,11 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
         "answer_skip_reason": None,
         "_events": _answer_events,
     }
-    if route == "setup" and not is_fallback_selection:
+    if route == "setup":
         _result_ko["answer_ref_json"] = ref_items
+        if prev_relevant:
+            _result_ko["_relevant_groups"] = prev_relevant
+            _result_ko["_current_group_idx"] = current_group_idx
     return _result_ko
 
 
@@ -4557,13 +4640,14 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
 
 def should_retry(
     state: AgentState,
-) -> Literal["done", "retry", "retry_expand", "retry_mq", "human"]:
+) -> Literal["done", "retry", "retry_expand", "retry_mq", "retry_next_group", "human"]:
     """Determine retry strategy based on attempt count.
 
     Retry strategies:
-    - 1st unfaithful (attempt 0→1): retry_expand - use more docs (8→20)
-    - 2nd unfaithful (attempt 1→2): retry - refine queries
-    - 3rd unfaithful (attempt 2→3): retry_mq - regenerate multi-query from scratch
+    - group-level retry: try next relevant group (no re-retrieval)
+    - 1st unfaithful (no more groups): retry_expand - use more docs (8→20)
+    - 2nd unfaithful: retry - refine queries
+    - 3rd unfaithful: retry_mq - regenerate multi-query from scratch
     """
     if state.get("retrieval_confirmed"):
         return "done"
@@ -4571,6 +4655,17 @@ def should_retry(
     faithful = bool(judge.get("faithful", False))
     if faithful:
         return "done"
+
+    # Group-level retry: if there are more relevant groups, try next one first
+    relevant_groups = state.get("_relevant_groups") or []
+    current_idx = int(state.get("_current_group_idx", 0) or 0)
+    if current_idx + 1 < len(relevant_groups):
+        logger.info(
+            "should_retry: next group available (%d/%d), routing to retry_next_group",
+            current_idx + 2,
+            len(relevant_groups),
+        )
+        return "retry_next_group"
 
     attempts = int(state.get("attempts", 0) or 0)
     max_attempts = int(state.get("max_attempts", 0) or 0)
@@ -4599,6 +4694,21 @@ def should_retry(
     if attempts == 1:
         return "retry"
     return "retry_mq"
+
+
+def retry_next_group_node(state: AgentState) -> Dict[str, Any]:
+    """Advance to next relevant group for group-level retry (no re-retrieval)."""
+    current_idx = int(state.get("_current_group_idx", 0) or 0)
+    next_idx = current_idx + 1
+    relevant_groups = state.get("_relevant_groups") or []
+    group_key = relevant_groups[next_idx][0] if next_idx < len(relevant_groups) else "?"
+    logger.info(
+        "retry_next_group: advancing group %d → %d (%s)",
+        current_idx + 1,
+        next_idx + 1,
+        group_key[:60],
+    )
+    return {"_current_group_idx": next_idx}
 
 
 def retry_bump_node(state: AgentState) -> Dict[str, Any]:

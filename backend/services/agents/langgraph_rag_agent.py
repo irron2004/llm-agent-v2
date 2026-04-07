@@ -46,6 +46,7 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     retry_bump_node,
     retry_expand_node,
     retry_mq_node,
+    retry_next_group_node,
     route_node,
     should_retry,
     st_gate_node,
@@ -759,6 +760,11 @@ class LangGraphRAGAgent:
             )
 
         # verified: add retry/human with different strategies
+        # retry_next_group: group-level retry - try next relevant group (no re-retrieval)
+        builder.add_node(
+            "retry_next_group",
+            self._wrap_node("retry_next_group", retry_next_group_node),
+        )
         # retry_expand: 1st retry - use more docs (8→20)
         builder.add_node("retry_expand", self._wrap_node("retry_expand", retry_expand_node))
         # retry_bump + refine_queries: 2nd retry - refine queries and re-retrieve
@@ -781,7 +787,8 @@ class LangGraphRAGAgent:
         # 호환성을 위해 'retry' 별칭을 두고 바로 retry_bump로 연결
         builder.add_node("retry", self._wrap_node("retry", lambda s: {}))
         # Conditional edges based on retry strategy
-        # - retry_expand: 1st unfaithful → expand more docs (no re-retrieval)
+        # - retry_next_group: group-level retry (no re-retrieval, just next group)
+        # - retry_expand: 1st unfaithful (no more groups) → expand more docs
         # - retry: 2nd unfaithful → refine queries and re-retrieve
         # - retry_mq: 3rd+ unfaithful → regenerate MQ from scratch
         builder.add_conditional_edges(
@@ -789,12 +796,16 @@ class LangGraphRAGAgent:
             should_retry,
             {
                 "done": "done",
+                "retry_next_group": "retry_next_group",
                 "retry_expand": "retry_expand",
                 "retry": "retry_bump",
                 "retry_mq": "retry_mq",
                 "human": "human_review",
             },
         )
+
+        # retry_next_group: advance group index and go back to answer (skip retrieve)
+        builder.add_edge("retry_next_group", "answer")
 
         # retry_expand: just increase expand_top_k and go back to expand_related
         builder.add_edge("retry_expand", "expand_related")
