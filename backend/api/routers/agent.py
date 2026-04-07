@@ -42,8 +42,8 @@ from backend.services.search_service import SearchService
 router = APIRouter(prefix="/agent", tags=["LangGraph Agent"])
 logger = logging.getLogger(__name__)
 
-DEFAULT_RETRIEVAL_TOP_K = 50
-DEFAULT_FINAL_TOP_K = 20
+DEFAULT_RETRIEVAL_TOP_K = 100
+DEFAULT_FINAL_TOP_K = 50
 MAX_SEARCH_QUERY_METADATA_ITEMS = 5
 MAX_SEARCH_QUERY_METADATA_CHARS = 120
 MAX_INDEX_METADATA_CHARS = 120
