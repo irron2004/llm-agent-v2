@@ -1,8 +1,8 @@
 # Task: Setup route relevance check — 하위 컴포넌트 쿼리 시 전 그룹 거부 문제
 
-Status: In-Progress (F, B, D 구현 완료 — 검증 대기)
+Status: In-Progress (F, B, D, E 구현 완료 — 통합 검증 대기)
 Owner: hskim
-Branch or worktree: feat/retrieval-logic-개선
+Branch or worktree: dev (feat/retrieval-logic-개선 merged)
 Created: 2026-04-07
 
 ## Goal
@@ -543,6 +543,7 @@ cd backend && uv run pytest tests/ -v -k "test_abbreviation or test_expand"
 - 2026-04-07: 수정 F 추가 — doc_id 키워드 부스트(retrieval 단계). ES BM25 검색에서 doc_id가 점수에 미반영되는 문제 발견. 가장 근본적 해결로 1순위 격상. 최종 진단을 "retrieval scoring 부족 + group selection failure 복합 문제"로 수정
 - 2026-04-07: 수정 F+B 구현 완료 — `feat/retrieval-logic-개선` 브랜치. F: es_search.py에 doc_id wildcard should-clause 추가 (boost=3.0), adapter/engine 4계층 파라미터 전달. B: langgraph_agent.py _group_query_score에 content sampling 추가. 기존 테스트 38건 전체 통과
 - 2026-04-07: 수정 D 구현 완료 (접근 2) — `_normalize_device_in_query` 헬퍼 추가, answer_node에서 parsed_query.selected_devices 재활용하여 query_for_prompt 정규화. 접근 1은 향후 필요 시 검토 가능성 문서에 명시
+- 2026-04-07: 수정 E 구현 완료 — answer_node에서 전 그룹 relevance check 실패 시 early-exit → retry_bump 라우팅. `answer_skip_reason="no_relevant_group"` 시그널로 answer+judge 스킵(~50-80s/cycle 절약). max_attempts 도달 시 기존 fallback 동작 유지. `_after_answer` 조건부 엣지 + retry_bump_node 시그널 클리어 포함. dev 커밋: f750f8f
 
 ## Final Check
 
