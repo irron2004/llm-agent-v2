@@ -463,13 +463,27 @@ class LangGraphRAGAgent:
             final_top_k=self.top_k,
         )
 
+    @staticmethod
+    def _strip_abbr_expansion(text: str) -> str:
+        """Remove abbreviation expansions like 'APC (Automated Process Control)' → 'APC'.
+
+        Handles patterns inserted by abbreviation_resolve_node to keep
+        search queries clean for ES BM25 matching.
+        """
+        import re
+        # Match: WORD (Expansion With Multiple Words) — only strip parenthesized
+        # expansions that follow a short token (<=6 chars, likely an abbreviation)
+        return re.sub(r'(\b[A-Za-z]{2,6})\s*\([^)]{4,}\)', r'\1', text).strip()
+
     def _prepare_retrieve_node(self, state: AgentState) -> Dict[str, Any]:
-        stable_query_en = " ".join(
+        # Strip abbreviation expansions from search queries to avoid polluting
+        # ES search with forms like "(Automated Process Control)"
+        stable_query_en = self._strip_abbr_expansion(" ".join(
             (state.get("query_en") or state.get("query") or "").split()
-        ).strip()
-        stable_query_ko = " ".join(
+        ))
+        stable_query_ko = self._strip_abbr_expansion(" ".join(
             (state.get("query_ko") or state.get("query") or "").split()
-        ).strip()
+        ))
         update: Dict[str, Any] = {
             "skip_mq": True,
             "mq_used": False,
@@ -710,6 +724,11 @@ class LangGraphRAGAgent:
         builder.add_edge("expand_related", "answer")
 
         def _after_answer(state: AgentState) -> str:
+            # Modification E: early-exit when all groups fail relevance check
+            # Skip judge + answer generation, go directly to re-retrieve.
+            # Only in verified mode (base mode has no retry nodes).
+            if mode != "base" and state.get("answer_skip_reason") == "no_relevant_group":
+                return "retry_bump"
             task_mode = str(state.get("task_mode") or "").strip().lower()
             if task_mode == "issue":
                 if state.get("answer") == ISSUE_CASE_EMPTY_MESSAGE:
@@ -717,14 +736,18 @@ class LangGraphRAGAgent:
                 return "issue_confirm"
             return "judge"
 
+        _after_answer_targets: dict[str, str] = {
+            "issue_confirm": "issue_confirm",
+            "judge": "judge",
+            "done": "done",
+        }
+        if mode != "base":
+            _after_answer_targets["retry_bump"] = "retry_bump"
+
         builder.add_conditional_edges(
             "answer",
             _after_answer,
-            {
-                "issue_confirm": "issue_confirm",
-                "judge": "judge",
-                "done": "done",
-            },
+            _after_answer_targets,
         )
         builder.add_edge("issue_detail_answer", "issue_sop_confirm")
 

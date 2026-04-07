@@ -3954,12 +3954,37 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
                     checks_done,
                 )
             else:
+                # Modification E: early-exit when all groups fail relevance check.
+                # Skip answer generation + judge to save ~50-80s per cycle.
+                # But at max_attempts, fall through to fallback so the user gets
+                # *some* answer rather than an empty retry loop.
+                _cur_attempts = int(state.get("attempts", 0) or 0)
+                _max_attempts = int(state.get("max_attempts", 0) or 0)
+                if _cur_attempts < _max_attempts:
+                    logger.info(
+                        "answer_node: no relevant group found — early-exit to re-retrieve "
+                        "(groups checked: %d, attempt %d/%d)",
+                        checks_done, _cur_attempts, _max_attempts,
+                    )
+                    _early_events: List[str] = []
+                    if doc_groups:
+                        _grp_info = [(k[:60], len(refs)) for k, refs in doc_groups[:5]]
+                        _early_events.append(f"[answer] groups({len(doc_groups)}): {_grp_info}")
+                    _early_events.append(
+                        f"[answer] early-exit: no relevant group after {checks_done} checks"
+                    )
+                    return {
+                        "answer": "",
+                        "answer_skip_reason": "no_relevant_group",
+                        "_events": _early_events,
+                    }
+                # max_attempts reached — use first group as fallback
                 ref_items = doc_groups[0][1]
                 is_fallback_selection = True
                 logger.info(
-                    "answer_node: no relevant group found, fallback to first group=%s (%d refs)",
-                    doc_groups[0][0][:60],
-                    len(doc_groups[0][1]),
+                    "answer_node: no relevant group but max_attempts reached — "
+                    "fallback to first group=%s (%d refs)",
+                    doc_groups[0][0][:60], len(ref_items),
                 )
         else:
             # 그룹이 1개면 그대로 사용
@@ -4092,6 +4117,7 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
             "reasoning": reasoning,
             "answer_format": {"ok": True, "skipped": True, "target_language": answer_language},
             "answer_format_retries": 0,
+            "answer_skip_reason": None,
             "_events": _answer_events,
         }
         if route == "setup" and not is_fallback_selection:
@@ -4154,6 +4180,7 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
         "reasoning": reasoning,
         "answer_format": format_result,
         "answer_format_retries": retries,
+        "answer_skip_reason": None,
         "_events": _answer_events,
     }
     if route == "setup" and not is_fallback_selection:
@@ -4563,6 +4590,7 @@ def retry_bump_node(state: AgentState) -> Dict[str, Any]:
     return {
         "attempts": int(state.get("attempts", 0)) + 1,
         "retry_strategy": "refine_queries",
+        "answer_skip_reason": None,
     }
 
 
