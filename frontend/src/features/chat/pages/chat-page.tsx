@@ -117,14 +117,22 @@ export default function ChatPage() {
     submitDetailedFeedback,
   } = useChatSession({ onTurnSaved: handleTurnSaved });
 
-  void sessionId;
-
+  // Load session from URL param (history click or direct link)
   useEffect(() => {
-    if (sessionParam) {
-      setSearchParams({}, { replace: true });
+    if (sessionParam && sessionParam !== sessionId) {
       loadSession(sessionParam);
     }
-  }, [sessionParam, loadSession, setSearchParams]);
+  }, [sessionParam]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update URL when sessionId changes (new session created or load complete)
+  useEffect(() => {
+    if (sessionId) {
+      const current = new URLSearchParams(window.location.search).get("session");
+      if (current !== sessionId) {
+        setSearchParams({ session: sessionId }, { replace: true });
+      }
+    }
+  }, [sessionId, setSearchParams]);
 
   useEffect(() => {
     registerSubmitHandlers({ submitReview, submitSearchQueries });
@@ -270,6 +278,7 @@ export default function ChatPage() {
     const handleNewChat = () => {
       reset();
       setPendingRegeneration(null);
+      setSearchParams({}, { replace: true });
     };
     window.addEventListener("pe-agent:new-chat", handleNewChat);
     return () => {

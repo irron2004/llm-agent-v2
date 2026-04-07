@@ -539,6 +539,18 @@ def get_feedback_mapping() -> dict[str, Any]:
             "updated_at": {
                 "type": "date",
             },
+            # ===================================================================
+            # Resolution Tracking
+            # ===================================================================
+            "resolved": {
+                "type": "boolean",
+            },
+            "resolved_link": {
+                "type": "keyword",
+            },
+            "resolved_at": {
+                "type": "date",
+            },
         },
     }
 

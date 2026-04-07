@@ -52,6 +52,13 @@ class FeedbackRequest(BaseModel):
     assistant_text: Optional[str] = Field(None, description="AI 답변 (자동 저장용)")
 
 
+class FeedbackResolutionRequest(BaseModel):
+    """Request to update feedback resolution status."""
+
+    resolved: bool = Field(..., description="해결 여부")
+    resolved_link: Optional[str] = Field(None, description="해결된 채팅 세션 링크")
+
+
 class FeedbackResponse(BaseModel):
     """Response for feedback data."""
 
@@ -67,6 +74,9 @@ class FeedbackResponse(BaseModel):
     comment: Optional[str] = None
     reviewer_name: Optional[str] = None
     logs: Optional[List[str]] = None
+    resolved: bool = False
+    resolved_link: Optional[str] = None
+    resolved_at: Optional[str] = None
     ts: str
 
 
@@ -103,6 +113,9 @@ def _feedback_to_response(feedback: Feedback) -> FeedbackResponse:
         comment=feedback.comment,
         reviewer_name=feedback.reviewer_name,
         logs=feedback.logs,
+        resolved=feedback.resolved,
+        resolved_link=feedback.resolved_link,
+        resolved_at=feedback.resolved_at.isoformat() if feedback.resolved_at else None,
         ts=feedback.ts.isoformat() if feedback.ts else "",
     )
 
@@ -248,6 +261,30 @@ async def save_feedback(
         raise HTTPException(status_code=500, detail="Failed to save feedback")
 
     return _feedback_to_response(saved)
+
+
+@router.patch("/{session_id}/{turn_id}/resolution", response_model=FeedbackResponse)
+async def update_resolution(
+    session_id: str,
+    turn_id: int,
+    req: FeedbackResolutionRequest,
+    service: FeedbackService = Depends(get_feedback_service),
+):
+    """Update resolution status of a feedback entry."""
+    success = service.update_resolution(
+        session_id=session_id,
+        turn_id=turn_id,
+        resolved=req.resolved,
+        resolved_link=req.resolved_link,
+    )
+    if not success:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+
+    feedback = service.get_feedback(session_id, turn_id)
+    if feedback is None:
+        raise HTTPException(status_code=404, detail="Feedback not found")
+
+    return _feedback_to_response(feedback)
 
 
 @router.get("/{session_id}/{turn_id}", response_model=FeedbackResponse)

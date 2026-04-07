@@ -255,6 +255,9 @@ export type FeedbackResponse = {
   comment?: string | null;
   reviewer_name?: string | null;
   logs?: string[] | null;
+  resolved?: boolean;
+  resolved_link?: string | null;
+  resolved_at?: string | null;
   ts: string;
 };
 

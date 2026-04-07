@@ -2,10 +2,12 @@ import { useState, useEffect, useCallback } from "react";
 import {
   Table,
   Select,
+  Input,
   InputNumber,
   Button,
   Modal,
   Spin,
+  Checkbox,
   message,
   Card,
   Statistic,
@@ -14,7 +16,9 @@ import {
   Tag,
 } from "antd";
 import {
+  CheckCircleOutlined,
   DownloadOutlined,
+  LinkOutlined,
   ReloadOutlined,
   StarFilled,
 } from "@ant-design/icons";
@@ -24,6 +28,7 @@ import {
   getFeedbackStatistics,
   exportFeedbackJson,
   exportFeedbackCsv,
+  updateFeedbackResolution,
 } from "../../chat/api";
 import type {
   FeedbackResponse,
@@ -44,6 +49,9 @@ export default function FeedbackPage() {
   const [selectedFeedback, setSelectedFeedback] =
     useState<FeedbackResponse | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [editResolved, setEditResolved] = useState(false);
+  const [editResolvedLink, setEditResolvedLink] = useState("");
+  const [savingResolution, setSavingResolution] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -72,6 +80,41 @@ export default function FeedbackPage() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const openDetail = useCallback((record: FeedbackResponse) => {
+    setSelectedFeedback(record);
+    setEditResolved(!!record.resolved);
+    setEditResolvedLink(record.resolved_link || "");
+    setDetailModalOpen(true);
+  }, []);
+
+  const handleSaveResolution = useCallback(async () => {
+    if (!selectedFeedback) return;
+    setSavingResolution(true);
+    try {
+      const updated = await updateFeedbackResolution(
+        selectedFeedback.session_id,
+        selectedFeedback.turn_id,
+        editResolved,
+        editResolvedLink || null,
+      );
+      setItems((prev) =>
+        prev.map((item) =>
+          item.session_id === updated.session_id && item.turn_id === updated.turn_id
+            ? { ...item, resolved: updated.resolved, resolved_link: updated.resolved_link, resolved_at: updated.resolved_at }
+            : item,
+        ),
+      );
+      setSelectedFeedback((prev) =>
+        prev ? { ...prev, resolved: updated.resolved, resolved_link: updated.resolved_link, resolved_at: updated.resolved_at } : prev,
+      );
+      message.success("해결 상태가 저장되었습니다.");
+    } catch {
+      message.error("해결 상태 저장에 실패했습니다.");
+    } finally {
+      setSavingResolution(false);
+    }
+  }, [selectedFeedback, editResolved, editResolvedLink]);
 
   const handleExportJson = async () => {
     try {
@@ -188,6 +231,23 @@ export default function FeedbackPage() {
       render: (name: string) => name || "-",
     },
     {
+      title: "해결",
+      dataIndex: "resolved",
+      key: "resolved",
+      width: 60,
+      align: "center" as const,
+      render: (resolved: boolean, record: FeedbackResponse) =>
+        resolved ? (
+          record.resolved_link ? (
+            <a href={record.resolved_link} title="해결된 채팅 보기">
+              <CheckCircleOutlined style={{ color: "#52c41a", fontSize: 16 }} />
+            </a>
+          ) : (
+            <CheckCircleOutlined style={{ color: "#52c41a", fontSize: 16 }} />
+          )
+        ) : null,
+    },
+    {
       title: "",
       key: "actions",
       width: 80,
@@ -195,10 +255,7 @@ export default function FeedbackPage() {
         <Button
           type="link"
           size="small"
-          onClick={() => {
-            setSelectedFeedback(record);
-            setDetailModalOpen(true);
-          }}
+          onClick={() => openDetail(record)}
         >
           상세
         </Button>
@@ -435,6 +492,47 @@ export default function FeedbackPage() {
                 </div>
               </div>
             )}
+
+            <div style={{ marginTop: 16, padding: 16, borderRadius: 8, border: "1px solid #d9d9d9", background: "#fafafa" }}>
+              <h4 style={{ marginBottom: 12 }}>해결 상태</h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <Checkbox
+                  checked={editResolved}
+                  onChange={(e: { target: { checked: boolean } }) => setEditResolved(e.target.checked)}
+                >
+                  해결됨
+                </Checkbox>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <LinkOutlined />
+                  <Input
+                    placeholder="해결된 채팅 링크 (e.g. /?session=abc123)"
+                    value={editResolvedLink}
+                    onChange={(e: { target: { value: string } }) => setEditResolvedLink(e.target.value)}
+                    style={{ flex: 1 }}
+                  />
+                  {editResolvedLink && (
+                    <a href={editResolvedLink} target="_blank" rel="noopener noreferrer">
+                      <Button size="small" icon={<LinkOutlined />}>열기</Button>
+                    </a>
+                  )}
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <Button
+                    type="primary"
+                    size="small"
+                    loading={savingResolution}
+                    onClick={handleSaveResolution}
+                  >
+                    저장
+                  </Button>
+                  {selectedFeedback.resolved_at && (
+                    <span style={{ fontSize: 12, color: "#999", alignSelf: "center" }}>
+                      마지막 업데이트: {new Date(selectedFeedback.resolved_at).toLocaleString("ko-KR")}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
 
             <div
               style={{
