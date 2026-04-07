@@ -125,6 +125,8 @@ class EsHybridRetriever(BaseRetriever):
         device_name: str | None = None,
         device_names: list[str] | None = None,
         device_boost_weight: float = 2.0,
+        doc_id_boost_tokens: list[str] | None = None,
+        doc_id_boost_weight: float = 3.0,
         **kwargs: Any,
     ) -> list[RetrievalResult]:
         """Retrieve relevant documents for a query.
@@ -184,6 +186,8 @@ class EsHybridRetriever(BaseRetriever):
             rrf_k=self.rrf_k,
             device_boost=device_name,
             device_boost_weight=device_boost_weight,
+            doc_id_boost_tokens=doc_id_boost_tokens,
+            doc_id_boost_weight=doc_id_boost_weight,
         )
 
         # Convert to RetrievalResult

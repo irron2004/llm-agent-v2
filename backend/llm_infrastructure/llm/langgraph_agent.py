@@ -554,6 +554,43 @@ _INQUIRY_COMPOUND_PATTERNS = (
     "work check", "work sheet",
 )
 
+# Tokens to exclude from doc_id boost (too generic or structural segments in doc_ids)
+_DOC_ID_BOOST_STOP = frozenset({
+    "the", "how", "to", "of", "in", "for", "and", "is", "are", "what",
+    "sop", "pems", "manual", "tsg", "global", "eng", "kor", "en",
+})
+
+
+def _extract_doc_id_boost_tokens(
+    query: str,
+    device_names: list,
+) -> list:
+    """Extract meaningful ASCII tokens from query for doc_id wildcard boosting.
+
+    Keeps only tokens that contain ASCII letters (doc_ids are English),
+    excludes device name tokens and procedural stopwords.
+    """
+    tokens = re.split(r"[\s,.\-_]+", query.lower())
+    device_tokens: set = set()
+    for d in device_names:
+        for t in re.split(r"[\s,.\-_]+", d.lower()):
+            if t:
+                device_tokens.add(t)
+
+    result: list = []
+    for tok in tokens:
+        if len(tok) < 2:
+            continue
+        if not any(c.isascii() and c.isalpha() for c in tok):
+            continue
+        if tok in _DOC_ID_BOOST_STOP or tok in _PROCEDURE_KEYWORDS_SET:
+            continue
+        if tok in device_tokens:
+            continue
+        result.append(tok)
+    return result
+
+
 _CITATION_RE = re.compile(r"\[[0-9]+\]")
 _EMOJI_NUMERAL_RE = re.compile(r"[0-9]️⃣")
 _MARKDOWN_TABLE_LINE_RE = re.compile(r"(?m)^\|.*\|\s*$")
@@ -2377,6 +2414,16 @@ def retrieve_node(
     # Use search_queries directly (already contains EN+KO from st_mq_node)
     all_queries = queries
 
+    # --- Modification F: doc_id keyword boost for setup route ---
+    # Extract meaningful tokens from the query to boost doc_ids containing
+    # component keywords (e.g., "apc", "pdb") via ES wildcard should-clause.
+    _route_for_boost = state.get("route", "general")
+    doc_id_boost_tokens: list | None = None
+    if _route_for_boost == "setup":
+        doc_id_boost_tokens = _extract_doc_id_boost_tokens(original_query, selected_devices)
+        if doc_id_boost_tokens:
+            logger.info("retrieve_node: doc_id_boost_tokens=%s", doc_id_boost_tokens)
+
     if selected_devices:
         # Strict device filter: selected devices only
         logger.info(
@@ -2392,6 +2439,7 @@ def retrieve_node(
                 device_names=selected_devices,
                 equip_ids=selected_equip_ids,
                 doc_types=selected_doc_type_filters,
+                doc_id_boost_tokens=doc_id_boost_tokens,
             )
             _add_docs(device_docs, filter_devices=True)
         logger.info("retrieve_node: strict device-filtered search found %d docs", len(all_docs))
@@ -2409,6 +2457,7 @@ def retrieve_node(
                 top_k=candidate_k,
                 equip_ids=selected_equip_ids,
                 doc_types=selected_doc_type_filters,
+                doc_id_boost_tokens=doc_id_boost_tokens,
             )
             _add_docs(docs, filter_devices=False)
 
@@ -3768,6 +3817,11 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
             gkey, grefs = item
             gkey_lower = gkey.lower()
             score = sum(2 for tok in _q_tokens if tok in gkey_lower)
+            # Modification B: also sample content of top refs for keyword match
+            content_sample = " ".join(
+                str(r.get("content", ""))[:500].lower() for r in grefs[:3]
+            )
+            score += sum(1 for tok in _q_tokens if tok in content_sample)
             return (-score, 0)  # higher score first
 
         doc_groups.sort(key=_group_query_score)
