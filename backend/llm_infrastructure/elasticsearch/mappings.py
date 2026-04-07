@@ -539,6 +539,18 @@ def get_feedback_mapping() -> dict[str, Any]:
             "updated_at": {
                 "type": "date",
             },
+            # ===================================================================
+            # Resolution Tracking
+            # ===================================================================
+            "resolved": {
+                "type": "boolean",
+            },
+            "resolved_link": {
+                "type": "keyword",
+            },
+            "resolved_at": {
+                "type": "date",
+            },
         },
     }
 
@@ -592,6 +604,15 @@ def get_chunk_v3_content_mapping() -> dict[str, Any]:
             "pipeline_version": {"type": "keyword", "doc_values": True},
             "created_at": {"type": "date"},
             "extra_meta": {"type": "object", "enabled": False},
+            # Component relation fields
+            "components": {"type": "keyword", "doc_values": True},
+            # RAPTOR hierarchical retrieval fields
+            "partition_key": {"type": "keyword", "doc_values": True},
+            "raptor_level": {"type": "integer"},
+            "raptor_parent_id": {"type": "keyword", "doc_values": True},
+            "raptor_children_ids": {"type": "keyword", "doc_values": True},
+            "is_summary_node": {"type": "boolean"},
+            "cluster_id": {"type": "keyword", "doc_values": True},
         },
     }
 
@@ -623,6 +644,7 @@ def get_chunk_v3_embed_mapping(
             "tenant_id": {"type": "keyword", "doc_values": True},
             "project_id": {"type": "keyword", "doc_values": True},
             "chapter": {"type": "keyword", "doc_values": True},
+            "components": {"type": "keyword", "doc_values": True},
             "embedding": {
                 "type": "dense_vector",
                 "dims": dims,

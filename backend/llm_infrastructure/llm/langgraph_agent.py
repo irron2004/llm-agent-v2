@@ -154,6 +154,9 @@ class AgentState(TypedDict, total=False):
     needs_history: bool
     prev_doc_ids: List[str]  # 이전 턴 참조 문서 ID
 
+    # Pre-fetched context docs (관련 문서 제안 버튼 클릭 시)
+    context_docs: List[RetrievalResult]
+
     # Retrieval outputs
     docs: List[RetrievalResult]
     all_docs: List[RetrievalResult]  # 재생성용 전체 문서 (rerank 전, 최대 20개)
@@ -180,6 +183,10 @@ class AgentState(TypedDict, total=False):
     abbreviation_resolved: bool  # 약어 모호성 해소 완료 여부
     abbreviation_selections: Dict[str, str]  # {약어: 선택된 풀네임}
     original_query: Optional[str]  # 약어 확장 전 원본 쿼리 (동의어 variant 생성용)
+
+    # Setup group-level retry
+    _relevant_groups: List[Tuple[str, List[Dict[str, Any]]]]  # relevance check 통과한 그룹들
+    _current_group_idx: int  # 현재 사용 중인 그룹 인덱스
 
     # Internal flags
     _skip_human_review: bool  # Auto-parse 모드에서 human_review 건너뛰기
@@ -550,6 +557,94 @@ _INQUIRY_COMPOUND_PATTERNS = (
     "작업 check", "작업 체크", "작업check", "작업체크",
     "work check", "work sheet",
 )
+
+# Tokens to exclude from doc_id boost (too generic or structural segments in doc_ids)
+_DOC_ID_BOOST_STOP = frozenset({
+    "the", "how", "to", "of", "in", "for", "and", "is", "are", "what",
+    "sop", "pems", "manual", "tsg", "global", "eng", "kor", "en",
+})
+
+
+def _extract_doc_id_boost_tokens(
+    query: str,
+    device_names: list,
+) -> list:
+    """Extract meaningful ASCII tokens from query for doc_id wildcard boosting.
+
+    Keeps only tokens that contain ASCII letters (doc_ids are English),
+    excludes device name tokens and procedural stopwords.
+    """
+    tokens = re.split(r"[\s,.\-_]+", query.lower())
+    device_tokens: set = set()
+    for d in device_names:
+        for t in re.split(r"[\s,.\-_]+", d.lower()):
+            if t:
+                device_tokens.add(t)
+
+    result: list = []
+    for tok in tokens:
+        if len(tok) < 2:
+            continue
+        if not any(c.isascii() and c.isalpha() for c in tok):
+            continue
+        if tok in _DOC_ID_BOOST_STOP or tok in _PROCEDURE_KEYWORDS_SET:
+            continue
+        if tok in device_tokens:
+            continue
+        result.append(tok)
+    return result
+
+
+def _normalize_device_in_query(query: str, canonical_device: str) -> str:
+    """Replace fuzzy device name variant in query with canonical form.
+
+    Uses compact text comparison + rapidfuzz WRatio to find the variant
+    span in the query and replace it with the canonical device name.
+    Reuses the same matching strategy as _extract_devices_from_query.
+    """
+    canonical_compact = _compact_text(canonical_device)
+    if not canonical_compact or len(canonical_compact) < 3:
+        return query
+
+    # Split query into word tokens (Korean separators included)
+    raw_tokens = re.split(r"([\s가-힣,;:()\"'?!。，；：（）의]+)", query)
+    word_tokens = [t for t in raw_tokens if t.strip() and not re.fullmatch(r"[\s가-힣,;:()\"'?!。，；：（）의]+", t)]
+
+    if not word_tokens:
+        return query
+
+    # Try 1-, 2-, 3-token spans (matching _extract_devices_from_query strategy)
+    best_span: str | None = None
+    best_score: float = 0
+
+    for width in range(1, min(4, len(word_tokens) + 1)):
+        for i in range(len(word_tokens) - width + 1):
+            span_text = " ".join(word_tokens[i : i + width])
+            span_compact = _compact_text(span_text)
+            if not span_compact or len(span_compact) < 3:
+                continue
+            # Exact compact match
+            if span_compact == canonical_compact:
+                display_device = canonical_device.replace("_", " ")
+                return query.replace(span_text, display_device, 1)
+            # Fuzzy match (same threshold as device detection)
+            try:
+                from rapidfuzz import fuzz
+
+                score = fuzz.WRatio(span_compact, canonical_compact)
+                if score >= 82 and score > best_score:
+                    best_score = score
+                    best_span = span_text
+            except ImportError:
+                pass
+
+    if best_span is not None:
+        # Use space-separated form for better BM25 tokenization
+        # e.g. "SUPRA_VPLUS" → "SUPRA VPLUS"
+        display_device = canonical_device.replace("_", " ")
+        return query.replace(best_span, display_device, 1)
+    return query
+
 
 _CITATION_RE = re.compile(r"\[[0-9]+\]")
 _EMOJI_NUMERAL_RE = re.compile(r"[0-9]️⃣")
@@ -1047,6 +1142,10 @@ def results_to_ref_json(
             )
             if section and str(section).strip():
                 metadata["section"] = str(section).strip()
+            # Preserve rerank hit count for group scoring
+            _rhc = d.metadata.get("rerank_hit_count")
+            if _rhc is not None:
+                metadata["rerank_hit_count"] = int(_rhc)
 
         # Extract page number for scroll positioning
         page_val = None
@@ -1252,6 +1351,8 @@ def _prioritize_setup_answer_refs(ref_items: List[Dict[str, Any]]) -> List[Dict[
 
 
 MAX_SETUP_DOC_TRIES = 5  # 적합성 판정 최대 문서 수
+MIN_REFS_FOR_ACCEPT = 3  # 그룹 즉시 채택 최소 refs 수
+CONSECUTIVE_EMPTY_LIMIT = 2  # 연속 빈 응답 시 early-exit 임계값
 MAX_ANSWER_REFS = 10  # 답변 생성 시 최대 REFS 수 (다페이지 SOP 원문 번역 대응)
 MAX_ISSUE_REFS = 10  # issue 사례 노출 최대 REFS 수
 MAX_ISSUE_CASE_MAP_DOCS = 10
@@ -1304,11 +1405,13 @@ def _check_doc_relevance(
     doc_ref_text: str,
     *,
     llm: "BaseLLM",
-) -> bool:
+) -> Optional[bool]:
     """문서가 질문에 답할 수 있는 절차/작업 정보를 포함하는지 가볍게 판정.
 
-    빈 응답 시 1회 재시도하고, 여전히 빈 응답이면 False(관련 없음)로 처리하여
-    다음 그룹이 체크될 수 있도록 한다.
+    Returns:
+        True: 관련 있음 ("yes" 포함)
+        False: 관련 없음 ("yes" 미포함)
+        None: 빈 응답으로 판정 불가 — 호출자가 처리
     """
     system = (
         "You are a relevance checker. Determine if the document contains "
@@ -1319,13 +1422,13 @@ def _check_doc_relevance(
     )
     user = f"Question: {query}\nDocument:\n{doc_ref_text[:6000]}"
 
-    raw = _invoke_llm(llm, system, user, max_tokens=10, temperature=TEMP_CLASSIFICATION)
+    # max_tokens must be large enough for thinking models (e.g. DeepSeek)
+    # which consume tokens in reasoning before producing the actual answer
+    raw = _invoke_llm(llm, system, user, max_tokens=256, temperature=TEMP_CLASSIFICATION)
     raw_stripped = (raw or "").strip().lower()
     if not raw_stripped:
-        # LLM 빈 응답 → 판정 불가. query-aware 그룹 정렬과 함께 사용되므로
-        # True로 처리하여 가장 관련성 높은 첫 번째 그룹이 통과하도록 한다.
-        logger.info("_check_doc_relevance: raw empty → default True (trust query-aware ordering)")
-        return True
+        logger.info("_check_doc_relevance: raw empty → None (undecidable)")
+        return None
     result = "yes" in raw_stripped
     logger.info("_check_doc_relevance: raw=%r → %s", raw_stripped[:50], result)
     return result
@@ -2369,8 +2472,28 @@ def retrieve_node(
                 seen.add(key)
                 all_docs.append(d)
 
+    # Normalize device name variants in queries for better BM25 tokenization
+    # e.g. "supravvplus" → "SUPRA VPLUS" so BM25 matches individual tokens
+    if selected_devices:
+        _canonical_for_norm = selected_devices[0]
+        _queries_before = list(queries)
+        queries = [_normalize_device_in_query(q, _canonical_for_norm) for q in queries]
+        if queries != _queries_before:
+            logger.info("retrieve_node: device-normalized queries: %s → %s", _queries_before, queries)
+
     # Use search_queries directly (already contains EN+KO from st_mq_node)
     all_queries = queries
+
+    # --- Modification F: doc_id keyword boost for setup route ---
+    # Extract meaningful tokens from the query to boost doc_ids containing
+    # component keywords (e.g., "apc", "pdb") via ES wildcard should-clause.
+    _route_for_boost = state.get("route", "general")
+    doc_id_boost_tokens: list | None = None
+    if _route_for_boost == "setup":
+        _boost_source = queries[0] if queries else original_query
+        doc_id_boost_tokens = _extract_doc_id_boost_tokens(_boost_source, selected_devices)
+        if doc_id_boost_tokens:
+            logger.info("retrieve_node: doc_id_boost_tokens=%s", doc_id_boost_tokens)
 
     if selected_devices:
         # Strict device filter: selected devices only
@@ -2387,6 +2510,7 @@ def retrieve_node(
                 device_names=selected_devices,
                 equip_ids=selected_equip_ids,
                 doc_types=selected_doc_type_filters,
+                doc_id_boost_tokens=doc_id_boost_tokens,
             )
             _add_docs(device_docs, filter_devices=True)
         logger.info("retrieve_node: strict device-filtered search found %d docs", len(all_docs))
@@ -2404,6 +2528,7 @@ def retrieve_node(
                 top_k=candidate_k,
                 equip_ids=selected_equip_ids,
                 doc_types=selected_doc_type_filters,
+                doc_id_boost_tokens=doc_id_boost_tokens,
             )
             _add_docs(docs, filter_devices=False)
 
@@ -2413,14 +2538,15 @@ def retrieve_node(
     selected_doc_types_normalized = {
         normalize_doc_type(dt) for dt in selected_doc_types if normalize_doc_type(dt)
     }
+    route = state.get("route", "general")
     sop_only_predicate = bool(
         state.get("sop_intent") is True
+        or route == "setup"
         or bool(selected_doc_types_normalized.intersection(sop_variants))
     )
 
     # --- Intent-based gating for SOP adjustments ---
     # SOP 문서 선택 시에도, 비절차(조회) 질문이면 절차 편향 조정을 건너뛴다.
-    route = state.get("route", "general")
     query_lower_for_intent = (original_query or "").lower()
     has_procedure_intent_early = any(
         kw in query_lower_for_intent for kw in _PROCEDURE_KEYWORDS_SET
@@ -2630,32 +2756,37 @@ def retrieve_node(
     # Rerank if reranker is available
     # Use English query for reranking - cross-encoder models often work better with English
     rerank_query = query_en if query_en else original_query
+    _count_before_rerank = len(all_docs)
     if reranker is not None and all_docs:
-        logger.info(
-            "retrieve_node: reranking %d docs to top %d (using query_en)",
-            len(all_docs),
-            final_top_k,
-        )
         docs = reranker.rerank(rerank_query, all_docs, top_k=final_top_k)
     else:
         # No reranker: just take top final_top_k by score
         docs = sorted(all_docs, key=_stable_tie_break_key)[:final_top_k]
+    _count_after_rerank = len(docs)
+    logger.info(
+        "retrieve_node: [1/4 rerank] %d → %d docs",
+        _count_before_rerank,
+        _count_after_rerank,
+    )
 
     # Score threshold: filter out docs below minimum score
     score_threshold = float(agent_settings.score_threshold)
     if score_threshold > 0.0 and docs:
-        before_count = len(docs)
+        _count_before_threshold = len(docs)
         docs = [d for d in docs if float(d.score) >= score_threshold]
-        filtered_count = before_count - len(docs)
+        filtered_count = _count_before_threshold - len(docs)
         if filtered_count > 0:
+            _count_after_rerank = len(docs)  # update for pipeline summary
             logger.info(
-                "retrieve_node: score_threshold=%.3f filtered %d/%d docs",
+                "retrieve_node: [1.5/4 threshold] %.3f filtered %d → %d docs",
                 score_threshold,
-                filtered_count,
-                before_count,
+                _count_before_threshold,
+                _count_after_rerank,
             )
 
     # Deduplicate by base doc_id (keep highest-scoring page per document)
+    # Count rerank hits per doc_id BEFORE dedup — used as group relevance signal
+    hit_counts: dict[str, int] = {}
     if agent_settings.dedupe_by_doc_id and docs:
 
         def _base_doc_id(doc_id: str) -> str:
@@ -2667,22 +2798,42 @@ def retrieve_node(
                     return s[:idx]
             return s
 
+        # Step 1: count hits per base_doc_id (before dedup)
+        from collections import Counter as _Counter
+        hit_counts: dict[str, int] = _Counter(
+            _base_doc_id(doc.doc_id) for doc in docs
+        )
+
+        # Step 2: dedupe — keep highest-scoring page, inject rerank_hit_count
         before_count = len(docs)
         seen_base: dict[str, int] = {}  # base_doc_id -> index in deduped list
         deduped: List[RetrievalResult] = []
         for doc in docs:
             base = _base_doc_id(doc.doc_id)
             if base not in seen_base:
-                seen_base[base] = len(deduped)
-                deduped.append(doc)
+                # Inject hit count into metadata for downstream group scoring
+                meta = dict(doc.metadata) if isinstance(doc.metadata, dict) else {}
+                meta["rerank_hit_count"] = hit_counts.get(base, 1)
+                deduped.append(
+                    RetrievalResult(
+                        doc_id=doc.doc_id,
+                        content=doc.content,
+                        score=doc.score,
+                        metadata=meta,
+                        raw_text=doc.raw_text,
+                    )
+                )
+                seen_base[base] = len(deduped) - 1
             # else: skip duplicate (first occurrence has highest score after sort)
-        if len(deduped) < before_count:
-            logger.info(
-                "retrieve_node: dedupe_by_doc_id removed %d duplicates (%d -> %d)",
-                before_count - len(deduped),
-                before_count,
-                len(deduped),
-            )
+        _top_hits = sorted(hit_counts.items(), key=lambda x: -x[1])[:8]
+        logger.info(
+            "retrieve_node: [2/4 group+dedupe] %d → %d docs (unique doc_ids=%d), "
+            "hit_counts=%s",
+            before_count,
+            len(deduped),
+            len(hit_counts),
+            [(k.split("/")[-1][:40], v) for k, v in _top_hits],
+        )
         docs = deduped
 
     # --- Doc-type diversity quota (SOP + Setup 동시 선택 시) ---
@@ -2730,11 +2881,18 @@ def retrieve_node(
             )
 
     # Section expansion: expand top groups by fetching full section chunks
+    _count_before_expand = len(docs)
     if rag_settings.section_expand_enabled and docs and hasattr(retriever, "es_engine"):
         docs = _apply_section_expansion(docs, retriever.es_engine, query=state.get("query", ""))
+    logger.info(
+        "retrieve_node: [3/4 section_expand] %d → %d docs (+%d)",
+        _count_before_expand,
+        len(docs),
+        len(docs) - _count_before_expand,
+    )
 
     logger.info(
-        "retrieve_node: returning %d docs (all_docs_for_regen: %d)",
+        "retrieve_node: [4/4 done] returning %d docs (all_docs_for_regen: %d)",
         len(docs),
         len(all_docs_for_regen),
     )
@@ -2742,6 +2900,49 @@ def retrieve_node(
     empty_retrieval_fallback = (
         mq_mode == "fallback" and not bool(state.get("mq_used", False)) and len(docs) == 0
     )
+
+    # --- Debug events for workflow trace ---
+    _retrieve_events: List[str] = []
+    # Pipeline count summary for workflow trace (all actual counts)
+    _retrieve_events.append(
+        f"[retrieve] pipeline: {_count_before_rerank} retrieved"
+        f" → {_count_after_rerank} reranked"
+        f" → {_count_before_expand} deduped"
+        f" → {len(docs)} expanded"
+    )
+    # Top rerank hit counts (multi-query voting signal)
+    if hit_counts:
+        _hit_summary = ", ".join(
+            f"{k.split('/')[-1][:30]}={v}"
+            for k, v in sorted(hit_counts.items(), key=lambda x: -x[1])[:5]
+        )
+        _retrieve_events.append(f"[retrieve] rerank_hit_counts: {_hit_summary}")
+    _retrieve_events.append(
+        f"[retrieve] sop_pred={sop_only_predicate} procedural={is_procedural_context} "
+        f"inquiry={has_inquiry_intent} route={route}"
+    )
+    if sop_only_predicate:
+        _penalty_parts = []
+        if agent_settings.early_page_penalty_enabled:
+            _penalty_parts.append(f"early_page(factor={agent_settings.early_page_penalty_factor})")
+        if agent_settings.scope_penalty_enabled:
+            _penalty_parts.append(f"scope(factor={agent_settings.scope_penalty_factor})")
+        if agent_settings.procedure_boost_enabled:
+            _penalty_parts.append(f"proc_boost(factor={agent_settings.procedure_boost_factor})")
+        _retrieve_events.append(f"[retrieve] penalties: {', '.join(_penalty_parts) or 'none'}")
+    else:
+        _retrieve_events.append("[retrieve] penalties: SKIPPED (sop_pred=False)")
+    # Top docs summary
+    _top_summary = []
+    for _di, _d in enumerate(docs[:5]):
+        _dm = _d.metadata if isinstance(_d.metadata, dict) else {}
+        _rhc = _dm.get("rerank_hit_count", 1)
+        _top_summary.append(
+            f"#{_di+1} hits={_rhc} p={_dm.get('page','?')} "
+            f"s={float(_d.score):.4f} {str(_d.doc_id)[:50]}"
+        )
+    if _top_summary:
+        _retrieve_events.append("[retrieve] top docs: " + " | ".join(_top_summary))
 
     return {
         "docs": docs,
@@ -2752,6 +2953,7 @@ def retrieve_node(
             "enabled": stage2_enabled,
             "doc_ids": stage2_doc_ids,
         },
+        "_events": _retrieve_events,
     }
 
 
@@ -2761,6 +2963,7 @@ def expand_related_docs_node(
     page_fetcher: Any = None,
     doc_fetcher: Any = None,
     section_fetcher: Any = None,
+    chapter_resolver: Any = None,
     page_window: int = RELATED_PAGE_WINDOW,
     max_ref_chars: int = MAX_REF_CHARS_ANSWER,
 ) -> Dict[str, Any]:
@@ -2853,7 +3056,7 @@ def expand_related_docs_node(
                 if hit_page is not None and all_section_pages:
                     current_group: List[int] = [all_section_pages[0]]
                     for i in range(1, len(all_section_pages)):
-                        if all_section_pages[i] - all_section_pages[i - 1] <= 1:
+                        if all_section_pages[i] - all_section_pages[i - 1] <= 3:
                             current_group.append(all_section_pages[i])
                         else:
                             if hit_page in current_group:
@@ -2882,6 +3085,49 @@ def expand_related_docs_node(
                     pages = list(range(page_min, page_max + 1))
                     expanded_pages = pages
                     related_docs = page_fetcher(doc.doc_id, pages)
+        elif chapter_resolver is not None:
+            # Fallback: section_chapter is empty — resolve from neighbor pages
+            page = _extract_page_value(meta)
+            if page is not None:
+                section_targets += 1
+                resolved_hits = chapter_resolver(
+                    doc_id=str(doc.doc_id),
+                    hit_page=page,
+                    max_pages=20,
+                )
+                if resolved_hits:
+                    related_docs = [
+                        hit.to_retrieval_result() if hasattr(hit, "to_retrieval_result") else hit
+                        for hit in resolved_hits
+                    ]
+                    expanded_pages = sorted(
+                        set(
+                            p
+                            for rd in related_docs
+                            for p in [
+                                _extract_page_value(
+                                    rd.metadata if isinstance(rd.metadata, dict) else {}
+                                )
+                            ]
+                            if p is not None
+                        )
+                    )
+                    logger.info(
+                        "[expand_related] chapter_resolver fallback: doc_id=%s, "
+                        "hit_page=%d, resolved %d pages",
+                        doc.doc_id, page, len(expanded_pages),
+                    )
+                elif page_fetcher is not None:
+                    # chapter_resolver returned nothing, fall back to page window
+                    page_targets += 1
+                    section_targets -= 1
+                    page_min = max(1, page - page_window)
+                    page_max = page + page_window
+                    pages = list(range(page_min, page_max + 1))
+                    expanded_pages = pages
+                    related_docs = page_fetcher(doc.doc_id, pages)
+            else:
+                skipped_targets += 1
         elif page_fetcher is not None:
             page = _extract_page_value(meta)
             if page is not None:
@@ -3663,15 +3909,37 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     if route == "setup":
         ref_items = _prioritize_setup_answer_refs(ref_items)
 
-    # Use original query for non-English answers to avoid language drift.
+    # Use original (pre-abbreviation-expansion) query for the prompt so the
+    # LLM sees natural phrasing (e.g. "APC valve") instead of the expanded
+    # form ("APC (Automated Process Control) valve") which can confuse it
+    # into thinking REFS don't match.
     if answer_language == "en":
         query_for_prompt = state.get("query_en") or state["query"]
     else:
-        query_for_prompt = state["query"]
+        query_for_prompt = state.get("original_query") or state["query"]
+
+    # Modification D (approach 2): normalize device name variant in query
+    # using the canonical name already detected by fuzzy matching in auto_parse.
+    # e.g. "SUPRAvvplus APC 교체 방법" → "SUPRA Vplus APC 교체 방법"
+    if route == "setup":
+        _pq_raw = state.get("parsed_query")
+        _canonical_devices = (_pq_raw.get("selected_devices") or []) if isinstance(_pq_raw, dict) else []
+        if _canonical_devices:
+            _original_qfp = query_for_prompt
+            query_for_prompt = _normalize_device_in_query(query_for_prompt, _canonical_devices[0])
+            if query_for_prompt != _original_qfp:
+                logger.info(
+                    "answer_node: device name normalized in query: %r → %r",
+                    _original_qfp, query_for_prompt,
+                )
 
     # Setup route: (doc_id, section)별 그룹핑 → 적합성 판정 → 선택 → REFS 제한
     # MAX_ANSWER_REFS를 그룹 선택 이후에 적용하여, 적합한 section이
     # 순위가 낮더라도 relevance check에 참여할 수 있도록 함.
+    doc_groups: list = []
+    is_fallback_selection = False
+    prev_relevant: List[Tuple[str, List[Dict[str, Any]]]] = []
+    current_group_idx = 0
     if route == "setup" and ref_items:
         doc_groups = _group_refs_by_doc_section_chapter(ref_items)
 
@@ -3684,53 +3952,133 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
             gkey, grefs = item
             gkey_lower = gkey.lower()
             score = sum(2 for tok in _q_tokens if tok in gkey_lower)
+            # Modification B: also sample content of top refs for keyword match
+            content_sample = " ".join(
+                str(r.get("content", ""))[:500].lower() for r in grefs[:3]
+            )
+            score += sum(1 for tok in _q_tokens if tok in content_sample)
+            # Rerank hit count: docs that appeared multiple times in rerank
+            # top-K are stronger relevance signals (multi-query voting)
+            max_hit = max(
+                (int((r.get("metadata") or {}).get("rerank_hit_count", 1)) for r in grefs),
+                default=1,
+            )
+            score += max_hit  # add hit count as bonus
             return (-score, 0)  # higher score first
 
         doc_groups.sort(key=_group_query_score)
 
+        _group_hit_info = []
+        for _gk, _gr in doc_groups[:8]:
+            _mhit = max(
+                (int((_r.get("metadata") or {}).get("rerank_hit_count", 1)) for _r in _gr),
+                default=1,
+            )
+            _group_hit_info.append(f"{_gk[:40]}(hits={_mhit},refs={len(_gr)})")
         logger.info(
-            "answer_node: setup doc_section_groups=%d keys=%s",
+            "answer_node: setup doc_section_groups=%d groups=%s",
             len(doc_groups),
-            [k[:60] for k, _ in doc_groups[:8]],
+            _group_hit_info,
         )
         if len(doc_groups) > 1:
             import time as _time
 
-            selected_refs = None
-            checks_done = 0
-            for i, (group_key, group_refs) in enumerate(doc_groups[:MAX_SETUP_DOC_TRIES]):
-                t0 = _time.time()
-                group_text = ref_json_to_text(group_refs)
-                relevant = _check_doc_relevance(query_for_prompt, group_text, llm=llm)
-                elapsed = _time.time() - t0
-                checks_done = i + 1
-                logger.info(
-                    "answer_node: setup relevance check %d/%d group=%s relevant=%s (%.1fs)",
-                    i + 1,
-                    min(len(doc_groups), MAX_SETUP_DOC_TRIES),
-                    group_key[:60],
-                    relevant,
-                    elapsed,
-                )
-                if relevant:
-                    selected_refs = group_refs
-                    break
+            # Check if we already have relevant groups from a previous pass
+            # (group-level retry: judge unfaithful → try next group)
+            prev_relevant = state.get("_relevant_groups") or []
+            current_group_idx = int(state.get("_current_group_idx", 0) or 0)
 
-            if selected_refs is not None:
-                ref_items = selected_refs
+            if prev_relevant and current_group_idx < len(prev_relevant):
+                # Group-level retry: skip relevance checks, use next group
+                group_key, group_refs = prev_relevant[current_group_idx]
+                ref_items = group_refs
+                is_fallback_selection = False
                 logger.info(
-                    "answer_node: setup selected group=%s (%d refs) after %d checks",
-                    selected_refs[0].get("doc_id", "?")[:50],
-                    len(selected_refs),
-                    checks_done,
+                    "answer_node: setup group retry %d/%d group=%s refs=%d (skip relevance check)",
+                    current_group_idx + 1,
+                    len(prev_relevant),
+                    group_key[:60],
+                    len(group_refs),
                 )
             else:
-                # 전부 부적합 → 첫 번째 그룹으로 fallback
-                ref_items = doc_groups[0][1]
-                logger.info(
-                    "answer_node: no relevant group found, fallback to first group=%s",
-                    doc_groups[0][0][:60],
-                )
+                # First pass: run relevance checks and collect ALL relevant groups
+                relevant_groups: List[Tuple[str, List[Dict[str, Any]]]] = []
+                consecutive_empty = 0
+                checks_done = 0
+                for i, (group_key, group_refs) in enumerate(doc_groups[:MAX_SETUP_DOC_TRIES]):
+                    t0 = _time.time()
+                    group_text = ref_json_to_text(group_refs)
+                    relevant = _check_doc_relevance(query_for_prompt, group_text, llm=llm)
+                    elapsed = _time.time() - t0
+                    checks_done = i + 1
+                    logger.info(
+                        "answer_node: setup relevance check %d/%d group=%s refs=%d relevant=%s (%.1fs)",
+                        i + 1,
+                        min(len(doc_groups), MAX_SETUP_DOC_TRIES),
+                        group_key[:60],
+                        len(group_refs),
+                        relevant,
+                        elapsed,
+                    )
+                    if relevant is None:
+                        consecutive_empty += 1
+                        if consecutive_empty >= CONSECUTIVE_EMPTY_LIMIT:
+                            logger.warning(
+                                "answer_node: %d consecutive empty responses, early-exit",
+                                consecutive_empty,
+                            )
+                            break
+                    else:
+                        consecutive_empty = 0
+                        if relevant:
+                            relevant_groups.append((group_key, group_refs))
+
+                if relevant_groups:
+                    # Use first relevant group, store all for group-level retry
+                    ref_items = relevant_groups[0][1]
+                    is_fallback_selection = len(relevant_groups[0][1]) < MIN_REFS_FOR_ACCEPT
+                    current_group_idx = 0
+                    prev_relevant = relevant_groups
+                    logger.info(
+                        "answer_node: setup selected group=%s (%d refs) after %d checks, "
+                        "total relevant_groups=%d",
+                        relevant_groups[0][0][:60],
+                        len(relevant_groups[0][1]),
+                        checks_done,
+                        len(relevant_groups),
+                    )
+                else:
+                    # No relevant group found
+                    _cur_attempts = int(state.get("attempts", 0) or 0)
+                    _max_attempts = int(state.get("max_attempts", 0) or 0)
+                    if _cur_attempts < _max_attempts:
+                        logger.info(
+                            "answer_node: no relevant group found — early-exit to re-retrieve "
+                            "(groups checked: %d, attempt %d/%d)",
+                            checks_done, _cur_attempts, _max_attempts,
+                        )
+                        _early_events: List[str] = []
+                        if doc_groups:
+                            _grp_info = [(k[:60], len(refs)) for k, refs in doc_groups[:5]]
+                            _early_events.append(f"[answer] groups({len(doc_groups)}): {_grp_info}")
+                        _early_events.append(
+                            f"[answer] early-exit: no relevant group after {checks_done} checks"
+                        )
+                        return {
+                            "answer": "",
+                            "answer_skip_reason": "no_relevant_group",
+                            "_events": _early_events,
+                        }
+                    # max_attempts reached — use first group as fallback
+                    ref_items = doc_groups[0][1]
+                    is_fallback_selection = True
+                    prev_relevant = []
+                    current_group_idx = 0
+                    logger.info(
+                        "answer_node: no relevant group but max_attempts reached — "
+                        "fallback to first group=%s (%d refs)",
+                        doc_groups[0][0][:60], len(ref_items),
+                    )
         else:
             # 그룹이 1개면 그대로 사용
             ref_items = doc_groups[0][1] if doc_groups else ref_items
@@ -3738,6 +4086,25 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     # 답변 생성 시 REFS 수 제한 (setup route는 그룹 선택 후 적용)
     if len(ref_items) > MAX_ANSWER_REFS:
         ref_items = ref_items[:MAX_ANSWER_REFS]
+
+    # --- Debug events for workflow trace ---
+    _answer_events: List[str] = []
+    if route == "setup" and doc_groups:
+        _group_info = [(k[:60], len(refs)) for k, refs in doc_groups[:5]]
+        _answer_events.append(f"[answer] groups({len(doc_groups)}): {_group_info}")
+        _sel_doc = ref_items[0].get("doc_id", "?")[:50] if ref_items else "none"
+        _sel_pages = [str(r.get("page", "?")) for r in ref_items[:5]]
+        _sel_mode = "direct" if not is_fallback_selection else "fallback"
+        _answer_events.append(
+            f"[answer] selected: {_sel_doc} pages=[{','.join(_sel_pages)}] refs={len(ref_items)} ({_sel_mode})"
+        )
+        if route == "setup" and not is_fallback_selection:
+            _answer_events.append(f"[answer] answer_ref_json: set (refs={len(ref_items)})")
+        elif route == "setup" and is_fallback_selection:
+            _answer_events.append("[answer] answer_ref_json: unset (fallback)")
+    _answer_events.append(
+        f"[answer] route={route} lang={answer_language} refs={len(ref_items)}"
+    )
 
     ref_text = ref_json_to_text(ref_items)
     logger.info(
@@ -3834,14 +4201,24 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
         answer[:500] if answer else "(empty)",
     )
 
+    _answer_events.append(f"[answer] ref_chars={len(ref_text)} answer_chars={len(answer)}")
+
     enforce_format = str(answer_language).strip().lower() == "ko"
     if not enforce_format:
-        return {
+        _result: Dict[str, Any] = {
             "answer": answer,
             "reasoning": reasoning,
             "answer_format": {"ok": True, "skipped": True, "target_language": answer_language},
             "answer_format_retries": 0,
+            "answer_skip_reason": None,
+            "_events": _answer_events,
         }
+        if route == "setup":
+            _result["answer_ref_json"] = ref_items
+            if prev_relevant:
+                _result["_relevant_groups"] = prev_relevant
+                _result["_current_group_idx"] = current_group_idx
+        return _result
 
     has_refs = bool(ref_items)
     format_result = _validate_answer_format(answer, target_language="ko", has_refs=has_refs)
@@ -3894,12 +4271,20 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
             bool(format_result.get("ok")),
         )
 
-    return {
+    _result_ko: Dict[str, Any] = {
         "answer": answer,
         "reasoning": reasoning,
         "answer_format": format_result,
         "answer_format_retries": retries,
+        "answer_skip_reason": None,
+        "_events": _answer_events,
     }
+    if route == "setup":
+        _result_ko["answer_ref_json"] = ref_items
+        if prev_relevant:
+            _result_ko["_relevant_groups"] = prev_relevant
+            _result_ko["_current_group_idx"] = current_group_idx
+    return _result_ko
 
 
 def issue_confirm_node(
@@ -4255,13 +4640,14 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
 
 def should_retry(
     state: AgentState,
-) -> Literal["done", "retry", "retry_expand", "retry_mq", "human"]:
+) -> Literal["done", "retry", "retry_expand", "retry_mq", "retry_next_group", "human"]:
     """Determine retry strategy based on attempt count.
 
     Retry strategies:
-    - 1st unfaithful (attempt 0→1): retry_expand - use more docs (8→20)
-    - 2nd unfaithful (attempt 1→2): retry - refine queries
-    - 3rd unfaithful (attempt 2→3): retry_mq - regenerate multi-query from scratch
+    - group-level retry: try next relevant group (no re-retrieval)
+    - 1st unfaithful (no more groups): retry_expand - use more docs (8→20)
+    - 2nd unfaithful: retry - refine queries
+    - 3rd unfaithful: retry_mq - regenerate multi-query from scratch
     """
     if state.get("retrieval_confirmed"):
         return "done"
@@ -4269,6 +4655,17 @@ def should_retry(
     faithful = bool(judge.get("faithful", False))
     if faithful:
         return "done"
+
+    # Group-level retry: if there are more relevant groups, try next one first
+    relevant_groups = state.get("_relevant_groups") or []
+    current_idx = int(state.get("_current_group_idx", 0) or 0)
+    if current_idx + 1 < len(relevant_groups):
+        logger.info(
+            "should_retry: next group available (%d/%d), routing to retry_next_group",
+            current_idx + 2,
+            len(relevant_groups),
+        )
+        return "retry_next_group"
 
     attempts = int(state.get("attempts", 0) or 0)
     max_attempts = int(state.get("max_attempts", 0) or 0)
@@ -4299,11 +4696,27 @@ def should_retry(
     return "retry_mq"
 
 
+def retry_next_group_node(state: AgentState) -> Dict[str, Any]:
+    """Advance to next relevant group for group-level retry (no re-retrieval)."""
+    current_idx = int(state.get("_current_group_idx", 0) or 0)
+    next_idx = current_idx + 1
+    relevant_groups = state.get("_relevant_groups") or []
+    group_key = relevant_groups[next_idx][0] if next_idx < len(relevant_groups) else "?"
+    logger.info(
+        "retry_next_group: advancing group %d → %d (%s)",
+        current_idx + 1,
+        next_idx + 1,
+        group_key[:60],
+    )
+    return {"_current_group_idx": next_idx}
+
+
 def retry_bump_node(state: AgentState) -> Dict[str, Any]:
     """Increment attempt counter."""
     return {
         "attempts": int(state.get("attempts", 0)) + 1,
         "retry_strategy": "refine_queries",
+        "answer_skip_reason": None,
     }
 
 
@@ -4710,19 +5123,56 @@ def _extract_devices_from_query(device_names: List[str], query: str) -> List[str
             query_for_match = query_for_match.replace(_compact_text(ko), _compact_text(en))
 
     # Phase 1: exact substring match (기존 로직)
-    matches: List[str] = []
+    # 단어 경계 인식을 위해 원본 query 토큰도 함께 사용
+    query_tokens_compact = [_compact_text(t) for t in re.split(r"[\s가-힣,;:()\"'?!。，；：（）의]+", query) if t.strip()]
+    # 연속 토큰 조합도 생성 (multi-word device: "supra vplus" → "supravplus")
+    query_token_combos: set[str] = set(query_tokens_compact)
+    for i in range(len(query_tokens_compact) - 1):
+        query_token_combos.add(query_tokens_compact[i] + query_tokens_compact[i + 1])
+    if len(query_tokens_compact) >= 3:
+        for i in range(len(query_tokens_compact) - 2):
+            query_token_combos.add(query_tokens_compact[i] + query_tokens_compact[i + 1] + query_tokens_compact[i + 2])
+
+    token_matches: List[str] = []
+    substr_matches: List[str] = []
     for name in device_names:
         cleaned = str(name).strip()
         if not cleaned or not _is_valid_device_candidate(cleaned):
             continue
         name_compact = _compact_text(cleaned)
-        if name_compact and name_compact in query_for_match:
-            matches.append(cleaned)
+        if not name_compact:
+            continue
+        # 토큰 조합 기반 매칭 (word boundary 보존, 우선)
+        if name_compact in query_token_combos:
+            token_matches.append(cleaned)
+        # fallback: 전체 compact query에서 substring 매칭
+        elif name_compact in query_for_match:
+            substr_matches.append(cleaned)
+    # 토큰 조합 매칭 우선, 없으면 substring fallback
+    matches = token_matches if token_matches else substr_matches
     if matches:
-        return _dedupe_queries(matches)[:1]
+        # 긴 이름 우선 (SUPRA Vplus > SUPRA V)
+        matches.sort(key=lambda n: len(_compact_text(n)), reverse=True)
+        best = matches[0]
+        best_compact = _compact_text(best)
+        # prefix 모호성 체크: 매칭된 이름이 더 긴 device name의 prefix인 경우
+        # Phase 2 fuzzy로 더 specific한 매칭 시도 (오타 대응: "vvplus" → "vplus")
+        has_longer_candidate = any(
+            _compact_text(n).startswith(best_compact)
+            and len(_compact_text(n)) > len(best_compact)
+            and _is_valid_device_candidate(n)
+            for n in device_names
+        )
+        if not has_longer_candidate:
+            return _dedupe_queries(matches)[:1]
+        # prefix 모호성이 있으면 Phase 2로 fall through
+        logger.debug(
+            "device Phase 1 match '%s' is prefix of longer candidate, trying fuzzy",
+            best,
+        )
 
-    # Phase 2: token-level fuzzy fallback (rapidfuzz) — exact match 실패 시에만
-    # 전체 쿼리 대신 개별 토큰을 추출하여 장비명과 비교 (오타 내성 향상)
+    # Phase 2: token-level fuzzy (rapidfuzz)
+    # exact match 실패 또는 prefix 모호성 시 실행. 오타 내성 향상.
     try:
         from rapidfuzz import fuzz, process
 
@@ -4768,7 +5218,13 @@ def _extract_devices_from_query(device_names: List[str], query: str) -> List[str
             )
             if result:
                 matched_compact, score, _idx = result
-                if best_match is None or score > best_match[0]:
+                if best_match is None:
+                    best_match = (score, matched_compact, candidates[matched_compact])
+                elif score > best_match[0] + 5:
+                    # 확실히 높은 score → 교체
+                    best_match = (score, matched_compact, candidates[matched_compact])
+                elif score >= best_match[0] - 5 and len(matched_compact) > len(best_match[1]):
+                    # score 비슷하지만 더 specific(긴 이름) → 우선
                     best_match = (score, matched_compact, candidates[matched_compact])
 
         # fallback: 전체 쿼리로도 시도 (토큰 분리가 실패한 경우 대비)
@@ -4785,6 +5241,25 @@ def _extract_devices_from_query(device_names: List[str], query: str) -> List[str
 
         if best_match:
             score, matched_compact, original = best_match
+            # Phase 1 prefix 모호성으로 fall-through한 경우:
+            # fuzzy 결과가 Phase 1보다 더 specific(긴 이름)이면 fuzzy 우선,
+            # 아니면 Phase 1 결과 유지
+            if matches:
+                phase1_best = matches[0]
+                phase1_len = len(_compact_text(phase1_best))
+                fuzzy_len = len(matched_compact)
+                if fuzzy_len >= phase1_len:
+                    logger.info(
+                        "device fuzzy preferred over Phase 1: '%s'→'%s' (score=%d, Phase1='%s')",
+                        query[:40], original, score, phase1_best,
+                    )
+                    return [original]
+                else:
+                    logger.info(
+                        "device Phase 1 kept over fuzzy: '%s' (Phase1='%s', fuzzy='%s' score=%d)",
+                        query[:40], phase1_best, original, score,
+                    )
+                    return [phase1_best]
             logger.info(
                 "device fuzzy match: query='%s' → '%s' (score=%d)",
                 query[:40], original, score,
@@ -4792,6 +5267,11 @@ def _extract_devices_from_query(device_names: List[str], query: str) -> List[str
             return [original]
     except Exception:
         logger.debug("device fuzzy match failed", exc_info=True)
+
+    # Phase 2 실패 시 Phase 1 결과가 있으면 fallback
+    if matches:
+        logger.info("device fuzzy failed, falling back to Phase 1: '%s'", matches[0])
+        return _dedupe_queries(matches)[:1]
 
     return []
 

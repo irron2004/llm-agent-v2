@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { CopyOutlined, CheckOutlined, ReloadOutlined, FilterOutlined, LikeOutlined, LikeFilled, DislikeOutlined, DislikeFilled, EditOutlined } from "@ant-design/icons";
-import { Message, FeedbackRating, RetrievedDoc, MessageFeedback } from "../types";
+import { Message, FeedbackRating, RetrievedDoc, MessageFeedback, RelatedDocTypeSuggestion } from "../types";
 import { MarkdownContent } from "./markdown-content";
 import { Button, Collapse, Tag } from "antd";
 import { ImagePreviewModal, ImagePreviewItem } from "../../../components/image-preview-modal";
@@ -272,6 +272,7 @@ type MessageItemProps = {
   }) => void;
   onDetailedFeedback?: (payload: DetailedFeedbackPayload) => void;
   onRegenerate?: (payload: RegeneratePayload) => void;
+  onRelatedDocClick?: (payload: { originalQuery: string; docType: string; chunkIds: string[] }) => void;
   onEdit?: (editedText: string) => void;
   issueCases?: Array<{ doc_id: string; title: string; summary: string }>;
   onIssueCaseSelect?: (docId: string) => void;
@@ -286,6 +287,7 @@ export function MessageItem({
   onFeedback,
   onDetailedFeedback,
   onRegenerate,
+  onRelatedDocClick,
   onEdit,
   issueCases,
   onIssueCaseSelect,
@@ -931,6 +933,42 @@ export function MessageItem({
                     <ReloadOutlined />
                     <span style={{ marginLeft: 4, fontSize: 12 }}>재생성</span>
                   </button>
+                </div>
+              )}
+              {/* 관련 문서 종류 제안 버튼 */}
+              {onRelatedDocClick && regenerateQuery && (message.relatedDocTypes ?? []).length > 0 && (
+                <div style={{
+                  marginTop: 10,
+                  padding: "10px 12px",
+                  background: "var(--color-bg-elevated, #f8f9fa)",
+                  borderRadius: 8,
+                  border: "1px solid var(--color-border, #e8e8e8)",
+                }}>
+                  <div style={{ fontSize: 12, color: "var(--color-text-secondary, #666)", marginBottom: 8 }}>
+                    다른 문서에서도 관련 내용이 발견되었습니다:
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {(message.relatedDocTypes ?? []).map((suggestion) => (
+                      <Button
+                        key={suggestion.doc_type}
+                        size="small"
+                        type="default"
+                        onClick={() => onRelatedDocClick!({
+                          originalQuery: regenerateQuery,
+                          docType: suggestion.doc_type,
+                          chunkIds: suggestion.chunk_ids,
+                        })}
+                        disabled={isStreaming}
+                        style={{
+                          fontSize: 12,
+                          borderColor: "#1890ff",
+                          color: "#1890ff",
+                        }}
+                      >
+                        {suggestion.message}
+                      </Button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

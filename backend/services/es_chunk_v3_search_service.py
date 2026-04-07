@@ -14,6 +14,7 @@ from backend.llm_infrastructure.reranking import get_reranker
 from backend.llm_infrastructure.reranking.base import BaseReranker
 from backend.llm_infrastructure.retrieval.base import RetrievalResult
 from backend.llm_infrastructure.retrieval.engines.es_search import EsSearchEngine
+from backend.llm_infrastructure.retrieval.postprocessors.relation_expander import RelationExpander
 from backend.llm_infrastructure.retrieval.rrf import merge_retrieval_result_lists_rrf
 from backend.llm_infrastructure.text_quality import is_noisy_chunk, strip_noisy_lines
 from backend.services.embedding_service import EmbeddingService
@@ -78,6 +79,16 @@ def _normalize_device_names_to_v3(device_names: list[str] | None) -> list[str] |
         if upper_space not in seen:
             seen.add(upper_space)
             result.append(upper_space)
+        # space-separated form: underscores → spaces, preserving case
+        space_form = name.replace("_", " ")
+        if space_form not in seen:
+            seen.add(space_form)
+            result.append(space_form)
+        # space-separated uppercase
+        space_upper = space_form.upper()
+        if space_upper not in seen:
+            seen.add(space_upper)
+            result.append(space_upper)
     return result or None
 
 
@@ -145,6 +156,8 @@ class EsChunkV3SearchService:
         sparse_weight: float = 0.3,
         rrf_k: int = 60,
         reranker: BaseReranker | None = None,
+        raptor_enabled: bool = False,
+        relation_expander: RelationExpander | None = None,
     ) -> None:
         self.es = es_client
         self.content_index = content_index
@@ -157,6 +170,9 @@ class EsChunkV3SearchService:
         self.sparse_weight = sparse_weight
         self.rrf_k = rrf_k
         self.reranker = reranker
+        self.raptor_enabled = raptor_enabled
+        self.relation_expander = relation_expander
+        self._last_cross_type_suggestions: dict[str, list[RetrievalResult]] = {}
 
         self.es_engine = EsSearchEngine(
             es_client=es_client,
@@ -167,6 +183,8 @@ class EsChunkV3SearchService:
                 "chunk_keywords^0.8",
             ],
         )
+        if self.raptor_enabled:
+            logger.info("RAPTOR supplementary retrieval enabled")
 
     @classmethod
     def from_settings(
@@ -243,6 +261,8 @@ class EsChunkV3SearchService:
                 device=rag_settings.embedding_device,
             )
 
+        relation_expander = RelationExpander.from_settings(rag_settings)
+
         return cls(
             es_client=es_client,
             content_index=resolved_content_index,
@@ -255,6 +275,8 @@ class EsChunkV3SearchService:
             sparse_weight=rag_settings.hybrid_sparse_weight,
             rrf_k=rag_settings.hybrid_rrf_k,
             reranker=reranker,
+            raptor_enabled=rag_settings.raptor_enabled,
+            relation_expander=relation_expander,
         )
 
     @staticmethod
@@ -551,6 +573,98 @@ class EsChunkV3SearchService:
         merged.sort(key=lambda item: (-item[1], item[2], item[0].doc_id))
         return [item[0] for item in merged]
 
+    def _raptor_summary_search(
+        self,
+        query_text: str,
+        query_vector: list[float],
+        *,
+        top_k: int = 10,
+        filters: dict[str, Any] | None = None,
+    ) -> list[RetrievalResult]:
+        """Search RAPTOR summary nodes via BM25 and expand to leaf children.
+
+        1. BM25 search on content index filtered to is_summary_node=true
+        2. Collect children IDs from matched summaries
+        3. Fetch children docs via mget → return as rank-scored list for RRF
+        """
+        summary_filter: list[dict[str, Any]] = [{"term": {"is_summary_node": True}}]
+        if filters:
+            if isinstance(filters, list):
+                summary_filter.extend(filters)
+            elif isinstance(filters, dict):
+                summary_filter.append(filters)
+
+        combined_filter = summary_filter if len(summary_filter) > 1 else summary_filter[0]
+
+        # BM25 search for summaries
+        text_query = self.es_engine._build_text_query(query_text)
+        body: dict[str, Any] = {
+            "query": {
+                "bool": {
+                    "must": text_query,
+                    "filter": combined_filter,
+                }
+            },
+            "size": min(top_k, 20),
+            "_source": ["chunk_id", "raptor_children_ids", "partition_key", "raptor_level", "content"],
+            "track_total_hits": False,
+        }
+        try:
+            response = self.es.search(index=self.content_index, body=body)
+        except Exception as exc:
+            logger.warning("raptor_supplementary: summary BM25 search failed: %s", exc)
+            return []
+
+        hits = response.get("hits", {}).get("hits", [])
+        if not hits:
+            logger.debug("raptor_supplementary: no summary nodes matched query")
+            return []
+
+        # Collect children IDs from matched summaries
+        children_ids: list[str] = []
+        seen: set[str] = set()
+        summary_count = len(hits)
+        for hit in hits:
+            source = hit.get("_source", {})
+            cids = source.get("raptor_children_ids") or []
+            if isinstance(cids, str):
+                cids = [cids]
+            for cid in cids:
+                cid_str = str(cid).strip()
+                if cid_str and cid_str not in seen:
+                    seen.add(cid_str)
+                    children_ids.append(cid_str)
+
+        if not children_ids:
+            logger.debug("raptor_supplementary: %d summaries matched but no children IDs", summary_count)
+            return []
+
+        # Fetch children docs (limit to avoid excessive fetches)
+        max_children = top_k * 3
+        fetch_ids = children_ids[:max_children]
+        children_docs = self._mget_content_docs(fetch_ids)
+
+        results: list[RetrievalResult] = []
+        for rank, cid in enumerate(fetch_ids, start=1):
+            doc = children_docs.get(cid)
+            if doc is None:
+                continue
+            score = 1.0 / rank  # rank-based score for RRF compatibility
+            result = self._content_doc_to_result(doc, score=score)
+            metadata = dict(result.metadata or {})
+            metadata["raptor_supplementary"] = True
+            metadata["raptor_summary_count"] = summary_count
+            result.metadata = metadata
+            results.append(result)
+
+        logger.info(
+            "raptor_supplementary: %d summaries → %d children IDs → %d leaf results",
+            summary_count,
+            len(children_ids),
+            len(results),
+        )
+        return results
+
     def search(
         self,
         query: str,
@@ -595,6 +709,23 @@ class EsChunkV3SearchService:
             device_names=v3_device_names,
         )
 
+        # Preserve base filters for RAPTOR summary search (which adds its own
+        # is_summary_node=True filter). The main search gets an extra exclusion.
+        base_filters = filters
+
+        # Exclude RAPTOR summary nodes from main dense/sparse search.
+        # Summary nodes have broad aggregated content that can dominate results;
+        # they are handled separately by _raptor_summary_search → children expansion.
+        if self.raptor_enabled:
+            exclude_summary = {"term": {"is_summary_node": False}}
+            if filters is None:
+                filters = exclude_summary
+            elif isinstance(filters, dict) and "bool" in filters and "must" in filters["bool"]:
+                filters = copy.deepcopy(filters)
+                filters["bool"]["must"].append(exclude_summary)
+            else:
+                filters = {"bool": {"must": [filters, exclude_summary]}}
+
         dense_candidates = self._dense_search_candidates(
             query_vector,
             top_k=candidate_n,
@@ -620,9 +751,22 @@ class EsChunkV3SearchService:
             sparse_weight if sparse_weight is not None else self.sparse_weight
         )
 
+        # RAPTOR supplementary: search summary nodes → expand children
+        raptor_results: list[RetrievalResult] = []
+        if self.raptor_enabled:
+            raptor_results = self._raptor_summary_search(
+                processed_query,
+                query_vector,
+                top_k=k,
+                filters=base_filters,
+            )
+
         if resolved_use_rrf:
+            result_lists = [dense_results, sparse_results]
+            if raptor_results:
+                result_lists.append(raptor_results)
             merged = merge_retrieval_result_lists_rrf(
-                [dense_results, sparse_results],
+                result_lists,
                 k=resolved_rrf_k,
             )
             for result in merged:
@@ -630,6 +774,11 @@ class EsChunkV3SearchService:
                 metadata.setdefault("rrf_k", resolved_rrf_k)
                 result.metadata = metadata
         else:
+            if raptor_results:
+                logger.warning(
+                    "raptor_supplementary: %d results discarded (use_rrf=False, weighted merge only supports 2 lists)",
+                    len(raptor_results),
+                )
             merged = self._weighted_merge(
                 dense_results,
                 sparse_results,
@@ -637,7 +786,28 @@ class EsChunkV3SearchService:
                 sparse_weight=resolved_sparse_weight,
             )
 
-        return _filter_noisy_results(merged[:k])
+        filtered = _filter_noisy_results(merged[:k])
+
+        # Relation expansion: enrich results with related chunks
+        if self.relation_expander and self.relation_expander.enabled:
+            expand_result = self.relation_expander.expand(
+                filtered, self.es, self.content_index
+            )
+            self._last_cross_type_suggestions = (
+                expand_result.cross_type_suggestions()
+            )
+            if self._last_cross_type_suggestions:
+                hint_types = {
+                    dt: len(rs)
+                    for dt, rs in self._last_cross_type_suggestions.items()
+                }
+                logger.info(
+                    "[RelationExpander] cross_type suggestions: %s", hint_types
+                )
+            return expand_result.all_results()
+
+        self._last_cross_type_suggestions = {}
+        return filtered
 
     def fetch_doc_pages(
         self,
@@ -730,6 +900,28 @@ class EsChunkV3SearchService:
                 exc,
             )
             return []
+
+    def fetch_chunks_by_ids(
+        self,
+        chunk_ids: list[str],
+    ) -> list[RetrievalResult]:
+        """Fetch specific chunks by their chunk_ids (for context_chunk_ids flow)."""
+        if not chunk_ids:
+            return []
+        docs = self._mget_content_docs(chunk_ids)
+        results: list[RetrievalResult] = []
+        for cid in chunk_ids:
+            doc = docs.get(cid)
+            if doc is None:
+                logger.warning("fetch_chunks_by_ids: chunk_id=%s not found", cid)
+                continue
+            results.append(self._content_doc_to_result(doc, score=0.0))
+        logger.info(
+            "fetch_chunks_by_ids: requested=%d, found=%d",
+            len(chunk_ids),
+            len(results),
+        )
+        return results
 
     def health_check(self) -> bool:
         try:

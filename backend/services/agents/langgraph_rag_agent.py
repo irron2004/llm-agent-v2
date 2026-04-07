@@ -46,6 +46,7 @@ from backend.llm_infrastructure.llm.langgraph_agent import (
     retry_bump_node,
     retry_expand_node,
     retry_mq_node,
+    retry_next_group_node,
     route_node,
     should_retry,
     st_gate_node,
@@ -79,8 +80,8 @@ class LangGraphRAGAgent:
         llm: BaseLLM,
         search_service: SearchService,
         prompt_spec: Optional[PromptSpec] = None,
-        top_k: int = 20,
-        retrieval_top_k: int = 50,
+        top_k: int = 50,
+        retrieval_top_k: int = 100,
         mode: str = "verified",  # base | verified
         checkpointer: Optional[MemorySaver] = None,
         ask_user_after_retrieve: bool = False,
@@ -103,6 +104,8 @@ class LangGraphRAGAgent:
         # section_fetcher for chapter-based expansion (v3)
         _es_engine = getattr(search_service, "es_engine", None)
         self.section_fetcher = getattr(_es_engine, "fetch_section_chunks", None)
+        # chapter_resolver: fallback when section_chapter is empty
+        self.chapter_resolver = getattr(_es_engine, "resolve_chapter_and_fetch", None)
         self.mode = mode
         self.ask_user_after_retrieve = ask_user_after_retrieve
         self.ask_device_selection = ask_device_selection
@@ -438,6 +441,19 @@ class LangGraphRAGAgent:
         return update
 
     def _retrieve_node(self, state: AgentState) -> Dict[str, Any]:
+        # Pre-fetched context docs (관련 문서 제안 버튼 클릭): skip retrieval
+        context_docs = state.get("context_docs")
+        if context_docs:
+            logger.info(
+                "_retrieve_node: using %d pre-fetched context_docs (skip search)",
+                len(context_docs),
+            )
+            return {
+                "docs": list(context_docs),
+                "all_docs": list(context_docs),
+                "ref_json": [],
+                "search_queries": state.get("search_queries", []),
+            }
         if self.use_canonical_retrieval:
             return self._canonical_retrieve_node(state)
         return retrieve_node(
@@ -448,13 +464,27 @@ class LangGraphRAGAgent:
             final_top_k=self.top_k,
         )
 
+    @staticmethod
+    def _strip_abbr_expansion(text: str) -> str:
+        """Remove abbreviation expansions like 'APC (Automated Process Control)' → 'APC'.
+
+        Handles patterns inserted by abbreviation_resolve_node to keep
+        search queries clean for ES BM25 matching.
+        """
+        import re
+        # Match: WORD (Expansion With Multiple Words) — only strip parenthesized
+        # expansions that follow a short token (<=6 chars, likely an abbreviation)
+        return re.sub(r'(\b[A-Za-z]{2,6})\s*\([^)]{4,}\)', r'\1', text).strip()
+
     def _prepare_retrieve_node(self, state: AgentState) -> Dict[str, Any]:
-        stable_query_en = " ".join(
+        # Strip abbreviation expansions from search queries to avoid polluting
+        # ES search with forms like "(Automated Process Control)"
+        stable_query_en = self._strip_abbr_expansion(" ".join(
             (state.get("query_en") or state.get("query") or "").split()
-        ).strip()
-        stable_query_ko = " ".join(
+        ))
+        stable_query_ko = self._strip_abbr_expansion(" ".join(
             (state.get("query_ko") or state.get("query") or "").split()
-        ).strip()
+        ))
         update: Dict[str, Any] = {
             "skip_mq": True,
             "mq_used": False,
@@ -528,6 +558,7 @@ class LangGraphRAGAgent:
                     page_fetcher=self.page_fetcher,
                     doc_fetcher=self.doc_fetcher,
                     section_fetcher=self.section_fetcher,
+                    chapter_resolver=self.chapter_resolver,
                 ),
             ),
         )
@@ -694,6 +725,11 @@ class LangGraphRAGAgent:
         builder.add_edge("expand_related", "answer")
 
         def _after_answer(state: AgentState) -> str:
+            # Modification E: early-exit when all groups fail relevance check
+            # Skip judge + answer generation, go directly to re-retrieve.
+            # Only in verified mode (base mode has no retry nodes).
+            if mode != "base" and state.get("answer_skip_reason") == "no_relevant_group":
+                return "retry_bump"
             task_mode = str(state.get("task_mode") or "").strip().lower()
             if task_mode == "issue":
                 if state.get("answer") == ISSUE_CASE_EMPTY_MESSAGE:
@@ -701,14 +737,18 @@ class LangGraphRAGAgent:
                 return "issue_confirm"
             return "judge"
 
+        _after_answer_targets: dict[str, str] = {
+            "issue_confirm": "issue_confirm",
+            "judge": "judge",
+            "done": "done",
+        }
+        if mode != "base":
+            _after_answer_targets["retry_bump"] = "retry_bump"
+
         builder.add_conditional_edges(
             "answer",
             _after_answer,
-            {
-                "issue_confirm": "issue_confirm",
-                "judge": "judge",
-                "done": "done",
-            },
+            _after_answer_targets,
         )
         builder.add_edge("issue_detail_answer", "issue_sop_confirm")
 
@@ -720,6 +760,11 @@ class LangGraphRAGAgent:
             )
 
         # verified: add retry/human with different strategies
+        # retry_next_group: group-level retry - try next relevant group (no re-retrieval)
+        builder.add_node(
+            "retry_next_group",
+            self._wrap_node("retry_next_group", retry_next_group_node),
+        )
         # retry_expand: 1st retry - use more docs (8→20)
         builder.add_node("retry_expand", self._wrap_node("retry_expand", retry_expand_node))
         # retry_bump + refine_queries: 2nd retry - refine queries and re-retrieve
@@ -742,7 +787,8 @@ class LangGraphRAGAgent:
         # 호환성을 위해 'retry' 별칭을 두고 바로 retry_bump로 연결
         builder.add_node("retry", self._wrap_node("retry", lambda s: {}))
         # Conditional edges based on retry strategy
-        # - retry_expand: 1st unfaithful → expand more docs (no re-retrieval)
+        # - retry_next_group: group-level retry (no re-retrieval, just next group)
+        # - retry_expand: 1st unfaithful (no more groups) → expand more docs
         # - retry: 2nd unfaithful → refine queries and re-retrieve
         # - retry_mq: 3rd+ unfaithful → regenerate MQ from scratch
         builder.add_conditional_edges(
@@ -750,12 +796,16 @@ class LangGraphRAGAgent:
             should_retry,
             {
                 "done": "done",
+                "retry_next_group": "retry_next_group",
                 "retry_expand": "retry_expand",
                 "retry": "retry_bump",
                 "retry_mq": "retry_mq",
                 "human": "human_review",
             },
         )
+
+        # retry_next_group: advance group index and go back to answer (skip retrieve)
+        builder.add_edge("retry_next_group", "answer")
 
         # retry_expand: just increase expand_top_k and go back to expand_related
         builder.add_edge("retry_expand", "expand_related")

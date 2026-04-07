@@ -117,14 +117,22 @@ export default function ChatPage() {
     submitDetailedFeedback,
   } = useChatSession({ onTurnSaved: handleTurnSaved });
 
-  void sessionId;
-
+  // Load session from URL param (history click or direct link)
   useEffect(() => {
-    if (sessionParam) {
-      setSearchParams({}, { replace: true });
+    if (sessionParam && sessionParam !== sessionId) {
       loadSession(sessionParam);
     }
-  }, [sessionParam, loadSession, setSearchParams]);
+  }, [sessionParam]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Update URL when sessionId changes (new session created or load complete)
+  useEffect(() => {
+    if (sessionId) {
+      const current = new URLSearchParams(window.location.search).get("session");
+      if (current !== sessionId) {
+        setSearchParams({ session: sessionId }, { replace: true });
+      }
+    }
+  }, [sessionId, setSearchParams]);
 
   useEffect(() => {
     registerSubmitHandlers({ submitReview, submitSearchQueries });
@@ -270,6 +278,7 @@ export default function ChatPage() {
     const handleNewChat = () => {
       reset();
       setPendingRegeneration(null);
+      setSearchParams({}, { replace: true });
     };
     window.addEventListener("pe-agent:new-chat", handleNewChat);
     return () => {
@@ -365,6 +374,16 @@ export default function ChatPage() {
     });
   }, [setPendingRegeneration]);
 
+  const handleRelatedDocClick = useCallback((payload: { originalQuery: string; docType: string; chunkIds: string[] }) => {
+    send({
+      text: payload.originalQuery,
+      overrides: {
+        contextChunkIds: payload.chunkIds,
+        autoParse: false,
+      },
+    });
+  }, [send]);
+
   const getOriginalQuery = useMemo(() => {
     const queryMap = new Map<string, string>();
     for (let i = 0; i < messages.length; i++) {
@@ -416,6 +435,7 @@ export default function ChatPage() {
                     onFeedback={submitFeedback}
                     onDetailedFeedback={submitDetailedFeedback}
                     onRegenerate={msg.role === "assistant" ? handleRegenerate : undefined}
+                    onRelatedDocClick={msg.role === "assistant" ? handleRelatedDocClick : undefined}
                     onEdit={msg.role === "user" && !isStreaming ? (editedText) => send({ text: editedText }) : undefined}
                     issueCases={
                       msg.role === "assistant" &&

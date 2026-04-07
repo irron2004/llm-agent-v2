@@ -181,6 +181,8 @@ class EsSearchEngine:
         rrf_k: int = 60,
         device_boost: str | None = None,
         device_boost_weight: float = 2.0,
+        doc_id_boost_tokens: list[str] | None = None,
+        doc_id_boost_weight: float = 3.0,
     ) -> list[EsSearchHit]:
         """Perform hybrid search combining dense and sparse.
 
@@ -199,6 +201,8 @@ class EsSearchEngine:
             rrf_k: RRF constant (only used if use_rrf=True).
             device_boost: Optional device_name to boost.
             device_boost_weight: Boost weight for matching device (default: 2.0).
+            doc_id_boost_tokens: Optional tokens to wildcard-match against doc_id.
+            doc_id_boost_weight: Boost weight for matching doc_id tokens.
 
         Returns:
             List of search hits.
@@ -212,6 +216,8 @@ class EsSearchEngine:
                 rrf_k,
                 device_boost,
                 device_boost_weight,
+                doc_id_boost_tokens,
+                doc_id_boost_weight,
             )
         return self._hybrid_search_script_score(
             query_vector,
@@ -222,6 +228,8 @@ class EsSearchEngine:
             filters,
             device_boost,
             device_boost_weight,
+            doc_id_boost_tokens,
+            doc_id_boost_weight,
         )
 
     def _hybrid_search_rrf(
@@ -233,6 +241,8 @@ class EsSearchEngine:
         rrf_k: int,
         device_boost: str | None = None,
         device_boost_weight: float = 2.0,
+        doc_id_boost_tokens: list[str] | None = None,
+        doc_id_boost_weight: float = 3.0,
     ) -> list[EsSearchHit]:
         """Hybrid search using app-level RRF over dense + sparse candidates."""
 
@@ -268,7 +278,10 @@ class EsSearchEngine:
 
         sparse_query: dict[str, Any] = {
             "bool": {
-                "must": self._build_text_query(query_text, device_boost, device_boost_weight),
+                "must": self._build_text_query(
+                    query_text, device_boost, device_boost_weight,
+                    doc_id_boost_tokens, doc_id_boost_weight,
+                ),
             }
         }
         if filters:
@@ -330,6 +343,8 @@ class EsSearchEngine:
         filters: dict[str, Any] | None,
         device_boost: str | None = None,
         device_boost_weight: float = 2.0,
+        doc_id_boost_tokens: list[str] | None = None,
+        doc_id_boost_weight: float = 3.0,
     ) -> list[EsSearchHit]:
         """Hybrid search using script_score with weighted combination."""
         # Combine BM25 and cosine similarity using script_score
@@ -338,7 +353,10 @@ class EsSearchEngine:
             f"+ params.sparse_weight * _score + 1.0"  # +1.0 to avoid negative scores
         )
 
-        match_query = self._build_text_query(query_text, device_boost, device_boost_weight)
+        match_query = self._build_text_query(
+            query_text, device_boost, device_boost_weight,
+            doc_id_boost_tokens, doc_id_boost_weight,
+        )
 
         query: dict[str, Any] = {
             "script_score": {
@@ -399,6 +417,7 @@ class EsSearchEngine:
             "section_number",
             "chapter_source",
             "chapter_ok",
+            "components",
         ]
 
     def fetch_section_chunks(
@@ -444,6 +463,109 @@ class EsSearchEngine:
             return self._parse_hits(resp)
         except Exception as e:
             logger.warning("Section chunk fetch failed: %s", e)
+            return []
+
+    def resolve_chapter_and_fetch(
+        self,
+        doc_id: str,
+        hit_page: int,
+        max_pages: int = 20,
+        content_index: str | None = None,
+    ) -> list[EsSearchHit]:
+        """Resolve chapter from neighbor pages when section_chapter is empty.
+
+        1. Look backward for the nearest page with non-empty section_chapter
+        2. Look forward for the next page with a different section_chapter
+        3. Fetch all pages in the resolved range
+
+        Returns empty list if no chapter can be resolved.
+        """
+        if not doc_id or hit_page is None:
+            return []
+        index = content_index or self.index_name
+
+        # Step 1: Find nearest previous page with non-empty section_chapter
+        try:
+            resp = self.es.search(
+                index=index,
+                body={
+                    "query": {"bool": {"filter": [
+                        {"term": {"doc_id": doc_id}},
+                        {"range": {"page": {"lte": hit_page}}},
+                    ], "must_not": [
+                        {"term": {"section_chapter": ""}},
+                    ]}},
+                    "size": 1,
+                    "sort": [{"page": {"order": "desc"}}],
+                    "_source": ["page", "section_chapter"],
+                },
+            )
+        except Exception as e:
+            logger.warning("resolve_chapter backward search failed: %s", e)
+            return []
+
+        backward_hits = resp.get("hits", {}).get("hits", [])
+        if not backward_hits:
+            return []
+
+        chapter_name = backward_hits[0]["_source"]["section_chapter"]
+        chapter_start_page = backward_hits[0]["_source"]["page"]
+
+        # Step 2: Find the next page with a different non-empty section_chapter
+        try:
+            resp2 = self.es.search(
+                index=index,
+                body={
+                    "query": {"bool": {"filter": [
+                        {"term": {"doc_id": doc_id}},
+                        {"range": {"page": {"gt": hit_page}}},
+                    ], "must_not": [
+                        {"term": {"section_chapter": ""}},
+                        {"term": {"section_chapter": chapter_name}},
+                    ]}},
+                    "size": 1,
+                    "sort": [{"page": {"order": "asc"}}],
+                    "_source": ["page", "section_chapter"],
+                },
+            )
+        except Exception as e:
+            logger.warning("resolve_chapter forward search failed: %s", e)
+            resp2 = {"hits": {"hits": []}}
+
+        forward_hits = resp2.get("hits", {}).get("hits", [])
+        chapter_end_page = (forward_hits[0]["_source"]["page"] - 1) if forward_hits else None
+
+        # Step 3: Fetch all pages in the resolved range
+        filters: list[dict[str, Any]] = [
+            {"term": {"doc_id": doc_id}},
+            {"range": {"page": {"gte": chapter_start_page}}},
+        ]
+        if chapter_end_page is not None:
+            filters.append({"range": {"page": {"lte": chapter_end_page}}})
+
+        try:
+            resp3 = self.es.search(
+                index=index,
+                body={
+                    "query": {"bool": {"filter": filters}},
+                    "size": max_pages,
+                    "sort": [{"page": {"order": "asc"}}],
+                    "_source": self._source_fields(),
+                },
+            )
+            result = self._parse_hits(resp3)
+            if result:
+                logger.info(
+                    "[resolve_chapter] doc_id=%s, hit_page=%d, resolved='%s' "
+                    "(pages %d-%s, fetched %d chunks)",
+                    doc_id, hit_page, chapter_name,
+                    chapter_start_page,
+                    chapter_end_page if chapter_end_page else "end",
+                    len(result),
+                )
+            return result
+        except Exception as e:
+            logger.warning("resolve_chapter range fetch failed: %s", e)
             return []
 
     def fetch_section_chunks_by_keyword(
@@ -498,13 +620,17 @@ class EsSearchEngine:
         query_text: str,
         device_boost: str | None = None,
         device_boost_weight: float = 2.0,
+        doc_id_boost_tokens: list[str] | None = None,
+        doc_id_boost_weight: float = 3.0,
     ) -> dict[str, Any]:
-        """Build text query for single or multi-field BM25 with optional device boost.
+        """Build text query for single or multi-field BM25 with optional boosts.
 
         Args:
             query_text: Search query text.
             device_boost: Optional device_name to boost.
             device_boost_weight: Boost weight for matching device.
+            doc_id_boost_tokens: Optional tokens to wildcard-match against doc_id.
+            doc_id_boost_weight: Boost weight for matching doc_id tokens.
 
         Returns:
             ES query clause.
@@ -520,40 +646,59 @@ class EsSearchEngine:
         else:
             base_query = {"match": {self.text_fields[0]: query_text}}
 
-        # If no device boost, return base query
-        if not device_boost:
+        # Collect should clauses for score boosting
+        should_clauses: list[dict[str, Any]] = []
+
+        # Device name boost (existing)
+        if device_boost:
+            should_clauses.append(
+                {
+                    "bool": {
+                        "should": [
+                            {
+                                "term": {
+                                    "device_name": {
+                                        "value": device_boost,
+                                        "boost": device_boost_weight,
+                                    }
+                                }
+                            },
+                            {
+                                "term": {
+                                    "device_name.keyword": {
+                                        "value": device_boost,
+                                        "boost": device_boost_weight,
+                                    }
+                                }
+                            },
+                        ],
+                        "minimum_should_match": 1,
+                    }
+                }
+            )
+
+        # Doc ID keyword boost: wildcard match query tokens against doc_id
+        # to boost documents whose doc_id contains relevant component keywords
+        if doc_id_boost_tokens:
+            for token in doc_id_boost_tokens:
+                should_clauses.append(
+                    {
+                        "wildcard": {
+                            "doc_id": {
+                                "value": f"*{token}*",
+                                "boost": doc_id_boost_weight,
+                            }
+                        }
+                    }
+                )
+
+        if not should_clauses:
             return base_query
 
-        # Wrap in bool query with should clause for device boost
-        # This boosts documents with matching device_name without filtering others
         return {
             "bool": {
                 "must": base_query,
-                "should": [
-                    {
-                        "bool": {
-                            "should": [
-                                {
-                                    "term": {
-                                        "device_name": {
-                                            "value": device_boost,
-                                            "boost": device_boost_weight,
-                                        }
-                                    }
-                                },
-                                {
-                                    "term": {
-                                        "device_name.keyword": {
-                                            "value": device_boost,
-                                            "boost": device_boost_weight,
-                                        }
-                                    }
-                                },
-                            ],
-                            "minimum_should_match": 1,
-                        }
-                    }
-                ],
+                "should": should_clauses,
             }
         }
 

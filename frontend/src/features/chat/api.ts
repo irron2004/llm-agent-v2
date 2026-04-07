@@ -162,6 +162,18 @@ export async function getFeedbackStatistics(): Promise<FeedbackStatisticsRespons
   return apiClient.get<FeedbackStatisticsResponse>("/api/feedback/statistics");
 }
 
+export async function updateFeedbackResolution(
+  sessionId: string,
+  turnId: number,
+  resolved: boolean,
+  resolvedLink?: string | null,
+): Promise<FeedbackResponse> {
+  return apiClient.patch<FeedbackResponse>(
+    `/api/feedback/${sessionId}/${turnId}/resolution`,
+    { resolved, resolved_link: resolvedLink || null },
+  );
+}
+
 export async function exportFeedbackJson(minScore = 3.0): Promise<Blob> {
   const url = buildUrl(`/api/feedback/export/json?min_score=${minScore}`);
   const res = await fetch(url);

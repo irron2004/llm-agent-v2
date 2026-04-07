@@ -30,6 +30,8 @@ type SendOptions = {
     searchQueries?: string[];
     selectedDocIds?: string[];
     autoParse?: boolean;
+    contextChunkIds?: string[];
+    useReactAgent?: boolean;
   };
 };
 
@@ -915,6 +917,7 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         selectedDevices: res.selected_devices ?? null,
         selectedDocTypes: res.selected_doc_types ?? null,
         searchQueries: effectiveSearchQueries.length > 0 ? effectiveSearchQueries : null,
+        relatedDocTypes: res.related_doc_types ?? m.relatedDocTypes ?? null,
       }));
 
       // If auto-parse could not detect a device, proactively open
@@ -941,13 +944,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
         ? res.all_retrieved_docs
         : (res.retrieved_docs || []);
 
-      const fallbackSuggest = hasAutoParseResult && !hasParsedDeviceSignal;
-      const shouldSuggestAdditionalDeviceSearch = typeof res.suggest_additional_device_search === "boolean"
-        ? (res.suggest_additional_device_search || fallbackSuggest)
-        : fallbackSuggest;
-      const hasCompletedAnswer = typeof res.answer === "string" && res.answer.trim().length > 0;
-      const shouldShowMissingDevicePrompt =
-        shouldSuggestAdditionalDeviceSearch && !hasCompletedAnswer;
+      // Legacy: missing device prompt is disabled. Device selection UI handles this.
+      const shouldShowMissingDevicePrompt = false;
 
       updateMessage(assistantId, (m) => ({
         ...m,
@@ -1194,6 +1192,8 @@ export function useChatSession(options: UseChatSessionOptions = {}) {
             filter_doc_types: overrides.filterDocTypes,
             search_queries: overrides.searchQueries,
             selected_doc_ids: overrides.selectedDocIds,
+            ...(overrides.contextChunkIds?.length ? { context_chunk_ids: overrides.contextChunkIds } : {}),
+            ...(overrides.useReactAgent ? { use_react_agent: true } : {}),
           } : {}),
           ...resumePayload,
           ...(!isResume && threadIdRef.current

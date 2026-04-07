@@ -388,6 +388,7 @@ class ReactRAGAgent:
         self.doc_fetcher = getattr(search_service, "fetch_doc_chunks", None)
         _es_engine = getattr(search_service, "es_engine", None)
         self.section_fetcher = getattr(_es_engine, "fetch_section_chunks", None)
+        self.chapter_resolver = getattr(_es_engine, "resolve_chapter_and_fetch", None)
         self.checkpointer = checkpointer or MemorySaver()
         self._device_names: List[str] = device_names or []
         self._doc_type_names: List[str] = doc_type_names or []
@@ -749,6 +750,7 @@ class ReactRAGAgent:
                 page_fetcher=self.page_fetcher,
                 doc_fetcher=self.doc_fetcher,
                 section_fetcher=self.section_fetcher,
+                chapter_resolver=self.chapter_resolver,
             )
             ref_json = expand_result.get("answer_ref_json") or ref_json
         except Exception:

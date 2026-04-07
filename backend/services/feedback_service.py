@@ -56,6 +56,9 @@ class Feedback:
     comment: Optional[str] = None
     reviewer_name: Optional[str] = None  # 피드백 제출자 이름 (선택)
     logs: Optional[list[str]] = None
+    resolved: bool = False
+    resolved_link: Optional[str] = None
+    resolved_at: Optional[datetime] = None
     ts: Optional[datetime] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -82,6 +85,9 @@ class Feedback:
             "comment": self.comment,
             "reviewer_name": self.reviewer_name,
             "logs": self.logs,
+            "resolved": self.resolved,
+            "resolved_link": self.resolved_link,
+            "resolved_at": self.resolved_at.isoformat() if self.resolved_at else None,
             "ts": (self.ts or datetime.utcnow()).isoformat(),
             "created_at": self.created_at.isoformat() if self.created_at else now,
             "updated_at": now,
@@ -102,6 +108,9 @@ class Feedback:
             comment=data.get("comment"),
             reviewer_name=data.get("reviewer_name"),
             logs=data.get("logs"),
+            resolved=data.get("resolved", False),
+            resolved_link=data.get("resolved_link"),
+            resolved_at=datetime.fromisoformat(data["resolved_at"]) if data.get("resolved_at") else None,
             ts=datetime.fromisoformat(data["ts"]) if data.get("ts") else None,
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None,
@@ -228,6 +237,33 @@ class FeedbackService:
             return Feedback.from_dict(result["_source"])
         except NotFoundError:
             return None
+
+    def update_resolution(
+        self,
+        session_id: str,
+        turn_id: int,
+        resolved: bool,
+        resolved_link: str | None = None,
+    ) -> bool:
+        """Update resolution status of a feedback entry."""
+        doc_id = f"{session_id}:{turn_id}"
+        now = datetime.utcnow().isoformat()
+        body: dict[str, Any] = {
+            "resolved": resolved,
+            "resolved_link": resolved_link,
+            "resolved_at": now if resolved else None,
+            "updated_at": now,
+        }
+        try:
+            self.es.update(
+                index=self.index,
+                id=doc_id,
+                body={"doc": body},
+                refresh=True,
+            )
+            return True
+        except NotFoundError:
+            return False
 
     def list_feedback(
         self,

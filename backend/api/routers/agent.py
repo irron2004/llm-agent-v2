@@ -42,8 +42,8 @@ from backend.services.search_service import SearchService
 router = APIRouter(prefix="/agent", tags=["LangGraph Agent"])
 logger = logging.getLogger(__name__)
 
-DEFAULT_RETRIEVAL_TOP_K = 50
-DEFAULT_FINAL_TOP_K = 20
+DEFAULT_RETRIEVAL_TOP_K = 100
+DEFAULT_FINAL_TOP_K = 50
 MAX_SEARCH_QUERY_METADATA_ITEMS = 5
 MAX_SEARCH_QUERY_METADATA_CHARS = 120
 MAX_INDEX_METADATA_CHARS = 120
@@ -395,6 +395,11 @@ class AgentRequest(BaseModel):
         False,
         description="[실험적] ReAct planner loop 기반 에이전트 사용 (non-resume, non-retrieval_only 경로만 적용)",
     )
+    context_chunk_ids: Optional[List[str]] = Field(
+        None,
+        description="관련 문서 제안 버튼 클릭 시 사용할 chunk_id 목록. "
+        "제공 시 검색을 스킵하고 해당 chunk로 직접 답변 생성.",
+    )
 
 
 class AutoParseConfirmDecision(BaseModel):
@@ -497,6 +502,10 @@ class AgentResponse(BaseModel):
     suggest_additional_device_search: bool = Field(
         False,
         description="auto_parse에서 device를 찾지 못해 추가 장비 검색을 제안해야 하는지 여부",
+    )
+    related_doc_types: Optional[List[Dict[str, Any]]] = Field(
+        None,
+        description="다른 doc_type에서 발견된 관련 문서 제안 [{doc_type, count, message}]",
     )
 
 
@@ -853,6 +862,38 @@ def _sanitize_search_queries_raw(result: Dict[str, Any]) -> Optional[List[str]]:
     return cleaned or None
 
 
+_DOC_TYPE_LABELS: dict[str, str] = {
+    "ts": "Trouble Shooting",
+    "setup": "Setup/설치",
+    "sop": "SOP",
+    "myservice": "MyService 이력",
+    "gcb": "GCB",
+}
+
+
+def _build_related_doc_type_suggestions(
+    search_service: SearchService,
+) -> Optional[List[Dict[str, Any]]]:
+    """search_service의 cross_type_suggestions를 API 응답 형식으로 변환."""
+    suggestions_map = getattr(search_service, "_last_cross_type_suggestions", {})
+    if not suggestions_map:
+        return None
+    result: list[dict[str, Any]] = []
+    for doc_type, chunks in suggestions_map.items():
+        label = _DOC_TYPE_LABELS.get(doc_type, doc_type.upper())
+        chunk_ids = [
+            (c.metadata or {}).get("chunk_id", c.doc_id)
+            for c in chunks
+        ]
+        result.append({
+            "doc_type": doc_type,
+            "count": len(chunks),
+            "chunk_ids": chunk_ids,
+            "message": f"{label} 문서에도 관련 내용이 {len(chunks)}건 있습니다. 확인하시겠습니까?",
+        })
+    return result
+
+
 def _resolve_index_name(search_service: SearchService) -> Optional[str]:
     es_engine = getattr(search_service, "es_engine", None)
     if es_engine is None:
@@ -1067,6 +1108,20 @@ async def run_agent(
     has_overrides = bool(state_overrides)
     state_overrides["mq_mode"] = effective_mq_mode
 
+    # context_chunk_ids: 관련 문서 제안 버튼 클릭 → 해당 chunk로 직접 답변 생성
+    if req.context_chunk_ids:
+        fetcher = getattr(search_service, "fetch_chunks_by_ids", None)
+        if fetcher:
+            context_docs = fetcher(req.context_chunk_ids)
+            if context_docs:
+                state_overrides["context_docs"] = context_docs
+                has_overrides = True
+                logger.info(
+                    "[run] context_chunk_ids: %d requested, %d fetched",
+                    len(req.context_chunk_ids),
+                    len(context_docs),
+                )
+
     # Build chat_history state (separate from overrides to avoid triggering regeneration path)
     chat_state: Dict[str, Any] = {}
     chat_state["mq_mode"] = effective_mq_mode
@@ -1266,6 +1321,7 @@ async def run_agent(
             search_queries=final_search_queries,
             detected_language=result.get("detected_language"),
             suggest_additional_device_search=suggest_additional_device_search,
+            related_doc_types=_build_related_doc_type_suggestions(search_service),
         )
 
     # 정상 완료
@@ -1298,6 +1354,7 @@ async def run_agent(
         search_queries=final_search_queries,
         detected_language=result.get("detected_language"),
         suggest_additional_device_search=suggest_additional_device_search,
+        related_doc_types=_build_related_doc_type_suggestions(search_service),
     )
 
 
@@ -1331,6 +1388,21 @@ async def run_agent_stream(
     state_overrides = _build_state_overrides(req)
     has_overrides = bool(state_overrides)
     state_overrides["mq_mode"] = effective_mq_mode
+
+    # context_chunk_ids: 관련 문서 제안 버튼 클릭 → 해당 chunk로 직접 답변 생성
+    if req.context_chunk_ids:
+        fetcher = getattr(search_service, "fetch_chunks_by_ids", None)
+        if fetcher:
+            context_docs = fetcher(req.context_chunk_ids)
+            if context_docs:
+                state_overrides["context_docs"] = context_docs
+                has_overrides = True
+                logger.info(
+                    "[run/stream] context_chunk_ids: %d requested, %d fetched",
+                    len(req.context_chunk_ids),
+                    len(context_docs),
+                )
+
     logger.info(
         "[run/stream] auto_parse=%s, is_resume=%s, ask_user=%s, has_overrides=%s, guided_confirm=%s, overrides_keys=%s",
         req.auto_parse, is_resume, req.ask_user_after_retrieve, has_overrides, req.guided_confirm, list(state_overrides.keys()),
@@ -1557,6 +1629,7 @@ async def run_agent_stream(
                     search_queries=final_search_queries,
                     detected_language=result.get("detected_language"),
                     suggest_additional_device_search=suggest_additional_device_search,
+                    related_doc_types=_build_related_doc_type_suggestions(search_service),
                 )
             else:
                 resp = AgentResponse(
@@ -1590,6 +1663,7 @@ async def run_agent_stream(
                     search_queries=final_search_queries,
                     detected_language=result.get("detected_language"),
                     suggest_additional_device_search=suggest_additional_device_search,
+                    related_doc_types=_build_related_doc_type_suggestions(search_service),
                 )
 
             _enqueue({"type": "final", "result": resp.model_dump()})

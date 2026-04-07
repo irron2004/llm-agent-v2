@@ -61,6 +61,7 @@ class EsChunkDocument:
     chapter: str = ""
     chunk_summary: str = ""
     chunk_keywords: list[str] = field(default_factory=list)
+    components: list[str] = field(default_factory=list)
 
     # Optional Fields
     page_image_path: str | None = None
@@ -119,6 +120,8 @@ class EsChunkDocument:
             doc["chunk_summary"] = self.chunk_summary
         if self.chunk_keywords:
             doc["chunk_keywords"] = self.chunk_keywords
+        if self.components:
+            doc["components"] = self.components
 
         # Add optional fields only if set
         if self.page_image_path:
@@ -193,6 +196,11 @@ class EsChunkDocument:
             chunk_keywords = [chunk_keywords]
         elif not isinstance(chunk_keywords, list):
             chunk_keywords = []
+        components = section_meta.get("components", [])
+        if isinstance(components, str):
+            components = [components]
+        elif not isinstance(components, list):
+            components = []
 
         return cls(
             doc_id=doc_id,
@@ -214,6 +222,7 @@ class EsChunkDocument:
             chapter=chapter,
             chunk_summary=chunk_summary,
             chunk_keywords=chunk_keywords,
+            components=components,
         )
 
 
