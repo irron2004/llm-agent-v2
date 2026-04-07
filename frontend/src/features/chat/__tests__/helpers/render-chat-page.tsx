@@ -28,8 +28,16 @@ export const mockRegisterSubmitHandlers = vi.fn();
 export const mockRegisterRegenerationHandlers = vi.fn();
 
 export const mockRefreshHistory = vi.fn();
+export const mockSetSearchParams = vi.fn();
 
 export const mockFetchDeviceCatalog = vi.fn<[], Promise<DeviceCatalogResponse>>();
+
+let currentSearchParams = new URLSearchParams();
+
+export function setMockSearchParams(value: string | URLSearchParams) {
+  currentSearchParams =
+    typeof value === "string" ? new URLSearchParams(value) : new URLSearchParams(value);
+}
 
 // ── Module-level mocks ──
 
@@ -50,7 +58,7 @@ vi.mock("../../api", () => ({
 }));
 
 vi.mock("react-router-dom", () => ({
-  useSearchParams: vi.fn(() => [new URLSearchParams(), vi.fn()]),
+  useSearchParams: vi.fn(() => [currentSearchParams, mockSetSearchParams]),
 }));
 
 // ── Lazy imports (after mocks are registered) ──
@@ -184,5 +192,7 @@ export function resetAllMocks() {
   mockRegisterSubmitHandlers.mockReset();
   mockRegisterRegenerationHandlers.mockReset();
   mockRefreshHistory.mockReset();
+  mockSetSearchParams.mockReset();
   mockFetchDeviceCatalog.mockReset();
+  currentSearchParams = new URLSearchParams();
 }

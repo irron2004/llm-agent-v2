@@ -6,7 +6,6 @@ import {
   InputNumber,
   Button,
   Modal,
-  Spin,
   Checkbox,
   message,
   Card,
@@ -35,6 +34,17 @@ import type {
   FeedbackStatisticsResponse,
 } from "../../chat/types";
 import { MarkdownContent } from "../../chat/components/markdown-content";
+
+export function buildChatSessionHref(sessionId: string): string {
+  return `/?session=${encodeURIComponent(sessionId)}`;
+}
+
+export function toSafeInternalHref(link?: string | null): string | null {
+  const trimmed = link?.trim();
+  if (!trimmed) return null;
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//")) return null;
+  return trimmed;
+}
 
 export default function FeedbackPage() {
   const [loading, setLoading] = useState(false);
@@ -236,16 +246,18 @@ export default function FeedbackPage() {
       key: "resolved",
       width: 60,
       align: "center" as const,
-      render: (resolved: boolean, record: FeedbackResponse) =>
-        resolved ? (
-          record.resolved_link ? (
-            <a href={record.resolved_link} title="해결된 채팅 보기">
+      render: (resolved: boolean, record: FeedbackResponse) => {
+        const safeResolvedLink = toSafeInternalHref(record.resolved_link);
+        return resolved ? (
+          safeResolvedLink ? (
+            <a href={safeResolvedLink} title="해결된 채팅 보기">
               <CheckCircleOutlined style={{ color: "#52c41a", fontSize: 16 }} />
             </a>
           ) : (
             <CheckCircleOutlined style={{ color: "#52c41a", fontSize: 16 }} />
           )
-        ) : null,
+        ) : null;
+      },
     },
     {
       title: "",
@@ -400,6 +412,12 @@ export default function FeedbackPage() {
       >
         {selectedFeedback && (
           <div>
+            {(() => {
+              const originalChatHref = buildChatSessionHref(selectedFeedback.session_id);
+              const safeResolvedHref = toSafeInternalHref(editResolvedLink);
+
+              return (
+                <>
             <div style={{ marginBottom: 16 }}>
               <h4 style={{ marginBottom: 8 }}>점수</h4>
               <div style={{ display: "flex", gap: 24 }}>
@@ -496,6 +514,13 @@ export default function FeedbackPage() {
             <div style={{ marginTop: 16, padding: 16, borderRadius: 8, border: "1px solid #d9d9d9", background: "#fafafa" }}>
               <h4 style={{ marginBottom: 12 }}>해결 상태</h4>
               <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <LinkOutlined />
+                  <span style={{ fontSize: 13, color: "#666" }}>원본 피드백 채팅</span>
+                  <a href={originalChatHref} target="_blank" rel="noopener noreferrer">
+                    <Button size="small">원본 채팅 열기</Button>
+                  </a>
+                </div>
                 <Checkbox
                   checked={editResolved}
                   onChange={(e: { target: { checked: boolean } }) => setEditResolved(e.target.checked)}
@@ -510,12 +535,17 @@ export default function FeedbackPage() {
                     onChange={(e: { target: { value: string } }) => setEditResolvedLink(e.target.value)}
                     style={{ flex: 1 }}
                   />
-                  {editResolvedLink && (
-                    <a href={editResolvedLink} target="_blank" rel="noopener noreferrer">
+                  {safeResolvedHref && (
+                    <a href={safeResolvedHref} target="_blank" rel="noopener noreferrer">
                       <Button size="small" icon={<LinkOutlined />}>열기</Button>
                     </a>
                   )}
                 </div>
+                {editResolvedLink && !safeResolvedHref && (
+                  <span style={{ fontSize: 12, color: "#cf1322" }}>
+                    앱 내부 경로만 허용됩니다. 예: /?session=resolved-session-id
+                  </span>
+                )}
                 <div style={{ display: "flex", gap: 8 }}>
                   <Button
                     type="primary"
@@ -545,6 +575,9 @@ export default function FeedbackPage() {
               {selectedFeedback.turn_id} |{" "}
               {new Date(selectedFeedback.ts).toLocaleString("ko-KR")}
             </div>
+                </>
+              );
+            })()}
           </div>
         )}
       </Modal>
