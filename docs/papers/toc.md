@@ -38,9 +38,11 @@
 - [박사과정 연구계획서 초안](./50_paper_d_sensor_doc/paper_d_research_proposal.md)
 - [논문 전략 및 프레이밍](./50_paper_d_sensor_doc/paper_d_paper_strategy.md)
 - [데이터 검증 Agent 지시문](./50_paper_d_sensor_doc/paper_d_data_verification.md)
+- [3가지 원칙 구현 예시](./50_paper_d_sensor_doc/paper_d_implementation_examples.md)
 - Evidence:
   - [RAAD-LLM 논문 상세 리뷰](./50_paper_d_sensor_doc/evidence/2026-04-14_raad_llm_review.md)
-  - [6개 영역 문헌 조사 (21편+)](./50_paper_d_sensor_doc/evidence/2026-04-14_literature_survey.md)
+  - [6개 영역 문헌 조사 (26편)](./50_paper_d_sensor_doc/evidence/2026-04-14_literature_survey.md)
+  - [Paper D 포지셔닝 중심 문헌조사](./50_paper_d_sensor_doc/evidence/2026-04-14_related_literature_survey.md)
 - 주제: 센서 이상 → 이벤트화 → 문서 검색 → 근거 기반 트러블슈팅 답변
 - 핵심 키워드: Contrastive Retriever, Hybrid RAG, Sensor Eventization, Temporal Uncertainty, Ontology
 

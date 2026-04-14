@@ -27,9 +27,11 @@
 ├── paper_d_research_proposal.md           # 박사과정 연구계획서 초안
 ├── paper_d_paper_strategy.md              # 논문 전략, 프레이밍, 빠른 실험 순서
 ├── paper_d_data_verification.md           # 데이터 검증 Agent 지시문 (3종)
+├── paper_d_implementation_examples.md     # 3가지 원칙 구현 예시 (코드 스케치)
 └── evidence/
-    ├── 2026-04-14_raad_llm_review.md      # RAAD-LLM 논문 상세 리뷰
-    └── 2026-04-14_literature_survey.md    # 6개 영역 21편+ 문헌 조사
+    ├── 2026-04-14_raad_llm_review.md              # RAAD-LLM 논문 상세 리뷰
+    ├── 2026-04-14_literature_survey.md            # 6개 영역 26편 문헌 조사
+    └── 2026-04-14_related_literature_survey.md    # Paper D 포지셔닝 중심 문헌조사
 ```
 
 ## Status
