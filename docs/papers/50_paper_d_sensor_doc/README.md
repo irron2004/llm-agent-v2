@@ -28,7 +28,8 @@
 ├── paper_d_paper_strategy.md              # 논문 전략, 프레이밍, 빠른 실험 순서
 ├── paper_d_data_verification.md           # 데이터 검증 Agent 지시문 (3종)
 └── evidence/
-    └── 2026-04-14_raad_llm_review.md      # RAAD-LLM 논문 상세 리뷰
+    ├── 2026-04-14_raad_llm_review.md      # RAAD-LLM 논문 상세 리뷰
+    └── 2026-04-14_literature_survey.md    # 6개 영역 21편+ 문헌 조사
 ```
 
 ## Status
@@ -48,7 +49,7 @@
 - [ ] 논문 가능성 판정 (7개 핵심 숫자 확인)
 - [ ] Pilot set 50~100개 구축
 - [ ] Failure family 선택 및 범위 확정
-- [ ] 관련 논문 추가 서베이 (CLaSP, LaSTR, SOPRAG, GraphRAG, ManuRAG 등)
+- [x] 관련 논문 문헌 조사 완료 — 6개 영역, Tier 1~3 총 21편+ (2026-04-14)
 - [ ] Baseline 구현
 - [ ] 1편 (데이터셋/문제정의) 논문 집필
 
