@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { SendOutlined, StopOutlined } from "@ant-design/icons";
-import { Select } from "antd";
+import { Select, Switch } from "antd";
 
 type SelectOption = { label: string; value: string };
 type DocTypeOption = SelectOption & { isPreset?: boolean };
@@ -20,6 +20,8 @@ type ChatInputProps = {
   equipOptions?: SelectOption[];
   selectedEquip?: string | null;
   onEquipChange?: (equip: string | null) => void;
+  useReactAgent?: boolean;
+  onReactAgentChange?: (checked: boolean) => void;
 };
 
 export function ChatInput({
@@ -37,6 +39,8 @@ export function ChatInput({
   equipOptions,
   selectedEquip,
   onEquipChange,
+  useReactAgent,
+  onReactAgentChange,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -63,7 +67,7 @@ export function ChatInput({
     }
   };
 
-  const hasFilterBar = Boolean(docTypeOptions || modelOptions || equipOptions);
+  const hasFilterBar = Boolean(docTypeOptions || modelOptions || equipOptions || onReactAgentChange);
 
   return (
     <div className="input-wrapper">
@@ -113,6 +117,12 @@ export function ChatInput({
                 (option?.label ?? "").toLowerCase().includes(input.toLowerCase())
               }
             />
+          )}
+          {onReactAgentChange && (
+            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer", whiteSpace: "nowrap", fontSize: 13 }}>
+              <Switch size="small" checked={useReactAgent} onChange={onReactAgentChange} />
+              <span>ReAct</span>
+            </label>
           )}
         </div>
       )}
