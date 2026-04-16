@@ -1149,6 +1149,14 @@ async def run_agent(
                 thread_id=tid,
                 state_overrides={"mq_mode": effective_mq_mode},
             )
+        # ReAct agent: use_react_agent가 명시적으로 요청된 경우 (overrides 유무 무관)
+        elif req.use_react_agent and not is_resume:
+            agent = _new_react_agent(
+                llm,
+                search_service,
+                prompt_spec,
+                top_k=req.top_k,
+            )
         # Auto-parse 모드 (기본값: True), skip when overrides are provided
         elif (
             req.auto_parse
@@ -1458,6 +1466,15 @@ async def run_agent_stream(
                     thread_id=tid,
                     state_overrides={"mq_mode": effective_mq_mode},
                 )
+            # ReAct agent: use_react_agent가 명시적으로 요청된 경우 (overrides 유무 무관)
+            elif req.use_react_agent and not is_resume:
+                agent = _new_react_agent(
+                    llm,
+                    search_service,
+                    prompt_spec,
+                    top_k=req.top_k,
+                    event_sink=_enqueue,
+                )
             # Auto-parse 모드 (기본값: True), skip when overrides are provided
             elif (
                 req.auto_parse
@@ -1473,16 +1490,6 @@ async def run_agent_stream(
                         prompt_spec,
                         top_k=req.top_k,
                         use_canonical_retrieval=req.use_canonical_retrieval,
-                        event_sink=_enqueue,
-                    )
-                elif req.use_react_agent:
-                    # [실험적] ReAct planner loop — streaming 경로
-                    # retrieval_only=True 시 _search_node에서 interrupt 처리 (C-API-003)
-                    agent = _new_react_agent(
-                        llm,
-                        search_service,
-                        prompt_spec,
-                        top_k=req.top_k,
                         event_sink=_enqueue,
                     )
                 else:
