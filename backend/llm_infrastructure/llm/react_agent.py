@@ -308,6 +308,13 @@ _FOLLOWUP_INDICATORS = {
     "줄여줘",
     "간단히",
     "쉽게",
+    "만들어줘",
+    "만들어 줘",
+    "출제해",
+    "작성해",
+    "작성하세요",
+    "써줘",
+    "써 줘",
 }
 
 
@@ -322,6 +329,13 @@ def _is_followup_query(query: str) -> bool:
         return False
     has_indicator = any(ind in ql for ind in _FOLLOWUP_INDICATORS)
     if not has_indicator:
+        return False
+    # TS/procedure 핵심 키워드가 있으면 독립 질문 (follow-up 아님)
+    _INDEPENDENT_SIGNALS = (
+        "alarm", "알람", "error", "에러", "interlock", "교체", "교정",
+        "캘리브", "청소", "점검", "spec", "part number",
+    )
+    if any(sig in ql for sig in _INDEPENDENT_SIGNALS):
         return False
     # 장비명이나 구체적 기술 키워드가 있으면 독립 질문일 가능성
     has_device = any(d in query.upper() for d in [
