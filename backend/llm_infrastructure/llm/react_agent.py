@@ -759,6 +759,15 @@ class ReactRAGAgent:
             "연결 불가",
             "timeout",
             "타임아웃",
+            "leak",
+            "리크",
+            "누설",
+            "particle",
+            "파티클",
+            "down",
+            "다운",
+            "hunting",
+            "헌팅",
         )
         if any(kw in raw_query.lower() for kw in _TS_KEYWORDS):
             current_dt = pq.get("selected_doc_types") or pq.get("doc_types") or []

@@ -1128,6 +1128,8 @@ async def run_agent(
         chat_state["chat_history"] = [h.model_dump() for h in req.chat_history]
 
     try:
+        logger.info("[run] branching: retrieval_only=%s, use_react=%s, auto_parse=%s, has_overrides=%s, is_resume=%s",
+                     req.retrieval_only, req.use_react_agent, req.auto_parse, has_overrides, is_resume)
         if req.retrieval_only and not is_resume:
             retrieval_only_agent = LangGraphRAGAgent(
                 llm=llm,
@@ -1151,6 +1153,7 @@ async def run_agent(
             )
         # ReAct agent: use_react_agent가 명시적으로 요청된 경우 (overrides 유무 무관)
         elif req.use_react_agent and not is_resume:
+            logger.info("[run] ★ ReAct agent selected (use_react_agent=%s, is_resume=%s)", req.use_react_agent, is_resume)
             agent = _new_react_agent(
                 llm,
                 search_service,
@@ -1164,6 +1167,7 @@ async def run_agent(
                 thread_id=tid,
                 state_overrides={
                     **(chat_state or {}),
+                    "mq_mode": "react",
                     "chat_history": [h.model_dump() for h in req.chat_history] if req.chat_history else [],
                 },
             )
@@ -1492,6 +1496,7 @@ async def run_agent_stream(
                     thread_id=tid,
                     state_overrides={
                         **(chat_state_stream or {}),
+                        "mq_mode": "react",
                         "chat_history": [h.model_dump() for h in req.chat_history] if req.chat_history else [],
                     },
                 )
