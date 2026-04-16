@@ -1294,7 +1294,8 @@ def _build_setup_work_procedure_ref_map(
         ]
         if inline_wp_docs:
             wp_ref_map[base_doc_id] = results_to_ref_json(
-                inline_wp_docs, max_chars=MAX_REF_CHARS_ANSWER,
+                inline_wp_docs,
+                max_chars=MAX_REF_CHARS_ANSWER,
             )
             continue
 
@@ -1319,7 +1320,8 @@ def _build_setup_work_procedure_ref_map(
 
         if fetched_wp_docs:
             wp_ref_map[base_doc_id] = results_to_ref_json(
-                fetched_wp_docs, max_chars=MAX_REF_CHARS_ANSWER,
+                fetched_wp_docs,
+                max_chars=MAX_REF_CHARS_ANSWER,
             )
 
     return wp_ref_map
@@ -4785,6 +4787,15 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     ref_text = ref_json_to_text(ref_items)
     query_for_judge = state.get("query_en") or state["query"]
     answer = state.get("answer", "")
+
+    # Guard: empty-REFS short-circuit — 검색 결과 없이 "찾지 못/결과가 없" 표시 시 LLM 판정 건너뛰기
+    if ref_text == "EMPTY":
+        has_not_found = "찾지 못" in answer or "결과가 없" in answer
+        has_clarification = ("?" in answer) and (len(answer.split("?")) <= 4)
+        has_citation = bool(re.search(r"\[[0-9]+\]", answer))
+        if has_not_found and has_clarification and not has_citation:
+            return {"judge": {"faithful": True, "issues": [], "hint": "no_refs: clarification"}}
+        return {"judge": {"faithful": False, "issues": ["no_refs"], "hint": "no refs to evaluate"}}
 
     # Setup route: 보완형 — 답변의 누락 내용을 보완하고 재시도 없이 종료
     if route == "setup" and answer and "찾지 못했습니다" not in answer:

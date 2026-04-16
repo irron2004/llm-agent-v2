@@ -67,22 +67,26 @@ def _infer_route(state: "ReactAgentState") -> str:  # type: ignore[name-defined]
         return "ts"
     return "general"
 
+
 # ── 상수 ────────────────────────────────────────────────────────────────────
 
-MAX_SEARCH_ITERATIONS = 3   # 최대 검색 횟수 (초과 시 강제 answer)
-MAX_JUDGE_RETRIES = 2       # judge unfaithful 시 최대 재시도 횟수
-TEMP_PLAN = 0.0             # planner 온도 (결정론적)
+MAX_SEARCH_ITERATIONS = 3  # 최대 검색 횟수 (초과 시 강제 answer)
+MAX_JUDGE_RETRIES = 2  # judge unfaithful 시 최대 재시도 횟수
+TEMP_PLAN = 0.0  # planner 온도 (결정론적)
 
 
 # ── NextAction 모델 (BaseLLM.generate(response_model=NextAction) 용) ──────────
 
+
 class NextAction(PydanticBaseModel):
     """planner LLM이 결정하는 다음 행동."""
+
     action: Literal["search", "search_solution", "answer"]
     reason: str
     query: Optional[str] = None
     device_names: List[str] = []
     doc_types: List[str] = []
+
 
 # ── State ────────────────────────────────────────────────────────────────────
 
@@ -100,15 +104,15 @@ class ReactAgentState(TypedDict, total=False):
     target_language: Optional[str]
     query_en: Optional[str]
     query_ko: Optional[str]
-    parsed_query: Dict[str, Any]   # device_names, doc_types, equip_ids, route …
+    parsed_query: Dict[str, Any]  # device_names, doc_types, equip_ids, route …
     original_query: str
 
     # ── ReAct 루프 ────────────────────────────────────────────────
-    plan: Optional[Dict[str, Any]]    # planner 결정 JSON
-    iterations: int                   # 실행된 검색 횟수
+    plan: Optional[Dict[str, Any]]  # planner 결정 JSON
+    iterations: int  # 실행된 검색 횟수
     action_trace: List[Dict[str, Any]]  # 검색 이력 (디버깅/프롬프트용)
-    collected_docs: List[Any]           # 누적 RetrievalResult
-    search_queries_used: List[str]      # 실제 사용된 쿼리 목록
+    collected_docs: List[Any]  # 누적 RetrievalResult
+    search_queries_used: List[str]  # 실제 사용된 쿼리 목록
 
     # ── C-API-001 메타데이터 ──────────────────────────────────────
     route: Optional[str]
@@ -181,7 +185,7 @@ def _format_history(chat_history: List[Dict[str, Any]]) -> str:
     if not chat_history:
         return "(없음)"
     lines = []
-    for turn in chat_history[-6:]:   # 최근 3턴 (6개 메시지)
+    for turn in chat_history[-6:]:  # 최근 3턴 (6개 메시지)
         # ChatHistoryTurn 형식 (agent.py가 model_dump()로 넘기는 형식)
         if "user_text" in turn:
             user = str(turn.get("user_text", ""))[:200]
@@ -219,11 +223,7 @@ def _format_doc_summary(docs: List[Any]) -> str:
     for doc in docs:
         meta = getattr(doc, "metadata", {}) or {}
         doc_id = meta.get("doc_id") or meta.get("id", "")
-        title = (
-            meta.get("title")
-            or meta.get("file_name")
-            or meta.get("doc_type", "")
-        )
+        title = meta.get("title") or meta.get("file_name") or meta.get("doc_type", "")
         device = meta.get("device_name", "")
         score = getattr(doc, "score", None) or meta.get("score")
         if doc_id and doc_id not in seen:
@@ -251,6 +251,110 @@ def _plan_fallback(has_docs: bool = False) -> Dict[str, Any]:
 
 
 # ── 장비명 토큰 기반 확장 ─────────────────────────────────────────────────────
+
+_PROCEDURE_KEYWORDS = {
+    "설치하는",
+    "설치하는법",
+    "설치 방법",
+    "설치법",
+    "연결하는",
+    "연결하는법",
+    "연결 방법",
+    "연결법",
+    "사용하는",
+    "사용 방법",
+    "사용법",
+    "조립하는",
+    "조립 방법",
+    "조립법",
+    "설정하는",
+    "설정 방법",
+    "설정법",
+    "setup",
+    "install",
+    "connect",
+    "configure",
+    "assemble",
+    "how to setup",
+    "how to install",
+    "how to connect",
+    "how to use",
+    "방법",
+    "법",
+    "如何使用",
+    "怎么安装",
+    "怎样连接",
+    "如何设置",
+}
+
+_TROUBLESHOOTING_KEYWORDS = {
+    "알람",
+    "에러",
+    "점검",
+    "조치",
+    "이상",
+    "트러블슈팅",
+    "abnormal",
+    "alarm",
+    "error",
+    "check",
+    "action",
+    "abnormal",
+    "troubleshoot",
+    "문제",
+    "故障",
+    "문제점",
+    "원인",
+    "해결",
+    "이상 증상",
+}
+
+_INQUIRY_PHRASES = {
+    "part number",
+    "model number",
+    "catalog number",
+    "cno",
+    "형번",
+    "품번",
+    "모델번호",
+    "부품번호",
+    "목록",
+    "전체 목록",
+    "list of",
+    "what are the",
+    "어디서",
+    "在哪里",
+    "where can",
+    "where is",
+    "where to find",
+    "지원 가능",
+    "対応",
+    "supported?",
+    "is supported",
+    "지원해",
+    "장비 필요",
+    "도구 필요",
+    "equipment needed",
+    "tool needed",
+    "뭐가 필요",
+    "뭐 필요",
+    "어떤 장비",
+    "어떤 도구",
+    "what equipment",
+    "what tool",
+}
+
+
+def _should_override_setup_to_general(query: str) -> bool:
+    q_lower = query.lower()
+    if any(kw in q_lower for kw in _PROCEDURE_KEYWORDS):
+        return False
+    if any(kw in q_lower for kw in _TROUBLESHOOTING_KEYWORDS):
+        return False
+    if any(p in q_lower for p in _INQUIRY_PHRASES):
+        return True
+    return False
+
 
 def _expand_device_names_by_tokens(
     selected: List[str],
@@ -286,7 +390,9 @@ def _expand_device_names_by_tokens(
     if len(expanded) > len(selected):
         logger.info(
             "device token expansion: %s → %s (%d variants added)",
-            selected, expanded[:5], len(expanded) - len(selected),
+            selected,
+            expanded[:5],
+            len(expanded) - len(selected),
         )
     return expanded
 
@@ -332,9 +438,8 @@ def _filter_docs_by_action_type(
     neutral: List[Any] = []  # doc_id에 action code가 없는 문서
 
     for doc in docs:
-        doc_id = (
-            getattr(doc, "doc_id", None)
-            or (getattr(doc, "metadata", {}) or {}).get("doc_id", "")
+        doc_id = getattr(doc, "doc_id", None) or (getattr(doc, "metadata", {}) or {}).get(
+            "doc_id", ""
         )
         m = _DOC_ID_ACTION_RE.search(str(doc_id))
         if not m:
@@ -347,7 +452,10 @@ def _filter_docs_by_action_type(
     if matched or unmatched:
         logger.info(
             "action_type_filter: intent=%s matched=%d unmatched=%d neutral=%d",
-            intent, len(matched), len(unmatched), len(neutral),
+            intent,
+            len(matched),
+            len(unmatched),
+            len(neutral),
         )
 
     # 매칭 문서 우선, 중립 문서 다음, 불일치 문서 마지막
@@ -409,15 +517,17 @@ class ReactRAGAgent:
 
     def _emit_node(self, name: str, elapsed_ms: float, details: str = "") -> None:
         elapsed_str = f"{elapsed_ms / 1000:.1f}s" if elapsed_ms >= 1000 else f"{elapsed_ms:.0f}ms"
-        self._emit({
-            "type": "log",
-            "level": "info",
-            "node": name,
-            "ts": time.time(),
-            "elapsed_ms": round(elapsed_ms, 1),
-            "details": details,
-            "message": f"{name} ({elapsed_str})" + (f" - {details}" if details else ""),
-        })
+        self._emit(
+            {
+                "type": "log",
+                "level": "info",
+                "node": name,
+                "ts": time.time(),
+                "elapsed_ms": round(elapsed_ms, 1),
+                "details": details,
+                "message": f"{name} ({elapsed_str})" + (f" - {details}" if details else ""),
+            }
+        )
 
     # ── 노드 구현 ─────────────────────────────────────────────────────────────
 
@@ -460,10 +570,28 @@ class ReactRAGAgent:
             update["parsed_query"] = pq
             update["route"] = route
 
+        current_route = pq.get("route")
+        if current_route == "setup" and _should_override_setup_to_general(state["query"]):
+            pq["route"] = "general"
+            update["parsed_query"] = pq
+            update["route"] = "general"
+
         # 트러블슈팅 질문 시 doc_types를 myservice/gcb/ts로 확장
         # (이상 원인, 점검/조치 이력 등 문제 해결 질문은 세 doc_type 모두 검색 필요)
         raw_query = state["query"]
-        _TS_KEYWORDS = ("트러블슈팅", "troubleshoot", "이상", "abnormal", "점검", "조치", "이력", "알람", "에러", "error", "alarm")
+        _TS_KEYWORDS = (
+            "트러블슈팅",
+            "troubleshoot",
+            "이상",
+            "abnormal",
+            "점검",
+            "조치",
+            "이력",
+            "알람",
+            "에러",
+            "error",
+            "alarm",
+        )
         if any(kw in raw_query.lower() for kw in _TS_KEYWORDS):
             current_dt = pq.get("selected_doc_types") or pq.get("doc_types") or []
             ts_types = {"myservice", "gcb", "ts"}
@@ -549,7 +677,9 @@ class ReactRAGAgent:
                 )
                 plan = next_action.model_dump()
             except Exception:
-                logger.warning("react_agent: plan generation failed, trying raw JSON parse", exc_info=True)
+                logger.warning(
+                    "react_agent: plan generation failed, trying raw JSON parse", exc_info=True
+                )
                 # structured output 실패 시 raw JSON 파싱 시도
                 plan = self._try_raw_plan_parse(user) or _plan_fallback(has_docs)
 
@@ -601,12 +731,14 @@ class ReactRAGAgent:
                 from backend.llm_infrastructure.query_expansion.abbreviation_expander import (
                     get_abbreviation_expander,
                 )
+
                 _expander = get_abbreviation_expander(agent_settings.abbreviation_dict_path)
                 expand_result = _expander.expand_query(search_query)
                 if expand_result.expanded_query != search_query:
                     logger.info(
                         "react_agent: abbreviation expanded '%s' → '%s'",
-                        search_query[:60], expand_result.expanded_query[:60],
+                        search_query[:60],
+                        expand_result.expanded_query[:60],
                     )
                     search_query = expand_result.expanded_query
             except Exception:
@@ -614,8 +746,12 @@ class ReactRAGAgent:
 
         # 필터: plan 우선, parsed_query 폴백
         pq = state.get("parsed_query") or {}
-        device_names: List[str] = plan.get("device_names") or pq.get("selected_devices") or pq.get("device_names") or []
-        doc_types: List[str] = plan.get("doc_types") or pq.get("selected_doc_types") or pq.get("doc_types") or []
+        device_names: List[str] = (
+            plan.get("device_names") or pq.get("selected_devices") or pq.get("device_names") or []
+        )
+        doc_types: List[str] = (
+            plan.get("doc_types") or pq.get("selected_doc_types") or pq.get("doc_types") or []
+        )
         equip_ids: List[str] = pq.get("selected_equip_ids") or pq.get("equip_ids") or []
 
         # 장비명 토큰 기반 확장: "GENEVA XP" → "GENEVA STP300 xp", "GENEVA_STP300_XP" 등 포함
@@ -667,22 +803,23 @@ class ReactRAGAgent:
             for d in existing
         }
         added = [
-            d for d in new_docs
-            if (
-                getattr(d, "doc_id", None)
-                or (getattr(d, "metadata", {}) or {}).get("doc_id")
-            ) not in existing_ids
+            d
+            for d in new_docs
+            if (getattr(d, "doc_id", None) or (getattr(d, "metadata", {}) or {}).get("doc_id"))
+            not in existing_ids
         ]
         combined = existing + added
 
         # 이력 기록
         trace = list(state.get("action_trace") or [])
-        trace.append({
-            "action": plan.get("action", "search"),
-            "query": search_query,
-            "found": len(new_docs),
-            "added": len(added),
-        })
+        trace.append(
+            {
+                "action": plan.get("action", "search"),
+                "query": search_query,
+                "found": len(new_docs),
+                "added": len(added),
+            }
+        )
 
         queries_used = list(state.get("search_queries_used") or [])
         queries_used.append(search_query)
@@ -714,11 +851,13 @@ class ReactRAGAgent:
             display = _merge_display_docs(combined)
             update["display_docs"] = display
             update["docs"] = combined
-            interrupt({
-                "type": "retrieval_review",
-                "docs": display,
-                "response_mode": "retrieval_only",
-            })
+            interrupt(
+                {
+                    "type": "retrieval_review",
+                    "docs": display,
+                    "response_mode": "retrieval_only",
+                }
+            )
 
         return update
 
@@ -811,13 +950,20 @@ class ReactRAGAgent:
             issues = judge_result.get("issues", [])
             logger.info(
                 "react_agent: judge unfaithful (attempt %d/%d), will retry. hint=%s issues=%s",
-                attempts + 1, max_attempts, hint[:100], issues[:3],
+                attempts + 1,
+                max_attempts,
+                hint[:100],
+                issues[:3],
             )
             result["_judge_retry_hint"] = hint
             result["_judge_retry_issues"] = issues
 
         elapsed = (time.perf_counter() - t0) * 1000
-        self._emit_node("judge", elapsed, "✓ 충실" if faithful else f"✗ 불충실 (attempt {attempts + 1}/{max_attempts})")
+        self._emit_node(
+            "judge",
+            elapsed,
+            "✓ 충실" if faithful else f"✗ 불충실 (attempt {attempts + 1}/{max_attempts})",
+        )
         return result
 
     @staticmethod
@@ -860,7 +1006,7 @@ class ReactRAGAgent:
             self._route_after_plan,
             {"search": "search", "answer": "answer"},
         )
-        builder.add_edge("search", "plan")   # 루프: search → plan → search | answer
+        builder.add_edge("search", "plan")  # 루프: search → plan → search | answer
         builder.add_edge("answer", "judge")
         builder.add_conditional_edges(
             "judge",
@@ -929,9 +1075,7 @@ class ReactRAGAgent:
         # mq_used: 검색을 2회 이상 했으면 True
         iterations = int(result.get("iterations", 0) or 0)
         result["mq_used"] = iterations > 1
-        result["mq_reason"] = (
-            f"react loop: {iterations} search(es)" if iterations > 1 else None
-        )
+        result["mq_reason"] = f"react loop: {iterations} search(es)" if iterations > 1 else None
         # mq_mode: state_overrides로 주입된 값 우선, 없으면 "react"
         if not result.get("mq_mode"):
             result["mq_mode"] = "react"
@@ -944,9 +1088,7 @@ class ReactRAGAgent:
         # selected_doc_types: parsed_query에서 읽어서 보조 metadata 채우기
         pq = result.get("parsed_query") or {}
         if not result.get("selected_doc_types"):
-            result["selected_doc_types"] = (
-                pq.get("selected_doc_types") or pq.get("doc_types") or []
-            )
+            result["selected_doc_types"] = pq.get("selected_doc_types") or pq.get("doc_types") or []
 
         # route: parsed_query에서 읽거나 "general" 기본값
         if not result.get("route"):
