@@ -91,6 +91,11 @@
 - 원인/조치 문맥과 연결됨
 - Paper D의 sensor-event ↔ maintenance case 연결 시작점으로 적합
 
+추가 검증 메모:
+- `APC_Position`의 exact / spaced query는 실제 관련 문서를 잘 찾았다.
+- 반면 `Position` single-token으로 잡힌 `40044000`은 원문 검증 결과 **robot teaching position** 문서로 확인되어 `irrelevant`였다.
+- 따라서 `Position` 같은 일반 토큰은 후보 수집용으로는 쓸 수 있지만, relevance 판정 없이는 위험하다.
+
 ### 5.2 APC_Pressure
 - hit 수: **58**
 
@@ -104,6 +109,10 @@
 - failure mode 문맥과 직접 연결됨
 - APC pressure 관련 troubleshooting entry point로 적합
 
+추가 검증 메모:
+- `40036448`은 status/action/cause/result chunk가 비교적 잘 갖춰져 있고,
+  SOP 참조(`Global SOP_SUPRA N_REP_PM_APC VALVE`)도 등장해 **Paper D pilot의 gold case 후보**로 볼 수 있다.
+
 ### 5.3 Temp2
 - hit 수: **242**
 
@@ -116,6 +125,10 @@
 - alarm / status 문맥에서 잘 잡힘
 - interlock, chamber, o-ring 등 maintenance context가 붙음
 
+추가 검증 메모:
+- `40086884`는 현재 summary 기준으로 relevant로 유지하고 있으나,
+  full content 원문 확인은 아직 남아 있다.
+
 ### 5.4 Temp1
 - hit 수: **80**
 
@@ -126,6 +139,10 @@
 
 의미:
 - temperature differential / spec out 문맥과 연결됨
+
+추가 검증 메모:
+- `40042585`는 원문 확인 결과 `Temp1 trigger temperature differential FDC out of spec → chuck 교체 → 정상화` 흐름이 확인되어,
+  **증상 → 원인/조치 → 결과**가 이어지는 또 하나의 gold case 후보다.
 
 ---
 
@@ -178,6 +195,20 @@
 2. 나머지는 **sensor name → document term mapping**을 만든 뒤 확장
 
 하는 방식이 맞다.
+
+### 원문 검증으로 추가 확인된 점
+
+1. **single-token false positive가 실제로 존재한다**
+   - `Position` → `40044000` 사례는 robot teaching position 문서로 확인됨
+   - 따라서 single-token은 후보 수집용으로만 쓰고, 반드시 사람 검토가 필요하다.
+
+2. **gold case 후보가 보인다**
+   - `40036448` (`APC_Pressure`): pressure hunting + APC valve + SOP 참조
+   - `40042585` (`Temp1`): Temp1 FDC out of spec → chuck 교체 → 정상화
+
+3. **summary만으로는 불충분한 문서가 있다**
+   - `Temp2`의 대표 사례는 아직 full content 검증이 필요하다.
+   - 따라서 query log에서 `relevant / partial / irrelevant / unreviewed` 구분이 중요하다.
 
 ---
 
