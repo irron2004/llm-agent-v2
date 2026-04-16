@@ -534,7 +534,6 @@ def _is_guided_resume(req: AgentRequest) -> bool:
         "issue_confirm",
         "issue_case_selection",
         "issue_sop_confirm",
-        "abbreviation_resolve",
     }
 
 
@@ -881,16 +880,15 @@ def _build_related_doc_type_suggestions(
     result: list[dict[str, Any]] = []
     for doc_type, chunks in suggestions_map.items():
         label = _DOC_TYPE_LABELS.get(doc_type, doc_type.upper())
-        chunk_ids = [
-            (c.metadata or {}).get("chunk_id", c.doc_id)
-            for c in chunks
-        ]
-        result.append({
-            "doc_type": doc_type,
-            "count": len(chunks),
-            "chunk_ids": chunk_ids,
-            "message": f"{label} 문서에도 관련 내용이 {len(chunks)}건 있습니다. 확인하시겠습니까?",
-        })
+        chunk_ids = [(c.metadata or {}).get("chunk_id", c.doc_id) for c in chunks]
+        result.append(
+            {
+                "doc_type": doc_type,
+                "count": len(chunks),
+                "chunk_ids": chunk_ids,
+                "message": f"{label} 문서에도 관련 내용이 {len(chunks)}건 있습니다. 확인하시겠습니까?",
+            }
+        )
     return result
 
 
@@ -1405,7 +1403,12 @@ async def run_agent_stream(
 
     logger.info(
         "[run/stream] auto_parse=%s, is_resume=%s, ask_user=%s, has_overrides=%s, guided_confirm=%s, overrides_keys=%s",
-        req.auto_parse, is_resume, req.ask_user_after_retrieve, has_overrides, req.guided_confirm, list(state_overrides.keys()),
+        req.auto_parse,
+        is_resume,
+        req.ask_user_after_retrieve,
+        has_overrides,
+        req.guided_confirm,
+        list(state_overrides.keys()),
     )
 
     loop = asyncio.get_running_loop()

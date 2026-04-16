@@ -12,7 +12,6 @@ import logging
 import hashlib
 import math
 import os
-import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional, Protocol, Set, Tuple, TypedDict
 
@@ -163,6 +162,7 @@ class AgentState(TypedDict, total=False):
     display_docs: List[RetrievalResult]
     ref_json: List[Dict[str, Any]]
     answer_ref_json: List[Dict[str, Any]]
+    setup_work_procedure_ref_map: Dict[str, List[Dict[str, Any]]]
 
     # Answer + judge
     answer: str
@@ -540,29 +540,76 @@ MAX_ANSWER_FORMAT_RETRIES = 2
 
 # --- Intent keyword sets for routing & retrieval gating ---
 # Procedure intent: 절차/교체/설치 등 작업 수행 의도
-_PROCEDURE_KEYWORDS_SET = frozenset({
-    "교체", "절차", "작업", "방법", "replacement", "procedure",
-    "how to", "install", "설치", "수리", "repair",
-})
+_PROCEDURE_KEYWORDS_SET = frozenset(
+    {
+        "교체",
+        "절차",
+        "작업",
+        "방법",
+        "replacement",
+        "procedure",
+        "how to",
+        "install",
+        "설치",
+        "수리",
+        "repair",
+    }
+)
 # Inquiry intent: 문서 내 특정 섹션 조회/열람 의도
-_INQUIRY_KEYWORDS = frozenset({
-    "조회", "보여줘", "알려줘", "목록", "리스트",
-    "worksheet", "work sheet", "tool list", "check sheet",
-    "scope", "목차", "part 위치", "개요", "overview",
-    "show me", "list of",
-})
+_INQUIRY_KEYWORDS = frozenset(
+    {
+        "조회",
+        "보여줘",
+        "알려줘",
+        "목록",
+        "리스트",
+        "worksheet",
+        "work sheet",
+        "tool list",
+        "check sheet",
+        "scope",
+        "목차",
+        "part 위치",
+        "개요",
+        "overview",
+        "show me",
+        "list of",
+    }
+)
 # 복합 패턴: procedure 키워드를 포함하지만 실제로는 조회 의도인 구문
 # "작업 check sheet", "작업 체크시트" 등 — procedure wins를 무효화
 _INQUIRY_COMPOUND_PATTERNS = (
-    "작업 check", "작업 체크", "작업check", "작업체크",
-    "work check", "work sheet",
+    "작업 check",
+    "작업 체크",
+    "작업check",
+    "작업체크",
+    "work check",
+    "work sheet",
 )
 
 # Tokens to exclude from doc_id boost (too generic or structural segments in doc_ids)
-_DOC_ID_BOOST_STOP = frozenset({
-    "the", "how", "to", "of", "in", "for", "and", "is", "are", "what",
-    "sop", "pems", "manual", "tsg", "global", "eng", "kor", "en",
-})
+_DOC_ID_BOOST_STOP = frozenset(
+    {
+        "the",
+        "how",
+        "to",
+        "of",
+        "in",
+        "for",
+        "and",
+        "is",
+        "are",
+        "what",
+        "sop",
+        "pems",
+        "manual",
+        "tsg",
+        "global",
+        "eng",
+        "kor",
+        "en",
+    }
+)
 
 
 def _extract_doc_id_boost_tokens(
@@ -608,7 +655,11 @@ def _normalize_device_in_query(query: str, canonical_device: str) -> str:
 
     # Split query into word tokens (Korean separators included)
     raw_tokens = re.split(r"([\s가-힣,;:()\"'?!。，；：（）의]+)", query)
-    word_tokens = [t for t in raw_tokens if t.strip() and not re.fullmatch(r"[\s가-힣,;:()\"'?!。，；：（）의]+", t)]
+    word_tokens = [
+        t
+        for t in raw_tokens
+        if t.strip() and not re.fullmatch(r"[\s가-힣,;:()\"'?!。，；：（）의]+", t)
+    ]
 
     if not word_tokens:
         return query
@@ -1170,6 +1221,150 @@ def results_to_ref_json(
     return ref
 
 
+_WORK_PROCEDURE_SECTION_KEYWORDS = (
+    "work procedure",
+    "work 절차",
+    "작업 절차",
+)
+
+
+def _base_doc_id_value(doc_id: Any) -> str:
+    s = str(doc_id or "").strip()
+    for sep in ("#", ":chunk_", ":"):
+        idx = s.find(sep)
+        if idx > 0:
+            return s[:idx]
+    return s
+
+
+def _is_work_procedure_section(section: Any) -> bool:
+    section_lower = str(section or "").strip().lower()
+    return any(keyword in section_lower for keyword in _WORK_PROCEDURE_SECTION_KEYWORDS)
+
+
+def _dedupe_ref_items(ref_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    deduped: List[Dict[str, Any]] = []
+    seen: set[tuple[str, Any, str, str]] = set()
+    for ref in ref_items:
+        metadata = ref.get("metadata") or {}
+        key = (
+            str(ref.get("doc_id") or "").strip(),
+            ref.get("page"),
+            str(metadata.get("section") or "").strip(),
+            str(ref.get("content") or "")[:120],
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(ref)
+    return deduped
+
+
+def _build_setup_work_procedure_ref_map(
+    docs: List[RetrievalResult],
+    *,
+    es_engine: Any,
+) -> Dict[str, List[Dict[str, Any]]]:
+    if not docs:
+        return {}
+
+    grouped_docs: Dict[str, List[RetrievalResult]] = {}
+    fetch_doc_ids: Dict[str, str] = {}
+    ordered_base_doc_ids: List[str] = []
+
+    for doc in docs:
+        base_doc_id = _base_doc_id_value(doc.doc_id)
+        if not base_doc_id:
+            continue
+        if base_doc_id not in grouped_docs:
+            grouped_docs[base_doc_id] = []
+            fetch_doc_ids[base_doc_id] = str(doc.doc_id).strip()
+            ordered_base_doc_ids.append(base_doc_id)
+        grouped_docs[base_doc_id].append(doc)
+
+    wp_ref_map: Dict[str, List[Dict[str, Any]]] = {}
+    for base_doc_id in ordered_base_doc_ids:
+        grouped = grouped_docs.get(base_doc_id, [])
+        inline_wp_docs = [
+            doc
+            for doc in grouped
+            if _is_work_procedure_section((doc.metadata or {}).get("section_chapter"))
+            or _is_work_procedure_section((doc.metadata or {}).get("section_type"))
+            or _is_work_procedure_section((doc.metadata or {}).get("chapter"))
+        ]
+        if inline_wp_docs:
+            wp_ref_map[base_doc_id] = results_to_ref_json(
+                inline_wp_docs,
+                max_chars=MAX_REF_CHARS_ANSWER,
+            )
+            continue
+
+        fetch_doc_id = fetch_doc_ids.get(base_doc_id)
+        if not fetch_doc_id:
+            continue
+
+        fetched_wp_docs: List[RetrievalResult] = []
+        for keyword in ("Work Procedure", "작업 절차", "Work 절차"):
+            hits = es_engine.fetch_section_chunks_by_keyword(
+                doc_id=fetch_doc_id,
+                keyword=keyword,
+                max_pages=50,
+                content_index=None,
+            )
+            if hits:
+                fetched_wp_docs = [
+                    hit.to_retrieval_result() if hasattr(hit, "to_retrieval_result") else hit
+                    for hit in hits
+                ]
+                break
+
+        if fetched_wp_docs:
+            wp_ref_map[base_doc_id] = results_to_ref_json(
+                fetched_wp_docs,
+                max_chars=MAX_REF_CHARS_ANSWER,
+            )
+
+    return wp_ref_map
+
+
+def _enrich_setup_doc_groups_with_work_procedure(
+    doc_groups: List[Tuple[str, List[Dict[str, Any]]]],
+    *,
+    work_procedure_ref_map: Dict[str, List[Dict[str, Any]]],
+) -> List[Tuple[str, List[Dict[str, Any]]]]:
+    if not doc_groups or not work_procedure_ref_map:
+        return doc_groups
+
+    enriched_groups: List[Tuple[str, List[Dict[str, Any]]]] = []
+    for group_key, group_refs in doc_groups:
+        merged_refs: List[Dict[str, Any]] = []
+        injected_doc_ids: set[str] = set()
+        existing_wp_doc_ids = {
+            _base_doc_id_value(ref.get("doc_id"))
+            for ref in group_refs
+            if _is_work_procedure_section((ref.get("metadata") or {}).get("section"))
+        }
+
+        for ref in group_refs:
+            merged_refs.append(ref)
+            base_doc_id = _base_doc_id_value(ref.get("doc_id"))
+            if (
+                not base_doc_id
+                or base_doc_id in injected_doc_ids
+                or base_doc_id in existing_wp_doc_ids
+            ):
+                continue
+
+            wp_refs = work_procedure_ref_map.get(base_doc_id) or []
+            if wp_refs:
+                merged_refs.extend(wp_refs)
+                injected_doc_ids.add(base_doc_id)
+
+        enriched_groups.append((group_key, _dedupe_ref_items(merged_refs)))
+
+    return enriched_groups
+
+
 def _strip_latex_noise(text: str) -> str:
     """Remove LaTeX markup, empty table cells, image refs, and page headers."""
     # 이미지 참조 제거
@@ -1189,6 +1384,12 @@ def _strip_latex_noise(text: str) -> str:
     # 빈 테이블 셀 반복 제거 (& & \\ 패턴)
     text = re.sub(r"(?:\s*&\s*&\s*\\\\)+", " ", text)
     text = re.sub(r"(?:\s*&\s*\\\\)+", " ", text)
+    # LaTeX 행 구분자 \\ → 줄바꿈
+    text = re.sub(r"\\\\", "\n", text)
+    # 테이블 셀 구분자 & → 공백
+    text = re.sub(r"\s*&\s*", " ", text)
+    # 테이블 포맷 잔여 {|l|l|l|} 등
+    text = re.sub(r"\{[|lcr\s]+\}", "", text)
     # 코드 펜스 제거
     text = re.sub(r"```(?:markdown)?\s*", "", text)
     text = re.sub(r"```\s*", "", text)
@@ -2479,7 +2680,9 @@ def retrieve_node(
         _queries_before = list(queries)
         queries = [_normalize_device_in_query(q, _canonical_for_norm) for q in queries]
         if queries != _queries_before:
-            logger.info("retrieve_node: device-normalized queries: %s → %s", _queries_before, queries)
+            logger.info(
+                "retrieve_node: device-normalized queries: %s → %s", _queries_before, queries
+            )
 
     # Use search_queries directly (already contains EN+KO from st_mq_node)
     all_queries = queries
@@ -2548,24 +2751,21 @@ def retrieve_node(
     # --- Intent-based gating for SOP adjustments ---
     # SOP 문서 선택 시에도, 비절차(조회) 질문이면 절차 편향 조정을 건너뛴다.
     query_lower_for_intent = (original_query or "").lower()
-    has_procedure_intent_early = any(
-        kw in query_lower_for_intent for kw in _PROCEDURE_KEYWORDS_SET
-    )
-    has_inquiry_intent = any(
-        kw in query_lower_for_intent for kw in _INQUIRY_KEYWORDS
-    )
+    has_procedure_intent_early = any(kw in query_lower_for_intent for kw in _PROCEDURE_KEYWORDS_SET)
+    has_inquiry_intent = any(kw in query_lower_for_intent for kw in _INQUIRY_KEYWORDS)
     # Procedure wins: 절차 키워드가 있으면 inquiry 무시
     # 단, 복합 조회 패턴("작업 check sheet" 등)은 procedure wins를 무효화
-    has_compound_inquiry = any(
-        cp in query_lower_for_intent for cp in _INQUIRY_COMPOUND_PATTERNS
+    has_compound_inquiry = any(cp in query_lower_for_intent for cp in _INQUIRY_COMPOUND_PATTERNS)
+    is_procedural_context = (route == "setup" or has_procedure_intent_early) and not (
+        has_inquiry_intent and (not has_procedure_intent_early or has_compound_inquiry)
     )
-    is_procedural_context = (
-        route == "setup" or has_procedure_intent_early
-    ) and not (has_inquiry_intent and (not has_procedure_intent_early or has_compound_inquiry))
 
     logger.info(
         "retrieve_node: intent gating — sop_pred=%s, procedural=%s, inquiry=%s, route=%s",
-        sop_only_predicate, is_procedural_context, has_inquiry_intent, route,
+        sop_only_predicate,
+        is_procedural_context,
+        has_inquiry_intent,
+        route,
     )
 
     def _apply_early_page_penalty(docs: List[RetrievalResult]) -> List[RetrievalResult]:
@@ -2589,7 +2789,12 @@ def retrieve_node(
                 penalized_docs.append(doc)
         return sorted(penalized_docs, key=_stable_tie_break_key)
 
-    if agent_settings.early_page_penalty_enabled and sop_only_predicate and is_procedural_context and all_docs:
+    if (
+        agent_settings.early_page_penalty_enabled
+        and sop_only_predicate
+        and is_procedural_context
+        and all_docs
+    ):
         all_docs = _apply_early_page_penalty(all_docs)
 
     if selected_doc_ids:
@@ -2800,9 +3005,8 @@ def retrieve_node(
 
         # Step 1: count hits per base_doc_id (before dedup)
         from collections import Counter as _Counter
-        hit_counts: dict[str, int] = _Counter(
-            _base_doc_id(doc.doc_id) for doc in docs
-        )
+
+        hit_counts: dict[str, int] = _Counter(_base_doc_id(doc.doc_id) for doc in docs)
 
         # Step 2: dedupe — keep highest-scoring page, inject rerank_hit_count
         before_count = len(docs)
@@ -2827,8 +3031,7 @@ def retrieve_node(
             # else: skip duplicate (first occurrence has highest score after sort)
         _top_hits = sorted(hit_counts.items(), key=lambda x: -x[1])[:8]
         logger.info(
-            "retrieve_node: [2/4 group+dedupe] %d → %d docs (unique doc_ids=%d), "
-            "hit_counts=%s",
+            "retrieve_node: [2/4 group+dedupe] %d → %d docs (unique doc_ids=%d), hit_counts=%s",
             before_count,
             len(deduped),
             len(hit_counts),
@@ -2859,9 +3062,8 @@ def retrieve_node(
             else:
                 other_docs.append(doc)
 
-        need_rebalance = (
-            (len(setup_docs) < min_setup and setup_docs)
-            or (len(sop_docs) < min_sop and sop_docs)
+        need_rebalance = (len(setup_docs) < min_setup and setup_docs) or (
+            len(sop_docs) < min_sop and sop_docs
         )
         if need_rebalance:
             # 각 그룹에서 최소 쿼터만큼 확보, 나머지는 원래 score 순서로 채움
@@ -2896,6 +3098,18 @@ def retrieve_node(
         len(docs),
         len(all_docs_for_regen),
     )
+
+    setup_work_procedure_ref_map: Dict[str, List[Dict[str, Any]]] = {}
+    if route == "setup" and sop_only_predicate and docs and hasattr(retriever, "es_engine"):
+        setup_work_procedure_ref_map = _build_setup_work_procedure_ref_map(
+            docs,
+            es_engine=retriever.es_engine,
+        )
+        if setup_work_procedure_ref_map:
+            logger.info(
+                "retrieve_node: setup_work_procedure_ref_map doc_ids=%d",
+                len(setup_work_procedure_ref_map),
+            )
     mq_mode = str(state.get("mq_mode") or "")
     empty_retrieval_fallback = (
         mq_mode == "fallback" and not bool(state.get("mq_used", False)) and len(docs) == 0
@@ -2938,7 +3152,7 @@ def retrieve_node(
         _dm = _d.metadata if isinstance(_d.metadata, dict) else {}
         _rhc = _dm.get("rerank_hit_count", 1)
         _top_summary.append(
-            f"#{_di+1} hits={_rhc} p={_dm.get('page','?')} "
+            f"#{_di + 1} hits={_rhc} p={_dm.get('page', '?')} "
             f"s={float(_d.score):.4f} {str(_d.doc_id)[:50]}"
         )
     if _top_summary:
@@ -2948,6 +3162,7 @@ def retrieve_node(
         "docs": docs,
         "ref_json": results_to_ref_json(docs),
         "all_docs": all_docs_for_regen,  # 재생성용 전체 문서 (최대 retrieval_top_k개)
+        "setup_work_procedure_ref_map": setup_work_procedure_ref_map,
         "mq_reason": "empty_retrieval" if empty_retrieval_fallback else state.get("mq_reason"),
         "retrieval_stage2": {
             "enabled": stage2_enabled,
@@ -3025,7 +3240,10 @@ def expand_related_docs_node(
                 logger.warning(
                     "[expand_related] CARRY-TRIGGERED section expansion: "
                     "doc_id=%s, page=%s, chapter='%s', chapter_source=%s",
-                    doc.doc_id, _extract_page_value(meta), section_chapter, _ch_src,
+                    doc.doc_id,
+                    _extract_page_value(meta),
+                    section_chapter,
+                    _ch_src,
                 )
             section_hits = section_fetcher(
                 doc_id=str(doc.doc_id),
@@ -3115,7 +3333,9 @@ def expand_related_docs_node(
                     logger.info(
                         "[expand_related] chapter_resolver fallback: doc_id=%s, "
                         "hit_page=%d, resolved %d pages",
-                        doc.doc_id, page, len(expanded_pages),
+                        doc.doc_id,
+                        page,
+                        len(expanded_pages),
                     )
                 elif page_fetcher is not None:
                     # chapter_resolver returned nothing, fall back to page window
@@ -3923,14 +4143,17 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     # e.g. "SUPRAvvplus APC 교체 방법" → "SUPRA Vplus APC 교체 방법"
     if route == "setup":
         _pq_raw = state.get("parsed_query")
-        _canonical_devices = (_pq_raw.get("selected_devices") or []) if isinstance(_pq_raw, dict) else []
+        _canonical_devices = (
+            (_pq_raw.get("selected_devices") or []) if isinstance(_pq_raw, dict) else []
+        )
         if _canonical_devices:
             _original_qfp = query_for_prompt
             query_for_prompt = _normalize_device_in_query(query_for_prompt, _canonical_devices[0])
             if query_for_prompt != _original_qfp:
                 logger.info(
                     "answer_node: device name normalized in query: %r → %r",
-                    _original_qfp, query_for_prompt,
+                    _original_qfp,
+                    query_for_prompt,
                 )
 
     # Setup route: (doc_id, section)별 그룹핑 → 적합성 판정 → 선택 → REFS 제한
@@ -3942,6 +4165,17 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
     current_group_idx = 0
     if route == "setup" and ref_items:
         doc_groups = _group_refs_by_doc_section_chapter(ref_items)
+        setup_work_procedure_ref_map = state.get("setup_work_procedure_ref_map") or {}
+        if isinstance(setup_work_procedure_ref_map, dict) and setup_work_procedure_ref_map:
+            doc_groups = _enrich_setup_doc_groups_with_work_procedure(
+                doc_groups,
+                work_procedure_ref_map=setup_work_procedure_ref_map,
+            )
+            logger.info(
+                "answer_node: setup group enrichment applied groups=%d wp_doc_ids=%d",
+                len(doc_groups),
+                len(setup_work_procedure_ref_map),
+            )
 
         # Query-aware group ordering: prefer groups whose doc_id contains
         # query tokens so that relevance checks are tried in priority order.
@@ -3953,9 +4187,7 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
             gkey_lower = gkey.lower()
             score = sum(2 for tok in _q_tokens if tok in gkey_lower)
             # Modification B: also sample content of top refs for keyword match
-            content_sample = " ".join(
-                str(r.get("content", ""))[:500].lower() for r in grefs[:3]
-            )
+            content_sample = " ".join(str(r.get("content", ""))[:500].lower() for r in grefs[:3])
             score += sum(1 for tok in _q_tokens if tok in content_sample)
             # Rerank hit count: docs that appeared multiple times in rerank
             # top-K are stronger relevance signals (multi-query voting)
@@ -4055,7 +4287,9 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
                         logger.info(
                             "answer_node: no relevant group found — early-exit to re-retrieve "
                             "(groups checked: %d, attempt %d/%d)",
-                            checks_done, _cur_attempts, _max_attempts,
+                            checks_done,
+                            _cur_attempts,
+                            _max_attempts,
                         )
                         _early_events: List[str] = []
                         if doc_groups:
@@ -4077,7 +4311,8 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
                     logger.info(
                         "answer_node: no relevant group but max_attempts reached — "
                         "fallback to first group=%s (%d refs)",
-                        doc_groups[0][0][:60], len(ref_items),
+                        doc_groups[0][0][:60],
+                        len(ref_items),
                     )
         else:
             # 그룹이 1개면 그대로 사용
@@ -4102,9 +4337,7 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
             _answer_events.append(f"[answer] answer_ref_json: set (refs={len(ref_items)})")
         elif route == "setup" and is_fallback_selection:
             _answer_events.append("[answer] answer_ref_json: unset (fallback)")
-    _answer_events.append(
-        f"[answer] route={route} lang={answer_language} refs={len(ref_items)}"
-    )
+    _answer_events.append(f"[answer] route={route} lang={answer_language} refs={len(ref_items)}")
 
     ref_text = ref_json_to_text(ref_items)
     logger.info(
@@ -4555,6 +4788,15 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
     query_for_judge = state.get("query_en") or state["query"]
     answer = state.get("answer", "")
 
+    # Guard: empty-REFS short-circuit — 검색 결과 없이 "찾지 못/결과가 없" 표시 시 LLM 판정 건너뛰기
+    if ref_text == "EMPTY":
+        has_not_found = "찾지 못" in answer or "결과가 없" in answer
+        has_clarification = ("?" in answer) and (len(answer.split("?")) <= 4)
+        has_citation = bool(re.search(r"\[[0-9]+\]", answer))
+        if has_not_found and has_clarification and not has_citation:
+            return {"judge": {"faithful": True, "issues": [], "hint": "no_refs: clarification"}}
+        return {"judge": {"faithful": False, "issues": ["no_refs"], "hint": "no refs to evaluate"}}
+
     # Setup route: 보완형 — 답변의 누락 내용을 보완하고 재시도 없이 종료
     if route == "setup" and answer and "찾지 못했습니다" not in answer:
         supplemented_answer, judge = _supplement_setup_answer(
@@ -4620,7 +4862,11 @@ def judge_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[str
             logger.warning(
                 "judge_node: failed to parse LLM output: %s", raw[:200] if raw else "(empty)"
             )
-            judge = {"faithful": False, "issues": ["parse_error"], "hint": "judge JSON parse failed"}
+            judge = {
+                "faithful": False,
+                "issues": ["parse_error"],
+                "hint": "judge JSON parse failed",
+            }
     attempts = int(state.get("attempts", 0) or 0)
     max_attempts = int(state.get("max_attempts", 0) or 0)
     faithful = bool(judge.get("faithful", False))
@@ -5124,14 +5370,20 @@ def _extract_devices_from_query(device_names: List[str], query: str) -> List[str
 
     # Phase 1: exact substring match (기존 로직)
     # 단어 경계 인식을 위해 원본 query 토큰도 함께 사용
-    query_tokens_compact = [_compact_text(t) for t in re.split(r"[\s가-힣,;:()\"'?!。，；：（）의]+", query) if t.strip()]
+    query_tokens_compact = [
+        _compact_text(t)
+        for t in re.split(r"[\s가-힣,;:()\"'?!。，；：（）의]+", query)
+        if t.strip()
+    ]
     # 연속 토큰 조합도 생성 (multi-word device: "supra vplus" → "supravplus")
     query_token_combos: set[str] = set(query_tokens_compact)
     for i in range(len(query_tokens_compact) - 1):
         query_token_combos.add(query_tokens_compact[i] + query_tokens_compact[i + 1])
     if len(query_tokens_compact) >= 3:
         for i in range(len(query_tokens_compact) - 2):
-            query_token_combos.add(query_tokens_compact[i] + query_tokens_compact[i + 1] + query_tokens_compact[i + 2])
+            query_token_combos.add(
+                query_tokens_compact[i] + query_tokens_compact[i + 1] + query_tokens_compact[i + 2]
+            )
 
     token_matches: List[str] = []
     substr_matches: List[str] = []
@@ -5188,10 +5440,7 @@ def _extract_devices_from_query(device_names: List[str], query: str) -> List[str
 
         # 토큰 추출: 한글/공백/구두점으로 분리하여 영문+숫자 토큰만 추출
         raw_tokens = re.split(r"[\s가-힣,;:()\"'?!。，；：（）]+", query)
-        alpha_tokens = [
-            _compact_text(t) for t in raw_tokens
-            if len(t) > 3 and not t.isdigit()
-        ]
+        alpha_tokens = [_compact_text(t) for t in raw_tokens if len(t) > 3 and not t.isdigit()]
         # 연속 토큰 2-3개 결합 (multi-word 장비명 대응: "supra vplus", "integer plus")
         combined_tokens: List[str] = list(alpha_tokens)
         for i in range(len(raw_tokens) - 1):
@@ -5251,18 +5500,26 @@ def _extract_devices_from_query(device_names: List[str], query: str) -> List[str
                 if fuzzy_len >= phase1_len:
                     logger.info(
                         "device fuzzy preferred over Phase 1: '%s'→'%s' (score=%d, Phase1='%s')",
-                        query[:40], original, score, phase1_best,
+                        query[:40],
+                        original,
+                        score,
+                        phase1_best,
                     )
                     return [original]
                 else:
                     logger.info(
                         "device Phase 1 kept over fuzzy: '%s' (Phase1='%s', fuzzy='%s' score=%d)",
-                        query[:40], phase1_best, original, score,
+                        query[:40],
+                        phase1_best,
+                        original,
+                        score,
                     )
                     return [phase1_best]
             logger.info(
                 "device fuzzy match: query='%s' → '%s' (score=%d)",
-                query[:40], original, score,
+                query[:40],
+                original,
+                score,
             )
             return [original]
     except Exception:

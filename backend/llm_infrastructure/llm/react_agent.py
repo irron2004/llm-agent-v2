@@ -67,22 +67,26 @@ def _infer_route(state: "ReactAgentState") -> str:  # type: ignore[name-defined]
         return "ts"
     return "general"
 
+
 # ── 상수 ────────────────────────────────────────────────────────────────────
 
-MAX_SEARCH_ITERATIONS = 3   # 최대 검색 횟수 (초과 시 강제 answer)
-MAX_JUDGE_RETRIES = 2       # judge unfaithful 시 최대 재시도 횟수
-TEMP_PLAN = 0.0             # planner 온도 (결정론적)
+MAX_SEARCH_ITERATIONS = 3  # 최대 검색 횟수 (초과 시 강제 answer)
+MAX_JUDGE_RETRIES = 2  # judge unfaithful 시 최대 재시도 횟수
+TEMP_PLAN = 0.0  # planner 온도 (결정론적)
 
 
 # ── NextAction 모델 (BaseLLM.generate(response_model=NextAction) 용) ──────────
 
+
 class NextAction(PydanticBaseModel):
     """planner LLM이 결정하는 다음 행동."""
-    action: Literal["search", "search_solution", "answer"]
+
+    action: Literal["search", "search_solution", "answer", "followup"]
     reason: str
     query: Optional[str] = None
     device_names: List[str] = []
     doc_types: List[str] = []
+
 
 # ── State ────────────────────────────────────────────────────────────────────
 
@@ -100,15 +104,15 @@ class ReactAgentState(TypedDict, total=False):
     target_language: Optional[str]
     query_en: Optional[str]
     query_ko: Optional[str]
-    parsed_query: Dict[str, Any]   # device_names, doc_types, equip_ids, route …
+    parsed_query: Dict[str, Any]  # device_names, doc_types, equip_ids, route …
     original_query: str
 
     # ── ReAct 루프 ────────────────────────────────────────────────
-    plan: Optional[Dict[str, Any]]    # planner 결정 JSON
-    iterations: int                   # 실행된 검색 횟수
+    plan: Optional[Dict[str, Any]]  # planner 결정 JSON
+    iterations: int  # 실행된 검색 횟수
     action_trace: List[Dict[str, Any]]  # 검색 이력 (디버깅/프롬프트용)
-    collected_docs: List[Any]           # 누적 RetrievalResult
-    search_queries_used: List[str]      # 실제 사용된 쿼리 목록
+    collected_docs: List[Any]  # 누적 RetrievalResult
+    search_queries_used: List[str]  # 실제 사용된 쿼리 목록
 
     # ── C-API-001 메타데이터 ──────────────────────────────────────
     route: Optional[str]
@@ -144,15 +148,19 @@ _PLAN_SYSTEM = """\
 사용자 질문, 대화 맥락, 수집된 문서를 분석해 다음 행동을 결정하세요.
 
 행동 종류:
-- search         : 문서를 검색 (처음이거나 현재 문서가 부적절할 때)
-- search_solution: 문제 원인 문서는 있지만 해결 절차 문서가 없을 때 추가 검색
-- answer         : 수집된 문서로 답변 생성 가능할 때
+- search          : 문서를 검색 (처음이거나 현재 문서가 부적절할 때)
+- search_solution : 문제 원인 문서는 있지만 해결 절차(SOP) 문서가 없을 때 추가 검색. 이 경우 doc_types를 반드시 ["sop", "setupmanual"]로 지정하세요.
+- answer          : 수집된 문서로 답변 생성 가능할 때
+- followup        : 사용자가 이전 답변을 기반으로 후속 요청할 때 (예: "표로 정리해줘", "자세히 설명해줘", "다른 장비로 알려줘", "한개더"). 새 검색 없이 이전 대화 맥락으로 바로 답변합니다.
 
 판단 기준:
+- **문서 내용을 반드시 확인하세요.** score가 높더라도 "내용" 항목을 읽고 질문이 원하는 구체 정보(파트 넘버, 절차, 수치 등)가 실제로 포함되어 있는지 확인하세요. score가 높아도 내용이 맞지 않으면 search로 재검색하세요.
 - 수집된 문서가 질문의 **구체적 행위**(교체/청소/조정/캘리브레이션 등)에 직접 관련되는지 확인하세요.
 - 문서가 같은 부품이라도 다른 행위(예: 교체를 물어봤는데 청소 문서만 있음)에 대한 것이면 search로 재검색하세요.
 - doc_id에 행위 유형이 포함됩니다: rep=교체(replacement), cln=청소(cleaning), adj=조정(adjustment), cal=캘리브레이션. 질문의 행위와 doc_id의 행위가 일치하는지 확인하세요.
 - reranker score가 낮은 문서(score < 0.1)가 대부분이면, 검색어를 더 구체적으로 변경하여 재검색하세요.
+- **대화 맥락에 이전 답변이 있고**, 사용자가 "정리해줘/자세히/표로/한개더/~로 알려줘" 등 후속 요청을 하면 followup을 선택하세요.
+- reason 필드에는 반드시 **(1) 현재 문서가 왜 부족한지 또는 적합한지, (2) 다음 검색으로 뭘 찾으려는지**를 구체적으로 기술하세요.
 """
 
 _PLAN_USER_TMPL = """\
@@ -177,15 +185,27 @@ _PLAN_USER_TMPL = """\
 
 
 def _format_history(chat_history: List[Dict[str, Any]]) -> str:
-    """ChatHistoryTurn(user_text/assistant_text) 또는 일반 role/content 형식을 모두 처리."""
+    """ChatHistoryTurn(user_text/assistant_text) 또는 일반 role/content 형식을 모두 처리.
+
+    직전 턴의 에이전트 답변은 800자까지 보존하여 follow-up 질문
+    ("표로 정리해줘", "자세히 설명해줘" 등)에 planner가 맥락을 파악할 수 있게 한다.
+    그 이전 턴들은 200자로 요약.
+    """
     if not chat_history:
         return "(없음)"
     lines = []
-    for turn in chat_history[-6:]:   # 최근 3턴 (6개 메시지)
+    recent = chat_history[-6:]  # 최근 3턴 (6개 메시지)
+    last_idx = len(recent) - 1
+    for i, turn in enumerate(recent):
+        # 직전 턴의 에이전트 답변만 800자, 나머지는 200자
+        is_last_turn = i >= last_idx - 1
+        user_limit = 200
+        asst_limit = 800 if is_last_turn else 200
+
         # ChatHistoryTurn 형식 (agent.py가 model_dump()로 넘기는 형식)
         if "user_text" in turn:
-            user = str(turn.get("user_text", ""))[:200]
-            asst = str(turn.get("assistant_text", ""))[:200]
+            user = str(turn.get("user_text", ""))[:user_limit]
+            asst = str(turn.get("assistant_text", ""))[:asst_limit]
             if user:
                 lines.append(f"사용자: {user}")
             if asst:
@@ -193,7 +213,8 @@ def _format_history(chat_history: List[Dict[str, Any]]) -> str:
         else:
             # 일반 role/content 형식
             role = turn.get("role", "user")
-            content = str(turn.get("content", ""))[:200]
+            limit = asst_limit if role != "user" else user_limit
+            content = str(turn.get("content", ""))[:limit]
             prefix = "사용자" if role == "user" else "에이전트"
             lines.append(f"{prefix}: {content}")
     return "\n".join(lines) if lines else "(없음)"
@@ -212,18 +233,18 @@ def _format_action_trace(trace: List[Dict[str, Any]]) -> str:
 
 
 def _format_doc_summary(docs: List[Any]) -> str:
-    """수집된 문서를 간략히 요약 (planner 프롬프트용). reranker score 포함."""
+    """수집된 문서를 간략히 요약 (planner 프롬프트용). reranker score + 내용 snippet 포함.
+
+    Planner가 score뿐 아니라 문서 내용의 적합성도 판단할 수 있도록
+    각 문서의 첫 150자 snippet을 함께 제공한다.
+    """
     if not docs:
         return "(없음)"
     seen: Dict[str, str] = {}
     for doc in docs:
         meta = getattr(doc, "metadata", {}) or {}
         doc_id = meta.get("doc_id") or meta.get("id", "")
-        title = (
-            meta.get("title")
-            or meta.get("file_name")
-            or meta.get("doc_type", "")
-        )
+        title = meta.get("title") or meta.get("file_name") or meta.get("doc_type", "")
         device = meta.get("device_name", "")
         score = getattr(doc, "score", None) or meta.get("score")
         if doc_id and doc_id not in seen:
@@ -235,6 +256,16 @@ def _format_doc_summary(docs: List[Any]) -> str:
                     label += f" (score={float(score):.3f})"
                 except (ValueError, TypeError):
                     pass
+            # 문서 내용 snippet 추가: planner가 내용 적합성 판단 가능
+            content = (
+                getattr(doc, "content", None)
+                or getattr(doc, "text", None)
+                or (meta.get("content") or meta.get("text") or "")
+            )
+            if content:
+                snippet = str(content).replace("\n", " ").strip()[:150]
+                if snippet:
+                    label += f"\n    내용: {snippet}"
             seen[doc_id] = label
 
     summaries = [f"- {v}" for v in list(seen.values())[:10]]
@@ -250,7 +281,234 @@ def _plan_fallback(has_docs: bool = False) -> Dict[str, Any]:
     return {"action": "search", "reason": "plan generation failed; fallback to search"}
 
 
+# ── Follow-up 감지 ──────────────────────────────────────────────────────────
+
+_FOLLOWUP_INDICATORS = {
+    "표로 정리",
+    "표로 만들",
+    "정리해줘",
+    "정리해",
+    "자세히",
+    "더 자세",
+    "좀 더",
+    "다시",
+    "한개더",
+    "한 개 더",
+    "하나 더",
+    "한개만 더",
+    "위에",
+    "아까",
+    "이전",
+    "방금",
+    "로 알려줘",
+    "로 해줘",
+    "로 바꿔",
+    "로 변경",
+    "요약해",
+    "줄여줘",
+    "간단히",
+    "쉽게",
+    "만들어줘",
+    "만들어 줘",
+    "출제해",
+    "작성해",
+    "작성하세요",
+    "써줘",
+    "써 줘",
+}
+
+
+def _is_followup_query(query: str) -> bool:
+    """검색 키워드 없이 이전 답변에 대한 후속 요청인지 판별한다.
+
+    조건: (1) followup indicator 포함 AND (2) 질문이 짧거나 장비/부품 키워드 없음
+    """
+    ql = query.strip().lower()
+    if len(ql) <= 2:
+        # "네", "응" 같은 1~2자 단답은 follow-up 아님
+        return False
+    has_indicator = any(ind in ql for ind in _FOLLOWUP_INDICATORS)
+    if not has_indicator:
+        return False
+    # TS/procedure 핵심 키워드가 있으면 독립 질문 (follow-up 아님)
+    _INDEPENDENT_SIGNALS = (
+        "alarm", "알람", "error", "에러", "interlock", "교체", "교정",
+        "캘리브", "청소", "점검", "spec", "part number",
+    )
+    if any(sig in ql for sig in _INDEPENDENT_SIGNALS):
+        return False
+    # 장비명이나 구체적 기술 키워드가 있으면 독립 질문일 가능성
+    has_device = any(d in query.upper() for d in [
+        "SUPRA", "PRECIA", "GENEVA", "INTEGER", "ETERNA", "ECOLITE", "ZEDIUS",
+    ])
+    # 짧은 follow-up (60자 미만) 또는 장비명 없으면 follow-up
+    if len(ql) < 60 and not has_device:
+        return True
+    # 장비명 있어도 "~로 알려줘" 패턴은 follow-up ("SUPRA Q로 알려줘")
+    if any(p in ql for p in ("로 알려줘", "로 해줘", "로 바꿔", "로 변경")):
+        return True
+    return False
+
+
+# ── Keyword overlap guard ────────────────────────────────────────────────────
+
+def _docs_lack_query_keywords(docs: List[Any], query: str) -> bool:
+    """수집된 문서의 내용에 질문의 핵심 키워드가 전혀 포함되지 않은지 검사.
+
+    score가 높아도 실제 내용에 질문이 원하는 정보가 없는 케이스를 감지한다.
+    (예: "part number 뭐야?" 인데 문서에 part number 관련 내용 없음)
+    """
+    if not docs or not query:
+        return False
+    # 질문에서 핵심 키워드 추출 (stop word 제외, 2자 이상)
+    _STOP = {"은", "는", "이", "가", "을", "를", "의", "에", "에서", "로", "으로",
+             "좀", "해줘", "알려줘", "뭐야", "어떻게", "관련", "해결", "방법",
+             "the", "is", "a", "an", "of", "for", "to", "in", "on", "what", "how"}
+    tokens = set(re.findall(r"[\w가-힣]+", query.lower()))
+    keywords = {t for t in tokens if len(t) >= 2 and t not in _STOP}
+    if not keywords:
+        return False
+
+    # 문서 내용에서 키워드 매칭 검사
+    matched = 0
+    for kw in keywords:
+        for doc in docs[:10]:  # 상위 10개만 검사
+            content = (
+                getattr(doc, "content", None)
+                or getattr(doc, "text", None)
+                or ""
+            )
+            meta = getattr(doc, "metadata", {}) or {}
+            doc_text = f"{content} {meta.get('title', '')} {meta.get('doc_id', '')}".lower()
+            if kw in doc_text:
+                matched += 1
+                break
+
+    # 핵심 키워드의 30% 미만만 매칭되면 "내용 부족"
+    ratio = matched / len(keywords) if keywords else 1.0
+    if ratio < 0.3:
+        logger.debug(
+            "keyword_overlap_guard: query=%s keywords=%s matched=%d/%d (%.0f%%)",
+            query[:60], list(keywords)[:5], matched, len(keywords), ratio * 100,
+        )
+        return True
+    return False
+
+
 # ── 장비명 토큰 기반 확장 ─────────────────────────────────────────────────────
+
+_PROCEDURE_KEYWORDS = {
+    "설치하는",
+    "설치하는법",
+    "설치 방법",
+    "설치법",
+    "연결하는",
+    "연결하는법",
+    "연결 방법",
+    "연결법",
+    "사용하는",
+    "사용 방법",
+    "사용법",
+    "조립하는",
+    "조립 방법",
+    "조립법",
+    "설정하는",
+    "설정 방법",
+    "설정법",
+    "교체 방법",
+    "교체 순서",
+    "교체 절차",
+    "청소 방법",
+    "순서",
+    "절차",
+    "setup",
+    "install",
+    "connect",
+    "configure",
+    "assemble",
+    "how to setup",
+    "how to install",
+    "how to connect",
+    "how to use",
+    "how to replace",
+    "방법",
+    "법",
+    "如何使用",
+    "怎么安装",
+    "怎样连接",
+    "如何设置",
+    "手順",
+    "交換方法",
+}
+
+_TROUBLESHOOTING_KEYWORDS = {
+    "알람",
+    "에러",
+    "점검",
+    "조치",
+    "이상",
+    "트러블슈팅",
+    "abnormal",
+    "alarm",
+    "error",
+    "check",
+    "action",
+    "abnormal",
+    "troubleshoot",
+    "문제",
+    "故障",
+    "문제점",
+    "원인",
+    "해결",
+    "이상 증상",
+}
+
+_INQUIRY_PHRASES = {
+    "part number",
+    "model number",
+    "catalog number",
+    "cno",
+    "형번",
+    "품번",
+    "모델번호",
+    "부품번호",
+    "목록",
+    "전체 목록",
+    "list of",
+    "what are the",
+    "어디서",
+    "在哪里",
+    "where can",
+    "where is",
+    "where to find",
+    "지원 가능",
+    "対応",
+    "supported?",
+    "is supported",
+    "지원해",
+    "장비 필요",
+    "도구 필요",
+    "equipment needed",
+    "tool needed",
+    "뭐가 필요",
+    "뭐 필요",
+    "어떤 장비",
+    "어떤 도구",
+    "what equipment",
+    "what tool",
+}
+
+
+def _should_override_setup_to_general(query: str) -> bool:
+    q_lower = query.lower()
+    if any(kw in q_lower for kw in _PROCEDURE_KEYWORDS):
+        return False
+    if any(kw in q_lower for kw in _TROUBLESHOOTING_KEYWORDS):
+        return False
+    if any(p in q_lower for p in _INQUIRY_PHRASES):
+        return True
+    return False
+
 
 def _expand_device_names_by_tokens(
     selected: List[str],
@@ -286,7 +544,9 @@ def _expand_device_names_by_tokens(
     if len(expanded) > len(selected):
         logger.info(
             "device token expansion: %s → %s (%d variants added)",
-            selected, expanded[:5], len(expanded) - len(selected),
+            selected,
+            expanded[:5],
+            len(expanded) - len(selected),
         )
     return expanded
 
@@ -332,9 +592,8 @@ def _filter_docs_by_action_type(
     neutral: List[Any] = []  # doc_id에 action code가 없는 문서
 
     for doc in docs:
-        doc_id = (
-            getattr(doc, "doc_id", None)
-            or (getattr(doc, "metadata", {}) or {}).get("doc_id", "")
+        doc_id = getattr(doc, "doc_id", None) or (getattr(doc, "metadata", {}) or {}).get(
+            "doc_id", ""
         )
         m = _DOC_ID_ACTION_RE.search(str(doc_id))
         if not m:
@@ -347,7 +606,10 @@ def _filter_docs_by_action_type(
     if matched or unmatched:
         logger.info(
             "action_type_filter: intent=%s matched=%d unmatched=%d neutral=%d",
-            intent, len(matched), len(unmatched), len(neutral),
+            intent,
+            len(matched),
+            len(unmatched),
+            len(neutral),
         )
 
     # 매칭 문서 우선, 중립 문서 다음, 불일치 문서 마지막
@@ -409,15 +671,17 @@ class ReactRAGAgent:
 
     def _emit_node(self, name: str, elapsed_ms: float, details: str = "") -> None:
         elapsed_str = f"{elapsed_ms / 1000:.1f}s" if elapsed_ms >= 1000 else f"{elapsed_ms:.0f}ms"
-        self._emit({
-            "type": "log",
-            "level": "info",
-            "node": name,
-            "ts": time.time(),
-            "elapsed_ms": round(elapsed_ms, 1),
-            "details": details,
-            "message": f"{name} ({elapsed_str})" + (f" - {details}" if details else ""),
-        })
+        self._emit(
+            {
+                "type": "log",
+                "level": "info",
+                "node": name,
+                "ts": time.time(),
+                "elapsed_ms": round(elapsed_ms, 1),
+                "details": details,
+                "message": f"{name} ({elapsed_str})" + (f" - {details}" if details else ""),
+            }
+        )
 
     # ── 노드 구현 ─────────────────────────────────────────────────────────────
 
@@ -460,13 +724,44 @@ class ReactRAGAgent:
             update["parsed_query"] = pq
             update["route"] = route
 
+        current_route = pq.get("route")
+        if current_route == "setup" and _should_override_setup_to_general(state["query"]):
+            pq["route"] = "general"
+            update["parsed_query"] = pq
+            update["route"] = "general"
+
         # 트러블슈팅 질문 시 doc_types를 myservice/gcb/ts로 확장
         # (이상 원인, 점검/조치 이력 등 문제 해결 질문은 세 doc_type 모두 검색 필요)
         raw_query = state["query"]
-        _TS_KEYWORDS = ("트러블슈팅", "troubleshoot", "이상", "abnormal", "점검", "조치", "이력", "알람", "에러", "error", "alarm")
+        _TS_KEYWORDS = (
+            "트러블슈팅",
+            "troubleshoot",
+            "이상",
+            "abnormal",
+            "점검",
+            "조치",
+            "이력",
+            "알람",
+            "에러",
+            "error",
+            "alarm",
+            "interlock",
+            "인터락",
+            "fault",
+            "fail",
+            "끊김",
+            "끊겼",
+            "불량",
+            "점등",
+            "안됨",
+            "안 됨",
+            "연결 불가",
+            "timeout",
+            "타임아웃",
+        )
         if any(kw in raw_query.lower() for kw in _TS_KEYWORDS):
             current_dt = pq.get("selected_doc_types") or pq.get("doc_types") or []
-            ts_types = {"myservice", "gcb", "ts"}
+            ts_types = {"myservice", "gcb", "ts", "sop", "setupmanual"}
             expanded = list(ts_types | {str(d).lower() for d in current_dt})
             pq["selected_doc_types"] = expanded
             pq["doc_types"] = expanded
@@ -530,10 +825,25 @@ class ReactRAGAgent:
         )
 
         has_docs = bool(state.get("collected_docs"))
+        chat_history = state.get("chat_history") or []
+
+        # ── Rule-based pre-checks (LLM 호출 전) ─────────────────────────
+
+        # (1) Follow-up 감지: 첫 iteration + docs 없음 + chat_history 있음 +
+        #     검색 키워드 없는 후속 요청
+        if iterations == 0 and not has_docs and chat_history:
+            if _is_followup_query(state.get("query", "")):
+                plan: Dict[str, Any] = {
+                    "action": "followup",
+                    "reason": "follow-up request detected; using previous context",
+                }
+                elapsed = (time.perf_counter() - t0) * 1000
+                self._emit_node("plan", elapsed, f"→ followup (rule-based)")
+                return {"plan": plan}
 
         # 최대 반복 횟수 초과 시 강제 answer
         if iterations >= max_iter:
-            plan: Dict[str, Any] = {
+            plan = {
                 "action": "answer",
                 "reason": f"max iterations ({max_iter}) reached",
             }
@@ -549,9 +859,37 @@ class ReactRAGAgent:
                 )
                 plan = next_action.model_dump()
             except Exception:
-                logger.warning("react_agent: plan generation failed, trying raw JSON parse", exc_info=True)
+                logger.warning(
+                    "react_agent: plan generation failed, trying raw JSON parse", exc_info=True
+                )
                 # structured output 실패 시 raw JSON 파싱 시도
                 plan = self._try_raw_plan_parse(user) or _plan_fallback(has_docs)
+
+        # ── Rule-based post-checks (LLM 결정 보정) ──────────────────────
+
+        action = plan.get("action", "answer")
+
+        # (2) search_solution → SOP/setupmanual 강제
+        if action == "search_solution":
+            plan_dt = plan.get("doc_types") or []
+            sop_types = {"sop", "setupmanual"}
+            if not any(d.lower() in sop_types for d in plan_dt):
+                plan["doc_types"] = list(sop_types | {d.lower() for d in plan_dt})
+                logger.info("react_agent: search_solution → forced SOP doc_types: %s", plan["doc_types"])
+
+        # (3) answer 결정이지만 문서 내용에 query 핵심어가 전혀 없으면 re-search 유도
+        if action == "answer" and has_docs and iterations < max_iter:
+            if _docs_lack_query_keywords(
+                state.get("collected_docs") or [],
+                state.get("query") or state.get("query_ko") or "",
+            ):
+                plan = {
+                    "action": "search",
+                    "reason": "collected docs lack query keywords; retrying with broader search",
+                    "query": query,
+                    "doc_types": [],  # 필터 풀고 재검색
+                }
+                logger.info("react_agent: keyword overlap guard triggered, forcing re-search")
 
         elapsed = (time.perf_counter() - t0) * 1000
         self._emit_node("plan", elapsed, f"→ {plan.get('action')} | {plan.get('reason', '')[:60]}")
@@ -601,12 +939,14 @@ class ReactRAGAgent:
                 from backend.llm_infrastructure.query_expansion.abbreviation_expander import (
                     get_abbreviation_expander,
                 )
+
                 _expander = get_abbreviation_expander(agent_settings.abbreviation_dict_path)
                 expand_result = _expander.expand_query(search_query)
                 if expand_result.expanded_query != search_query:
                     logger.info(
                         "react_agent: abbreviation expanded '%s' → '%s'",
-                        search_query[:60], expand_result.expanded_query[:60],
+                        search_query[:60],
+                        expand_result.expanded_query[:60],
                     )
                     search_query = expand_result.expanded_query
             except Exception:
@@ -614,8 +954,12 @@ class ReactRAGAgent:
 
         # 필터: plan 우선, parsed_query 폴백
         pq = state.get("parsed_query") or {}
-        device_names: List[str] = plan.get("device_names") or pq.get("selected_devices") or pq.get("device_names") or []
-        doc_types: List[str] = plan.get("doc_types") or pq.get("selected_doc_types") or pq.get("doc_types") or []
+        device_names: List[str] = (
+            plan.get("device_names") or pq.get("selected_devices") or pq.get("device_names") or []
+        )
+        doc_types: List[str] = (
+            plan.get("doc_types") or pq.get("selected_doc_types") or pq.get("doc_types") or []
+        )
         equip_ids: List[str] = pq.get("selected_equip_ids") or pq.get("equip_ids") or []
 
         # 장비명 토큰 기반 확장: "GENEVA XP" → "GENEVA STP300 xp", "GENEVA_STP300_XP" 등 포함
@@ -667,22 +1011,23 @@ class ReactRAGAgent:
             for d in existing
         }
         added = [
-            d for d in new_docs
-            if (
-                getattr(d, "doc_id", None)
-                or (getattr(d, "metadata", {}) or {}).get("doc_id")
-            ) not in existing_ids
+            d
+            for d in new_docs
+            if (getattr(d, "doc_id", None) or (getattr(d, "metadata", {}) or {}).get("doc_id"))
+            not in existing_ids
         ]
         combined = existing + added
 
         # 이력 기록
         trace = list(state.get("action_trace") or [])
-        trace.append({
-            "action": plan.get("action", "search"),
-            "query": search_query,
-            "found": len(new_docs),
-            "added": len(added),
-        })
+        trace.append(
+            {
+                "action": plan.get("action", "search"),
+                "query": search_query,
+                "found": len(new_docs),
+                "added": len(added),
+            }
+        )
 
         queries_used = list(state.get("search_queries_used") or [])
         queries_used.append(search_query)
@@ -714,11 +1059,13 @@ class ReactRAGAgent:
             display = _merge_display_docs(combined)
             update["display_docs"] = display
             update["docs"] = combined
-            interrupt({
-                "type": "retrieval_review",
-                "docs": display,
-                "response_mode": "retrieval_only",
-            })
+            interrupt(
+                {
+                    "type": "retrieval_review",
+                    "docs": display,
+                    "response_mode": "retrieval_only",
+                }
+            )
 
         return update
 
@@ -811,13 +1158,20 @@ class ReactRAGAgent:
             issues = judge_result.get("issues", [])
             logger.info(
                 "react_agent: judge unfaithful (attempt %d/%d), will retry. hint=%s issues=%s",
-                attempts + 1, max_attempts, hint[:100], issues[:3],
+                attempts + 1,
+                max_attempts,
+                hint[:100],
+                issues[:3],
             )
             result["_judge_retry_hint"] = hint
             result["_judge_retry_issues"] = issues
 
         elapsed = (time.perf_counter() - t0) * 1000
-        self._emit_node("judge", elapsed, "✓ 충실" if faithful else f"✗ 불충실 (attempt {attempts + 1}/{max_attempts})")
+        self._emit_node(
+            "judge",
+            elapsed,
+            "✓ 충실" if faithful else f"✗ 불충실 (attempt {attempts + 1}/{max_attempts})",
+        )
         return result
 
     @staticmethod
@@ -840,7 +1194,74 @@ class ReactRAGAgent:
         action = plan.get("action", "answer")
         if action in ("search", "search_solution"):
             return "search"
+        if action == "followup":
+            return "followup"
         return "answer"
+
+    # ── followup 노드 ────────────────────────────────────────────────────────
+
+    def _followup_node(self, state: ReactAgentState) -> Dict[str, Any]:
+        """이전 대화 맥락을 기반으로 후속 답변을 생성한다.
+
+        새 검색 없이 chat_history의 이전 답변 + collected_docs를 컨텍스트로
+        바로 answer를 생성. "표로 정리해줘", "자세히", "한개더" 등에 대응.
+        """
+        t0 = time.perf_counter()
+        query = state.get("query", "")
+        chat_history = state.get("chat_history") or []
+
+        # 이전 턴에서 에이전트 답변 추출 (가장 최근 것)
+        prev_answer = ""
+        for turn in reversed(chat_history):
+            if "assistant_text" in turn:
+                prev_answer = str(turn.get("assistant_text", ""))
+                break
+            elif turn.get("role") == "assistant":
+                prev_answer = str(turn.get("content", ""))
+                break
+
+        # 이전 collected_docs가 있으면 ref_json 구성
+        docs = state.get("collected_docs") or []
+        ref_json = results_to_ref_json(docs) if docs else []
+
+        # followup 전용 프롬프트: 이전 답변을 컨텍스트로 제공
+        followup_system = (
+            "당신은 RAG 어시스턴트입니다. 사용자가 이전 답변에 대한 후속 요청을 했습니다.\n"
+            "아래 '이전 답변'과 'REFS'를 참고하여 사용자의 요청에 맞게 답변을 재구성하세요.\n"
+            "- 이전 답변의 내용을 기반으로 요청된 형식(표, 요약, 상세 설명 등)으로 변환하세요.\n"
+            "- 새로운 정보를 추측하여 추가하지 마세요.\n"
+            "- **반드시 한국어로 답변하세요.**"
+        )
+        followup_user = (
+            f"## 사용자의 후속 요청\n{query}\n\n"
+            f"## 이전 답변\n{prev_answer[:3000]}\n\n"
+            f"## REFS\n{json.dumps(ref_json[:10], ensure_ascii=False)[:2000] if ref_json else '(없음)'}"
+        )
+
+        try:
+            resp = self.llm.generate(
+                messages=[
+                    {"role": "system", "content": followup_system},
+                    {"role": "user", "content": followup_user},
+                ],
+                temperature=0.0,
+            )
+            answer = resp.text if hasattr(resp, "text") else str(resp)
+        except Exception:
+            logger.warning("react_agent: followup answer generation failed", exc_info=True)
+            answer = prev_answer  # fallback: 이전 답변 그대로
+
+        display = _merge_display_docs(docs) if docs else []
+        elapsed = (time.perf_counter() - t0) * 1000
+        self._emit_node("followup", elapsed, f"{len(answer)}자")
+        return {
+            "answer": answer,
+            "answer_ref_json": ref_json,
+            "ref_json": ref_json,
+            "docs": docs,
+            "all_docs": docs,
+            "display_docs": display,
+        }
 
     # ── 그래프 조립 ───────────────────────────────────────────────────────────
 
@@ -851,6 +1272,7 @@ class ReactRAGAgent:
         builder.add_node("plan", self._plan_node)
         builder.add_node("search", self._search_node)
         builder.add_node("answer", self._answer_node)
+        builder.add_node("followup", self._followup_node)
         builder.add_node("judge", self._judge_node)
 
         builder.add_edge(START, "preprocess")
@@ -858,10 +1280,11 @@ class ReactRAGAgent:
         builder.add_conditional_edges(
             "plan",
             self._route_after_plan,
-            {"search": "search", "answer": "answer"},
+            {"search": "search", "answer": "answer", "followup": "followup"},
         )
-        builder.add_edge("search", "plan")   # 루프: search → plan → search | answer
+        builder.add_edge("search", "plan")  # 루프: search → plan → search | answer
         builder.add_edge("answer", "judge")
+        builder.add_edge("followup", "judge")  # followup도 judge를 거침
         builder.add_conditional_edges(
             "judge",
             self._route_after_judge,
@@ -929,9 +1352,7 @@ class ReactRAGAgent:
         # mq_used: 검색을 2회 이상 했으면 True
         iterations = int(result.get("iterations", 0) or 0)
         result["mq_used"] = iterations > 1
-        result["mq_reason"] = (
-            f"react loop: {iterations} search(es)" if iterations > 1 else None
-        )
+        result["mq_reason"] = f"react loop: {iterations} search(es)" if iterations > 1 else None
         # mq_mode: state_overrides로 주입된 값 우선, 없으면 "react"
         if not result.get("mq_mode"):
             result["mq_mode"] = "react"
@@ -944,9 +1365,7 @@ class ReactRAGAgent:
         # selected_doc_types: parsed_query에서 읽어서 보조 metadata 채우기
         pq = result.get("parsed_query") or {}
         if not result.get("selected_doc_types"):
-            result["selected_doc_types"] = (
-                pq.get("selected_doc_types") or pq.get("doc_types") or []
-            )
+            result["selected_doc_types"] = pq.get("selected_doc_types") or pq.get("doc_types") or []
 
         # route: parsed_query에서 읽거나 "general" 기본값
         if not result.get("route"):

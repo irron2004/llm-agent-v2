@@ -39,6 +39,7 @@ export default function ChatPage() {
   const [suggestedDeviceError, setSuggestedDeviceError] = useState<string | null>(null);
   const [showSuggestedDevicePanel, setShowSuggestedDevicePanel] = useState(false);
   const [lastSelectedDevice, setLastSelectedDevice] = useState<string | null>(null);
+  const [useReactAgent, setUseReactAgent] = useState(false);
 
   // Filter bar state
   const [catalog, setCatalog] = useState<DeviceCatalogResponse | null>(null);
@@ -351,6 +352,7 @@ export default function ChatPage() {
     const filterOverrides: Record<string, unknown> = {};
     if (selectedModel) filterOverrides.filterDevices = [selectedModel];
     if (selectedDocTypes.length > 0) filterOverrides.filterDocTypes = selectedDocTypes;
+    if (useReactAgent) filterOverrides.useReactAgent = true;
 
     if (Object.keys(filterOverrides).length > 0) {
       await send({ text, overrides: filterOverrides as Parameters<typeof send>[0]["overrides"] });
@@ -553,6 +555,8 @@ export default function ChatPage() {
               equipOptions={[]}
               selectedEquip={selectedEquip}
               onEquipChange={setSelectedEquip}
+              useReactAgent={useReactAgent}
+              onReactAgentChange={setUseReactAgent}
             />
           </InputArea>
         </ChatContainer>

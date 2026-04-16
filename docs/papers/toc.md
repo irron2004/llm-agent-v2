@@ -30,9 +30,21 @@
 - 준비 중
 - 예정 주제: Drift detection, rollback policy, risk-cost optimization
 
-## 6. Paper D — Faithfulness (옵션)
-- 준비 중
-- 예정 주제: Numeric/Condition validation
+## 6. Paper D — Sensor-Document Linking Agent
+- [README / 진행 현황](./50_paper_d_sensor_doc/README.md)
+- [아이디어 정리 + 4단계 파이프라인](./50_paper_d_sensor_doc/paper_d_ideation.md)
+- [학습 로드맵 (A~D 단계)](./50_paper_d_sensor_doc/paper_d_training_roadmap.md)
+- [APC 에이전트 상세 아키텍처](./50_paper_d_sensor_doc/paper_d_architecture.md)
+- [박사과정 연구계획서 초안](./50_paper_d_sensor_doc/paper_d_research_proposal.md)
+- [논문 전략 및 프레이밍](./50_paper_d_sensor_doc/paper_d_paper_strategy.md)
+- [데이터 검증 Agent 지시문](./50_paper_d_sensor_doc/paper_d_data_verification.md)
+- [3가지 원칙 구현 예시](./50_paper_d_sensor_doc/paper_d_implementation_examples.md)
+- Evidence:
+  - [RAAD-LLM 논문 상세 리뷰](./50_paper_d_sensor_doc/evidence/2026-04-14_raad_llm_review.md)
+  - [6개 영역 문헌 조사 (26편)](./50_paper_d_sensor_doc/evidence/2026-04-14_literature_survey.md)
+  - [Paper D 포지셔닝 중심 문헌조사](./50_paper_d_sensor_doc/evidence/2026-04-14_related_literature_survey.md)
+- 주제: 센서 이상 → 이벤트화 → 문서 검색 → 근거 기반 트러블슈팅 답변
+- 핵심 키워드: Contrastive Retriever, Hybrid RAG, Sensor Eventization, Temporal Uncertainty, Ontology
 
 ## 7. Legacy
 - [Paper B 작업용 초안(중복 성격, 보관)](./90_legacy/paper_b_stability_aware_retrieval.md)
