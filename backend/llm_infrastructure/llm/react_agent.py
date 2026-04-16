@@ -70,7 +70,7 @@ def _infer_route(state: "ReactAgentState") -> str:  # type: ignore[name-defined]
 
 # ── 상수 ────────────────────────────────────────────────────────────────────
 
-MAX_SEARCH_ITERATIONS = 3  # 최대 검색 횟수 (초과 시 강제 answer)
+MAX_SEARCH_ITERATIONS = 6  # 최대 검색 횟수 (초과 시 강제 answer)
 MAX_JUDGE_RETRIES = 2  # judge unfaithful 시 최대 재시도 횟수
 TEMP_PLAN = 0.0  # planner 온도 (결정론적)
 
