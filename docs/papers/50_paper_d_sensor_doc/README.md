@@ -30,6 +30,7 @@
 ├── paper_d_data_verification.md           # 데이터 검증 Agent 지시문 (3종)
 ├── paper_d_implementation_examples.md     # 3가지 원칙 구현 예시 (코드 스케치)
 ├── paper_d_es_query_results.md            # SUPRA Vplus 센서명 기반 ES 조회 결과 정리
+├── paper_d_keyword_query_log.md           # 키워드별 조회 문서와 relevance 판정 작업장
 └── evidence/
     ├── 2026-04-14_raad_llm_review.md              # RAAD-LLM 논문 상세 리뷰
     ├── 2026-04-14_literature_survey.md            # 6개 영역 26편 문헌 조사
@@ -52,6 +53,7 @@
 - [x] 논문 전략 및 프레이밍 정리
 - [x] 데이터 검증 Agent 지시문 작성
 - [x] SUPRA Vplus 센서명 기반 ES 조회 결과 정리
+- [x] 키워드별 조회 문서 및 relevance 판정용 로그 문서 작성
 - [x] survey한 논문 reference 문서 작성
 - [x] BibTeX 우선 수집 목록 작성
 - [x] 논문 비교표 문서 작성
