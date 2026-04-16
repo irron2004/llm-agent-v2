@@ -81,7 +81,7 @@ TEMP_PLAN = 0.0  # planner 온도 (결정론적)
 class NextAction(PydanticBaseModel):
     """planner LLM이 결정하는 다음 행동."""
 
-    action: Literal["search", "search_solution", "answer"]
+    action: Literal["search", "search_solution", "answer", "followup"]
     reason: str
     query: Optional[str] = None
     device_names: List[str] = []
@@ -148,15 +148,19 @@ _PLAN_SYSTEM = """\
 사용자 질문, 대화 맥락, 수집된 문서를 분석해 다음 행동을 결정하세요.
 
 행동 종류:
-- search         : 문서를 검색 (처음이거나 현재 문서가 부적절할 때)
-- search_solution: 문제 원인 문서는 있지만 해결 절차 문서가 없을 때 추가 검색
-- answer         : 수집된 문서로 답변 생성 가능할 때
+- search          : 문서를 검색 (처음이거나 현재 문서가 부적절할 때)
+- search_solution : 문제 원인 문서는 있지만 해결 절차(SOP) 문서가 없을 때 추가 검색. 이 경우 doc_types를 반드시 ["sop", "setupmanual"]로 지정하세요.
+- answer          : 수집된 문서로 답변 생성 가능할 때
+- followup        : 사용자가 이전 답변을 기반으로 후속 요청할 때 (예: "표로 정리해줘", "자세히 설명해줘", "다른 장비로 알려줘", "한개더"). 새 검색 없이 이전 대화 맥락으로 바로 답변합니다.
 
 판단 기준:
+- **문서 내용을 반드시 확인하세요.** score가 높더라도 "내용" 항목을 읽고 질문이 원하는 구체 정보(파트 넘버, 절차, 수치 등)가 실제로 포함되어 있는지 확인하세요. score가 높아도 내용이 맞지 않으면 search로 재검색하세요.
 - 수집된 문서가 질문의 **구체적 행위**(교체/청소/조정/캘리브레이션 등)에 직접 관련되는지 확인하세요.
 - 문서가 같은 부품이라도 다른 행위(예: 교체를 물어봤는데 청소 문서만 있음)에 대한 것이면 search로 재검색하세요.
 - doc_id에 행위 유형이 포함됩니다: rep=교체(replacement), cln=청소(cleaning), adj=조정(adjustment), cal=캘리브레이션. 질문의 행위와 doc_id의 행위가 일치하는지 확인하세요.
 - reranker score가 낮은 문서(score < 0.1)가 대부분이면, 검색어를 더 구체적으로 변경하여 재검색하세요.
+- **대화 맥락에 이전 답변이 있고**, 사용자가 "정리해줘/자세히/표로/한개더/~로 알려줘" 등 후속 요청을 하면 followup을 선택하세요.
+- reason 필드에는 반드시 **(1) 현재 문서가 왜 부족한지 또는 적합한지, (2) 다음 검색으로 뭘 찾으려는지**를 구체적으로 기술하세요.
 """
 
 _PLAN_USER_TMPL = """\
@@ -181,15 +185,27 @@ _PLAN_USER_TMPL = """\
 
 
 def _format_history(chat_history: List[Dict[str, Any]]) -> str:
-    """ChatHistoryTurn(user_text/assistant_text) 또는 일반 role/content 형식을 모두 처리."""
+    """ChatHistoryTurn(user_text/assistant_text) 또는 일반 role/content 형식을 모두 처리.
+
+    직전 턴의 에이전트 답변은 800자까지 보존하여 follow-up 질문
+    ("표로 정리해줘", "자세히 설명해줘" 등)에 planner가 맥락을 파악할 수 있게 한다.
+    그 이전 턴들은 200자로 요약.
+    """
     if not chat_history:
         return "(없음)"
     lines = []
-    for turn in chat_history[-6:]:  # 최근 3턴 (6개 메시지)
+    recent = chat_history[-6:]  # 최근 3턴 (6개 메시지)
+    last_idx = len(recent) - 1
+    for i, turn in enumerate(recent):
+        # 직전 턴의 에이전트 답변만 800자, 나머지는 200자
+        is_last_turn = i >= last_idx - 1
+        user_limit = 200
+        asst_limit = 800 if is_last_turn else 200
+
         # ChatHistoryTurn 형식 (agent.py가 model_dump()로 넘기는 형식)
         if "user_text" in turn:
-            user = str(turn.get("user_text", ""))[:200]
-            asst = str(turn.get("assistant_text", ""))[:200]
+            user = str(turn.get("user_text", ""))[:user_limit]
+            asst = str(turn.get("assistant_text", ""))[:asst_limit]
             if user:
                 lines.append(f"사용자: {user}")
             if asst:
@@ -197,7 +213,8 @@ def _format_history(chat_history: List[Dict[str, Any]]) -> str:
         else:
             # 일반 role/content 형식
             role = turn.get("role", "user")
-            content = str(turn.get("content", ""))[:200]
+            limit = asst_limit if role != "user" else user_limit
+            content = str(turn.get("content", ""))[:limit]
             prefix = "사용자" if role == "user" else "에이전트"
             lines.append(f"{prefix}: {content}")
     return "\n".join(lines) if lines else "(없음)"
@@ -216,7 +233,11 @@ def _format_action_trace(trace: List[Dict[str, Any]]) -> str:
 
 
 def _format_doc_summary(docs: List[Any]) -> str:
-    """수집된 문서를 간략히 요약 (planner 프롬프트용). reranker score 포함."""
+    """수집된 문서를 간략히 요약 (planner 프롬프트용). reranker score + 내용 snippet 포함.
+
+    Planner가 score뿐 아니라 문서 내용의 적합성도 판단할 수 있도록
+    각 문서의 첫 150자 snippet을 함께 제공한다.
+    """
     if not docs:
         return "(없음)"
     seen: Dict[str, str] = {}
@@ -235,6 +256,16 @@ def _format_doc_summary(docs: List[Any]) -> str:
                     label += f" (score={float(score):.3f})"
                 except (ValueError, TypeError):
                     pass
+            # 문서 내용 snippet 추가: planner가 내용 적합성 판단 가능
+            content = (
+                getattr(doc, "content", None)
+                or getattr(doc, "text", None)
+                or (meta.get("content") or meta.get("text") or "")
+            )
+            if content:
+                snippet = str(content).replace("\n", " ").strip()[:150]
+                if snippet:
+                    label += f"\n    내용: {snippet}"
             seen[doc_id] = label
 
     summaries = [f"- {v}" for v in list(seen.values())[:10]]
@@ -986,7 +1017,74 @@ class ReactRAGAgent:
         action = plan.get("action", "answer")
         if action in ("search", "search_solution"):
             return "search"
+        if action == "followup":
+            return "followup"
         return "answer"
+
+    # ── followup 노드 ────────────────────────────────────────────────────────
+
+    def _followup_node(self, state: ReactAgentState) -> Dict[str, Any]:
+        """이전 대화 맥락을 기반으로 후속 답변을 생성한다.
+
+        새 검색 없이 chat_history의 이전 답변 + collected_docs를 컨텍스트로
+        바로 answer를 생성. "표로 정리해줘", "자세히", "한개더" 등에 대응.
+        """
+        t0 = time.perf_counter()
+        query = state.get("query", "")
+        chat_history = state.get("chat_history") or []
+
+        # 이전 턴에서 에이전트 답변 추출 (가장 최근 것)
+        prev_answer = ""
+        for turn in reversed(chat_history):
+            if "assistant_text" in turn:
+                prev_answer = str(turn.get("assistant_text", ""))
+                break
+            elif turn.get("role") == "assistant":
+                prev_answer = str(turn.get("content", ""))
+                break
+
+        # 이전 collected_docs가 있으면 ref_json 구성
+        docs = state.get("collected_docs") or []
+        ref_json = results_to_ref_json(docs) if docs else []
+
+        # followup 전용 프롬프트: 이전 답변을 컨텍스트로 제공
+        followup_system = (
+            "당신은 RAG 어시스턴트입니다. 사용자가 이전 답변에 대한 후속 요청을 했습니다.\n"
+            "아래 '이전 답변'과 'REFS'를 참고하여 사용자의 요청에 맞게 답변을 재구성하세요.\n"
+            "- 이전 답변의 내용을 기반으로 요청된 형식(표, 요약, 상세 설명 등)으로 변환하세요.\n"
+            "- 새로운 정보를 추측하여 추가하지 마세요.\n"
+            "- **반드시 한국어로 답변하세요.**"
+        )
+        followup_user = (
+            f"## 사용자의 후속 요청\n{query}\n\n"
+            f"## 이전 답변\n{prev_answer[:3000]}\n\n"
+            f"## REFS\n{json.dumps(ref_json[:10], ensure_ascii=False)[:2000] if ref_json else '(없음)'}"
+        )
+
+        try:
+            resp = self.llm.generate(
+                messages=[
+                    {"role": "system", "content": followup_system},
+                    {"role": "user", "content": followup_user},
+                ],
+                temperature=0.0,
+            )
+            answer = resp.text if hasattr(resp, "text") else str(resp)
+        except Exception:
+            logger.warning("react_agent: followup answer generation failed", exc_info=True)
+            answer = prev_answer  # fallback: 이전 답변 그대로
+
+        display = _merge_display_docs(docs) if docs else []
+        elapsed = (time.perf_counter() - t0) * 1000
+        self._emit_node("followup", elapsed, f"{len(answer)}자")
+        return {
+            "answer": answer,
+            "answer_ref_json": ref_json,
+            "ref_json": ref_json,
+            "docs": docs,
+            "all_docs": docs,
+            "display_docs": display,
+        }
 
     # ── 그래프 조립 ───────────────────────────────────────────────────────────
 
@@ -997,6 +1095,7 @@ class ReactRAGAgent:
         builder.add_node("plan", self._plan_node)
         builder.add_node("search", self._search_node)
         builder.add_node("answer", self._answer_node)
+        builder.add_node("followup", self._followup_node)
         builder.add_node("judge", self._judge_node)
 
         builder.add_edge(START, "preprocess")
@@ -1004,10 +1103,11 @@ class ReactRAGAgent:
         builder.add_conditional_edges(
             "plan",
             self._route_after_plan,
-            {"search": "search", "answer": "answer"},
+            {"search": "search", "answer": "answer", "followup": "followup"},
         )
         builder.add_edge("search", "plan")  # 루프: search → plan → search | answer
         builder.add_edge("answer", "judge")
+        builder.add_edge("followup", "judge")  # followup도 judge를 거침
         builder.add_conditional_edges(
             "judge",
             self._route_after_judge,
