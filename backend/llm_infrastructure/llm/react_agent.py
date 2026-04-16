@@ -281,6 +281,106 @@ def _plan_fallback(has_docs: bool = False) -> Dict[str, Any]:
     return {"action": "search", "reason": "plan generation failed; fallback to search"}
 
 
+# ── Follow-up 감지 ──────────────────────────────────────────────────────────
+
+_FOLLOWUP_INDICATORS = {
+    "표로 정리",
+    "표로 만들",
+    "정리해줘",
+    "정리해",
+    "자세히",
+    "더 자세",
+    "좀 더",
+    "다시",
+    "한개더",
+    "한 개 더",
+    "하나 더",
+    "한개만 더",
+    "위에",
+    "아까",
+    "이전",
+    "방금",
+    "로 알려줘",
+    "로 해줘",
+    "로 바꿔",
+    "로 변경",
+    "요약해",
+    "줄여줘",
+    "간단히",
+    "쉽게",
+}
+
+
+def _is_followup_query(query: str) -> bool:
+    """검색 키워드 없이 이전 답변에 대한 후속 요청인지 판별한다.
+
+    조건: (1) followup indicator 포함 AND (2) 질문이 짧거나 장비/부품 키워드 없음
+    """
+    ql = query.strip().lower()
+    if len(ql) <= 2:
+        # "네", "응" 같은 1~2자 단답은 follow-up 아님
+        return False
+    has_indicator = any(ind in ql for ind in _FOLLOWUP_INDICATORS)
+    if not has_indicator:
+        return False
+    # 장비명이나 구체적 기술 키워드가 있으면 독립 질문일 가능성
+    has_device = any(d in query.upper() for d in [
+        "SUPRA", "PRECIA", "GENEVA", "INTEGER", "ETERNA", "ECOLITE", "ZEDIUS",
+    ])
+    # 짧은 follow-up (60자 미만) 또는 장비명 없으면 follow-up
+    if len(ql) < 60 and not has_device:
+        return True
+    # 장비명 있어도 "~로 알려줘" 패턴은 follow-up ("SUPRA Q로 알려줘")
+    if any(p in ql for p in ("로 알려줘", "로 해줘", "로 바꿔", "로 변경")):
+        return True
+    return False
+
+
+# ── Keyword overlap guard ────────────────────────────────────────────────────
+
+def _docs_lack_query_keywords(docs: List[Any], query: str) -> bool:
+    """수집된 문서의 내용에 질문의 핵심 키워드가 전혀 포함되지 않은지 검사.
+
+    score가 높아도 실제 내용에 질문이 원하는 정보가 없는 케이스를 감지한다.
+    (예: "part number 뭐야?" 인데 문서에 part number 관련 내용 없음)
+    """
+    if not docs or not query:
+        return False
+    # 질문에서 핵심 키워드 추출 (stop word 제외, 2자 이상)
+    _STOP = {"은", "는", "이", "가", "을", "를", "의", "에", "에서", "로", "으로",
+             "좀", "해줘", "알려줘", "뭐야", "어떻게", "관련", "해결", "방법",
+             "the", "is", "a", "an", "of", "for", "to", "in", "on", "what", "how"}
+    tokens = set(re.findall(r"[\w가-힣]+", query.lower()))
+    keywords = {t for t in tokens if len(t) >= 2 and t not in _STOP}
+    if not keywords:
+        return False
+
+    # 문서 내용에서 키워드 매칭 검사
+    matched = 0
+    for kw in keywords:
+        for doc in docs[:10]:  # 상위 10개만 검사
+            content = (
+                getattr(doc, "content", None)
+                or getattr(doc, "text", None)
+                or ""
+            )
+            meta = getattr(doc, "metadata", {}) or {}
+            doc_text = f"{content} {meta.get('title', '')} {meta.get('doc_id', '')}".lower()
+            if kw in doc_text:
+                matched += 1
+                break
+
+    # 핵심 키워드의 30% 미만만 매칭되면 "내용 부족"
+    ratio = matched / len(keywords) if keywords else 1.0
+    if ratio < 0.3:
+        logger.debug(
+            "keyword_overlap_guard: query=%s keywords=%s matched=%d/%d (%.0f%%)",
+            query[:60], list(keywords)[:5], matched, len(keywords), ratio * 100,
+        )
+        return True
+    return False
+
+
 # ── 장비명 토큰 기반 확장 ─────────────────────────────────────────────────────
 
 _PROCEDURE_KEYWORDS = {
@@ -301,6 +401,12 @@ _PROCEDURE_KEYWORDS = {
     "설정하는",
     "설정 방법",
     "설정법",
+    "교체 방법",
+    "교체 순서",
+    "교체 절차",
+    "청소 방법",
+    "순서",
+    "절차",
     "setup",
     "install",
     "connect",
@@ -310,12 +416,15 @@ _PROCEDURE_KEYWORDS = {
     "how to install",
     "how to connect",
     "how to use",
+    "how to replace",
     "방법",
     "법",
     "如何使用",
     "怎么安装",
     "怎样连接",
     "如何设置",
+    "手順",
+    "交換方法",
 }
 
 _TROUBLESHOOTING_KEYWORDS = {
@@ -622,10 +731,23 @@ class ReactRAGAgent:
             "에러",
             "error",
             "alarm",
+            "interlock",
+            "인터락",
+            "fault",
+            "fail",
+            "끊김",
+            "끊겼",
+            "불량",
+            "점등",
+            "안됨",
+            "안 됨",
+            "연결 불가",
+            "timeout",
+            "타임아웃",
         )
         if any(kw in raw_query.lower() for kw in _TS_KEYWORDS):
             current_dt = pq.get("selected_doc_types") or pq.get("doc_types") or []
-            ts_types = {"myservice", "gcb", "ts"}
+            ts_types = {"myservice", "gcb", "ts", "sop", "setupmanual"}
             expanded = list(ts_types | {str(d).lower() for d in current_dt})
             pq["selected_doc_types"] = expanded
             pq["doc_types"] = expanded
@@ -689,10 +811,25 @@ class ReactRAGAgent:
         )
 
         has_docs = bool(state.get("collected_docs"))
+        chat_history = state.get("chat_history") or []
+
+        # ── Rule-based pre-checks (LLM 호출 전) ─────────────────────────
+
+        # (1) Follow-up 감지: 첫 iteration + docs 없음 + chat_history 있음 +
+        #     검색 키워드 없는 후속 요청
+        if iterations == 0 and not has_docs and chat_history:
+            if _is_followup_query(state.get("query", "")):
+                plan: Dict[str, Any] = {
+                    "action": "followup",
+                    "reason": "follow-up request detected; using previous context",
+                }
+                elapsed = (time.perf_counter() - t0) * 1000
+                self._emit_node("plan", elapsed, f"→ followup (rule-based)")
+                return {"plan": plan}
 
         # 최대 반복 횟수 초과 시 강제 answer
         if iterations >= max_iter:
-            plan: Dict[str, Any] = {
+            plan = {
                 "action": "answer",
                 "reason": f"max iterations ({max_iter}) reached",
             }
@@ -713,6 +850,32 @@ class ReactRAGAgent:
                 )
                 # structured output 실패 시 raw JSON 파싱 시도
                 plan = self._try_raw_plan_parse(user) or _plan_fallback(has_docs)
+
+        # ── Rule-based post-checks (LLM 결정 보정) ──────────────────────
+
+        action = plan.get("action", "answer")
+
+        # (2) search_solution → SOP/setupmanual 강제
+        if action == "search_solution":
+            plan_dt = plan.get("doc_types") or []
+            sop_types = {"sop", "setupmanual"}
+            if not any(d.lower() in sop_types for d in plan_dt):
+                plan["doc_types"] = list(sop_types | {d.lower() for d in plan_dt})
+                logger.info("react_agent: search_solution → forced SOP doc_types: %s", plan["doc_types"])
+
+        # (3) answer 결정이지만 문서 내용에 query 핵심어가 전혀 없으면 re-search 유도
+        if action == "answer" and has_docs and iterations < max_iter:
+            if _docs_lack_query_keywords(
+                state.get("collected_docs") or [],
+                state.get("query") or state.get("query_ko") or "",
+            ):
+                plan = {
+                    "action": "search",
+                    "reason": "collected docs lack query keywords; retrying with broader search",
+                    "query": query,
+                    "doc_types": [],  # 필터 풀고 재검색
+                }
+                logger.info("react_agent: keyword overlap guard triggered, forcing re-search")
 
         elapsed = (time.perf_counter() - t0) * 1000
         self._emit_node("plan", elapsed, f"→ {plan.get('action')} | {plan.get('reason', '')[:60]}")
