@@ -24,6 +24,7 @@
 ├── paper_d_ideation.md                    # 아이디어 정리 + 4단계 파이프라인 설계
 ├── paper_d_training_roadmap.md            # 학습 전략 (A~D 단계)
 ├── paper_d_architecture.md                # APC 에이전트 상세 아키텍처 (RAAD-LLM 기반)
+├── paper_d_professor_onepage_summary.md   # 교수님께 빠르게 설명하는 1페이지 요약
 ├── paper_d_research_proposal.md           # 박사과정 연구계획서 초안
 ├── paper_d_paper_strategy.md              # 논문 전략, 프레이밍, 빠른 실험 순서
 ├── paper_d_data_verification.md           # 데이터 검증 Agent 지시문 (3종)
@@ -31,7 +32,10 @@
 └── evidence/
     ├── 2026-04-14_raad_llm_review.md              # RAAD-LLM 논문 상세 리뷰
     ├── 2026-04-14_literature_survey.md            # 6개 영역 26편 문헌 조사
-    └── 2026-04-14_related_literature_survey.md    # Paper D 포지셔닝 중심 문헌조사
+    ├── 2026-04-14_related_literature_survey.md    # Paper D 포지셔닝 중심 문헌조사
+    ├── paper_d_surveyed_references.md             # 나중에 빠르게 다시 볼 수 있는 참고용 논문 정리
+    ├── paper_d_bibtex_priority.md                 # BibTeX를 먼저 확보해야 할 논문 목록
+    └── paper_d_paper_comparison_table.md          # 논문별 차이를 한눈에 보는 비교표
 ```
 
 ## Status
@@ -42,9 +46,13 @@
 - [x] 학습 로드맵 (A~D)
 - [x] RAAD-LLM 논문 상세 리뷰
 - [x] APC 에이전트 상세 아키텍처 설계
+- [x] 교수님 보고용 1페이지 요약 작성
 - [x] 박사과정 연구계획서 초안
 - [x] 논문 전략 및 프레이밍 정리
 - [x] 데이터 검증 Agent 지시문 작성
+- [x] survey한 논문 reference 문서 작성
+- [x] BibTeX 우선 수집 목록 작성
+- [x] 논문 비교표 문서 작성
 
 ### 다음 단계
 - [ ] Agent 지시문으로 데이터 검증 수행 (로그/센서/연결)

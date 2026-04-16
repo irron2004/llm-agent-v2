@@ -107,7 +107,37 @@
 
 ---
 
-## 6. 집필 단계별 사용법
+## 6. 수집 상태 체크리스트
+
+실제 BibTeX/DOI/venue 확인이 끝날 때마다 아래 체크박스를 업데이트한다.
+
+### 최우선 확보 목록
+- [ ] CLaSP
+- [ ] LaSTR
+- [ ] S2S-FDD
+- [ ] Technical language processing for maintenance work orders
+- [ ] Causal knowledge extraction from maintenance documents
+- [ ] Extracting failure time data from industrial maintenance records using text mining
+- [ ] SOPRAG
+- [ ] Effective Maintenance by Reducing Failure-Cause Misdiagnosis in Semiconductor Industry
+- [ ] RAIDR
+- [ ] RAGLog
+
+### 2순위 확보 목록
+- [ ] TRACE
+- [ ] SensorLM
+- [ ] Document GraphRAG
+- [ ] RAINDROP
+- [ ] FC-STGNN
+- [ ] THGNN
+- [ ] The ROAD from Sensor Data to Process Instances
+- [ ] Inferring Missing Event Log Data from IoT Sensor Data
+- [ ] Process mining on sensor data: a review
+- [ ] SensorStream
+
+---
+
+## 7. 집필 단계별 사용법
 
 ### Proposal / Introduction 쓰기 전
 - 최우선 확보 목록 1~8부터 확인
@@ -121,7 +151,7 @@
 
 ---
 
-## 7. 관련 문서
+## 8. 관련 문서
 
 - `paper_d_surveyed_references.md`
 - `paper_d_paper_comparison_table.md`
