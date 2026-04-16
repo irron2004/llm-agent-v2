@@ -228,7 +228,8 @@ def _format_action_trace(trace: List[Dict[str, Any]]) -> str:
         action = act.get("action", "search")
         query = act.get("query", "")
         found = act.get("found", 0)
-        lines.append(f"{i}. [{action}] 쿼리='{query}' → {found}개 청크 수집")
+        added = act.get("added", found)
+        lines.append(f"{i}. [{action}] 쿼리='{query}' → {found}개 검색, {added}개 신규 추가")
     return "\n".join(lines)
 
 
@@ -877,7 +878,29 @@ class ReactRAGAgent:
                 plan["doc_types"] = list(sop_types | {d.lower() for d in plan_dt})
                 logger.info("react_agent: search_solution → forced SOP doc_types: %s", plan["doc_types"])
 
-        # (3) answer 결정이지만 문서 내용에 query 핵심어가 전혀 없으면 re-search 유도
+        # (3) search 반복인데 새 문서가 없으면 강제 answer (무한 루프 방지)
+        if action in ("search", "search_solution") and iterations >= 2:
+            trace = state.get("action_trace") or []
+            # 직전 2회 검색에서 added=0이면 더 찾을 문서 없음
+            recent_added = [t.get("added", -1) for t in trace[-2:]]
+            if len(recent_added) >= 2 and all(a == 0 for a in recent_added):
+                plan = {
+                    "action": "answer",
+                    "reason": "last 2 searches added 0 new docs; answering with collected docs",
+                }
+                logger.info("react_agent: no-new-docs guard → forcing answer")
+            else:
+                # 직전 검색어와 동일하면 강제 answer (같은 쿼리 반복 방지)
+                last_query = trace[-1].get("query", "") if trace else ""
+                plan_query = plan.get("query") or ""
+                if last_query and plan_query and last_query.strip().lower() == plan_query.strip().lower():
+                    plan = {
+                        "action": "answer",
+                        "reason": "duplicate search query detected; answering with collected docs",
+                    }
+                    logger.info("react_agent: duplicate-query guard → forcing answer")
+
+        # (4) answer 결정이지만 문서 내용에 query 핵심어가 전혀 없으면 re-search 유도
         if action == "answer" and has_docs and iterations < max_iter:
             if _docs_lack_query_keywords(
                 state.get("collected_docs") or [],
