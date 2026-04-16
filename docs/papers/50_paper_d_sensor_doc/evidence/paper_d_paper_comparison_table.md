@@ -30,18 +30,18 @@
 | LaSTR | time series segment + language query | segment retrieval | segment | 없음 | 없음 | 없음 | 없음 | event-centric retrieval 참고 |
 | TRACE | time series + text | multimodal retrieval | aligned context | 없음 | 없음 | 없음 | 없음 | hard negative / multimodal retrieval 참고 |
 | SensorLM | sensor + text | sensor-language model | text-aligned sensor state | 없음 | 없음 | 없음 | 없음 | caption/pseudo-text 전략 참고 |
-| S2S-FDD | industrial time series + maintenance documents | explainable zero-shot diagnosis | relevant documents | 간접적 | 있음 | 약함 | 없음 | eventizer + explanation 구조가 유사 |
+| FD-LLM | sensor signal + language | fault diagnosis with LLM | language-grounded diagnosis | 간접적 | 약함 | 약함 | 없음 | signal-to-language explanation 층의 대체 근거 |
 | Technical language processing for maintenance work orders | maintenance logs | work order mining | 없음(분석 중심) | 있음 | 없음 | 없음 | 없음 | maintenance log가 핵심 데이터라는 근거 |
 | Causal knowledge extraction from maintenance documents | maintenance text | causal triple extraction | causal graph entries | 있음 | 간접적 | 없음 | 문서/원인 graph | evidence graph 구축 근거 |
 | Extracting failure time data from industrial maintenance records | maintenance records | failure time reconstruction | 없음 | 있음 | 없음 | 강함 | 없음 | temporal uncertainty 직접 지지 |
 | SOPRAG | SOP/manual | structured SOP retrieval | SOP sections | 없음 | 있음 | 없음 | SOP graph | 문서 grounding 구조 핵심 근거 |
 | Document GraphRAG | manufacturing documents | graph-based document QA | document chunks/graph nodes | 없음 | 있음 | 없음 | document graph | SOP/manual grounding 보강 |
 | Effective Maintenance by Reducing Failure-Cause Misdiagnosis in Semiconductor Industry | FDC sensors + contextual info | semiconductor diagnosis | 없음 | 간접적 | 없음 | 없음 | 없음 | sensor-only 한계의 도메인 근거 |
-| RAIDR | incident data + sensor relation + docs | incident diagnosis/reporting | historical incidents + docs | 간접적 | 있음 | 약함 | sensor relation graph | graph-structured retrieval과 가장 유사 |
+| KEO | O&M text + knowledge graph | KG-augmented retrieval for industrial QA | graph/text evidence | 간접적 | 있음 | 없음 | knowledge graph | graph-grounded evidence retrieval 참고 |
 | RAGLog | logs + KB | retrieval-based anomaly reasoning | similar logs / KB | 로그 중심 | 없음 | 없음 | 없음 | anomaly를 retrieval로 보는 framing 참고 |
 | RAINDROP | multivariate time series | graph-guided representation | 없음 | 없음 | 없음 | 없음 | sensor graph | graph-based state representation 배경 |
 | FC-STGNN | multivariate time series | spatial-temporal sensor graph modeling | 없음 | 없음 | 없음 | 없음 | sensor graph | multi-sensor relation graph 배경 |
-| THGNN | heterogeneous time-series system | temporal heterogeneous graph learning | 없음 | 없음 | 없음 | 없음 | heterogeneous graph | sensor/case/document 확장 논리 |
+| THGNN / HTGNN 계열 | heterogeneous time-series system | temporal heterogeneous graph learning | 없음 | 없음 | 없음 | 없음 | heterogeneous graph | 개념은 유용하지만 final citation 전 재검증 필요 |
 | The ROAD from Sensor Data to Process Instances | sensor streams | process instance reconstruction | event/process instance | 없음 | 없음 | 간접적 | process/event relation | sensor→event abstraction 근거 |
 | Inferring Missing Event Log Data from IoT Sensor Data | IoT sensor streams | event log reconstruction | missing event log | 간접적 | 없음 | 간접적 | process/event relation | sensor stream ↔ event log alignment 강화 |
 
@@ -61,6 +61,7 @@
 - **temporal uncertainty** 를 retrieval 중심 문제로 다루는 것
 - **retrieved evidence의 citation correctness / grounding quality** 평가
 - **real semiconductor sensor + real maintenance log + real SOP/manual** 조합
+- **검증된 graph-based state retrieval 직접 선행연구가 아직 제한적**
 
 ### 3.3 Paper D의 상대적 위치
 

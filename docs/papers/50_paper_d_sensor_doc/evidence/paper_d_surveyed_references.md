@@ -28,7 +28,7 @@
 | 2 | LaSTR | 시계열 retrieval | segment-level time series retrieval | event-centric window retrieval 근거 |
 | 3 | TRACE | multimodal retrieval | time-series grounding + hard negative mining | retrieval 설계 정교화 참고 |
 | 4 | SensorLM | sensor-language model | sensor-text alignment + captioning | 데이터 부족 시 pseudo-text / caption 전략 |
-| 5 | S2S-FDD | explainable fault diagnosis | time series → semantic summary → document-supported diagnosis | eventizer + explanation layer 근거 |
+| 5 | FD-LLM | LLM fault diagnosis | sensor signal → language → fault diagnosis | eventizer + explanation layer 대체 근거 |
 | 6 | Technical language processing for maintenance work orders | maintenance NLP | work order 기반 corrective action / topic extraction | maintenance log mining 축 핵심 |
 | 7 | Causal knowledge extraction from maintenance documents | maintenance KG | maintenance text에서 causal triple 추출 | evidence graph / cause-action relation 근거 |
 | 8 | Extracting failure time data from industrial maintenance records using text mining | temporal alignment | work order 시각으로 failure time 복원 | temporal uncertainty 핵심 근거 |
@@ -37,9 +37,9 @@
 | 11 | Effective Maintenance by Reducing Failure-Cause Misdiagnosis in Semiconductor Industry | semiconductor diagnosis | sensor-only 진단의 한계 + contextual info 필요 | 반도체 도메인 motivation |
 | 12 | RAINDROP | sensor graph | graph-guided multivariate time series modeling | graph-based state representation background |
 | 13 | FC-STGNN | sensor graph | spatial-temporal graph for multi-sensor data | multi-sensor relation modeling |
-| 14 | THGNN | heterogeneous sensor graph | temporal + heterogeneous graph learning | sensor/case/document graph 확장 논리 |
+| 14 | KEO | KG-augmented industrial RAG | KG vs text-chunk retrieval on O&M context | graph-grounded evidence retrieval 참고 |
 | 15 | RAGLog | retrieval anomaly/log reasoning | retrieval-augmented anomaly handling | retrieval-style anomaly/state matching 근거 |
-| 16 | RAIDR | retrieval incident diagnosis | sensor relation + historical incident + docs | graph-structured state retrieval에 가장 가까운 축 |
+| 16 | THGNN / HTGNN 계열 | heterogeneous sensor graph | temporal + heterogeneous graph learning | heterogeneous graph 확장 논리 (재검증 후 사용) |
 | 17 | The ROAD from Sensor Data to Process Instances | sensor→event alignment | sensor data에서 process instance 복원 | event/process abstraction 근거 |
 | 18 | Inferring Missing Event Log Data from IoT Sensor Data | event log reconstruction | sensor로부터 missing event log 추정 | sensor stream → event alignment 근거 |
 
@@ -69,9 +69,9 @@
 - **Paper D 의미**: paired sensor-text가 부족할 때 event summary/caption을 만드는 전략의 참고 문헌이다.
 - **언제 참고?** 데이터 부족 대응 전략.
 
-#### S2S-FDD
-- **핵심**: 시계열을 semantic summary로 바꾸고 문서 근거를 붙여 fault diagnosis를 시도한다.
-- **Paper D 의미**: eventizer + explanation layer + document-supported diagnosis 구조가 Paper D와 매우 유사하다.
+#### FD-LLM
+- **핵심**: 센서 신호를 언어 표현과 연결해 fault diagnosis를 수행하는 LLM 기반 접근.
+- **Paper D 의미**: signal-to-language 층과 diagnosis 연결을 설명하는 더 안전한 대체 근거로 쓸 수 있다.
 - **언제 참고?** eventizer 서술, explanation layer, related work.
 
 ---
@@ -140,20 +140,21 @@
 - **Paper D 의미**: 센서 간 관계를 graph로 보려는 현재 아이디어와 매우 잘 맞는다.
 - **언제 참고?** sensor relation graph 배경.
 
-#### THGNN
-- **핵심**: temporal + heterogeneous graph neural network.
-- **Paper D 의미**: sensor / maintenance case / document를 heterogeneous graph로 확장하는 논리의 bridge 역할을 한다.
-- **언제 참고?** heterogeneous graph 확장 아이디어.
-
 #### RAGLog
 - **핵심**: anomaly/log reasoning을 retrieval-augmented 방식으로 다룬다.
 - **Paper D 의미**: anomaly를 pure classifier로 다루지 않고 retrieval로 접근하는 사고방식을 지지한다.
 - **언제 참고?** retrieval-style anomaly/state matching framing.
 
-#### RAIDR
-- **핵심**: historical incident retrieval + document/report grounding.
-- **Paper D 의미**: graph-structured state retrieval + linked documents grounding 쪽에서 가장 가까운 구조다.
-- **언제 참고?** related work에서 가장 직접 비교 가능한 후보 중 하나.
+#### KEO
+- **핵심**: O&M 문맥에서 knowledge graph와 RAG를 결합해 evidence retrieval을 수행한다.
+- **Paper D 의미**: graph 자체를 retrieval structure와 evidence organization에 쓰는 더 안전한 비교 문헌이다.
+- **언제 참고?** graph-grounded evidence retrieval, document grounding discussion.
+
+#### THGNN / HTGNN 계열
+- **핵심**: temporal + heterogeneous graph learning.
+- **Paper D 의미**: sensor / maintenance case / document를 heterogeneous graph로 확장하는 논리에는 유용하다.
+- **주의**: 버전과 venue가 여러 갈래이므로 final citation 전 재검증이 필요하다.
+- **언제 참고?** heterogeneous graph 확장 아이디어.
 
 ---
 
@@ -186,7 +187,7 @@
 ### Tier 1 — 바로 다시 봐야 하는 논문
 1. CLaSP
 2. LaSTR
-3. S2S-FDD
+3. FD-LLM
 4. Technical language processing for maintenance work orders
 5. Causal knowledge extraction from maintenance documents
 6. Extracting failure time data from industrial maintenance records using text mining
@@ -194,11 +195,11 @@
 8. Effective Maintenance by Reducing Failure-Cause Misdiagnosis in Semiconductor Industry
 
 ### Tier 2 — 지금 대화 이후 새로 중요해진 논문
-1. RAIDR
+1. KEO
 2. RAGLog
 3. RAINDROP
 4. FC-STGNN
-5. THGNN
+5. THGNN / HTGNN 계열 (재검증 후)
 6. Inferring Missing Event Log Data from IoT Sensor Data
 7. The ROAD from Sensor Data to Process Instances
 
@@ -221,7 +222,7 @@
 - DML-LLM Hybrid fault diagnosis
 - MaintAGT
 - DiagnosticIQ
-- HTGNN 일부 버전
+- THGNN / HTGNN 일부 버전
 - LogSentry
 - EnrichLog
 - Graph-augmented fault diagnosis (2026)
@@ -247,7 +248,7 @@
 - SensorLM
 
 ### Method — Eventizer / Explanation Layer
-- S2S-FDD
+- FD-LLM
 - RAAD-LLM
 
 ### Method — Document Grounding
@@ -257,9 +258,9 @@
 ### Method — Graph-based State Representation (if used)
 - RAINDROP
 - FC-STGNN
-- THGNN
+- THGNN / HTGNN 계열 (재검증 후)
 - RAGLog
-- RAIDR
+- KEO
 
 ### Method — Event / Process Alignment
 - The ROAD from Sensor Data to Process Instances

@@ -28,13 +28,13 @@
 |---|---|---|---|
 | 1 | CLaSP | sensor-window ↔ text/log retrieval backbone | Method / Related Work |
 | 2 | LaSTR | event-centric window retrieval 정당화 | Method / Related Work |
-| 3 | S2S-FDD | eventizer + document-supported diagnosis 구조 참고 | Eventizer / Related Work |
+| 3 | FD-LLM | signal-to-language 기반 fault diagnosis 설명층 참고 | Eventizer / Related Work |
 | 4 | Technical language processing for maintenance work orders | maintenance log mining 핵심 | Introduction / Related Work |
 | 5 | Causal knowledge extraction from maintenance documents | maintenance text → causal graph 근거 | Data / Evidence Graph |
 | 6 | Extracting failure time data from industrial maintenance records using text mining | temporal uncertainty 핵심 근거 | Problem Definition |
 | 7 | SOPRAG | SOP/manual structured retrieval 근거 | Document Retriever |
 | 8 | Effective Maintenance by Reducing Failure-Cause Misdiagnosis in Semiconductor Industry | semiconductor motivation | Introduction |
-| 9 | RAIDR | graph-structured state retrieval + linked docs에 가장 가까운 구조 | Related Work / Discussion |
+| 9 | KEO | KG+RAG를 이용한 graph-grounded evidence retrieval 참고 | Related Work / Discussion |
 | 10 | RAGLog | retrieval-style anomaly/state matching framing | Related Work |
 
 ---
@@ -51,7 +51,7 @@
 | 13 | Document GraphRAG | graph-based document grounding 근거 | Document Grounding |
 | 14 | RAINDROP | graph-guided multivariate representation | Graph-based state representation |
 | 15 | FC-STGNN | multi-sensor relation graph background | Graph-based state representation |
-| 16 | THGNN | heterogeneous graph 확장 논리 | Heterogeneous graph discussion |
+| 16 | THGNN / HTGNN 계열 (재검증 후) | heterogeneous graph 확장 논리 | Heterogeneous graph discussion |
 | 17 | The ROAD from Sensor Data to Process Instances | sensor → process/event abstraction | Process/Event alignment |
 | 18 | Inferring Missing Event Log Data from IoT Sensor Data | sensor stream ↔ event log 연결 | Event-centric alignment |
 | 19 | Process mining on sensor data: a review | process mining literature bridge | Related Work 서론 |
@@ -70,7 +70,7 @@
 | DML-LLM Hybrid fault diagnosis | 재검증 필요 | semiconductor diagnosis 연결 가능성 있음 |
 | MaintAGT | 재검증 필요 | maintenance multimodal LLM 계열 |
 | DiagnosticIQ | 재검증 필요 | benchmark/evaluation 축 가능성 |
-| HTGNN 일부 버전 | 재검증 필요 | 버전/venue에 따라 쓰임이 달라질 수 있음 |
+| THGNN / HTGNN 일부 버전 | 재검증 필요 | 버전/venue에 따라 쓰임이 달라질 수 있음 |
 | LogSentry | 재검증 필요 | retrieval anomaly 처리 쪽 참고용 |
 | EnrichLog | 재검증 필요 | knowledge-enriched anomaly reasoning |
 | Graph-augmented fault diagnosis (2026) | 재검증 필요 | 구조는 좋으나 final citation 전 다시 확인 |
@@ -84,7 +84,7 @@
 
 1. CLaSP
 2. LaSTR
-3. S2S-FDD
+3. FD-LLM
 4. Technical language processing for maintenance work orders
 5. Causal knowledge extraction from maintenance documents
 6. Extracting failure time data from industrial maintenance records using text mining
@@ -93,11 +93,11 @@
 
 ### Step 2 — graph/retrieval 확장 축 확보
 
-9. RAIDR
+9. KEO
 10. RAGLog
 11. RAINDROP
 12. FC-STGNN
-13. THGNN
+13. THGNN / HTGNN 계열 (재검증 후)
 
 ### Step 3 — event alignment / process mining 축 확보
 
@@ -114,13 +114,13 @@
 ### 최우선 확보 목록
 - [ ] CLaSP
 - [ ] LaSTR
-- [ ] S2S-FDD
+- [ ] FD-LLM
 - [ ] Technical language processing for maintenance work orders
 - [ ] Causal knowledge extraction from maintenance documents
 - [ ] Extracting failure time data from industrial maintenance records using text mining
 - [ ] SOPRAG
 - [ ] Effective Maintenance by Reducing Failure-Cause Misdiagnosis in Semiconductor Industry
-- [ ] RAIDR
+- [ ] KEO
 - [ ] RAGLog
 
 ### 2순위 확보 목록
@@ -129,7 +129,7 @@
 - [ ] Document GraphRAG
 - [ ] RAINDROP
 - [ ] FC-STGNN
-- [ ] THGNN
+- [ ] THGNN / HTGNN (재검증 후)
 - [ ] The ROAD from Sensor Data to Process Instances
 - [ ] Inferring Missing Event Log Data from IoT Sensor Data
 - [ ] Process mining on sensor data: a review

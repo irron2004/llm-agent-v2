@@ -69,12 +69,12 @@
 - **한계**: wearable 중심, 산업 maintenance와 거리 있음
 - **Paper D relevance**: 중간 이상 — 데이터 부족 대응 전략에서 중요
 
-#### 5) S2S-FDD: Bridging Industrial Time Series and Natural Language for Explainable Zero-shot Fault Diagnosis
-- **출처**: arXiv 2603.08048
-- **핵심**: 시계열을 자연어 semantic summary로 변환하고 historical maintenance documents를 참고하여 진단
-- **왜 중요한가**: "signal-to-semantic operator" + 문서 기반 diagnosis라는 구조가 Paper D와 매우 유사
+#### 5) FD-LLM: Large Language Model for Fault Diagnosis of Machines
+- **출처**: arXiv 2412.01218
+- **핵심**: 센서 신호를 언어 표현과 연결해 fault diagnosis를 수행하는 LLM 기반 접근
+- **왜 중요한가**: signal-to-language 형태의 설명층과 diagnosis 연결을 지지
 - **한계**: retrieval benchmark나 time-uncertainty-aware alignment까지는 약함
-- **Paper D relevance**: 매우 높음 — explanation layer / eventizer 서술 근거로 좋음
+- **Paper D relevance**: 높음 — explanation layer / eventizer의 더 안전한 대체 근거
 
 ### 3.2 Maintenance Log / Work Order Mining
 
@@ -212,7 +212,7 @@
 ### Tier 1 — 바로 읽기
 1. CLaSP
 2. LaSTR
-3. S2S-FDD
+3. FD-LLM
 4. Technical language processing for maintenance work orders
 5. Causal knowledge extraction from long text maintenance documents
 6. Extracting failure time data from industrial maintenance records using text mining
