@@ -1157,6 +1157,16 @@ async def run_agent(
                 prompt_spec,
                 top_k=req.top_k,
             )
+            result = agent.run(
+                req.message,
+                attempts=0,
+                max_attempts=req.max_attempts,
+                thread_id=tid,
+                state_overrides={
+                    **(chat_state or {}),
+                    "chat_history": [h.model_dump() for h in req.chat_history] if req.chat_history else [],
+                },
+            )
         # Auto-parse 모드 (기본값: True), skip when overrides are provided
         elif (
             req.auto_parse
@@ -1474,6 +1484,16 @@ async def run_agent_stream(
                     prompt_spec,
                     top_k=req.top_k,
                     event_sink=_enqueue,
+                )
+                result = agent.run(
+                    req.message,
+                    attempts=0,
+                    max_attempts=req.max_attempts,
+                    thread_id=tid,
+                    state_overrides={
+                        **(chat_state_stream or {}),
+                        "chat_history": [h.model_dump() for h in req.chat_history] if req.chat_history else [],
+                    },
                 )
             # Auto-parse 모드 (기본값: True), skip when overrides are provided
             elif (
