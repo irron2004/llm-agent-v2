@@ -84,12 +84,44 @@ Loss: InfoNCE (bidirectional)
 
 ---
 
-## 7. Paper D에 주는 시사점
+## 7. Novelty Boundary (DriMM 이후)
+
+**Paper D의 novelty를 "산업 시계열-텍스트 alignment"로 잡으면 안 된다.** 그건 DriMM이 이미 했다.
+
+Paper D의 novelty는 반드시 이렇게 좁혀야 한다:
+
+> 산업 시계열-텍스트 alignment 자체가 아니라, **센서 "이상 이벤트"를 정비 근거 문서와 연결하고, temporal uncertainty와 equipment hierarchy contamination을 다루는 retrieval 문제**
+
+### Contribution 재정의 (DriMM 이후)
+
+1. **Sensor event abstraction** — raw window가 아닌 event episode (DriMM과 차별)
+2. **Weakly supervised maintenance evidence alignment** — noisy temporal pairing (DriMM은 깔끔한 pair)
+3. **Hierarchy-aware hard negative** — DriMM이 future work으로 남긴 것을 해결
+
+### Temporal uncertainty의 위치 변경
+
+- 기존: 제목/중심 키워드
+- 수정: **weak supervision 문제로 본문에** ("maintenance logs are not synchronized with sensor anomalies → positive pairs are noisy → we use temporal windows + metadata + symptom cues for weak pairing")
+
+### 실험에 DriMM-style baseline 필수
+
+```
+DriMM-style baseline:
+  raw sensor summary + maintenance text + standard InfoNCE bi-encoder
+
+Paper D proposed:
+  sensor event episode + maintenance evidence + hierarchy-aware hard negative
+```
+
+이 비교가 없으면 reviewer가 "DriMM 방식 그대로 하면 안 되나?"라고 물을 것.
+
+## 8. Paper D에 주는 시사점
 
 1. **산업 시계열-텍스트 alignment가 학술적으로 인정받는 방향** — ICML workshop 수준
 2. **bi-encoder + InfoNCE가 기본 구조로 충분** — 복잡한 architecture 필요 없음
 3. **DriMM이 남긴 hard negative 한계가 Paper D의 기여로 직결**
 4. **경쟁 위험**: 누군가 DriMM을 반도체/정비에 적용하면 차별점 약화 → **빨리 1편을 내야 함**
+5. **"alignment 자체"는 더 이상 novelty가 아님** — event abstraction + weak pairing + hierarchy가 novelty
 
 ---
 

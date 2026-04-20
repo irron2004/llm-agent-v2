@@ -61,7 +61,7 @@ status: completed
 | 항목 | 이전 (과도한 scope) | 수정 후 (집중된 scope) |
 |------|---------------------|------------------------|
 | **핵심 문제** | Anomaly + Retrieval + Grounding + Action | **Sensor-to-Maintenance Retrieval** |
-| **제목** | Rule-Grounded Cross-Modal Alignment... | **Temporal- and Hierarchy-Aware Cross-Modal Retrieval of Maintenance Evidence from Sensor Events** |
+| **제목** | Rule-Grounded Cross-Modal Alignment... | **Hierarchy-Aware Cross-Modal Retrieval of Maintenance Evidence from Sensor Events** |
 | **Anomaly Detection** | 메인 contribution | 전처리/보조 태스크로 위치 변경 |
 | **Loss 함수** | 4개 (L_align + L_anom + L_cause + L_device) | **1개** (hierarchy-aware contrastive) |
 | **Baseline** | 20개+ | **5~7개** |
