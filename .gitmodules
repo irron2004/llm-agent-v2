@@ -1,0 +1,6 @@
+[submodule "ai-dashboard"]
+	path = ai-dashboard
+	url = /home/hskim/work/ai-dashboard
+[submodule "docs/papers"]
+	path = docs/papers
+	url = https://github.com/irron2004/phd_paper.git
