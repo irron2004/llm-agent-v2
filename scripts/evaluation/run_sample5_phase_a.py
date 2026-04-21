@@ -6,6 +6,7 @@ so before/after comparison is 1:1 consistent.
 
 from __future__ import annotations
 
+import argparse
 import json
 import time
 from pathlib import Path
@@ -14,9 +15,8 @@ import requests
 
 REPO = Path(__file__).resolve().parents[2]
 BEFORE_FILE = REPO / "data/eval_results/mybot_march_react_before_20260416_sample5/run_min.jsonl"
-AFTER_FILE = REPO / "data/eval_results/mybot_march_react_after_20260416_sample5/run_min.jsonl"
-OUT_DIR = REPO / "data/eval_results/mybot_march_react_phase_a_20260421_sample5"
-API_URL = "http://localhost:8611/api/agent/run"
+DEFAULT_OUT = REPO / "data/eval_results/mybot_march_react_phase_a_20260421_sample5"
+DEFAULT_API = "http://localhost:8611/api/agent/run"
 TIMEOUT = 240  # seconds per query
 
 
@@ -30,7 +30,7 @@ def load_before_queries() -> list[tuple[str, str]]:
     return queries
 
 
-def run_query(qid: str, query: str) -> dict:
+def run_query(qid: str, query: str, api_url: str) -> dict:
     payload = {
         "message": query,
         "use_react_agent": True,
@@ -39,7 +39,7 @@ def run_query(qid: str, query: str) -> dict:
     }
     t0 = time.time()
     try:
-        r = requests.post(API_URL, json=payload, timeout=TIMEOUT)
+        r = requests.post(api_url, json=payload, timeout=TIMEOUT)
         elapsed = (time.time() - t0) * 1000
         r.raise_for_status()
         resp = r.json()
@@ -63,15 +63,21 @@ def run_query(qid: str, query: str) -> dict:
 
 
 def main() -> None:
-    OUT_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = OUT_DIR / "run_min.jsonl"
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--api-url", default=DEFAULT_API)
+    parser.add_argument("--out-dir", default=str(DEFAULT_OUT))
+    args = parser.parse_args()
+
+    out_dir = Path(args.out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "run_min.jsonl"
     queries = load_before_queries()
-    print(f"Running {len(queries)} queries against {API_URL}")
+    print(f"Running {len(queries)} queries against {args.api_url}")
     results: list[dict] = []
     with out_path.open("w", encoding="utf-8") as f:
         for i, (qid, q) in enumerate(queries, 1):
             print(f"[{i}/{len(queries)}] {qid}: {q[:80]}", flush=True)
-            result = run_query(qid, q)
+            result = run_query(qid, q, args.api_url)
             faith = (result.get("response") or {}).get("judge", {}).get("faithful", "?")
             ans_len = len((result.get("response") or {}).get("answer", "") or "")
             elapsed = result.get("elapsed_ms", 0)
