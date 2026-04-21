@@ -4436,7 +4436,12 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
 
     _answer_events.append(f"[answer] ref_chars={len(ref_text)} answer_chars={len(answer)}")
 
-    enforce_format = str(answer_language).strip().lower() == "ko"
+    # Phase A (2026-04-21): general/ts 경로는 질문 유형에 맞는 유연한 구조(표, 원인/검증/요약
+    # 블록 등)를 허용하도록 프롬프트 철학을 바꿨으므로 strict 절차 템플릿 검증을 끈다.
+    # setup 경로만 SOP 절차 템플릿(# 제목 / ## 작업 절차 / N. 번호)을 계속 강제한다.
+    enforce_format = (
+        str(answer_language).strip().lower() == "ko" and str(route).strip().lower() == "setup"
+    )
     if not enforce_format:
         _result: Dict[str, Any] = {
             "answer": answer,
@@ -4479,8 +4484,8 @@ def answer_node(state: AgentState, *, llm: BaseLLM, spec: PromptSpec) -> Dict[st
 
         fix_system = (
             "\n\n[FORMAT FIX]\n"
-            "아래 템플릿을 정확히 준수하여 답변 전체를 다시 작성하세요. "
-            "금지 사항(이모지 번호, 마크다운 테이블, 혼합 언어 제목)을 절대 사용하지 마세요.\n"
+            "아래 SOP 절차 템플릿을 정확히 준수하여 답변 전체를 다시 작성하세요. "
+            "금지 사항(이모지 번호, 혼합 언어 제목)을 절대 사용하지 마세요.\n"
             "위반 사항:\n" + ("\n".join(violations) if violations else "- 템플릿 미준수") + "\n"
         )
 
