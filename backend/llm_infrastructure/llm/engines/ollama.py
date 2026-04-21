@@ -170,19 +170,54 @@ class OllamaClient:
         data = self._post_json(f"{self.base_url}/api/chat", payload)
         message = data.get("message")
         text = ""
+        reasoning: Optional[str] = None
         if isinstance(message, dict):
             content = message.get("content")
             if isinstance(content, str):
                 text = content
+            # Qwen3 exposes reasoning under "thinking"; older OpenAI-compatible uses "reasoning"
+            thinking = message.get("thinking") or message.get("reasoning_content") or message.get("reasoning")
+            if isinstance(thinking, str) and thinking.strip():
+                reasoning = thinking
         if not text:
             response = data.get("response")
             if isinstance(response, str):
                 text = response
+        # Conservative fallback: when content is empty and the reasoning/thinking text
+        # clearly contains structured output (a JSON object or judge/classification
+        # keys), expose reasoning as text so downstream JSON regex parsers (judge,
+        # router, classification) can succeed. For plain text generation
+        # (e.g. answer_node) we deliberately leave text empty to avoid polluting
+        # the answer with internal reasoning monologue.
+        if (not text or not text.strip()) and reasoning:
+            import re as _re
+            # Match: {"  OR  "faithful"  OR  "action"  OR  "route"  OR  ```json fence
+            if _re.search(
+                r'\{\s*"|"faithful"|"action"|"route"|"gate"|"yes_or_no"|```\s*json',
+                reasoning,
+            ):
+                text = reasoning
+        # Strict JSON recovery: if response_model required, pull the last complete JSON
+        # object from reasoning text.
+        if response_model is not None and (not text or not text.strip()) and reasoning:
+            import re as _re
+            # Prefer the last complete {...} block (greedy at end).
+            for pat in (r"\{[\s\S]*\}\s*$", r"\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}"):
+                m = _re.search(pat, reasoning.strip())
+                if m:
+                    candidate = m.group(0)
+                    try:
+                        import json as _json
+                        _json.loads(candidate)
+                        text = candidate
+                        break
+                    except Exception:
+                        continue
 
         if response_model is not None:
             return response_model.model_validate_json(text)
 
-        return LLMResponse(text=text, raw=data)
+        return LLMResponse(text=text, raw=data, reasoning=reasoning)
 
     def _post_json(self, url: str, payload: dict[str, Any]) -> dict[str, Any]:
         try:

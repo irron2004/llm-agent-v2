@@ -17,7 +17,7 @@ REPO = Path(__file__).resolve().parents[2]
 BEFORE_FILE = REPO / "data/eval_results/mybot_march_react_before_20260416_sample5/run_min.jsonl"
 DEFAULT_OUT = REPO / "data/eval_results/mybot_march_react_phase_a_20260421_sample5"
 DEFAULT_API = "http://localhost:8611/api/agent/run"
-TIMEOUT = 240  # seconds per query
+TIMEOUT = 900  # seconds per query (Qwen3 with think=true may take longer for large refs)
 
 
 def load_before_queries() -> list[tuple[str, str]]:
