@@ -39,14 +39,19 @@ if isinstance(thinking, str) and thinking.strip():
 
 ```python
 # Conservative fallback: when content is empty and the reasoning/thinking text
-# clearly contains structured output (a JSON object with a quoted key),
+# clearly contains structured output (JSON object or judge/classification keys),
 # expose reasoning as text so downstream JSON regex parsers (judge, router,
 # classification) can succeed. For plain text generation (e.g. answer_node)
 # we deliberately leave text empty to avoid polluting the answer with
 # internal reasoning monologue.
 if (not text or not text.strip()) and reasoning:
     import re as _re
-    if _re.search(r"\{\s*\"", reasoning):
+    # Match: {"  OR  "faithful"  OR  "action"  OR  "route"  OR  "gate"
+    #        OR  "yes_or_no"  OR  ```json fence
+    if _re.search(
+        r'\{\s*"|"faithful"|"action"|"route"|"gate"|"yes_or_no"|```\s*json',
+        reasoning,
+    ):
         text = reasoning
 ```
 
