@@ -6,6 +6,8 @@ type Env = {
   // Parsing 관련
   ingestionsBase: string;
   defaultIngestionRun: string;
+  // Developer Tools (/dev/*) access guard
+  devAccessToken: string;
 };
 
 const normalize = (value: string | undefined, fallback = "") =>
@@ -31,6 +33,8 @@ export const env: Env = {
   // Parsing 관련
   ingestionsBase: normalize(import.meta.env.VITE_INGESTIONS_BASE, "/data/ingestions"),
   defaultIngestionRun: normalize(import.meta.env.VITE_DEFAULT_INGESTION_RUN, ""),
+  // Developer Tools (/dev/*) access guard
+  devAccessToken: normalize(import.meta.env.VITE_DEV_ACCESS_TOKEN, ""),
 };
 
 export const buildUrl = (path: string) => {
